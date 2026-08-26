@@ -5,6 +5,7 @@ import argparse
 import csv
 import datetime as dt
 import html
+import io
 import os
 import re
 import sys
@@ -78,6 +79,36 @@ MANUAL_REQUIRED_FIELDS = [
 ]
 
 
+def iso_datetime(value: str) -> str:
+    """Valida `--data` na entrada.
+
+    Data invalida era aceita e gravada. Como toda guarda de data depende de
+    conseguir parsear `data_coleta`, uma cotacao com data podre nunca vencia,
+    nunca entrava certo na comparacao de ancora e nao era reclamada por
+    ninguem: escapava calada de todas as travas.
+    """
+    texto = (value or "").strip()
+    for formato in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return dt.datetime.strptime(texto, formato).isoformat()
+        except ValueError:
+            continue
+    raise argparse.ArgumentTypeError(
+        f"data invalida: {value!r}. Use AAAA-MM-DD ou AAAA-MM-DDTHH:MM:SS."
+    )
+
+
+def valid_collection_date(value: Any) -> bool:
+    texto = str(value or "").strip()
+    if not texto:
+        return False
+    try:
+        dt.date.fromisoformat(texto[:10])
+    except ValueError:
+        return False
+    return True
+
+
 def today() -> str:
     return dt.date.today().isoformat()
 
@@ -92,25 +123,49 @@ def slugify(value: str) -> str:
     return slug or "item"
 
 
+def atomic_write_text(path: Path, text: str) -> None:
+    """Grava por arquivo temporario e troca de uma vez so.
+
+    Abrir em modo `w` trunca o arquivo ANTES de escrever: um Ctrl+C, disco
+    cheio ou excecao no meio deixava `cotacoes.csv` vazio e levava junto a
+    serie historica inteira. `os.replace` e atomico no Windows e no POSIX.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporario = path.with_name(f".{path.name}.tmp")
+    try:
+        with temporario.open("w", encoding="utf-8", newline="") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporario, path)
+    except BaseException:
+        temporario.unlink(missing_ok=True)
+        raise
+
+
 def read_yaml(path: Path, default: Any = None) -> Any:
     if not path.exists():
         return default
-    with path.open("r", encoding="utf-8") as f:
-        loaded = yaml.safe_load(f)
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            loaded = yaml.safe_load(f)
+    except yaml.YAMLError as erro:
+        detalhe = str(erro).splitlines()[0] if str(erro) else erro.__class__.__name__
+        raise SystemExit(
+            f"YAML invalido em {path}: {detalhe}\n"
+            "Abra o arquivo e conserte a indentacao ou as aspas antes de continuar."
+        ) from erro
     return default if loaded is None else loaded
 
 
 def write_yaml(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="\n") as f:
-        yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+    atomic_write_text(path, yaml.safe_dump(data, allow_unicode=True, sort_keys=False))
 
 
 def append_text(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     separator = "" if not existing or existing.endswith("\n") else "\n"
-    path.write_text(existing + separator + text, encoding="utf-8", newline="\n")
+    atomic_write_text(path, existing + separator + text)
 
 
 def render_template(name: str, **values: Any) -> str:
@@ -160,7 +215,7 @@ def load_frontmatter(path: Path) -> tuple[dict[str, Any], str]:
 
 def save_frontmatter(path: Path, meta: dict[str, Any], body: str) -> None:
     frontmatter = yaml.safe_dump(meta, allow_unicode=True, sort_keys=False).strip()
-    path.write_text(f"---\n{frontmatter}\n---\n\n{body.lstrip()}", encoding="utf-8", newline="\n")
+    atomic_write_text(path, f"---\n{frontmatter}\n---\n\n{body.lstrip()}")
 
 
 def project_path(value: str) -> Path:
@@ -390,17 +445,15 @@ def new_project(args: argparse.Namespace) -> None:
             f"- Cotacoes minimas por candidato: {regra['cotacoes_minimas_texto']}",
             1,
         )
-    (path / "briefing.md").write_text(briefing, encoding="utf-8", newline="\n")
-    (path / "processo.md").write_text(render_template("processo.md", data=today()), encoding="utf-8", newline="\n")
-    (path / "01-definir-modelo.md").write_text(
+    atomic_write_text((path / "briefing.md"), briefing)
+    atomic_write_text((path / "processo.md"), render_template("processo.md", data=today()))
+    atomic_write_text(
+        path / "01-definir-modelo.md",
         render_template("01-definir-modelo.md", necessidade=necessidade),
-        encoding="utf-8",
-        newline="\n",
     )
-    (path / "ranking.md").write_text("# Ranking\n\nAinda nao gerado.\n", encoding="utf-8", newline="\n")
-    (path / "decisao.md").write_text(render_template("decisao.md"), encoding="utf-8", newline="\n")
-    with (path / "cotacoes.csv").open("w", encoding="utf-8", newline="") as f:
-        csv.DictWriter(f, fieldnames=COTACOES_HEADER, lineterminator=CSV_EOL).writeheader()
+    atomic_write_text((path / "ranking.md"), "# Ranking\n\nAinda nao gerado.\n")
+    atomic_write_text((path / "decisao.md"), render_template("decisao.md"))
+    atomic_write_text(path / "cotacoes.csv", ",".join(COTACOES_HEADER) + CSV_EOL)
     set_process_state(path, estado="pesquisando", proxima_acao="definir modelo/requisitos com ajuda da IA")
     print(path.relative_to(ROOT))
 
@@ -433,7 +486,7 @@ def new_product(args: argparse.Namespace) -> None:
         "descartado_porque": None,
     }
     write_yaml(path / "produto.yaml", data)
-    (path / "pesquisa.md").write_text(render_template("pesquisa.md"), encoding="utf-8", newline="\n")
+    atomic_write_text((path / "pesquisa.md"), render_template("pesquisa.md"))
     append_timeline(project, "produto", f"Candidato registrado: {args.nome}", f"id={produto_id}")
     mark_steps(project, [3])
     print(path.relative_to(ROOT))
@@ -492,11 +545,14 @@ def write_quotes(project: Path, rows: list[dict[str, Any]]) -> None:
                 header.append(key)
     if any(row.get(EXTRA_COLUMNS_KEY) for row in rows) and EXTRA_COLUMNS_KEY not in header:
         header.append(EXTRA_COLUMNS_KEY)
-    with (project / "cotacoes.csv").open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=header, lineterminator=CSV_EOL)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({field: row.get(field, "") for field in header})
+    # Monta tudo em memoria e so entao troca o arquivo: a serie historica nunca
+    # fica truncada no meio de uma gravacao.
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=header, lineterminator=CSV_EOL)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({field: row.get(field, "") for field in header})
+    atomic_write_text(project / "cotacoes.csv", buffer.getvalue())
 
 
 def find_product_path(produto_id: str) -> Path | None:
@@ -539,7 +595,7 @@ def set_process_state(project: Path, *, estado: str | None = None, proxima_acao:
             text = re.sub(pattern, replacement, text)
         else:
             text = text.replace("## Estado atual\n", f"## Estado atual\n\n{replacement}\n", 1)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    atomic_write_text(path, text)
 
 
 def mark_steps(project: Path, steps: list[int]) -> None:
@@ -549,7 +605,7 @@ def mark_steps(project: Path, steps: list[int]) -> None:
     text = path.read_text(encoding="utf-8")
     for step in steps:
         text = re.sub(rf"(?m)^- \[ \] {step}\.", f"- [x] {step}.", text)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    atomic_write_text(path, text)
 
 
 def add_quote(args: argparse.Namespace) -> None:
@@ -634,7 +690,7 @@ def append_timeline(project: Path, etapa: str, decisao: str, porque: str) -> Non
         insert_at = len(lines)
     lines.insert(insert_at, line)
     text = "".join(lines)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    atomic_write_text(path, text)
 
 
 def find_product(produto_id: str) -> dict[str, Any] | None:
@@ -810,6 +866,12 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
             errors.append(f"cotacoes.csv linha {index}: campos obrigatorios ausentes: {', '.join(missing)}")
         for problem in numeric_problems(row):
             errors.append(f"cotacoes.csv linha {index} ({row.get('produto_id')}): {problem}")
+        if row.get("data_coleta") and not valid_collection_date(row.get("data_coleta")):
+            errors.append(
+                f"cotacoes.csv linha {index} ({row.get('produto_id')}): `data_coleta` "
+                f"nao e data ISO ({row.get('data_coleta')!r}). Sem data valida a cotacao "
+                "escapa das travas de frescor e da deteccao de preco ancora."
+            )
         if tco_required:
             tco_missing = [
                 field
@@ -959,9 +1021,20 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
         motivo = product.get("descartado_porque") or "motivo nao registrado"
         eliminations.append(f"produto descartado ({motivo})")
 
-    preco_teto = briefing.get("preco_teto")
-    if preco_teto not in {None, "null", ""} and quote_float(row.get("custo_total")) > quote_float(preco_teto):
-        eliminations.append(f"custo_total acima do preco_teto ({row.get('custo_total')} > {preco_teto})")
+    # O teto do proprio produto e mais especifico que o do briefing e vence
+    # quando for menor. Era aceito pelo CLI, gravado no produto.yaml e ignorado
+    # aqui: campo que o usuario preenche e que nao fazia nada.
+    tetos = [
+        (quote_float(valor), origem)
+        for valor, origem in [(briefing.get("preco_teto"), "briefing"), (product.get("preco_teto"), "produto")]
+        if valor not in {None, "null", ""} and quote_float(valor) > 0
+    ]
+    if tetos:
+        preco_teto, origem_teto = min(tetos)
+        if quote_float(row.get("custo_total")) > preco_teto:
+            eliminations.append(
+                f"custo_total acima do preco_teto do {origem_teto} ({row.get('custo_total')} > {preco_teto})"
+            )
 
     nota_minima = gate.get("nota_minima_ajustada")
     if nota_minima is not None:
@@ -1004,6 +1077,27 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
             eliminations.append(f"requisito obrigatorio nao atendido: {key}")
 
     return eliminations
+
+
+def waiting_gap(product: dict[str, Any], quote: dict[str, str]) -> str:
+    """Aviso para produto em `aguardando_preco` que ainda nao chegou ao alvo.
+
+    O estado quer dizer "aprovado, mas decidi esperar preco melhor". Ele
+    aparecia liderando o ranking sem nenhuma marca, como se estivesse pronto.
+    """
+    if (product or {}).get("estado") != "aguardando_preco":
+        return ""
+    alvo = quote_float((product or {}).get("preco_alvo"))
+    atual = quote_float(quote.get("custo_total"))
+    desde = (product or {}).get("aguardando_preco_desde") or ""
+    if alvo and atual and atual > alvo:
+        return (
+            f"aguardando preco desde {desde}: faltam R$ {round(atual - alvo, 2)} "
+            f"para o alvo de R$ {alvo}. Voce decidiu esperar, nao comprar."
+        )
+    if alvo and atual and atual <= alvo:
+        return f"AGUARDANDO PRECO E O ALVO FOI ATINGIDO: R$ {atual} <= R$ {alvo}. Hora de reavaliar."
+    return f"aguardando preco desde {desde} (sem preco_alvo definido)."
 
 
 def current_adjusted_rating(row: dict[str, str]) -> float:
@@ -1110,34 +1204,35 @@ def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ran
         "valor_revenda_estimado",
         "tco_total",
     ]
-    with (project / "ranking.csv").open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fields, lineterminator=CSV_EOL)
-        writer.writeheader()
-        for item in [*elegiveis, *cortados]:
-            writer.writerow(
-                {
-                    "produto_id": item.produto_id,
-                    "nome": item.product.get("nome") or item.produto_id,
-                    "score": item.score,
-                    "qualidade": item.axes.get("qualidade"),
-                    "valor": item.axes.get("valor"),
-                    "risco": item.axes.get("risco"),
-                    "aderencia": item.axes.get("aderencia"),
-                    "conveniencia": item.axes.get("conveniencia"),
-                    "status": "cortado" if item.eliminations else "elegivel",
-                    "motivos": "; ".join(item.eliminations),
-                    "alertas": "; ".join(item.alerts),
-                    "fonte": item.quote.get("fonte"),
-                    "idade_dias": "" if item.idade_dias is None else item.idade_dias,
-                    "cotacao_vencida": "sim" if item.vencida else "nao",
-                    "eixos_sem_dado": "; ".join(item.eixos_sem_dado),
-                    "custo_total": item.quote.get("custo_total"),
-                    "custo_operacional_mensal": item.quote.get("custo_operacional_mensal"),
-                    "tco_meses": item.quote.get("tco_meses"),
-                    "valor_revenda_estimado": item.quote.get("valor_revenda_estimado"),
-                    "tco_total": item.quote.get("tco_total"),
-                }
-            )
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fields, lineterminator=CSV_EOL)
+    writer.writeheader()
+    for item in [*elegiveis, *cortados]:
+        writer.writerow(
+            {
+                "produto_id": item.produto_id,
+                "nome": item.product.get("nome") or item.produto_id,
+                "score": item.score,
+                "qualidade": item.axes.get("qualidade"),
+                "valor": item.axes.get("valor"),
+                "risco": item.axes.get("risco"),
+                "aderencia": item.axes.get("aderencia"),
+                "conveniencia": item.axes.get("conveniencia"),
+                "status": "cortado" if item.eliminations else "elegivel",
+                "motivos": "; ".join(item.eliminations),
+                "alertas": "; ".join(item.alerts),
+                "fonte": item.quote.get("fonte"),
+                "idade_dias": "" if item.idade_dias is None else item.idade_dias,
+                "cotacao_vencida": "sim" if item.vencida else "nao",
+                "eixos_sem_dado": "; ".join(item.eixos_sem_dado),
+                "custo_total": item.quote.get("custo_total"),
+                "custo_operacional_mensal": item.quote.get("custo_operacional_mensal"),
+                "tco_meses": item.quote.get("tco_meses"),
+                "valor_revenda_estimado": item.quote.get("valor_revenda_estimado"),
+                "tco_total": item.quote.get("tco_total"),
+            }
+        )
+    atomic_write_text(project / "ranking.csv", buffer.getvalue())
 
 
 def build_ranking(args: argparse.Namespace) -> None:
@@ -1179,6 +1274,9 @@ def build_ranking(args: argparse.Namespace) -> None:
                     f"   cotacao vencida: {item.idade_dias} dias desde a coleta "
                     f"(limite {quote_expiry_days(item.quote.get('fonte'))} para fonte={item.quote.get('fonte')}); recote antes de decidir"
                 )
+            espera = waiting_gap(item.product, item.quote)
+            if espera:
+                lines.append(f"   {espera}")
             if item.alerts:
                 lines.append(f"   alertas: {', '.join(item.alerts)}")
             lines.append("")
@@ -1213,7 +1311,7 @@ def build_ranking(args: argparse.Namespace) -> None:
             ]
         )
 
-    (project / "ranking.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    atomic_write_text((project / "ranking.md"), "\n".join(lines) + "\n")
     write_ranking_csv(project, elegiveis, cortados)
     mark_steps(project, [5, 6])
     if elegiveis:
@@ -1314,7 +1412,7 @@ def show_history(args: argparse.Namespace) -> None:
             lines.append(f"| {ponto['data']} | {ponto['custo']} | {ponto['loja']} | {ponto['fonte']} |")
         lines.append("")
     path = project / "historico.md"
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    atomic_write_text(path, "\n".join(lines) + "\n")
     print(path)
     for item in series:
         print(
@@ -1336,6 +1434,11 @@ def promote_quote(args: argparse.Namespace) -> None:
     row = dict(base)
     row["data_coleta"] = args.data or now_iso()
     row["fonte"] = "manual"
+    # A suspeita da linha web se referia ao que se via na pesquisa. A conferencia
+    # manual e uma observacao nova: ou voce reafirma a suspeita com --flag-suspeita,
+    # ou ela nao se aplica. Herdar calado congela um alerta que talvez ja morreu.
+    row["flag_suspeita"] = ""
+    row["score"] = ""
     for field, value in {
         "loja": args.loja,
         "vendedor": args.vendedor,
@@ -1470,13 +1573,14 @@ def list_waiting_price(args: argparse.Namespace) -> None:
             f"| {row['nome']} | {row['categoria']} | {row['projeto']} | {row['preco_atual']} | {row['preco_alvo']} | {row['preco_teto']} | {row['distancia_ate_alvo']} | {row['desde']} | {row['porque']} |"
         )
     report = BASE / "aguardando-preco.md"
-    report.write_text("\n".join(md_lines) + "\n", encoding="utf-8", newline="\n")
+    atomic_write_text(report, "\n".join(md_lines) + "\n")
     csv_path = BASE / "aguardando-preco.csv"
-    with csv_path.open("w", encoding="utf-8", newline="") as f:
-        fields = ["produto_id", "nome", "categoria", "projeto", "preco_atual", "preco_alvo", "preco_teto", "distancia_ate_alvo", "desde", "porque"]
-        writer = csv.DictWriter(f, fieldnames=fields, lineterminator=CSV_EOL)
-        writer.writeheader()
-        writer.writerows(rows)
+    fields = ["produto_id", "nome", "categoria", "projeto", "preco_atual", "preco_alvo", "preco_teto", "distancia_ate_alvo", "desde", "porque"]
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fields, lineterminator=CSV_EOL)
+    writer.writeheader()
+    writer.writerows(rows)
+    atomic_write_text(csv_path, buffer.getvalue())
     print(report.relative_to(ROOT))
     print(f"Itens: {len(rows)}")
 
@@ -1635,6 +1739,17 @@ def decide(args: argparse.Namespace) -> None:
             "Recote antes de fechar, ou use --permitir-vencida para registrar assim mesmo."
         )
 
+    if product.get("estado") == "aguardando_preco" and not args.permitir_aguardando:
+        alvo = quote_float(product.get("preco_alvo"))
+        atual = quote_float(quote.get("custo_total"))
+        if alvo and atual > alvo:
+            raise SystemExit(
+                f"{args.produto_id} esta em `aguardando_preco` e o custo atual (R$ {atual}) "
+                f"ainda esta acima do seu preco alvo (R$ {alvo}).\n"
+                "Voce mesmo decidiu esperar. Use --permitir-aguardando se mudou de ideia, "
+                "ou `aguardar-preco` de novo com outro alvo."
+            )
+
     perdedores = []
     for value in args.perdedores or []:
         if ":" not in value:
@@ -1707,7 +1822,7 @@ def decide(args: argparse.Namespace) -> None:
             "- D+180:",
         ]
     )
-    (project / "decisao.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    atomic_write_text((project / "decisao.md"), "\n".join(lines) + "\n")
     append_timeline(project, "decisao", f"Escolhido {args.produto_id}", args.porque)
     mark_steps(project, [8])
     if args.comprado:
@@ -1746,7 +1861,7 @@ def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quot
     for needle, replacement in replacements.items():
         text = text.replace(needle, replacement, 1)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    atomic_write_text(path, text)
     return path
 
 
@@ -1778,7 +1893,7 @@ def fill_verdict(args: argparse.Namespace) -> None:
         updates[f"{prefix} licao"] = args.licao
     for label, value in updates.items():
         text = replace_or_append_bullet(text, label, value)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    atomic_write_text(path, text)
     print(path)
 
 
@@ -1852,7 +1967,7 @@ def new_verdict(args: argparse.Namespace) -> None:
     if path.exists() and not args.force:
         raise SystemExit(f"Veredito ja existe: {path}")
     text = render_template("veredito.md").replace("- Projeto:", f"- Projeto: {project.name}")
-    path.write_text(text, encoding="utf-8", newline="\n")
+    atomic_write_text(path, text)
     print(path.relative_to(ROOT))
 
 
@@ -1957,7 +2072,7 @@ def validate(args: argparse.Namespace) -> None:
             "- Aviso: nao impede pesquisa, mas precisa ser considerado antes de comprar.",
         ]
     )
-    (project / "validacao.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    atomic_write_text((project / "validacao.md"), "\n".join(lines) + "\n")
     print(project / "validacao.md")
     print(f"Erros: {len(errors)}")
     print(f"Avisos: {len(warnings)}")
@@ -2176,7 +2291,7 @@ def reuse_report(args: argparse.Namespace) -> None:
             "ou loja registrada por uma compra anterior.",
         ])
     path = BASE / "reaproveitamento.md"
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    atomic_write_text(path, "\n".join(lines) + "\n")
     print(path.relative_to(ROOT))
     print(f"Taxa: {percent}%")
 
@@ -2397,7 +2512,7 @@ pre {
 def write_dashboard_asset() -> None:
     assets = DASHBOARD / "assets"
     assets.mkdir(parents=True, exist_ok=True)
-    (assets / "styles.css").write_text(dashboard_styles().strip() + "\n", encoding="utf-8", newline="\n")
+    atomic_write_text((assets / "styles.css"), dashboard_styles().strip() + "\n")
 
 
 def html_page(title: str, body: str, current_dir: Path) -> str:
@@ -2556,7 +2671,7 @@ def generate_project_page(project: Path) -> Path:
   </table>
 </section>
 """
-    page.write_text(html_page(project.name, body, page_dir), encoding="utf-8", newline="\n")
+    atomic_write_text(page, html_page(project.name, body, page_dir))
     return page
 
 
@@ -2588,7 +2703,7 @@ def generate_knowledge_page() -> Path:
 </section>
 <section class="section panel"><h2>Licoes</h2><table><tbody>{lesson_rows or '<tr><td>Nenhuma licao.</td></tr>'}</tbody></table></section>
 """
-    page.write_text(html_page("Base de conhecimento", body, DASHBOARD), encoding="utf-8", newline="\n")
+    atomic_write_text(page, html_page("Base de conhecimento", body, DASHBOARD))
     return page
 
 
@@ -2689,7 +2804,7 @@ def generate_dashboard(args: argparse.Namespace) -> None:
 </section>
 """
     index = DASHBOARD / "index.html"
-    index.write_text(html_page("Central de Compras", body, DASHBOARD), encoding="utf-8", newline="\n")
+    atomic_write_text(index, html_page("Central de Compras", body, DASHBOARD))
     print(index.relative_to(ROOT))
     print(f"Projetos: {len(projects)}")
 
@@ -2722,7 +2837,8 @@ def private_data_dir(_: argparse.Namespace) -> None:
     destino.mkdir(parents=True, exist_ok=True)
     readme = destino / "LEIA-ME.md"
     if not readme.exists():
-        readme.write_text(
+        atomic_write_text(
+            readme,
             "# Dados privados da Central de Compras\n\n"
             "Esta pasta fica FORA do repositorio de proposito. Arquivo que nao esta\n"
             "na arvore versionada nao pode subir para o GitHub por acidente.\n\n"
@@ -2734,8 +2850,6 @@ def private_data_dir(_: argparse.Namespace) -> None:
             "## Nunca fica aqui nem em lugar nenhum\n\n"
             "- Numero de cartao, CVV, senha, token\n\n"
             "No repositorio, referencie por caminho, nunca por copia do conteudo.\n",
-            encoding="utf-8",
-            newline="\n",
         )
     print(destino)
     print("Dado pessoal mora aqui, fora do repositorio. Nunca cartao, CVV ou senha.")
@@ -2877,7 +2991,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--link")
     p.add_argument("--flag-suspeita", choices=["", "AVAL_SUSPEITA", "ANCORA", "RECICLADO"], default="")
     p.add_argument("--fonte", choices=["web", "manual"], default="manual")
-    p.add_argument("--data")
+    p.add_argument("--data", type=iso_datetime, help="AAAA-MM-DD ou AAAA-MM-DDTHH:MM:SS")
     p.set_defaults(func=add_quote)
 
     p = sub.add_parser("ranking", help="gera ranking.md com gates e score aberto")
@@ -2951,6 +3065,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--risco", action="append", default=[])
     p.add_argument("--permitir-web", action="store_true")
     p.add_argument("--permitir-vencida", action="store_true", help="aceita cotacao fora do prazo de validade")
+    p.add_argument("--permitir-aguardando", action="store_true", help="fecha mesmo com o produto em aguardando_preco acima do alvo")
     p.add_argument("--sem-perdedores", action="store_true", help="fecha sem registrar derrotados (nao houve concorrente)")
     p.add_argument("--comprado", action="store_true", help="marca o projeto como comprado ao decidir")
     p.add_argument("--force-veredito", action="store_true", help="sobrescreve veredito existente")
@@ -2986,7 +3101,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--garantia-tipo", choices=["nacional", "importada", "vendedor", "nenhuma"])
     p.add_argument("--link")
     p.add_argument("--flag-suspeita", choices=["", "AVAL_SUSPEITA", "ANCORA", "RECICLADO"])
-    p.add_argument("--data")
+    p.add_argument("--data", type=iso_datetime, help="AAAA-MM-DD ou AAAA-MM-DDTHH:MM:SS")
     p.set_defaults(func=promote_quote)
 
     p = sub.add_parser("descartar", help="marca candidato como descartado com motivo obrigatorio")

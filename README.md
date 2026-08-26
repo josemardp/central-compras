@@ -90,6 +90,23 @@ Preco envelhece. Cotacao `web` vale 14 dias e `manual` vale 7 (`frescor:` em
 - `ranking.md` marca a linha como vencida;
 - `decidir` **recusa** fechar, a menos que voce use `--permitir-vencida`.
 
+A data e validada na entrada: `--data ontem` e recusado. Sem data ISO, a cotacao
+escaparia calada de toda guarda de frescor e da deteccao de preco ancora.
+
+## Travas do `decidir`
+
+Fechar uma decisao e o unico ato irreversivel aqui. Ele recusa quando:
+
+| Situacao | Escape |
+|---|---|
+| cotacao nao e `fonte=manual` | `--permitir-web` |
+| cotacao passou da validade | `--permitir-vencida` |
+| produto em `aguardando_preco` acima do alvo | `--permitir-aguardando` |
+| falta o motivo da derrota de algum candidato | `--perdedores` ou `--sem-perdedores` |
+
+Nenhuma delas bloqueia sozinha: todas tem escape nomeado. A trava existe para
+voce dizer "sim, e de proposito", nao para o sistema decidir por voce.
+
 ## Regra de parada
 
 Vem da faixa de valor do projeto (secao 7.5 do PRD) e e escrita no `briefing.md`
@@ -157,6 +174,9 @@ o que vazou.
 - Cotacao vencida nao fecha compra. Preco de tres semanas atras nao e preco.
 - Decisao sem o motivo da derrota do segundo colocado nao e aceita.
 - Coluna que o schema nao conhece nunca e descartada do `cotacoes.csv`.
+- Toda gravacao e atomica: Ctrl+C no meio nao deixa arquivo truncado.
+- `preco_teto` do produto vence o do briefing quando for menor.
+- Cotacao manual nao herda a suspeita da linha web: e observacao nova.
 
 ## Estrutura
 

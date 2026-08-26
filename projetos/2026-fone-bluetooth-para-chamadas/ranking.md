@@ -1,6 +1,6 @@
 # Ranking
 
-Gerado em 2026-08-26T16:33:57.
+Gerado em 2026-08-26T16:53:28.
 
 ## Elegiveis
 
@@ -8,6 +8,7 @@ Gerado em 2026-08-26T16:33:57.
    qualidade 0.83 · valor 1.00 · risco 0.71 · aderencia 0.50 · conveniencia 0.50
    custo_total R$ 296.64 / Amazon / estimativa web
    score parcial - sem dado em: conveniencia (contam como 0,50 neutro)
+   aguardando preco desde 2026-08-26: faltam R$ 36.64 para o alvo de R$ 260.0. Voce decidiu esperar, nao comprar.
 
 2. Soundcore Anker Life Q30 - 59.4
    qualidade 0.63 · valor 0.64 · risco 0.60 · aderencia 0.50 · conveniencia 0.50

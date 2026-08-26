@@ -200,3 +200,30 @@ O que estava errado e foi corrigido:
 - Importacao semiautomatica de planilhas.
 - Integracao com calendario para vereditos.
 - App ou interface web com formulario.
+
+## Sprint 9 - Robustez sob entrada quebrada
+
+Meta: aguentar arquivo editado a mao, interrupcao e dado torto sem perder nada.
+
+Status: concluida.
+
+O que estava errado e foi corrigido:
+
+- **Gravacao nao era atomica.** `cotacoes.csv` era aberto em modo `w`, que
+  trunca antes de escrever. Um Ctrl+C, disco cheio ou excecao no meio zerava a
+  serie historica inteira. Medido: o arquivo ia de 2 linhas para 0. Agora toda
+  gravacao passa por arquivo temporario e `os.replace`.
+- **Data invalida escapava de todas as travas.** `--data ontem` era aceito e
+  gravado. Como toda guarda de data depende de parsear `data_coleta`, aquela
+  cotacao nunca vencia, nao entrava certo na deteccao de ancora e nao era
+  reclamada por ninguem. Agora e barrada na entrada e na validacao.
+- **`preco_teto` do produto era ignorado.** O CLI aceitava, gravava no
+  `produto.yaml` e o gate so olhava o do briefing.
+- **`promover-cotacao` herdava `flag_suspeita` da linha web.** A conferencia
+  manual e observacao nova: ou voce reafirma a suspeita, ou ela nao se aplica.
+- **Produto em `aguardando_preco` ranqueava como pronto.** O estado quer dizer
+  "decidi esperar preco melhor" e aparecia liderando sem marca nenhuma. Agora o
+  ranking mostra quanto falta para o alvo e `decidir` pede confirmacao.
+- **YAML corrompido cuspia traceback cru.** Agora diz qual arquivo e o que fazer.
+
+Testes: de 66 para 82.
