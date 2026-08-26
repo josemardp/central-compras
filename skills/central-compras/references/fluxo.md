@@ -66,3 +66,11 @@ python scripts\central_compras.py reaproveitamento --categoria fone
 ```
 
 `prompt-ia` automatically includes relevant lessons, brands, and stores.
+
+## Local Dashboard
+
+```powershell
+python scripts\central_compras.py dashboard
+```
+
+Open `dashboard\index.html` to inspect active projects, waiting-price items, per-project rankings, brand/store lessons, regret notes, gate adherence, and decision time.

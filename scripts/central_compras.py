@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import html
+import os
 import re
 import sys
 import textwrap
@@ -22,6 +24,7 @@ PRODUTOS = ROOT / "produtos"
 TEMPLATES = ROOT / "templates"
 BASE = ROOT / "base-conhecimento"
 VEREDITOS = ROOT / "vereditos"
+DASHBOARD = ROOT / "dashboard"
 
 COTACOES_HEADER = [
     "data_coleta",
@@ -1467,12 +1470,12 @@ def knowledge_context(project: Path) -> str:
     return "\n\n".join(parts)
 
 
-def reuse_report(args: argparse.Namespace) -> None:
-    projects = sorted(path for path in PROJETOS.iterdir() if path.is_dir())
+def reuse_stats(categoria: str | None = None) -> tuple[list[dict[str, Any]], int, int, float]:
+    projects = sorted(path for path in PROJETOS.iterdir() if path.is_dir()) if PROJETOS.exists() else []
     rows = []
     for project in projects:
         briefing, _ = load_frontmatter(project / "briefing.md")
-        if args.categoria and briefing.get("categoria") != args.categoria:
+        if categoria and briefing.get("categoria") != categoria:
             continue
         brand_files, store_files = knowledge_files_for_project(project)
         lessons = lesson_lines_for_category(briefing.get("categoria"))
@@ -1490,6 +1493,11 @@ def reuse_report(args: argparse.Namespace) -> None:
     total = len(rows)
     reused = sum(1 for row in rows if row["reaproveitou"])
     percent = round((reused / total) * 100, 1) if total else 0
+    return rows, total, reused, percent
+
+
+def reuse_report(args: argparse.Namespace) -> None:
+    rows, total, reused, percent = reuse_stats(args.categoria)
     lines = ["# Reaproveitamento", "", f"Gerado em {now_iso()}.", "", f"- Projetos analisados: {total}", f"- Projetos com conhecimento reutilizavel: {reused}", f"- Taxa: {percent}%", "", "| Projeto | Categoria | Marcas | Lojas | Licoes | Reaproveitou |", "|---|---|---:|---:|---:|---|"]
     for row in rows:
         lines.append(f"| {row['projeto']} | {row['categoria']} | {row['marcas']} | {row['lojas']} | {row['licoes']} | {'sim' if row['reaproveitou'] else 'nao'} |")
@@ -1497,6 +1505,453 @@ def reuse_report(args: argparse.Namespace) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     print(path.relative_to(ROOT))
     print(f"Taxa: {percent}%")
+
+
+def read_csv_file(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def safe_html(value: Any) -> str:
+    return html.escape("" if value is None else str(value))
+
+
+def dashboard_link(from_dir: Path, target: Path, label: str) -> str:
+    rel = os.path.relpath(target, from_dir).replace("\\", "/")
+    return f'<a href="{safe_html(rel)}">{safe_html(label)}</a>'
+
+
+def project_dirs() -> list[Path]:
+    if not PROJETOS.exists():
+        return []
+    return sorted(path for path in PROJETOS.iterdir() if path.is_dir() and (path / "briefing.md").exists())
+
+
+def project_decision_summary(project: Path) -> tuple[str, str]:
+    decision = project / "decisao.md"
+    if not decision.exists():
+        return "", ""
+    text = decision.read_text(encoding="utf-8")
+    chosen = extract_bullet(text, "Produto")
+    why_match = re.search(r"## Por que escolhi\s*\n\s*- ([^\n]+)", text)
+    why = why_match.group(1).strip() if why_match else ""
+    if chosen.startswith("- "):
+        chosen = ""
+    return chosen, why
+
+
+def project_counts(project: Path) -> dict[str, Any]:
+    briefing, _ = load_frontmatter(project / "briefing.md")
+    quotes = read_quotes(project)
+    latest = latest_quotes(quotes)
+    ranking = read_csv_file(project / "ranking.csv")
+    errors, warnings = validation_report(project)
+    chosen, why = project_decision_summary(project)
+    manual_ids = {row.get("produto_id") for row in quotes if row.get("fonte") == "manual"}
+    leader = next((row for row in ranking if row.get("status") == "elegivel"), None)
+    opened_at = parse_dashboard_date(briefing.get("criado_em"))
+    decided_at = decision_date(project)
+    decision_days = (decided_at - opened_at).days if opened_at and decided_at else ""
+    waiting = [
+        row for row in waiting_price_rows()
+        if row.get("projeto") == project.name
+    ]
+    return {
+        "id": project.name,
+        "categoria": briefing.get("categoria"),
+        "estado": briefing.get("estado"),
+        "preco_teto": briefing.get("preco_teto"),
+        "cotacoes": len(quotes),
+        "manual": len(manual_ids),
+        "candidatos": len(latest),
+        "erros": len(errors),
+        "avisos": len(warnings),
+        "lider": leader.get("nome") if leader else "",
+        "score": leader.get("score") if leader else "",
+        "escolhido": chosen,
+        "porque": why,
+        "aguardando_preco": len(waiting),
+        "criado_em": opened_at.isoformat() if opened_at else "",
+        "data_decisao": decided_at.isoformat() if decided_at else "",
+        "dias_ate_decisao": decision_days,
+        "gate_ok": len(errors) == 0,
+    }
+
+
+def verdict_summaries() -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for path in sorted(VEREDITOS.glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        rows.append(
+            {
+                "arquivo": path.name,
+                "projeto": extract_bullet(text, "Projeto"),
+                "produto": extract_bullet(text, "Produto"),
+                "d30": extract_bullet(text, "D+30 nota arrependimento"),
+                "d180": extract_bullet(text, "D+180 nota arrependimento"),
+                "resumo": extract_bullet(text, "D+180 resumo") or extract_bullet(text, "D+30 resumo"),
+            }
+        )
+    return rows
+
+
+def dashboard_styles() -> str:
+    return """
+:root {
+  color-scheme: light;
+  --bg: #f7f5ef;
+  --surface: #ffffff;
+  --ink: #20201d;
+  --muted: #67645e;
+  --line: #ded8cb;
+  --teal: #0f766e;
+  --green: #2f7d32;
+  --amber: #b7791f;
+  --coral: #b45342;
+  --blue: #2563eb;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  letter-spacing: 0;
+}
+a { color: var(--teal); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.shell { max-width: 1240px; margin: 0 auto; padding: 24px; }
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+}
+h1 { font-size: 28px; line-height: 1.1; margin: 0 0 6px; }
+h2 { font-size: 18px; margin: 0 0 12px; }
+h3 { font-size: 15px; margin: 0 0 8px; }
+.muted { color: var(--muted); font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.panel, .metric {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+.metric strong { display: block; font-size: 24px; line-height: 1.1; }
+.metric span { color: var(--muted); font-size: 12px; }
+.metric.teal { border-top: 4px solid var(--teal); }
+.metric.green { border-top: 4px solid var(--green); }
+.metric.amber { border-top: 4px solid var(--amber); }
+.metric.coral { border-top: 4px solid var(--coral); }
+.section { margin-top: 18px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; font-size: 13px; }
+th { color: var(--muted); font-weight: 700; }
+td.num, th.num { text-align: right; }
+.pill { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; background: #ede8dc; color: var(--ink); }
+.pill.ok { background: #dff0df; color: var(--green); }
+.pill.warn { background: #faedcc; color: var(--amber); }
+.pill.bad { background: #f5d7d1; color: var(--coral); }
+.bars { display: grid; gap: 8px; }
+.bar-row { display: grid; grid-template-columns: 120px 1fr 42px; align-items: center; gap: 8px; font-size: 13px; }
+.bar-track { height: 10px; background: #ede8dc; border-radius: 999px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--teal); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions a { font-size: 13px; }
+pre {
+  white-space: pre-wrap;
+  background: #2b2a26;
+  color: #faf7ef;
+  padding: 12px;
+  border-radius: 8px;
+  overflow: auto;
+}
+@media (max-width: 900px) {
+  .grid, .two { grid-template-columns: 1fr; }
+  .topbar { display: block; }
+  .shell { padding: 16px; }
+  th, td { font-size: 12px; }
+}
+"""
+
+
+def write_dashboard_asset() -> None:
+    assets = DASHBOARD / "assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    (assets / "styles.css").write_text(dashboard_styles().strip() + "\n", encoding="utf-8", newline="\n")
+
+
+def html_page(title: str, body: str, current_dir: Path) -> str:
+    css = os.path.relpath(DASHBOARD / "assets" / "styles.css", current_dir).replace("\\", "/")
+    return f"""<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{safe_html(title)}</title>
+  <link rel="stylesheet" href="{safe_html(css)}">
+</head>
+<body>
+  <main class="shell">
+    {body}
+  </main>
+</body>
+</html>
+"""
+
+
+def bar_chart(counts: dict[str, int]) -> str:
+    max_value = max(counts.values(), default=1) or 1
+    rows = []
+    for label, value in sorted(counts.items()):
+        width = round((value / max_value) * 100, 1)
+        rows.append(
+            f'<div class="bar-row"><span>{safe_html(label)}</span><div class="bar-track"><div class="bar-fill" style="width: {width}%"></div></div><strong>{value}</strong></div>'
+        )
+    return '<div class="bars">' + "".join(rows) + "</div>"
+
+
+def parse_dashboard_date(value: Any) -> dt.date | None:
+    if isinstance(value, dt.date):
+        return value
+    if value in {None, ""}:
+        return None
+    try:
+        return dt.date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def decision_date(project: Path) -> dt.date | None:
+    decision = project / "decisao.md"
+    if not decision.exists():
+        return None
+    text = decision.read_text(encoding="utf-8")
+    return parse_dashboard_date(extract_bullet(text, "Data"))
+
+
+def generate_project_page(project: Path) -> Path:
+    page_dir = DASHBOARD / "projetos"
+    page_dir.mkdir(parents=True, exist_ok=True)
+    page = page_dir / f"{project.name}.html"
+    summary = project_counts(project)
+    ranking = read_csv_file(project / "ranking.csv")
+    quotes = read_quotes(project)
+    source_links = " · ".join(
+        [
+            dashboard_link(page_dir, project / "briefing.md", "briefing"),
+            dashboard_link(page_dir, project / "processo.md", "processo"),
+            dashboard_link(page_dir, project / "ranking.md", "ranking"),
+            dashboard_link(page_dir, project / "cotacoes.csv", "cotacoes"),
+            dashboard_link(page_dir, project / "validacao.md", "validacao"),
+        ]
+    )
+    ranking_rows = []
+    for row in ranking:
+        status_class = "bad" if row.get("status") == "cortado" else "ok"
+        ranking_rows.append(
+            "<tr>"
+            f"<td>{safe_html(row.get('nome'))}</td>"
+            f"<td class=\"num\">{safe_html(row.get('score'))}</td>"
+            f"<td><span class=\"pill {status_class}\">{safe_html(row.get('status'))}</span></td>"
+            f"<td>{safe_html(row.get('motivos'))}</td>"
+            f"<td>{safe_html(row.get('alertas'))}</td>"
+            "</tr>"
+        )
+    quote_rows = []
+    for row in quotes[-20:]:
+        quote_rows.append(
+            "<tr>"
+            f"<td>{safe_html(row.get('data_coleta'))}</td>"
+            f"<td>{safe_html(row.get('produto_id'))}</td>"
+            f"<td>{safe_html(row.get('loja'))}</td>"
+            f"<td class=\"num\">{safe_html(row.get('custo_total'))}</td>"
+            f"<td>{safe_html(row.get('fonte'))}</td>"
+            "</tr>"
+        )
+    body = f"""
+<div class="topbar">
+  <div>
+    <h1>{safe_html(project.name)}</h1>
+    <div class="muted">{safe_html(summary.get('categoria'))} · {safe_html(summary.get('estado'))}</div>
+  </div>
+  <div class="actions">{dashboard_link(page_dir, DASHBOARD / "index.html", "inicio")} · {source_links}</div>
+</div>
+<section class="grid">
+  <div class="metric teal"><strong>{safe_html(summary['cotacoes'])}</strong><span>cotacoes</span></div>
+  <div class="metric green"><strong>{safe_html(summary['manual'])}</strong><span>produtos com cotacao manual</span></div>
+  <div class="metric amber"><strong>{safe_html(summary['avisos'])}</strong><span>avisos</span></div>
+  <div class="metric coral"><strong>{safe_html(summary['dias_ate_decisao'])}</strong><span>dias ate decisao</span></div>
+</section>
+<section class="section panel">
+  <h2>Decisao</h2>
+  <table>
+    <tbody>
+      <tr><td>Escolhido</td><td>{safe_html(summary['escolhido'])}</td></tr>
+      <tr><td>Por que</td><td>{safe_html(summary['porque'])}</td></tr>
+      <tr><td>Gate</td><td><span class="pill {'ok' if summary['gate_ok'] else 'bad'}">{'ok' if summary['gate_ok'] else 'com erro'}</span></td></tr>
+      <tr><td>Aguardando preco</td><td>{safe_html(summary['aguardando_preco'])}</td></tr>
+    </tbody>
+  </table>
+</section>
+<section class="section panel">
+  <h2>Ranking</h2>
+  <table>
+    <thead><tr><th>Produto</th><th class="num">Score</th><th>Status</th><th>Motivos</th><th>Alertas</th></tr></thead>
+    <tbody>{''.join(ranking_rows) or '<tr><td colspan="5">Sem ranking gerado.</td></tr>'}</tbody>
+  </table>
+</section>
+<section class="section panel">
+  <h2>Cotacoes</h2>
+  <table>
+    <thead><tr><th>Data</th><th>Produto</th><th>Loja</th><th class="num">Custo</th><th>Fonte</th></tr></thead>
+    <tbody>{''.join(quote_rows) or '<tr><td colspan="5">Sem cotacoes.</td></tr>'}</tbody>
+  </table>
+</section>
+"""
+    page.write_text(html_page(project.name, body, page_dir), encoding="utf-8", newline="\n")
+    return page
+
+
+def generate_knowledge_page() -> Path:
+    page = DASHBOARD / "base-conhecimento.html"
+    brand_files = sorted((BASE / "marcas").glob("*.md"))
+    store_files = sorted((BASE / "lojas").glob("*.md"))
+    lessons = lesson_lines_for_category(None)
+    brand_rows = "".join(f"<tr><td>{dashboard_link(DASHBOARD, path, path.stem)}</td></tr>" for path in brand_files)
+    store_rows = "".join(f"<tr><td>{dashboard_link(DASHBOARD, path, path.stem)}</td></tr>" for path in store_files)
+    lesson_rows = "".join(f"<tr><td>{safe_html(line)}</td></tr>" for line in lessons)
+    body = f"""
+<div class="topbar">
+  <div>
+    <h1>Base de conhecimento</h1>
+    <div class="muted">Marcas, lojas e licoes registradas</div>
+  </div>
+  <div class="actions">{dashboard_link(DASHBOARD, DASHBOARD / "index.html", "inicio")} · {dashboard_link(DASHBOARD, BASE / "licoes.md", "licoes.md")}</div>
+</div>
+<section class="grid">
+  <div class="metric teal"><strong>{len(brand_files)}</strong><span>marcas</span></div>
+  <div class="metric green"><strong>{len(store_files)}</strong><span>lojas</span></div>
+  <div class="metric amber"><strong>{len(lessons)}</strong><span>licoes recentes</span></div>
+  <div class="metric coral"><strong>{len(waiting_price_rows())}</strong><span>aguardando preco</span></div>
+</section>
+<section class="two section">
+  <div class="panel"><h2>Marcas</h2><table><tbody>{brand_rows or '<tr><td>Nenhuma marca.</td></tr>'}</tbody></table></div>
+  <div class="panel"><h2>Lojas</h2><table><tbody>{store_rows or '<tr><td>Nenhuma loja.</td></tr>'}</tbody></table></div>
+</section>
+<section class="section panel"><h2>Licoes</h2><table><tbody>{lesson_rows or '<tr><td>Nenhuma licao.</td></tr>'}</tbody></table></section>
+"""
+    page.write_text(html_page("Base de conhecimento", body, DASHBOARD), encoding="utf-8", newline="\n")
+    return page
+
+
+def generate_dashboard(args: argparse.Namespace) -> None:
+    DASHBOARD.mkdir(parents=True, exist_ok=True)
+    write_dashboard_asset()
+    projects = project_dirs()
+    summaries = [project_counts(project) for project in projects]
+    for project in projects:
+        generate_project_page(project)
+    knowledge_page = generate_knowledge_page()
+    waiting = waiting_price_rows()
+    verdicts = verdict_summaries()
+    states: dict[str, int] = {}
+    for summary in summaries:
+        states[str(summary.get("estado") or "sem_estado")] = states.get(str(summary.get("estado") or "sem_estado"), 0) + 1
+    _, _, _, reuse_percent = reuse_stats(None)
+    reuse_rate = f"{reuse_percent}%"
+    manual_projects = sum(1 for summary in summaries if summary["manual"])
+    warnings_total = sum(int(summary["avisos"]) for summary in summaries)
+    gate_ok = sum(1 for summary in summaries if summary["gate_ok"])
+    gate_rate = round((gate_ok / len(summaries)) * 100, 1) if summaries else 0
+    decision_days_values = [int(summary["dias_ate_decisao"]) for summary in summaries if summary["dias_ate_decisao"] != ""]
+    avg_decision_days = round(sum(decision_days_values) / len(decision_days_values), 1) if decision_days_values else ""
+    regrets = [
+        quote_float(value)
+        for row in verdicts
+        for value in [row.get("d180") or row.get("d30")]
+        if value not in {None, ""}
+    ]
+    avg_regret = round(sum(regrets) / len(regrets), 1) if regrets else ""
+    project_rows = []
+    for project, summary in zip(projects, summaries):
+        page = DASHBOARD / "projetos" / f"{project.name}.html"
+        pill_class = "ok" if summary["estado"] == "comprado" else "warn" if summary["aguardando_preco"] else ""
+        project_rows.append(
+            "<tr>"
+            f"<td>{dashboard_link(DASHBOARD, page, summary['id'])}</td>"
+            f"<td>{safe_html(summary['categoria'])}</td>"
+            f"<td><span class=\"pill {pill_class}\">{safe_html(summary['estado'])}</span></td>"
+            f"<td>{safe_html(summary['lider'])}</td>"
+            f"<td class=\"num\">{safe_html(summary['score'])}</td>"
+            f"<td class=\"num\">{safe_html(summary['cotacoes'])}</td>"
+            f"<td class=\"num\">{safe_html(summary['manual'])}</td>"
+            f"<td class=\"num\">{safe_html(summary['dias_ate_decisao'])}</td>"
+            "</tr>"
+        )
+    waiting_rows = []
+    for row in waiting:
+        waiting_rows.append(
+            "<tr>"
+            f"<td>{safe_html(row['nome'])}</td>"
+            f"<td>{safe_html(row['projeto'])}</td>"
+            f"<td class=\"num\">{safe_html(row['preco_atual'])}</td>"
+            f"<td class=\"num\">{safe_html(row['preco_alvo'])}</td>"
+            f"<td class=\"num\">{safe_html(row['distancia_ate_alvo'])}</td>"
+            "</tr>"
+        )
+    verdict_rows = []
+    for row in verdicts[-10:]:
+        verdict_rows.append(
+            "<tr>"
+            f"<td>{dashboard_link(DASHBOARD, VEREDITOS / row['arquivo'], row['produto'] or row['arquivo'])}</td>"
+            f"<td>{safe_html(row['projeto'])}</td>"
+            f"<td class=\"num\">{safe_html(row['d30'])}</td>"
+            f"<td class=\"num\">{safe_html(row['d180'])}</td>"
+            f"<td>{safe_html(row['resumo'])}</td>"
+            "</tr>"
+        )
+    body = f"""
+<div class="topbar">
+  <div>
+    <h1>Central de Compras</h1>
+    <div class="muted">Atualizado em {safe_html(now_iso())}</div>
+  </div>
+  <div class="actions">{dashboard_link(DASHBOARD, knowledge_page, "base de conhecimento")} · {dashboard_link(DASHBOARD, BASE / "aguardando-preco.md", "aguardando preco")}</div>
+</div>
+<section class="grid">
+  <div class="metric teal"><strong>{len(projects)}</strong><span>projetos</span></div>
+  <div class="metric green"><strong>{manual_projects}</strong><span>com cotacao manual</span></div>
+  <div class="metric amber"><strong>{len(waiting)}</strong><span>aguardando preco</span></div>
+  <div class="metric coral"><strong>{safe_html(avg_decision_days)}</strong><span>dias medios ate decisao</span></div>
+</section>
+<section class="two section">
+  <div class="panel"><h2>Estados</h2>{bar_chart(states)}</div>
+  <div class="panel"><h2>Indicadores</h2><table><tbody><tr><td>Reaproveitamento</td><td class="num">{safe_html(reuse_rate)}</td></tr><tr><td>Aderencia ao gate</td><td class="num">{gate_rate}%</td></tr><tr><td>Avisos abertos</td><td class="num">{warnings_total}</td></tr><tr><td>Arrependimento medio</td><td class="num">{safe_html(avg_regret)}</td></tr><tr><td>Vereditos</td><td class="num">{len(verdicts)}</td></tr></tbody></table></div>
+</section>
+<section class="section panel">
+  <h2>Projetos</h2>
+  <table>
+    <thead><tr><th>Projeto</th><th>Categoria</th><th>Estado</th><th>Lider</th><th class="num">Score</th><th class="num">Cotacoes</th><th class="num">Manual</th><th class="num">Dias</th></tr></thead>
+    <tbody>{''.join(project_rows) or '<tr><td colspan="8">Nenhum projeto.</td></tr>'}</tbody>
+  </table>
+</section>
+<section class="two section">
+  <div class="panel"><h2>Aguardando Preco</h2><table><thead><tr><th>Produto</th><th>Projeto</th><th class="num">Atual</th><th class="num">Alvo</th><th class="num">Distancia</th></tr></thead><tbody>{''.join(waiting_rows) or '<tr><td colspan="5">Nenhum item.</td></tr>'}</tbody></table></div>
+  <div class="panel"><h2>Vereditos</h2><table><thead><tr><th>Produto</th><th>Projeto</th><th class="num">D+30</th><th class="num">D+180</th><th>Resumo</th></tr></thead><tbody>{''.join(verdict_rows) or '<tr><td colspan="5">Nenhum veredito.</td></tr>'}</tbody></table></div>
+</section>
+"""
+    index = DASHBOARD / "index.html"
+    index.write_text(html_page("Central de Compras", body, DASHBOARD), encoding="utf-8", newline="\n")
+    print(index.relative_to(ROOT))
+    print(f"Projetos: {len(projects)}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1593,6 +2048,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("reaproveitamento", help="gera relatorio de conhecimento reutilizavel")
     p.add_argument("--categoria")
     p.set_defaults(func=reuse_report)
+
+    p = sub.add_parser("dashboard", help="gera dashboard HTML local")
+    p.set_defaults(func=generate_dashboard)
 
     p = sub.add_parser("prompt-ia", help="gera prompt de apoio para uma etapa")
     p.add_argument("projeto")

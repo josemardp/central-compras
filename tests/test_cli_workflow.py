@@ -509,6 +509,84 @@ class CliWorkflowTest(unittest.TestCase):
         self.assertIn("QCY H3 foi bom", lessons)
         self.assertIn("Chegou certo", brand)
 
+    def test_dashboard_generates_local_html_pages(self):
+        self.run_cli(
+            "novo-projeto",
+            "fone dashboard teste",
+            "--categoria",
+            "fone",
+            "--valor-estimado",
+            "350",
+            "--preco-teto",
+            "500",
+        )
+        project = "projetos/2026-fone-dashboard-teste"
+        self.run_cli(
+            "novo-produto",
+            project,
+            "QCY H3",
+            "--marca",
+            "QCY",
+            "--categoria",
+            "fone",
+            "--produto-id",
+            "qcy-h3",
+            "--atributo",
+            "tipo=headphone",
+            "--atributo",
+            "conexao=bluetooth",
+            "--atributo",
+            "microfone=true",
+            "--atributo",
+            "bateria_horas=70",
+            "--atributo",
+            "garantia_meses=12",
+        )
+        self.run_cli(
+            "cotar",
+            project,
+            "--produto-id",
+            "qcy-h3",
+            "--loja",
+            "Amazon",
+            "--vendedor",
+            "Loja oficial",
+            "--vendedor-tipo",
+            "oficial",
+            "--preco",
+            "299",
+            "--nota",
+            "4.6",
+            "--avaliacoes",
+            "1200",
+            "--garantia-meses",
+            "12",
+            "--garantia-tipo",
+            "nacional",
+            "--fonte",
+            "manual",
+            "--link",
+            "https://example.com/qcy-h3",
+        )
+        self.run_cli("ranking", project)
+        result = self.run_cli("dashboard")
+
+        index = self.tmpdir / "dashboard" / "index.html"
+        project_page = self.tmpdir / "dashboard" / "projetos" / "2026-fone-dashboard-teste.html"
+        knowledge_page = self.tmpdir / "dashboard" / "base-conhecimento.html"
+        styles = self.tmpdir / "dashboard" / "assets" / "styles.css"
+
+        self.assertIn("dashboard\\index.html", result.stdout)
+        self.assertTrue(index.exists())
+        self.assertTrue(project_page.exists())
+        self.assertTrue(knowledge_page.exists())
+        self.assertTrue(styles.exists())
+        self.assertIn("Central de Compras", index.read_text(encoding="utf-8"))
+        self.assertIn("Aderencia ao gate", index.read_text(encoding="utf-8"))
+        self.assertIn("dias medios ate decisao", index.read_text(encoding="utf-8"))
+        self.assertIn("QCY H3", project_page.read_text(encoding="utf-8"))
+        self.assertIn("Base de conhecimento", knowledge_page.read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

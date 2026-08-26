@@ -40,6 +40,7 @@ python scripts/central_compras.py listar-aguardando-preco --categoria fone
 python scripts/central_compras.py decidir projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --porque "Melhor equilibrio entre microfone, garantia nacional e preco confirmado." --perdedores "anker-q30: melhor ANC, mas passou do preco teto" --comprado
 python scripts/central_compras.py preencher-veredito vereditos/2026-09-25-projeto-produto.md --fase d30 --nota-arrependimento 1 --compraria-de-novo sim --resumo "Chegou certo e resolveu." --licao "Compraria de novo."
 python scripts/central_compras.py aprender-veredito vereditos/2026-09-25-projeto-produto.md --marca QCY --loja Amazon --categoria fone
+python scripts/central_compras.py dashboard
 python scripts/central_compras.py resumo projetos/2026-fone-bluetooth-para-chamadas
 python scripts/central_compras.py status projetos/2026-fone-bluetooth-para-chamadas
 ```
@@ -51,6 +52,16 @@ python scripts/central_compras.py cotar projetos/2026-comprar-carro --produto-id
 ```
 
 Se a categoria tiver `tco_meses` em `config/categorias.yaml`, o ranking usa `tco_total` no eixo valor.
+
+## Dashboard local
+
+Gere a visao HTML da Central:
+
+```powershell
+python scripts/central_compras.py dashboard
+```
+
+Abra `dashboard/index.html` no navegador para ver projetos, itens aguardando preco, ranking por processo, marcas, lojas, licoes, arrependimento, aderencia ao gate e tempo ate decisao.
 
 ## Principios
 
@@ -82,6 +93,7 @@ base-conhecimento/
 vereditos/
 scripts/
 templates/
+dashboard/
 ```
 
 ## Como a IA entra

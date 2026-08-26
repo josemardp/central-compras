@@ -127,17 +127,19 @@ Gate de saida:
 
 Meta: enxergar a memoria acumulada sem abrir arquivo por arquivo.
 
+Status: concluida como dashboard HTML local gerado a partir dos dados reais do repositorio.
+
 Entregas:
-- Gerador HTML local.
-- Pagina inicial com projetos ativos, aguardando preco e comprados.
-- Pagina de ranking por projeto.
-- Pagina de marcas, lojas e licoes.
-- Indicadores: reaproveitamento, arrependimento, tempo ate decisao e aderencia ao gate.
+- [x] Gerador HTML local.
+- [x] Pagina inicial com projetos ativos, aguardando preco e comprados.
+- [x] Pagina de ranking por projeto.
+- [x] Pagina de marcas, lojas e licoes.
+- [x] Indicadores: reaproveitamento, arrependimento, tempo ate decisao e aderencia ao gate.
 
 Gate de saida:
-- Dashboard abre localmente.
-- Dados carregam dos CSV/YAML reais.
-- Nenhum dado pessoal exposto.
+- [x] Dashboard abre localmente.
+- [x] Dados carregam dos CSV/YAML reais.
+- [x] Nenhum dado pessoal exposto.
 
 ## Sprint 7 - Hardening e rotina
 
