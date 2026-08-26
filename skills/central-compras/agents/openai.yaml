@@ -1,0 +1,4 @@
+interface:
+  display_name: "Central de Compras"
+  short_description: "Guia compras com memoria decisoria"
+  default_prompt: "Use $central-compras para abrir ou evoluir um processo de compra na Central."

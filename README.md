@@ -88,6 +88,20 @@ A IA ajuda principalmente em tres momentos:
 
 Os prompts gerados por `prompt-ia` incluem automaticamente licoes da categoria, marcas e lojas ja registradas na base de conhecimento.
 
+Tambem ha uma skill local instalada em:
+
+```text
+C:\Users\pc\.codex\skills\central-compras
+```
+
+Use no Codex:
+
+```text
+$central-compras abra um processo para comprar um fone de ate R$ 600
+```
+
+A copia versionada da skill fica em `skills/central-compras/`.
+
 Ela nao deve fingir que confirmou preco, estoque, frete ou cupom quando isso depende do site no momento da compra. Esses dados entram como `fonte=manual`.
 
 ## Testes

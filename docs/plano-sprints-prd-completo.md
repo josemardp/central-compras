@@ -93,13 +93,15 @@ Gate de saida:
 
 Meta: reduzir edicao manual e transformar a Central em assistente guiado.
 
+Status: skill local instalada e versionada; gate operacional depende de usar em uma compra real do inicio ao fim.
+
 Entregas:
-- Skill local `central-compras`.
-- Entrevista guiada para briefing.
-- Prompt de pesquisa por categoria.
-- Prompt de comparacao de reviews.
-- Prompt de decisao final com "por que escolhi" e "por que nao escolhi".
-- Guardrails: IA pode sugerir `fonte=web`, mas nao fecha compra sem `fonte=manual`.
+- [x] Skill local `central-compras`.
+- [x] Entrevista guiada para briefing.
+- [x] Prompt de pesquisa por categoria.
+- [x] Prompt de comparacao de reviews.
+- [x] Prompt de decisao final com "por que escolhi" e "por que nao escolhi".
+- [x] Guardrails: IA pode sugerir `fonte=web`, mas nao fecha compra sem `fonte=manual`.
 
 Gate de saida:
 - Uma compra criada do briefing ate a decisao sem editar arquivos manualmente.
