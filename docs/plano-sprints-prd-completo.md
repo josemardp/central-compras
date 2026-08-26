@@ -297,3 +297,49 @@ com `parcial` (que e o que os quatro produtos reais usam), `yaml_scalar`,
 com defeito.
 
 Testes: de 96 para 118.
+
+## Sprint 12 - Achados da auditoria externa
+
+Meta: aplicar o retorno de uma revisao independente (Codex) feita depois de
+cinco rodadas internas.
+
+Status: concluida. Todos os achados foram reproduzidos antes de corrigidos, e
+nenhum era falso positivo.
+
+**Criticos.**
+
+- **`decidir` fechava compra de produto cortado pelo gate.** O principio 2 do
+  PRD valia no ranking e era ignorado exatamente no momento que importa. Dava
+  para comprar o que o sistema tinha reprovado. Agora `decidir` consulta
+  `gate_eliminations` e recusa sem `--permitir-cortado`.
+- **`promover-cotacao` carimbava web antiga como manual de hoje.** Sem informar
+  nada, copiava o preco antigo com a data de agora e marcava `fonte=manual`. O
+  pior tipo de mentira que este sistema pode contar para si mesmo. Agora exige
+  dizer o que foi conferido, ou `--sem-alteracao` explicito.
+- **`NaN` e infinito passavam como preco.** Toda comparacao com NaN e falsa,
+  entao escapavam do teste de negativo, da validacao e entravam elegiveis no
+  ranking. Barrados em `quote_float` e reportados em `validar`.
+- **Data futura passava.** Formato era validado, sanidade nao: uma cotacao de
+  2099 nunca vencia. Barrada na entrada e na validacao.
+- **`auditar` quebrava o principio 3 na compra cara.** O ranking compara por
+  `tco_total` e a memoria de calculo explicava por `custo_total`: a conta
+  publicada nao fechava. A regra do campo de valor virou uma funcao unica,
+  `value_field_for`, usada pelos dois.
+- **Varredor de segredos com falsos-negativos**: CPF sem pontuacao, cartao com
+  `_` como separador, arquivo `.env` fora da varredura, e `` a esquerda de
+  `api_key` impedindo casar `OPENAI_API_KEY`.
+
+**Julgamento.** O achado mais afiado nao era um bug: o eixo sem dado entrando
+como 0,50 neutro fazia "nao sei o prazo" valer 5 pontos a mais que "o prazo e
+pessimo e eu sei disso". O score premiava o silencio. Trocado por
+renormalizacao (o eixo ausente sai da conta) mais um indice de `confianca`
+publicado no ranking, no CSV e na memoria de calculo. `decidir` recusa fechar
+abaixo de 75% de confianca.
+
+**Relevantes.** `--sem-perdedores` burlava o principio 4 mesmo havendo
+concorrente com cotacao; agora a flag e recusada nesse caso. Derivados
+versionados geram conflito de merge entre maquinas; em vez de despublicar (o
+`ranking.md` ao lado do `decisao.md` e a evidencia da decisao), nasceu o comando
+`regenerar`, que refaz tudo a partir das fontes e torna o conflito trivial.
+
+Testes: de 118 para 140.

@@ -34,16 +34,11 @@ princípios invioláveis dele, que valem como **critério de auditoria**:
 ### Forma
 
 - Python 3, dependência única `PyYAML`. Sem framework, sem banco.
-- `scripts/central_compras.py` — 3.457 linhas, arquivo único, 27 subcomandos.
-- `tests/` — 13 arquivos, 2.236 linhas, 118 testes. `python -m unittest discover -s tests`.
+- `scripts/central_compras.py` — arquivo único, 29 subcomandos.
+- `tests/` — 140 testes. `python -m unittest discover -s tests`.
 - Dados em CSV/YAML/Markdown versionados. Dashboard HTML estático gerado.
 - Usado de **várias máquinas Windows**, via PowerShell e Git Bash.
-- Os 27 comandos: `init`, `novo-projeto`, `novo-produto`, `cotar`, `promover-cotacao`,
-  `ranking`, `validar`, `auditar`, `historico`, `decidir`, `descartar`,
-  `aguardar-preco`, `listar-aguardando-preco`, `novo-veredito`,
-  `preencher-veredito`, `aprender-veredito`, `registrar-marca`, `registrar-loja`,
-  `registrar-licao`, `reaproveitamento`, `prompt-ia`, `dashboard`, `status`,
-  `resumo`, `anotar`, `migrar-cotacoes`, `dados-privados`, `checar-segredos`.
+- Os 29 comandos: `aguardar-preco`, `anotar`, `aprender-veredito`, `auditar`, `checar-segredos`, `cotar`, `dados-privados`, `dashboard`, `decidir`, `descartar`, `historico`, `init`, `listar-aguardando-preco`, `migrar-cotacoes`, `novo-produto`, `novo-projeto`, `novo-veredito`, `preencher-veredito`, `promover-cotacao`, `prompt-ia`, `ranking`, `reaproveitamento`, `regenerar`, `registrar-licao`, `registrar-loja`, `registrar-marca`, `resumo`, `status`, `validar`.
 
 ### Modelo de dados
 

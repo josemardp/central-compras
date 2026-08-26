@@ -483,9 +483,10 @@ class CliWorkflowTest(unittest.TestCase):
             "qcy-h3",
             "--porque",
             "Preco aceito para testar veredito.",
-            # O produto esta em aguardando_preco acima do alvo: fechar exige
-            # dizer explicitamente que mudou de ideia.
+            # O produto esta em aguardando_preco acima do alvo E acima do proprio
+            # preco_teto: fechar exige declarar as duas excecoes.
             "--permitir-aguardando",
+            "--permitir-cortado",
             "--comprado",
         )
         verdict = next((self.tmpdir / "vereditos").glob("*qcy-h3.md"))

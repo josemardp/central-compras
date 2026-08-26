@@ -42,6 +42,7 @@ python scripts/central_compras.py preencher-veredito vereditos/2026-09-25-projet
 python scripts/central_compras.py aprender-veredito vereditos/2026-09-25-projeto-produto.md --marca QCY --loja Amazon --categoria fone
 python scripts/central_compras.py dashboard
 python scripts/central_compras.py historico projetos/2026-fone-bluetooth-para-chamadas
+python scripts/central_compras.py regenerar
 python scripts/central_compras.py migrar-cotacoes
 python scripts/central_compras.py dados-privados
 python scripts/central_compras.py resumo projetos/2026-fone-bluetooth-para-chamadas
@@ -73,9 +74,17 @@ que 75 numa compra de carro.
 Os limites ficam em `config/preferencias.yaml`, em `escala:`. `lojas_preferidas`
 entra no eixo risco: loja da sua lista pesa menos risco que loja desconhecida.
 
-Quando falta dado num eixo, ele conta como 0,50 neutro **e o ranking avisa**
-("score parcial - sem dado em: conveniencia"). Um numero montado sobre campo
-vazio nao pode passar por medida.
+Quando falta dado num eixo, ele **fica fora da conta** e os pesos restantes sao
+renormalizados. O score passa a medir so o que se sabe, e `confianca` diz quanto
+do peso total esta apoiado em dado real.
+
+Isso corrige um incentivo perverso: com o eixo ausente valendo 0,50 neutro,
+"nao informei o prazo" valia 5 pontos a mais que "o prazo e pessimo e eu sei
+disso". O score premiava o silencio.
+
+Score 80 com confianca 60% **nao e comparavel** com score 80 com confianca 100%.
+Abaixo de `confianca_minima_para_decidir` (75% por padrao), `decidir` recusa
+fechar sem `--permitir-incompleto`.
 
 `nota_ajustada` e recalculada na hora do ranking a partir de `nota` e
 `n_avaliacoes`, nunca lida congelada do CSV: se voce mudar os pesos da nota
@@ -159,6 +168,23 @@ python scripts/central_compras.py dashboard
 
 Abra `dashboard/index.html` no navegador para ver projetos, itens aguardando preco, ranking por processo, marcas, lojas, licoes, arrependimento, aderencia ao gate e tempo ate decisao.
 
+## Conflito de merge entre maquinas
+
+`ranking.md`, `ranking.csv`, `validacao.md`, `historico.md`, `memoria-calculo.md`
+e `dashboard/` sao derivados, mas ficam versionados de proposito: o `ranking.md`
+ao lado do `decisao.md` e a evidencia de por que voce decidiu naquele dia.
+
+Se der conflito num deles, **nao resolva a mao**. Fique com qualquer lado e rode:
+
+```powershell
+python scripts/central_compras.py regenerar
+```
+
+Conflito nas fontes (`cotacoes.csv`, `produto.yaml`, `briefing.md`) e outra
+historia: ai o conteudo importa e tem que ser resolvido de verdade. O
+`cotacoes.csv` e append-only e uma linha por observacao, entao o merge textual
+do Git costuma dar certo; confira com `validar` depois.
+
 ## Seguranca antes do commit
 
 ```powershell
@@ -202,6 +228,10 @@ o que vazou.
 - Toda gravacao e atomica: Ctrl+C no meio nao deixa arquivo truncado.
 - `preco_teto` do produto vence o do briefing quando for menor.
 - Cotacao manual nao herda a suspeita da linha web: e observacao nova.
+- `promover-cotacao` exige dizer o que foi conferido no site: `manual` sem
+  conferencia seria carimbar preco velho de novo.
+- Produto reprovado no gate nao fecha compra, so com excecao declarada.
+- `NaN`, infinito e data no futuro nao entram como numero de ranking.
 - Manual vencida nao vence observacao recente.
 - `aprender-veredito` roda uma vez por veredito; repetir exige `--force`.
 - Editar gate por `--gate` preserva os comentarios do `categorias.yaml`.

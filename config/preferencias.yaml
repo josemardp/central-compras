@@ -51,6 +51,10 @@ frescor:
   validade_web_dias: 14
   validade_manual_dias: 7
 
+# Fracao minima do peso do score que precisa estar apoiada em dado real para
+# fechar uma compra. Abaixo disso, `decidir` pede --permitir-incompleto.
+confianca_minima_para_decidir: 0.75
+
 lojas_preferidas:
   - Amazon
   - Mercado Livre

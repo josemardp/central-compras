@@ -6,6 +6,7 @@ import csv
 import datetime as dt
 import html
 import io
+import math
 import os
 import re
 import sys
@@ -90,12 +91,22 @@ def iso_datetime(value: str) -> str:
     texto = (value or "").strip()
     for formato in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
-            return dt.datetime.strptime(texto, formato).isoformat()
+            return reject_future(dt.datetime.strptime(texto, formato)).isoformat()
         except ValueError:
             continue
     raise argparse.ArgumentTypeError(
         f"data invalida: {value!r}. Use AAAA-MM-DD ou AAAA-MM-DDTHH:MM:SS."
     )
+
+
+def reject_future(momento: dt.datetime) -> dt.datetime:
+    """Cotacao e observacao do passado. Nao existe preco coletado amanha."""
+    if momento.date() > dt.date.today():
+        raise argparse.ArgumentTypeError(
+            f"data no futuro: {momento.date().isoformat()}. "
+            "Cotacao e observacao de algo que voce viu, nao previsao."
+        )
+    return momento
 
 
 def valid_collection_date(value: Any) -> bool:
@@ -248,9 +259,15 @@ def quote_float(value: Any, default: float = 0.0) -> float:
     if value in {None, ""}:
         return default
     try:
-        return float(str(value).replace(",", "."))
+        numero = float(str(value).replace(",", "."))
     except ValueError:
         return default
+    # NaN e infinito contaminam qualquer conta seguinte em silencio, porque
+    # toda comparacao com NaN e falsa. `validar` reporta como erro; aqui eles
+    # nao podem virar numero de ranking.
+    if math.isnan(numero) or math.isinf(numero):
+        return default
+    return numero
 
 
 def brl(value: Any, vazio: str = "-") -> str:
@@ -799,6 +816,15 @@ def numeric_problems(row: dict[str, str]) -> list[str]:
         except ValueError:
             problems.append(f"`{field}` nao e numero valido ({raw!r})")
             continue
+        # `float("NaN")` e `float("inf")` sao aceitos pelo Python, e toda
+        # comparacao com NaN e falsa: sem esta checagem eles escapavam de
+        # `< 0` e viravam custo valido no ranking.
+        if math.isnan(valor):
+            problems.append(f"`{field}` nao e numero ({raw!r})")
+            continue
+        if math.isinf(valor):
+            problems.append(f"`{field}` e infinito ({raw!r})")
+            continue
         if valor < 0:
             problems.append(f"`{field}` negativo ({raw})")
 
@@ -899,6 +925,12 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
             errors.append(f"cotacoes.csv linha {index}: campos obrigatorios ausentes: {', '.join(missing)}")
         for problem in numeric_problems(row):
             errors.append(f"cotacoes.csv linha {index} ({row.get('produto_id')}): {problem}")
+        futura = parse_dashboard_date(row.get("data_coleta"))
+        if futura and futura > dt.date.today():
+            errors.append(
+                f"cotacoes.csv linha {index} ({row.get('produto_id')}): `data_coleta` no futuro "
+                f"({futura.isoformat()}). Cotacao e observacao do passado, e data futura nunca vence."
+            )
         if row.get("data_coleta") and not valid_collection_date(row.get("data_coleta")):
             errors.append(
                 f"cotacoes.csv linha {index} ({row.get('produto_id')}): `data_coleta` "
@@ -976,6 +1008,7 @@ class Ranked:
     eixos_sem_dado: list[str]
     idade_dias: int | None
     vencida: bool
+    confianca: float
 
 
 def quote_age_days(row: dict[str, str], reference: dt.date | None = None) -> int | None:
@@ -1186,14 +1219,22 @@ def current_adjusted_rating(row: dict[str, str]) -> float:
     return adjusted_rating(nota, quote_int(row.get("n_avaliacoes")))
 
 
+def value_field_for(briefing: dict[str, Any]) -> tuple[str, str]:
+    """Qual campo o eixo valor compara: custo de etiqueta ou TCO.
+
+    Uma funcao so, usada pelo ranking e pela memoria de calculo, para os dois
+    nunca divergirem de novo.
+    """
+    categoria = briefing.get("categoria") or "generico"
+    usa_tco = bool(category_tco_months(categoria) or quote_float(briefing.get("valor_estimado")) > 20000)
+    return ("tco_total", "TCO") if usa_tco else ("custo_total", "custo total")
+
+
 def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     rows = read_quotes(project)
     latest = latest_quotes(rows)
     weights = preferences().get("score", {})
-    categoria = briefing.get("categoria") or "generico"
-    use_tco = bool(category_tco_months(categoria) or quote_float(briefing.get("valor_estimado")) > 20000)
-
     pre_candidates: list[tuple[str, dict[str, str], dict[str, Any], list[str], list[str]]] = []
     for produto_id, row in latest.items():
         product = find_product(produto_id) or {"id": produto_id, "categoria": briefing.get("categoria"), "marca": ""}
@@ -1201,7 +1242,7 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
         alerts = manipulation_alerts(rows, row)
         pre_candidates.append((produto_id, row, product, eliminations, alerts))
 
-    value_field = "tco_total" if use_tco else "custo_total"
+    value_field, _ = value_field_for(briefing)
 
     def cost_of(row: dict[str, str]) -> float:
         return quote_float(row.get(value_field) or row.get("custo_total"))
@@ -1229,6 +1270,9 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
         if not (product.get("requisitos_atendidos") or {}):
             sem_dado.append("aderencia")
 
+        if cost_of(row) <= 0:
+            sem_dado.append("valor")
+
         axes = {
             "qualidade": quality_score(nota_ajustada),
             "valor": value_score(cost_of(row), menor_custo),
@@ -1236,7 +1280,20 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
             "aderencia": adherence_score(product),
             "conveniencia": conveniencia,
         }
-        score = sum(axes[key] * quote_float(weights.get(key), 0) for key in axes) * 100
+
+        # Eixo sem dado sai da conta em vez de entrar como 0,50 neutro, e os
+        # pesos restantes sao renormalizados. Com o 0,50, "nao informei o prazo"
+        # valia 5 pontos a mais que "o prazo e pessimo e eu sei disso": o score
+        # premiava o silencio. Agora o score mede o que se sabe, e `confianca`
+        # diz quanto do peso total esta de fato apoiado em dado.
+        com_dado = {k: v for k, v in axes.items() if k not in sem_dado}
+        peso_total = sum(quote_float(weights.get(k), 0) for k in axes)
+        peso_com_dado = sum(quote_float(weights.get(k), 0) for k in com_dado)
+        confianca = round(peso_com_dado / peso_total, 3) if peso_total else 0.0
+        if peso_com_dado:
+            score = sum(axes[k] * quote_float(weights.get(k), 0) for k in com_dado) / peso_com_dado * 100
+        else:
+            score = 0.0
         if eliminations:
             score = 0
         candidates.append(
@@ -1251,6 +1308,7 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
                 sem_dado,
                 quote_age_days(row),
                 quote_is_stale(row),
+                confianca,
             )
         )
 
@@ -1273,6 +1331,7 @@ def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ran
         "motivos",
         "alertas",
         "fonte",
+        "confianca",
         "idade_dias",
         "cotacao_vencida",
         "eixos_sem_dado",
@@ -1300,6 +1359,7 @@ def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ran
                 "motivos": "; ".join(item.eliminations),
                 "alertas": "; ".join(item.alerts),
                 "fonte": item.quote.get("fonte"),
+                "confianca": item.confianca,
                 "idade_dias": "" if item.idade_dias is None else item.idade_dias,
                 "cotacao_vencida": "sim" if item.vencida else "nao",
                 "eixos_sem_dado": "; ".join(item.eixos_sem_dado),
@@ -1327,7 +1387,12 @@ def build_ranking(args: argparse.Namespace) -> None:
             lines.append("Nenhum candidato passou pelos gates.")
         for idx, item in enumerate(elegiveis, 1):
             product_name = item.product.get("nome") or item.produto_id
-            axes = " · ".join(f"{key} {value:.2f}" for key, value in item.axes.items())
+            # Eixo fora da conta nao pode exibir numero: mostrar `0.50` para algo
+            # que nao entrou no score faz o leitor somar errado de cabeca.
+            axes = " · ".join(
+                f"{key} --" if key in item.eixos_sem_dado else f"{key} {value:.2f}"
+                for key, value in item.axes.items()
+            )
             fonte_alerta = "confirmada manualmente" if item.quote.get("fonte") == "manual" else "estimativa web"
             tco_line = ""
             if item.quote.get("tco_total") and quote_float(item.quote.get("tco_total")) != quote_float(item.quote.get("custo_total")):
@@ -1345,7 +1410,8 @@ def build_ranking(args: argparse.Namespace) -> None:
                 lines.append("   empate tecnico com o lider: decida pelo criterio humano, nao pelo numero")
             if item.eixos_sem_dado:
                 lines.append(
-                    f"   score parcial - sem dado em: {', '.join(item.eixos_sem_dado)} (contam como 0,50 neutro)"
+                    f"   confianca {item.confianca:.0%} - sem dado em: {', '.join(item.eixos_sem_dado)}. "
+                    "Esses eixos ficaram FORA da conta; o score mede so o que se sabe."
                 )
             if item.vencida:
                 lines.append(
@@ -1372,6 +1438,8 @@ def build_ranking(args: argparse.Namespace) -> None:
                 "## Observacoes",
                 "",
                 "- Score zerado significa corte por gate, nao produto ruim em absoluto.",
+                "- `confianca` e a fracao do peso do score apoiada em dado real. Score 80 com "
+                "confianca 60% nao e comparavel com score 80 com confianca 100%.",
                 "- Linha `fonte=web` nao fecha compra; confirme preco, estoque e frete antes de decidir.",
                 "- Diferenca de ate 3 pontos entre finalistas deve ser tratada como empate tecnico.",
                 "- `ranking.csv` e derivado e pode ser sobrescrito; `cotacoes.csv` preserva a serie historica.",
@@ -1508,6 +1576,30 @@ def promote_quote(args: argparse.Namespace) -> None:
     base = latest_quote_for_product(rows, args.produto_id, fonte=args.fonte_base)
     if not base:
         raise SystemExit(f"Nenhuma cotacao {args.fonte_base} encontrada para {args.produto_id}")
+
+    # `manual` significa "eu abri o site e conferi agora". Promover sem informar
+    # nada copiava o preco antigo com a data de hoje e carimbava de conferido:
+    # o pior tipo de mentira que este sistema pode contar para si mesmo.
+    confirmados = [
+        campo
+        for campo, valor in {
+            "--preco": args.preco,
+            "--custo-total": args.custo_total,
+            "--frete": args.frete,
+            "--vendedor": args.vendedor,
+            "--link": args.link,
+            "--garantia-meses": args.garantia_meses,
+        }.items()
+        if valor is not None
+    ]
+    if not confirmados and not args.sem_alteracao:
+        raise SystemExit(
+            "Promover para `manual` exige dizer o que voce conferiu no site agora.\n"
+            "Informe ao menos um entre --preco, --custo-total, --frete, --vendedor, "
+            "--link ou --garantia-meses.\n"
+            "Se conferiu e estava tudo igual ao que ja estava registrado, "
+            "use --sem-alteracao para declarar isso explicitamente."
+        )
 
     row = dict(base)
     row["data_coleta"] = args.data or now_iso()
@@ -1810,6 +1902,32 @@ def decide(args: argparse.Namespace) -> None:
     if quote.get("fonte") != "manual" and not args.permitir_web:
         raise SystemExit("A cotacao final nao e manual. Use --permitir-web se quiser registrar mesmo assim.")
 
+    # Principio 2 do PRD: gate antes de score. Ele valia no ranking e era
+    # ignorado exatamente no momento que importa, a compra.
+    briefing_meta, _ = load_frontmatter(project / "briefing.md")
+    cortes = gate_eliminations(quote, product, briefing_meta)
+    if cortes and not args.permitir_cortado:
+        raise SystemExit(
+            f"{args.produto_id} foi cortado pelos gates e nao deveria ser comprado:\n"
+            + "\n".join(f"  - {motivo}" for motivo in cortes)
+            + "\nUse --permitir-cortado se for uma excecao consciente, "
+            "ou ajuste o gate da categoria se ele esta calibrado errado."
+        )
+
+    minima = quote_float(preferences().get("confianca_minima_para_decidir"), 0.75)
+    elegiveis, cortados = compute_ranking(project)
+    ranqueado = next(
+        (item for item in [*elegiveis, *cortados] if item.produto_id == args.produto_id),
+        None,
+    )
+    if ranqueado and ranqueado.confianca < minima and not args.permitir_incompleto:
+        raise SystemExit(
+            f"Confianca de apenas {ranqueado.confianca:.0%} no score de {args.produto_id} "
+            f"(minimo {minima:.0%}).\n"
+            f"Sem dado em: {', '.join(ranqueado.eixos_sem_dado)}.\n"
+            "Preencha esses campos ou use --permitir-incompleto para decidir assim mesmo."
+        )
+
     if quote_is_stale(quote) and not args.permitir_vencida:
         raise SystemExit(
             f"A cotacao escolhida tem {quote_age_days(quote)} dias "
@@ -1849,6 +1967,12 @@ def decide(args: argparse.Namespace) -> None:
     outros = sorted(set(latest_quotes(read_quotes(project))) - {args.produto_id})
     registrados = {produto for produto, _ in perdedores}
     faltando = [produto for produto in outros if produto not in registrados]
+    if args.sem_perdedores and outros:
+        raise SystemExit(
+            "--sem-perdedores declara que nao houve concorrente, mas estes tem cotacao "
+            "neste projeto: " + ", ".join(outros) + ".\n"
+            "Registre o motivo da derrota de cada um com --perdedores."
+        )
     if faltando and not args.sem_perdedores:
         raise SystemExit(
             "Faltou registrar por que estes candidatos perderam: "
@@ -2986,10 +3110,16 @@ def audit_score(args: argparse.Namespace) -> None:
     escala = (preferences().get("escala") or {}).get("qualidade") or {}
     piso = quote_float(escala.get("nota_piso"), 3.8)
     teto = quote_float(escala.get("nota_teto"), 5.0)
+    # O ranking compara por TCO quando a categoria define `tco_meses` ou o
+    # projeto passa de R$ 20.000. A memoria de calculo precisa explicar o MESMO
+    # numero: explicar por custo_total enquanto o ranking usou tco_total fazia a
+    # conta publicada nao fechar justamente na compra cara.
+    briefing_meta, _ = load_frontmatter(project / "briefing.md")
+    campo_valor, rotulo_valor = value_field_for(briefing_meta)
     custos = [
-        quote_float(item.quote.get("custo_total"))
+        quote_float(item.quote.get(campo_valor) or item.quote.get("custo_total"))
         for item in elegiveis
-        if quote_float(item.quote.get("custo_total")) > 0
+        if quote_float(item.quote.get(campo_valor) or item.quote.get("custo_total")) > 0
     ]
     menor_custo = min(custos) if custos else 0.0
 
@@ -3024,9 +3154,17 @@ def audit_score(args: argparse.Namespace) -> None:
         )
 
         linhas.extend(["", "### Valor", ""])
-        custo = quote_float(row.get("custo_total"))
-        linhas.append(f"- custo total desta cotacao: {brl(custo)}")
-        linhas.append(f"- menor custo entre os elegiveis: {brl(menor_custo)}")
+        custo = quote_float(row.get(campo_valor) or row.get("custo_total"))
+        linhas.append(f"- base de comparacao: **{rotulo_valor}**")
+        if campo_valor == "tco_total":
+            linhas.append(
+                f"- custo de etiqueta {brl(row.get('custo_total'))} + operacao "
+                f"{brl(row.get('custo_operacional_mensal'))}/mes x {row.get('tco_meses') or 0} meses "
+                f"- revenda estimada {brl(row.get('valor_revenda_estimado'))} = **{brl(custo)}**"
+            )
+        else:
+            linhas.append(f"- custo total desta cotacao: {brl(custo)}")
+        linhas.append(f"- menor {rotulo_valor} entre os elegiveis: {brl(menor_custo)}")
         linhas.append(
             f"- valor = {brl(menor_custo)} / {brl(custo)} = **{item.axes['valor']:.3f}**"
         )
@@ -3086,6 +3224,28 @@ def audit_score(args: argparse.Namespace) -> None:
         print(f"{nome}: score {item.score}")
 
 
+def regenerate(args: argparse.Namespace) -> None:
+    """Refaz todo arquivo derivado a partir das fontes.
+
+    Derivado versionado da conflito de merge entre maquinas. A saida nao e
+    apagar o derivado (o `ranking.md` ao lado do `decisao.md` e a evidencia de
+    por que voce decidiu), e sim tornar o conflito trivial: fique com qualquer
+    lado e rode isto.
+    """
+    projetos = [project_path(args.projeto)] if args.projeto else project_dirs()
+    for project in projetos:
+        alvo = argparse.Namespace(projeto=str(project), produto_id=None, strict=False)
+        build_ranking(alvo)
+        validate(alvo)
+        show_history(alvo)
+        audit_score(alvo)
+        print(f"  {project.name}: ranking, validacao, historico e memoria de calculo refeitos")
+    list_waiting_price(argparse.Namespace(categoria=None))
+    reuse_report(argparse.Namespace(categoria=None))
+    generate_dashboard(argparse.Namespace())
+    print(f"{len(projetos)} projeto(s) regenerado(s). Nenhuma fonte foi tocada.")
+
+
 def migrate_quotes(args: argparse.Namespace) -> None:
     """Atualiza o cabecalho do cotacoes.csv sem perder linha nem coluna."""
     alvos = [project_path(args.projeto)] if args.projeto else project_dirs()
@@ -3134,14 +3294,22 @@ def private_data_dir(_: argparse.Namespace) -> None:
 
 SENSITIVE_PATTERNS: list[tuple[str, str, str]] = [
     ("CPF", r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", "CPF formatado"),
-    ("CARTAO", r"\b(?:\d[ .-]?){13,19}\b", "sequencia com cara de numero de cartao"),
+    # CPF sem pontuacao so conta quando esta rotulado: 11 digitos soltos sao
+    # rastreio, EAN e telefone o tempo todo num repositorio de compras.
+    ("CPF", r"(?i)\bcpf\b[^0-9]{0,12}\d{11}\b", "CPF sem pontuacao, rotulado"),
+    ("CARTAO", r"\b(?:\d[ ._-]?){13,19}\b", "sequencia com cara de numero de cartao"),
     ("CVV", r"(?i)\bcvv\b\s*[:=]\s*\d{3,4}\b", "CVV"),
     ("SENHA", r"(?i)\b(senha|password|passwd)\b\s*[:=]\s*\S+", "senha em texto"),
-    ("TOKEN", r"(?i)\b(token|api[_-]?key|secret|access[_-]?key)\b\s*[:=]\s*[A-Za-z0-9_\-]{12,}", "token/chave"),
+    # Sem `\b` a esquerda de proposito: em `OPENAI_API_KEY` o `_` e caractere de
+    # palavra, entao `\bapi_key` nunca casaria.
+    ("TOKEN", r"(?i)(token|api[_-]?key|secret|access[_-]?key)\b\s*[:=]\s*[A-Za-z0-9_\-]{12,}", "token/chave"),
     ("GITHUB", r"\bgh[pousr]_[A-Za-z0-9]{20,}\b", "token do GitHub"),
 ]
 
-SCAN_SUFFIXES = {".md", ".csv", ".yaml", ".yml", ".txt", ".json", ".py", ".html", ".css"}
+SCAN_SUFFIXES = {".md", ".csv", ".yaml", ".yml", ".txt", ".json", ".py", ".html", ".css", ".env", ".ini", ".cfg", ".toml"}
+
+# Arquivos sem extensao que costumam guardar segredo.
+SCAN_NAMES = {".env", ".env.local", "env", "credentials", "secrets"}
 
 # Marcador de excecao na linha: exemplo em teste ou documentacao.
 ALLOW_SECRET_MARKER = "central-compras:exemplo-nao-e-segredo"
@@ -3169,7 +3337,7 @@ def scan_sensitive(root: Path) -> list[tuple[str, int, str, str]]:
     achados: list[tuple[str, int, str, str]] = []
     ignorar = {".git", "__pycache__", ".venv", "venv", ".pytest_cache", "dados-privados"}
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in SCAN_SUFFIXES:
+        if not path.is_file() or (path.suffix.lower() not in SCAN_SUFFIXES and path.name.lower() not in SCAN_NAMES):
             continue
         if any(part in ignorar for part in path.parts):
             continue
@@ -3323,6 +3491,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--produto-id", help="um produto so; sem isso, audita todos")
     p.set_defaults(func=audit_score)
 
+    p = sub.add_parser("regenerar", help="refaz todo arquivo derivado; use apos conflito de merge")
+    p.add_argument("--projeto", help="um projeto especifico; sem isso, todos")
+    p.set_defaults(func=regenerate)
+
     p = sub.add_parser("migrar-cotacoes", help="atualiza o cabecalho do cotacoes.csv preservando linhas e colunas extras")
     p.add_argument("--projeto", help="um projeto especifico; sem isso, migra todos")
     p.set_defaults(func=migrate_quotes)
@@ -3348,6 +3520,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--permitir-web", action="store_true")
     p.add_argument("--permitir-vencida", action="store_true", help="aceita cotacao fora do prazo de validade")
     p.add_argument("--permitir-aguardando", action="store_true", help="fecha mesmo com o produto em aguardando_preco acima do alvo")
+    p.add_argument("--permitir-cortado", action="store_true", help="fecha mesmo com o produto reprovado nos gates")
+    p.add_argument("--permitir-incompleto", action="store_true", help="fecha mesmo com confianca abaixo do minimo")
     p.add_argument("--sem-perdedores", action="store_true", help="fecha sem registrar derrotados (nao houve concorrente)")
     p.add_argument("--comprado", action="store_true", help="marca o projeto como comprado ao decidir")
     p.add_argument("--force-veredito", action="store_true", help="sobrescreve veredito existente")
@@ -3384,6 +3558,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--link")
     p.add_argument("--flag-suspeita", choices=["", "AVAL_SUSPEITA", "ANCORA", "RECICLADO"])
     p.add_argument("--data", type=iso_datetime, help="AAAA-MM-DD ou AAAA-MM-DDTHH:MM:SS")
+    p.add_argument("--sem-alteracao", action="store_true", help="conferi no site e estava tudo igual ao registrado")
     p.set_defaults(func=promote_quote)
 
     p = sub.add_parser("descartar", help="marca candidato como descartado com motivo obrigatorio")

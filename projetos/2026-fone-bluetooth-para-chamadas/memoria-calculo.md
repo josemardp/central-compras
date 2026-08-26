@@ -1,6 +1,6 @@
 # Memoria de calculo
 
-Gerado em 2026-08-26T20:08:17.
+Gerado em 2026-08-26T20:49:11.
 
 ## QCY H3 ANC
 
@@ -12,8 +12,9 @@ Gerado em 2026-08-26T20:08:17.
 
 ### Valor
 
+- base de comparacao: **custo total**
 - custo total desta cotacao: R$ 296,64
-- menor custo entre os elegiveis: R$ 296,64
+- menor custo total entre os elegiveis: R$ 296,64
 - valor = R$ 296,64 / R$ 296,64 = **1.000**
 
 ### Risco
@@ -58,8 +59,9 @@ Gerado em 2026-08-26T20:08:17.
 
 ### Valor
 
+- base de comparacao: **custo total**
 - custo total desta cotacao: R$ 466,00
-- menor custo entre os elegiveis: R$ 296,64
+- menor custo total entre os elegiveis: R$ 296,64
 - valor = R$ 296,64 / R$ 466,00 = **0.637**
 
 ### Risco
@@ -110,8 +112,9 @@ Os eixos abaixo sao informativos: gate vem antes de score.
 
 ### Valor
 
+- base de comparacao: **custo total**
 - custo total desta cotacao: R$ 499,00
-- menor custo entre os elegiveis: R$ 296,64
+- menor custo total entre os elegiveis: R$ 296,64
 - valor = R$ 296,64 / R$ 499,00 = **0.594**
 
 ### Risco
@@ -165,8 +168,9 @@ Os eixos abaixo sao informativos: gate vem antes de score.
 
 ### Valor
 
+- base de comparacao: **custo total**
 - custo total desta cotacao: R$ 429,00
-- menor custo entre os elegiveis: R$ 296,64
+- menor custo total entre os elegiveis: R$ 296,64
 - valor = R$ 296,64 / R$ 429,00 = **0.691**
 
 ### Risco

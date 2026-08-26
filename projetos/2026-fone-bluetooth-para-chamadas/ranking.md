@@ -1,19 +1,19 @@
 # Ranking
 
-Gerado em 2026-08-26T20:08:17.
+Gerado em 2026-08-26T20:49:11.
 
 ## Elegiveis
 
-1. QCY H3 ANC - 76.5
-   qualidade 0.83 · valor 1.00 · risco 0.71 · aderencia 0.50 · conveniencia 0.50
+1. QCY H3 ANC - 79.5
+   qualidade 0.83 · valor 1.00 · risco 0.71 · aderencia 0.50 · conveniencia --
    custo total R$ 296,64 / Amazon / estimativa web
-   score parcial - sem dado em: conveniencia (contam como 0,50 neutro)
+   confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
    aguardando preco desde 2026-08-26: faltam R$ 36,64 para o alvo de R$ 260,00. Voce decidiu esperar, nao comprar.
 
-2. Soundcore Anker Life Q30 - 59.4
-   qualidade 0.63 · valor 0.64 · risco 0.60 · aderencia 0.50 · conveniencia 0.50
+2. Soundcore Anker Life Q30 - 60.5
+   qualidade 0.63 · valor 0.64 · risco 0.60 · aderencia 0.50 · conveniencia --
    custo total R$ 466,00 / Amazon / estimativa web
-   score parcial - sem dado em: conveniencia (contam como 0,50 neutro)
+   confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
 ## Cortados pelos gates
 
@@ -23,6 +23,7 @@ Gerado em 2026-08-26T20:08:17.
 ## Observacoes
 
 - Score zerado significa corte por gate, nao produto ruim em absoluto.
+- `confianca` e a fracao do peso do score apoiada em dado real. Score 80 com confianca 60% nao e comparavel com score 80 com confianca 100%.
 - Linha `fonte=web` nao fecha compra; confirme preco, estoque e frete antes de decidir.
 - Diferenca de ate 3 pontos entre finalistas deve ser tratada como empate tecnico.
 - `ranking.csv` e derivado e pode ser sobrescrito; `cotacoes.csv` preserva a serie historica.
