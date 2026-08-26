@@ -21,6 +21,30 @@ escala:
   conveniencia:
     prazo_otimo_dias: 2   # ate aqui -> 1,00
     prazo_ruim_dias: 30   # daqui em diante -> 0,00
+  # Principio 3 do PRD: todo numero e rastreavel. Estes pesos estavam cravados
+  # no codigo, entao `risco 0,71` era um numero que voce nao tinha como conferir.
+  # `auditar` mostra a conta inteira usando exatamente o que esta aqui.
+  risco:
+    peso_vendedor: 0.30
+    peso_garantia_tipo: 0.35
+    peso_garantia_prazo: 0.20
+    peso_loja: 0.15
+    garantia_meses_cheia: 36    # a partir daqui o prazo vale 1,00
+    penalidade_por_alerta: 0.15
+    penalidade_maxima: 0.35
+    vendedor:
+      oficial: 1.00
+      fisica: 0.85
+      terceiro: 0.65
+      desconhecido: 0.55
+    garantia:
+      nacional: 1.00
+      importada: 0.70
+      vendedor: 0.55
+      nenhuma: 0.10
+      desconhecido: 0.45
+    loja_preferida: 1.00
+    loja_desconhecida: 0.70
 
 # Preco envelhece. Cotacao velha nao pode ser tratada como preco de hoje.
 frescor:

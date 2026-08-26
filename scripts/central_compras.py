@@ -1013,18 +1013,63 @@ def preferred_store(loja: str | None) -> bool:
     )
 
 
-def risk_score(row: dict[str, str], alerts: list[str] | None = None) -> float:
+def risk_parts(row: dict[str, str], alerts: list[str] | None = None) -> list[tuple[str, str, float, float]]:
+    """Parcelas do eixo risco: (rotulo, o que foi lido, nota, peso).
+
+    Devolver as parcelas em vez de so o total e o que permite `auditar` mostrar
+    a conta inteira e cumprir o principio 3 do PRD.
+    """
+    cfg = (preferences().get("escala") or {}).get("risco") or {}
+    tabela_vendedor = cfg.get("vendedor") or {}
+    tabela_garantia = cfg.get("garantia") or {}
+
     vendedor = (row.get("vendedor_tipo") or "").lower()
     garantia = (row.get("garantia_tipo") or "").lower()
-    vendedor_score = {"oficial": 1.0, "fisica": 0.85, "terceiro": 0.65}.get(vendedor, 0.55)
-    garantia_score = {"nacional": 1.0, "importada": 0.70, "vendedor": 0.55, "nenhuma": 0.10}.get(garantia, 0.45)
-    meses = min(quote_float(row.get("garantia_meses")), 36) / 36
-    # PRD 7.3: o eixo risco inclui a reputacao da loja. `lojas_preferidas` era
-    # declarada em preferencias.yaml e nunca lida por ninguem.
-    loja_score = 1.0 if preferred_store(row.get("loja")) else 0.7
-    score = (vendedor_score * 0.30) + (garantia_score * 0.35) + (meses * 0.20) + (loja_score * 0.15)
-    alert_count = len(set(alerts or ([] if not row.get("flag_suspeita") else [row.get("flag_suspeita")])))
-    score -= min(0.35, alert_count * 0.15)
+    meses_cheia = quote_float(cfg.get("garantia_meses_cheia"), 36) or 36
+    meses = min(quote_float(row.get("garantia_meses")), meses_cheia) / meses_cheia
+    preferida = preferred_store(row.get("loja"))
+
+    return [
+        (
+            "vendedor",
+            row.get("vendedor_tipo") or "nao informado",
+            quote_float(tabela_vendedor.get(vendedor), quote_float(tabela_vendedor.get("desconhecido"), 0.55)),
+            quote_float(cfg.get("peso_vendedor"), 0.30),
+        ),
+        (
+            "garantia (tipo)",
+            row.get("garantia_tipo") or "nao informado",
+            quote_float(tabela_garantia.get(garantia), quote_float(tabela_garantia.get("desconhecido"), 0.45)),
+            quote_float(cfg.get("peso_garantia_tipo"), 0.35),
+        ),
+        (
+            "garantia (prazo)",
+            f"{row.get('garantia_meses') or 0} de {int(meses_cheia)} meses",
+            round(meses, 3),
+            quote_float(cfg.get("peso_garantia_prazo"), 0.20),
+        ),
+        (
+            "loja",
+            f"{row.get('loja') or 'nao informada'}" + (" (preferida)" if preferida else " (fora da lista)"),
+            quote_float(cfg.get("loja_preferida" if preferida else "loja_desconhecida"), 1.0 if preferida else 0.70),
+            quote_float(cfg.get("peso_loja"), 0.15),
+        ),
+    ]
+
+
+def risk_penalty(row: dict[str, str], alerts: list[str] | None = None) -> tuple[int, float]:
+    cfg = (preferences().get("escala") or {}).get("risco") or {}
+    quantidade = len(set(alerts or ([] if not row.get("flag_suspeita") else [row.get("flag_suspeita")])))
+    penalidade = min(
+        quote_float(cfg.get("penalidade_maxima"), 0.35),
+        quantidade * quote_float(cfg.get("penalidade_por_alerta"), 0.15),
+    )
+    return quantidade, round(penalidade, 3)
+
+
+def risk_score(row: dict[str, str], alerts: list[str] | None = None) -> float:
+    score = sum(nota * peso for _, _, nota, peso in risk_parts(row, alerts))
+    score -= risk_penalty(row, alerts)[1]
     return round(max(0.0, min(1.0, score)), 3)
 
 
@@ -2922,6 +2967,125 @@ def generate_dashboard(args: argparse.Namespace) -> None:
     print(f"Projetos: {len(projects)}")
 
 
+def audit_score(args: argparse.Namespace) -> None:
+    """Mostra a conta inteira: do que esta no CSV ate o score final.
+
+    Principio 3 do PRD: se o score e 76,5, tem que dar para reconstruir os 76,5
+    a mao, com uma calculadora. Ate aqui, dava para conferir eixos -> score, mas
+    nao CSV -> eixos, porque os pesos internos do risco viviam so no codigo.
+    """
+    project = project_path(args.projeto)
+    elegiveis, cortados = compute_ranking(project)
+    todos = [*elegiveis, *cortados]
+    if args.produto_id:
+        todos = [item for item in todos if item.produto_id == args.produto_id]
+        if not todos:
+            raise SystemExit(f"Produto sem cotacao neste projeto: {args.produto_id}")
+
+    pesos = preferences().get("score", {})
+    escala = (preferences().get("escala") or {}).get("qualidade") or {}
+    piso = quote_float(escala.get("nota_piso"), 3.8)
+    teto = quote_float(escala.get("nota_teto"), 5.0)
+    custos = [
+        quote_float(item.quote.get("custo_total"))
+        for item in elegiveis
+        if quote_float(item.quote.get("custo_total")) > 0
+    ]
+    menor_custo = min(custos) if custos else 0.0
+
+    linhas: list[str] = ["# Memoria de calculo", "", f"Gerado em {now_iso()}.", ""]
+    for item in todos:
+        row = item.quote
+        nota_ajustada = current_adjusted_rating(row)
+        linhas.extend([f"## {item.product.get('nome') or item.produto_id}", ""])
+        if item.eliminations:
+            linhas.extend([
+                "**Cortado pelos gates, entao o score e 0 por definicao.** Motivos:",
+                "",
+                *(f"- {motivo}" for motivo in item.eliminations),
+                "",
+                "Os eixos abaixo sao informativos: gate vem antes de score.",
+                "",
+            ])
+
+        linhas.extend(["### Qualidade", ""])
+        linhas.append(
+            f"- nota bruta {row.get('nota') or 0} com {row.get('n_avaliacoes') or 0} avaliacoes"
+        )
+        cfg_bayes = preferences().get("nota_bayesiana", {})
+        media = quote_float(cfg_bayes.get("media_categoria_padrao"), 4.3)
+        ancora = quote_float(cfg_bayes.get("peso_ancora"), 50)
+        n = quote_int(row.get("n_avaliacoes"))
+        linhas.append(
+            f"- nota ajustada = ({n} x {row.get('nota') or 0} + {ancora} x {media}) / ({n} + {ancora}) = **{nota_ajustada}**"
+        )
+        linhas.append(
+            f"- qualidade = ({nota_ajustada} - {piso}) / ({teto} - {piso}) = **{item.axes['qualidade']:.3f}**"
+        )
+
+        linhas.extend(["", "### Valor", ""])
+        custo = quote_float(row.get("custo_total"))
+        linhas.append(f"- custo total desta cotacao: {brl(custo)}")
+        linhas.append(f"- menor custo entre os elegiveis: {brl(menor_custo)}")
+        linhas.append(
+            f"- valor = {brl(menor_custo)} / {brl(custo)} = **{item.axes['valor']:.3f}**"
+        )
+
+        linhas.extend(["", "### Risco", "", "| Parcela | Lido da cotacao | Nota | Peso | Contribui |", "|---|---|---:|---:|---:|"])
+        subtotal = 0.0
+        for rotulo, lido, nota, peso in risk_parts(row, item.alerts):
+            subtotal += nota * peso
+            linhas.append(f"| {rotulo} | {lido} | {nota:.2f} | {peso} | {nota * peso:.4f} |")
+        quantidade, penalidade = risk_penalty(row, item.alerts)
+        linhas.append(f"| soma | | | | **{subtotal:.4f}** |")
+        if quantidade:
+            linhas.append(
+                f"| penalidade | {quantidade} alerta(s): {', '.join(item.alerts) or 'flag manual'} | | | **-{penalidade:.4f}** |"
+            )
+        linhas.append(f"| risco | | | | **{item.axes['risco']:.3f}** |")
+
+        linhas.extend(["", "### Aderencia", ""])
+        reqs = item.product.get("requisitos_atendidos") or {}
+        if reqs:
+            for chave, valor in reqs.items():
+                peso_req = 1.0 if valor is True else (0.5 if str(valor).lower() in {"parcial", "partial"} else 0.0)
+                linhas.append(f"- {chave}: {valor} vale {peso_req}")
+            linhas.append(f"- aderencia = media = **{item.axes['aderencia']:.3f}**")
+        else:
+            linhas.append("- nenhum requisito registrado no produto: entra como **0,50 neutro**")
+
+        linhas.extend(["", "### Conveniencia", ""])
+        prazo = row.get("frete_prazo_dias")
+        if prazo in {"", None}:
+            linhas.append("- prazo de frete nao informado: entra como **0,50 neutro**")
+        else:
+            cfg_conv = (preferences().get("escala") or {}).get("conveniencia") or {}
+            otimo = quote_float(cfg_conv.get("prazo_otimo_dias"), 2)
+            ruim = quote_float(cfg_conv.get("prazo_ruim_dias"), 30)
+            linhas.append(
+                f"- conveniencia = ({ruim} - {prazo}) / ({ruim} - {otimo}) = **{item.axes['conveniencia']:.3f}**"
+            )
+
+        linhas.extend(["", "### Score final", "", "| Eixo | Nota | Peso | Contribui |", "|---|---:|---:|---:|"])
+        total = 0.0
+        for eixo, nota in item.axes.items():
+            peso = quote_float(pesos.get(eixo), 0)
+            total += nota * peso
+            linhas.append(f"| {eixo} | {nota:.3f} | {peso} | {nota * peso:.4f} |")
+        linhas.append(f"| **total x 100** | | | **{total * 100:.1f}** |")
+        if item.eliminations:
+            linhas.append("")
+            linhas.append(f"Score publicado: **0** (cortado no gate, nao os {total * 100:.1f} acima).")
+        linhas.append("")
+
+    caminho = project / "memoria-calculo.md"
+    atomic_write_text(caminho, "\n".join(linhas) + "\n")
+    print(caminho)
+    for item in todos:
+        nome = item.product.get("nome") or item.produto_id
+        print(f"{nome}: score {item.score}")
+
+
 def migrate_quotes(args: argparse.Namespace) -> None:
     """Atualiza o cabecalho do cotacoes.csv sem perder linha nem coluna."""
     alvos = [project_path(args.projeto)] if args.projeto else project_dirs()
@@ -3153,6 +3317,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("projeto")
     p.add_argument("--produto-id")
     p.set_defaults(func=show_history)
+
+    p = sub.add_parser("auditar", help="mostra a conta inteira do score, do CSV ate o numero final")
+    p.add_argument("projeto")
+    p.add_argument("--produto-id", help="um produto so; sem isso, audita todos")
+    p.set_defaults(func=audit_score)
 
     p = sub.add_parser("migrar-cotacoes", help="atualiza o cabecalho do cotacoes.csv preservando linhas e colunas extras")
     p.add_argument("--projeto", help="um projeto especifico; sem isso, migra todos")

@@ -81,6 +81,20 @@ vazio nao pode passar por medida.
 `n_avaliacoes`, nunca lida congelada do CSV: se voce mudar os pesos da nota
 bayesiana, o gate e o score acompanham.
 
+## Auditar um score
+
+```powershell
+python scripts/central_compras.py auditar projetos/<projeto> --produto-id <id>
+```
+
+Gera `memoria-calculo.md` com a conta inteira: nota bayesiana, cada parcela do
+risco com o que foi lido da cotacao, e a soma final eixo por eixo. E o principio
+3 do PRD entregue de verdade: da para refazer o numero na calculadora.
+
+Os pesos internos do risco ficam em `preferencias.yaml`, em `escala.risco`.
+Antes eles viviam cravados no codigo, entao `risco 0,71` era um numero que voce
+nao tinha como conferir.
+
 ## Frescor da cotacao
 
 Preco envelhece. Cotacao `web` vale 14 dias e `manual` vale 7 (`frescor:` em
@@ -192,6 +206,7 @@ o que vazou.
 - `aprender-veredito` roda uma vez por veredito; repetir exige `--force`.
 - Editar gate por `--gate` preserva os comentarios do `categorias.yaml`.
 - Dinheiro sai no formato brasileiro: `R$ 1.234,50`.
+- Nenhuma constante de score mora no codigo: tudo em `preferencias.yaml`.
 
 ## Estrutura
 
@@ -244,3 +259,9 @@ Ela nao deve fingir que confirmou preco, estoque, frete ou cupom quando isso dep
 ```powershell
 python -m unittest discover -s tests
 ```
+
+118 testes. Alem dos casos de exemplo, ha teste de invariante que gera cotacoes
+aleatorias (inclusive patologicas: preco negativo, `1e309`, data impossivel,
+unicode) e confere propriedades que tem que valer sempre: score entre 0 e 100,
+eixo entre 0 e 1, cortado nunca pontua, o mais barato elegivel sempre tira 1,00
+no eixo valor, e reescrever o CSV lido nao muda o arquivo nem perde linha.

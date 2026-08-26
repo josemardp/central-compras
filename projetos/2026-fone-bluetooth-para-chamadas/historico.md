@@ -1,6 +1,6 @@
 # Historico de preco
 
-Gerado em 2026-08-26T17:06:29.
+Gerado em 2026-08-26T20:08:18.
 
 ## Edifier W820NB Plus
 

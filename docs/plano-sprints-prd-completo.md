@@ -259,3 +259,41 @@ vazio e com projeto sem cotacao, desempenho com 25 projetos (1,1s), e
 `parse_pairs` com `=` dentro do valor.
 
 Testes: de 82 para 96.
+
+## Sprint 11 - Auditabilidade e invariantes
+
+Meta: trocar inspecao manual por metodo. Cobertura, fuzz com invariantes e
+verificacao de uma promessa do PRD que nunca tinha sido testada.
+
+Status: concluida.
+
+**Achado principal.** O principio 3 do PRD ("se o score e 82, e possivel
+reconstruir os 82 a partir do CSV, a mao, com uma calculadora") era meia-verdade.
+De eixos para score, fechava. De CSV para eixos, nao: os pesos internos do eixo
+risco (0,30 vendedor / 0,35 tipo de garantia / 0,20 prazo / 0,15 loja) e as
+tabelas de pontuacao viviam cravados no codigo. `risco 0,71` era um numero
+impossivel de conferir.
+
+Corrigido:
+- Todas as constantes do risco foram para `preferencias.yaml`, em `escala.risco`.
+- Comando `auditar` gera `memoria-calculo.md` com a conta inteira, parcela por
+  parcela, incluindo a penalidade por alerta.
+- Teste que confere que as parcelas do risco somam de volta no risco publicado.
+
+**Fuzz com invariantes.** 80 rodadas geradas com semente fixa, metade com dado
+patologico de proposito (preco negativo, `1e309`, `2026-13-45`, unicode,
+categoria inexistente, colisao de `anuncio_id`, estado desconhecido). Zero
+violacoes. As propriedades verificadas: score em 0-100, eixo em 0-1, cortado
+sempre com score 0, elegivel sempre sem eliminacao, ordem decrescente, o mais
+barato elegivel sempre com valor 1,00, nenhum relatorio explode, e
+`write(read(x)) == x` sem perder linha.
+
+**Cobertura.** 87% com fluxo completo e testes combinados. Os ramos que estavam
+sem teste nenhum e que produziriam resposta errada em silencio ganharam teste:
+`parse_scalar` (e como `--requisito r=false` vira deal-breaker), `adherence_score`
+com `parcial` (que e o que os quatro produtos reais usam), `yaml_scalar`,
+`waiting_gap` sem preco alvo, busca de projeto por nome parcial e ambiguo, e
+`replace_or_append_bullet`. Todos ja estavam corretos: estavam sem teste, nao
+com defeito.
+
+Testes: de 96 para 118.
