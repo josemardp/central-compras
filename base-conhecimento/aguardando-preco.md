@@ -1,6 +1,6 @@
 # Aguardando preco
 
-Gerado em 2026-08-26T16:53:30.
+Gerado em 2026-08-26T17:06:29.
 
 | Produto | Categoria | Projeto | Atual | Alvo | Teto | Distancia | Desde | Motivo |
 |---|---|---|---:|---:|---:|---:|---|---|

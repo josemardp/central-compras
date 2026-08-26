@@ -227,3 +227,35 @@ O que estava errado e foi corrigido:
 - **YAML corrompido cuspia traceback cru.** Agora diz qual arquivo e o que fazer.
 
 Testes: de 66 para 82.
+
+## Sprint 10 - Selecao, idempotencia e leitura
+
+Meta: garantir que o sistema tecnicamente funcionando entregue tambem a
+resposta certa para quem le.
+
+Status: concluida.
+
+O que estava errado e foi corrigido:
+
+- **Cotacao manual vencida vencia observacao recente.** `latest_quotes` preferia
+  `manual` sem olhar a data: medido, um preco manual de 2024 (R$ 900) rankeava
+  no lugar de uma cotacao web de hoje (R$ 400). A guarda de frescor avisava, mas
+  a escolha em si continuava errada.
+- **`aprender-veredito` nao era idempotente.** Rodar duas vezes duplicava marca
+  e loja na base, e a base alimenta o `prompt-ia`: o aprendizado passava a
+  contar dobrado. Agora recusa repetir sem `--force`.
+- **`registrar-licao --gate` apagava os comentarios do `categorias.yaml`.** O
+  arquivo e feito para ser editado e documentado a mao, e um `safe_dump` do
+  arquivo inteiro comia toda explicacao. A edicao passou a ser cirurgica, na
+  linha certa, com conferencia de que o YAML continua valido depois.
+- **`--perdedores` aceitava o proprio escolhido**, gerando um `decisao.md` que
+  dizia que o vencedor perdeu.
+- **Dinheiro saia como `R$ 1234.5`** em ranking, historico, decisao, veredito,
+  prompts e dashboard.
+
+Verificado e sem defeito nesta rodada: escape de HTML do dashboard (conteudo
+hostil sai inerte, nenhuma tag executavel injetada), dashboard com repositorio
+vazio e com projeto sem cotacao, desempenho com 25 projetos (1,1s), e
+`parse_pairs` com `=` dentro do valor.
+
+Testes: de 82 para 96.

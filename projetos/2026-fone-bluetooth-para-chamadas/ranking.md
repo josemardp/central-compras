@@ -1,18 +1,18 @@
 # Ranking
 
-Gerado em 2026-08-26T16:53:28.
+Gerado em 2026-08-26T17:06:28.
 
 ## Elegiveis
 
 1. QCY H3 ANC - 76.5
    qualidade 0.83 · valor 1.00 · risco 0.71 · aderencia 0.50 · conveniencia 0.50
-   custo_total R$ 296.64 / Amazon / estimativa web
+   custo total R$ 296,64 / Amazon / estimativa web
    score parcial - sem dado em: conveniencia (contam como 0,50 neutro)
-   aguardando preco desde 2026-08-26: faltam R$ 36.64 para o alvo de R$ 260.0. Voce decidiu esperar, nao comprar.
+   aguardando preco desde 2026-08-26: faltam R$ 36,64 para o alvo de R$ 260,00. Voce decidiu esperar, nao comprar.
 
 2. Soundcore Anker Life Q30 - 59.4
    qualidade 0.63 · valor 0.64 · risco 0.60 · aderencia 0.50 · conveniencia 0.50
-   custo_total R$ 466.0 / Amazon / estimativa web
+   custo total R$ 466,00 / Amazon / estimativa web
    score parcial - sem dado em: conveniencia (contam como 0,50 neutro)
 
 ## Cortados pelos gates

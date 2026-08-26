@@ -114,6 +114,17 @@ na criacao. `status` e `validar` comparam a pesquisa real contra o orcamento:
 candidatos demais e cotacoes de menos por candidato viram aviso. A regra existe
 para proteger voce de gastar seis horas para economizar R$ 40.
 
+## Qual cotacao representa o produto
+
+O ranking usa uma cotacao por produto, escolhida assim:
+
+1. a **manual mais recente dentro da validade** (foi conferida por voce);
+2. se nao houver, a **observacao mais recente dentro da validade**, ainda que seja `web`;
+3. se tudo estiver vencido, a manual mais nova, e o ranking marca como vencida.
+
+O passo 2 existe porque preferir a manual cegamente fazia um preco de dois anos
+atras rankear no lugar do de hoje.
+
 ## Historico de preco
 
 ```powershell
@@ -177,6 +188,10 @@ o que vazou.
 - Toda gravacao e atomica: Ctrl+C no meio nao deixa arquivo truncado.
 - `preco_teto` do produto vence o do briefing quando for menor.
 - Cotacao manual nao herda a suspeita da linha web: e observacao nova.
+- Manual vencida nao vence observacao recente.
+- `aprender-veredito` roda uma vez por veredito; repetir exige `--force`.
+- Editar gate por `--gate` preserva os comentarios do `categorias.yaml`.
+- Dinheiro sai no formato brasileiro: `R$ 1.234,50`.
 
 ## Estrutura
 

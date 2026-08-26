@@ -253,6 +253,20 @@ def quote_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def brl(value: Any, vazio: str = "-") -> str:
+    """Dinheiro no formato brasileiro: 1234.5 -> `R$ 1.234,50`."""
+    if value in {None, ""}:
+        return vazio
+    try:
+        numero = float(str(value).replace(",", "."))
+    except ValueError:
+        return str(value)
+    inteiro, _, centavos = f"{abs(numero):,.2f}".partition(".")
+    inteiro = inteiro.replace(",", ".")
+    sinal = "-" if numero < 0 else ""
+    return f"{sinal}R$ {inteiro},{centavos}"
+
+
 def quote_int(value: Any, default: int = 0) -> int:
     if value in {None, ""}:
         return default
@@ -669,7 +683,7 @@ def add_quote(args: argparse.Namespace) -> None:
     if args.fonte == "manual":
         mark_steps(project, [7])
         set_process_state(project, proxima_acao="gerar ranking e comparar finalistas com cotacao manual")
-    print(f"Cotacao adicionada: {args.produto_id} - R$ {row['custo_total']}")
+    print(f"Cotacao adicionada: {args.produto_id} - {brl(row['custo_total'])}")
 
 
 def append_timeline(project: Path, etapa: str, decisao: str, porque: str) -> None:
@@ -701,14 +715,33 @@ def find_product(produto_id: str) -> dict[str, Any] | None:
 
 
 def latest_quotes(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+    """Cotacao que representa cada produto no ranking.
+
+    Manual vale mais que web porque foi conferida. Mas manual VENCIDA nao vale
+    mais que uma observacao recente: preferir cegamente a manual fazia um preco
+    de dois anos atras rankear no lugar do de hoje. Quando a manual venceu,
+    usa a observacao mais recente e o ranking avisa que ela e estimativa.
+    """
     grouped: dict[str, list[dict[str, str]]] = {}
     for row in rows:
         grouped.setdefault(row.get("produto_id", ""), []).append(row)
+
     latest: dict[str, dict[str, str]] = {}
     for produto_id, values in grouped.items():
-        manual = [row for row in values if row.get("fonte") == "manual"]
-        pool = manual or values
-        latest[produto_id] = sorted(pool, key=lambda r: r.get("data_coleta", ""))[-1]
+        por_data = sorted(values, key=lambda r: str(r.get("data_coleta") or ""))
+        manual_no_prazo = [
+            row for row in por_data if row.get("fonte") == "manual" and not quote_is_stale(row)
+        ]
+        if manual_no_prazo:
+            latest[produto_id] = manual_no_prazo[-1]
+            continue
+        recentes = [row for row in por_data if not quote_is_stale(row)]
+        if recentes:
+            latest[produto_id] = recentes[-1]
+            continue
+        # Tudo vencido: fica a manual mais nova, ou a observacao mais nova.
+        manual = [row for row in por_data if row.get("fonte") == "manual"]
+        latest[produto_id] = (manual or por_data)[-1]
     return latest
 
 
@@ -1092,11 +1125,11 @@ def waiting_gap(product: dict[str, Any], quote: dict[str, str]) -> str:
     desde = (product or {}).get("aguardando_preco_desde") or ""
     if alvo and atual and atual > alvo:
         return (
-            f"aguardando preco desde {desde}: faltam R$ {round(atual - alvo, 2)} "
-            f"para o alvo de R$ {alvo}. Voce decidiu esperar, nao comprar."
+            f"aguardando preco desde {desde}: faltam {brl(round(atual - alvo, 2))} "
+            f"para o alvo de {brl(alvo)}. Voce decidiu esperar, nao comprar."
         )
     if alvo and atual and atual <= alvo:
-        return f"AGUARDANDO PRECO E O ALVO FOI ATINGIDO: R$ {atual} <= R$ {alvo}. Hora de reavaliar."
+        return f"AGUARDANDO PRECO E O ALVO FOI ATINGIDO: {brl(atual)} <= {brl(alvo)}. Hora de reavaliar."
     return f"aguardando preco desde {desde} (sem preco_alvo definido)."
 
 
@@ -1253,12 +1286,12 @@ def build_ranking(args: argparse.Namespace) -> None:
             fonte_alerta = "confirmada manualmente" if item.quote.get("fonte") == "manual" else "estimativa web"
             tco_line = ""
             if item.quote.get("tco_total") and quote_float(item.quote.get("tco_total")) != quote_float(item.quote.get("custo_total")):
-                tco_line = f"   TCO {item.quote.get('tco_meses')} meses R$ {item.quote.get('tco_total')}"
+                tco_line = f"   TCO {item.quote.get('tco_meses')} meses {brl(item.quote.get('tco_total'))}"
             lines.extend(
                 [
                     f"{idx}. {product_name} - {item.score:.1f}",
                     f"   {axes}",
-                    f"   custo_total R$ {item.quote.get('custo_total')} / {item.quote.get('loja')} / {fonte_alerta}",
+                    f"   custo total {brl(item.quote.get('custo_total'))} / {item.quote.get('loja')} / {fonte_alerta}",
                 ]
             )
             if tco_line:
@@ -1392,8 +1425,8 @@ def show_history(args: argparse.Namespace) -> None:
             f"({item['primeira_coleta'][:10]} ate {item['ultima_coleta'][:10]})"
         )
         lines.append(
-            f"- Custo: atual R$ {item['atual']} / minimo R$ {item['minimo']} / "
-            f"mediana R$ {item['mediana']} / maximo R$ {item['maximo']}"
+            f"- Custo: atual {brl(item['atual'])} / minimo {brl(item['minimo'])} / "
+            f"mediana {brl(item['mediana'])} / maximo {brl(item['maximo'])}"
         )
         lines.append(f"- Variacao desde a primeira coleta: {item['variacao_pct']}%")
         if item["observacoes"] < 2:
@@ -1409,15 +1442,15 @@ def show_history(args: argparse.Namespace) -> None:
         lines.append("| Data | Custo total | Loja | Fonte |")
         lines.append("|---|---:|---|---|")
         for ponto in item["pontos"]:
-            lines.append(f"| {ponto['data']} | {ponto['custo']} | {ponto['loja']} | {ponto['fonte']} |")
+            lines.append(f"| {ponto['data']} | {brl(ponto['custo'])} | {ponto['loja']} | {ponto['fonte']} |")
         lines.append("")
     path = project / "historico.md"
     atomic_write_text(path, "\n".join(lines) + "\n")
     print(path)
     for item in series:
         print(
-            f"{item['nome']}: {item['observacoes']} obs / atual R$ {item['atual']} / "
-            f"mediana R$ {item['mediana']} / variacao {item['variacao_pct']}%"
+            f"{item['nome']}: {item['observacoes']} obs / atual {brl(item['atual'])} / "
+            f"mediana {brl(item['mediana'])} / variacao {item['variacao_pct']}%"
         )
 
 
@@ -1492,7 +1525,7 @@ def promote_quote(args: argparse.Namespace) -> None:
     )
     mark_steps(project, [7])
     set_process_state(project, proxima_acao="gerar ranking com a cotacao manual e registrar decisao")
-    print(f"Cotacao manual adicionada: {args.produto_id} - R$ {row.get('custo_total')}")
+    print(f"Cotacao manual adicionada: {args.produto_id} - {brl(row.get('custo_total'))}")
 
 
 def discard_product(args: argparse.Namespace) -> None:
@@ -1602,7 +1635,7 @@ def decision_briefing(project: Path) -> str:
             linha = (
                 f"{posicao}. {item.product.get('nome') or item.produto_id} - {item.score:.1f}\n"
                 f"   {eixos}\n"
-                f"   R$ {item.quote.get('custo_total')} em {item.quote.get('loja')} "
+                f"   {brl(item.quote.get('custo_total'))} em {item.quote.get('loja')} "
                 f"({item.quote.get('vendedor') or 'vendedor nao confirmado'}, "
                 f"garantia {item.quote.get('garantia_meses') or '?'} meses "
                 f"{item.quote.get('garantia_tipo')}), fonte={item.quote.get('fonte')}"
@@ -1635,8 +1668,8 @@ def decision_briefing(project: Path) -> str:
         partes.append("\nSerie historica de custo:")
         for item in com_serie:
             partes.append(
-                f"- {item['nome']}: atual R$ {item['atual']}, mediana R$ {item['mediana']}, "
-                f"minimo R$ {item['minimo']}, variacao {item['variacao_pct']}%"
+                f"- {item['nome']}: atual {brl(item['atual'])}, mediana {brl(item['mediana'])}, "
+                f"minimo {brl(item['minimo'])}, variacao {item['variacao_pct']}%"
             )
     if len(serie) > len(com_serie):
         partes.append(
@@ -1744,8 +1777,8 @@ def decide(args: argparse.Namespace) -> None:
         atual = quote_float(quote.get("custo_total"))
         if alvo and atual > alvo:
             raise SystemExit(
-                f"{args.produto_id} esta em `aguardando_preco` e o custo atual (R$ {atual}) "
-                f"ainda esta acima do seu preco alvo (R$ {alvo}).\n"
+                f"{args.produto_id} esta em `aguardando_preco` e o custo atual ({brl(atual)}) "
+                f"ainda esta acima do seu preco alvo ({brl(alvo)}).\n"
                 "Voce mesmo decidiu esperar. Use --permitir-aguardando se mudou de ideia, "
                 "ou `aguardar-preco` de novo com outro alvo."
             )
@@ -1758,6 +1791,10 @@ def decide(args: argparse.Namespace) -> None:
         produto, motivo = produto.strip(), motivo.strip()
         if not motivo:
             raise SystemExit(f"Perdedor sem motivo: {produto}. O `nao escolhi` vale mais que o `escolhi`.")
+        if produto == args.produto_id:
+            raise SystemExit(
+                f"`{produto}` e o produto escolhido; ele nao pode constar como perdedor."
+            )
         if not find_product(produto):
             raise SystemExit(f"Perdedor nao existe em `produtos/`: {produto}. Confira o produto_id.")
         perdedores.append((produto, motivo))
@@ -1784,7 +1821,7 @@ def decide(args: argparse.Namespace) -> None:
         f"- Produto ID: {args.produto_id}",
         f"- Cotacao usada: {quote.get('loja')} / {quote.get('vendedor')}",
         f"- Data: {today()}",
-        f"- Custo total confirmado: R$ {quote.get('custo_total')}",
+        f"- Custo total confirmado: {brl(quote.get('custo_total'))}",
         "",
         "## Por que escolhi",
         "",
@@ -1848,7 +1885,7 @@ def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quot
         "- Projeto:": f"- Projeto: {project.name}",
         "- Produto:": f"- Produto: {product.get('nome') or produto_id}",
         "- Data da compra:": f"- Data da compra: {today() if quote.get('fonte') == 'manual' else ''}",
-        "- Valor pago:": f"- Valor pago: R$ {quote.get('custo_total')}",
+        "- Valor pago:": f"- Valor pago: {brl(quote.get('custo_total'))}",
         "- Vendedor:": f"- Vendedor: {quote.get('loja')} / {quote.get('vendedor')}",
         "- Veredito D+30 previsto:": f"- Veredito D+30 previsto: {d30.isoformat()}",
         "- Veredito D+180 previsto:": f"- Veredito D+180 previsto: {d180.isoformat()}",
@@ -1912,6 +1949,14 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     if not path.exists():
         raise SystemExit(f"Veredito nao encontrado: {args.veredito}")
     text = path.read_text(encoding="utf-8")
+    # Rodar duas vezes duplicava marca e loja na base, e a base alimenta o
+    # `prompt-ia`: o mesmo aprendizado passava a contar dobrado.
+    if "## Aprendizado exportado" in text and not args.force:
+        raise SystemExit(
+            f"Este veredito ja foi exportado para a base de conhecimento.\n"
+            f"Veja o bloco `## Aprendizado exportado` em {path}.\n"
+            "Use --force se quiser exportar de novo mesmo assim."
+        )
     project_name = extract_bullet(text, "Projeto")
     product_name = extract_bullet(text, "Produto")
     seller = extract_bullet(text, "Vendedor")
@@ -2113,17 +2158,85 @@ def register_brand(args: argparse.Namespace) -> None:
     print(path.relative_to(ROOT))
 
 
+def yaml_scalar(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return yaml.safe_dump(value, allow_unicode=True, default_flow_style=True).strip().rstrip("\n...").strip()
+
+
+def set_category_gate(path: Path, categoria: str, field: str, value: Any) -> None:
+    """Escreve `categoria.gate.campo` mexendo so na linha certa.
+
+    Um `safe_dump` do arquivo inteiro apagava todo comentario que voce escreveu
+    explicando por que cada gate existe. `categorias.yaml` e feito para ser
+    editado a mao, entao a edicao aqui e cirurgica.
+    """
+    linhas = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    escrito = f"    {field}: {yaml_scalar(value)}"
+
+    def fim_do_bloco(inicio: int, indent_minimo: int) -> int:
+        fim = inicio + 1
+        for i in range(inicio + 1, len(linhas)):
+            crua = linhas[i]
+            if not crua.strip() or crua.lstrip().startswith("#"):
+                continue
+            if len(crua) - len(crua.lstrip()) < indent_minimo:
+                return fim
+            fim = i + 1
+        return fim
+
+    inicio_categoria = next(
+        (i for i, linha in enumerate(linhas) if linha.rstrip() == f"{categoria}:"), None
+    )
+    if inicio_categoria is None:
+        if linhas and linhas[-1].strip():
+            linhas.append("")
+        linhas.extend([f"{categoria}:", "  gate:", escrito])
+        atomic_write_text(path, "\n".join(linhas) + "\n")
+        return
+
+    fim_categoria = fim_do_bloco(inicio_categoria, 1)
+    inicio_gate = next(
+        (i for i in range(inicio_categoria + 1, fim_categoria) if linhas[i].rstrip() == "  gate:"),
+        None,
+    )
+    if inicio_gate is None:
+        linhas[fim_categoria:fim_categoria] = ["  gate:", escrito]
+        atomic_write_text(path, "\n".join(linhas) + "\n")
+        return
+
+    fim_gate = fim_do_bloco(inicio_gate, 3)
+    alvo = next(
+        (i for i in range(inicio_gate + 1, fim_gate) if linhas[i].strip().startswith(f"{field}:")),
+        None,
+    )
+    if alvo is None:
+        linhas.insert(inicio_gate + 1, escrito)
+    else:
+        linhas[alvo] = escrito
+    atomic_write_text(path, "\n".join(linhas) + "\n")
+
+
 def apply_lesson_gate(gate: str) -> str:
     if "=" not in gate or "." not in gate.split("=", 1)[0]:
         raise SystemExit("Use --gate categoria.campo=valor. Exemplo: cosmetico.exige_vendedor_oficial=true")
     left, raw_value = gate.split("=", 1)
     categoria, field = left.split(".", 1)
-    categories = read_yaml(CONFIG / "categorias.yaml", {})
-    category = categories.setdefault(categoria, {})
-    gate_cfg = category.setdefault("gate", {})
-    gate_cfg[field] = parse_scalar(raw_value)
-    write_yaml(CONFIG / "categorias.yaml", categories)
-    return f"{categoria}.{field}={gate_cfg[field]}"
+    path = CONFIG / "categorias.yaml"
+    valor = parse_scalar(raw_value)
+    set_category_gate(path, categoria, field, valor)
+    # Confere que o arquivo continua valido e que o valor chegou onde devia.
+    conferencia = ((read_yaml(path, {}) or {}).get(categoria) or {}).get("gate", {})
+    if conferencia.get(field) != valor:
+        raise SystemExit(
+            f"Nao consegui gravar o gate {categoria}.{field} em {path}. "
+            "Edite o arquivo a mao e confira a indentacao."
+        )
+    return f"{categoria}.{field}={valor}"
 
 
 def register_lesson(args: argparse.Namespace) -> None:
@@ -2604,10 +2717,10 @@ def generate_project_page(project: Path) -> Path:
             "<tr>"
             f"<td>{safe_html(item['nome'])}</td>"
             f"<td class=\"num\">{safe_html(item['observacoes'])}</td>"
-            f"<td class=\"num\">{safe_html(item['atual'])}</td>"
-            f"<td class=\"num\">{safe_html(item['minimo'])}</td>"
-            f"<td class=\"num\">{safe_html(item['mediana'])}</td>"
-            f"<td class=\"num\">{safe_html(item['maximo'])}</td>"
+            f"<td class=\"num\">{safe_html(brl(item['atual']))}</td>"
+            f"<td class=\"num\">{safe_html(brl(item['minimo']))}</td>"
+            f"<td class=\"num\">{safe_html(brl(item['mediana']))}</td>"
+            f"<td class=\"num\">{safe_html(brl(item['maximo']))}</td>"
             f"<td class=\"num\">{aviso}</td>"
             "</tr>"
         )
@@ -2619,7 +2732,7 @@ def generate_project_page(project: Path) -> Path:
             f"<td>{safe_html(row.get('data_coleta'))}</td>"
             f"<td>{safe_html(row.get('produto_id'))}</td>"
             f"<td>{safe_html(row.get('loja'))}</td>"
-            f"<td class=\"num\">{safe_html(row.get('custo_total'))}</td>"
+            f"<td class=\"num\">{safe_html(brl(row.get('custo_total')))}</td>"
             f"<td>{safe_html(row.get('fonte'))}</td>"
             "</tr>"
         )
@@ -2757,9 +2870,9 @@ def generate_dashboard(args: argparse.Namespace) -> None:
             "<tr>"
             f"<td>{safe_html(row['nome'])}</td>"
             f"<td>{safe_html(row['projeto'])}</td>"
-            f"<td class=\"num\">{safe_html(row['preco_atual'])}</td>"
-            f"<td class=\"num\">{safe_html(row['preco_alvo'])}</td>"
-            f"<td class=\"num\">{safe_html(row['distancia_ate_alvo'])}</td>"
+            f"<td class=\"num\">{safe_html(brl(row['preco_atual'], ''))}</td>"
+            f"<td class=\"num\">{safe_html(brl(row['preco_alvo'], ''))}</td>"
+            f"<td class=\"num\">{safe_html(brl(row['distancia_ate_alvo'], ''))}</td>"
             "</tr>"
         )
     verdict_rows = []
@@ -3158,6 +3271,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--alerta")
     p.add_argument("--nota-arrependimento", type=float)
     p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"])
+    p.add_argument("--force", action="store_true", help="exporta de novo um veredito ja exportado")
     p.set_defaults(func=learn_from_verdict)
 
     return parser

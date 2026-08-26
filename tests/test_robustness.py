@@ -132,7 +132,7 @@ class WaitingPriceTest(unittest.TestCase):
     def test_waiting_product_above_target_is_flagged(self):
         produto = {"estado": "aguardando_preco", "preco_alvo": 260, "aguardando_preco_desde": "2026-08-26"}
         aviso = cc.waiting_gap(produto, {"custo_total": "296.64"})
-        self.assertIn("faltam R$ 36.64", aviso)
+        self.assertIn("faltam R$ 36,64", aviso)
 
     def test_waiting_product_that_hit_the_target_says_so(self):
         produto = {"estado": "aguardando_preco", "preco_alvo": 300, "aguardando_preco_desde": "2026-08-26"}
