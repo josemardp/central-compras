@@ -3,8 +3,8 @@
 ## Estado atual
 
 - Estado: pesquisando
-- Proxima acao: confirmar manualmente preco, frete, estoque, garantia e vendedor dos finalistas.
-- Decisao aberta: QCY H3 ANC lidera a pesquisa web, mas ainda nao pode ser escolhido sem cotacao manual.
+- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
+- Decisao aberta: QCY H3 ANC lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
 
 ## Linha do tempo decisoria
 
@@ -28,7 +28,7 @@
 - [x] 3. Registrar produtos em `produtos/`
 - [x] 4. Coletar cotacoes iniciais
 - [x] 5. Aplicar gates eliminatorios
-- [ ] 6. Comparar finalistas
+- [x] 6. Comparar finalistas
 - [ ] 7. Confirmar preco/frete/estoque manualmente
 - [ ] 8. Registrar decisao e por que os outros perderam
 - [ ] 9. Comprar

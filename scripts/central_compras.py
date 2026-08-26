@@ -48,6 +48,24 @@ COTACOES_HEADER = [
     "score",
 ]
 
+QUOTE_REQUIRED_FIELDS = [
+    "data_coleta",
+    "produto_id",
+    "loja",
+    "vendedor_tipo",
+    "custo_total",
+    "nota",
+    "n_avaliacoes",
+    "garantia_tipo",
+    "fonte",
+]
+
+MANUAL_REQUIRED_FIELDS = [
+    "vendedor",
+    "garantia_meses",
+    "link",
+]
+
 
 def today() -> str:
     return dt.date.today().isoformat()
@@ -410,6 +428,93 @@ def latest_quote_for_product(rows: list[dict[str, str]], produto_id: str, fonte:
     return sorted(matches, key=lambda r: r.get("data_coleta", ""))[-1]
 
 
+def category_definition(categoria: str) -> dict[str, Any]:
+    categories = read_yaml(CONFIG / "categorias.yaml", {})
+    return categories.get(categoria) or categories.get("generico") or {}
+
+
+def product_required_attrs(product: dict[str, Any], briefing: dict[str, Any]) -> list[str]:
+    categoria = product.get("categoria") or briefing.get("categoria") or "generico"
+    category = category_definition(categoria)
+    required = category.get("atributos_obrigatorios") or []
+    attrs = product.get("atributos") or {}
+    return [field for field in required if attrs.get(field) in {None, ""}]
+
+
+def quote_missing_fields(row: dict[str, str]) -> list[str]:
+    missing = [field for field in QUOTE_REQUIRED_FIELDS if row.get(field) in {None, ""}]
+    if row.get("fonte") == "manual":
+        missing.extend(field for field in MANUAL_REQUIRED_FIELDS if row.get(field) in {None, ""})
+    return missing
+
+
+def manipulation_alerts(rows: list[dict[str, str]], row: dict[str, str]) -> list[str]:
+    alerts: list[str] = []
+    explicit = row.get("flag_suspeita")
+    if explicit:
+        alerts.append(explicit)
+
+    nota = quote_float(row.get("nota"))
+    avaliacoes = quote_int(row.get("n_avaliacoes"))
+    if nota >= 4.9 and 0 < avaliacoes < 150:
+        alerts.append("AVAL_SUSPEITA")
+
+    preco = quote_float(row.get("preco"))
+    promocional = quote_float(row.get("preco_promocional"))
+    if preco and promocional and promocional < preco * 0.60:
+        previous_prices = [
+            quote_float(other.get("preco"))
+            for other in rows
+            if other is not row and other.get("produto_id") == row.get("produto_id") and quote_float(other.get("preco"))
+        ]
+        if not previous_prices or min(previous_prices) > preco * 0.90:
+            alerts.append("ANCORA")
+
+    anuncio_id = row.get("anuncio_id")
+    if anuncio_id:
+        product_ids = {other.get("produto_id") for other in rows if other.get("anuncio_id") == anuncio_id and other.get("produto_id")}
+        if len(product_ids) > 1:
+            alerts.append("RECICLADO")
+
+    return sorted(set(alerts))
+
+
+def validation_report(project: Path) -> tuple[list[str], list[str]]:
+    briefing, _ = load_frontmatter(project / "briefing.md")
+    rows = read_quotes(project)
+    latest = latest_quotes(rows)
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if not rows:
+        warnings.append("Projeto ainda nao tem cotacoes.")
+
+    for produto_id in sorted(latest):
+        product = find_product(produto_id)
+        if not product:
+            errors.append(f"Produto citado em cotacao nao existe em `produtos/`: {produto_id}")
+            continue
+        missing_attrs = product_required_attrs(product, briefing)
+        if missing_attrs:
+            warnings.append(f"{produto_id}: atributos obrigatorios ausentes: {', '.join(missing_attrs)}")
+        if product.get("estado") == "descartado" and not product.get("descartado_porque"):
+            errors.append(f"{produto_id}: produto descartado sem motivo.")
+
+    for index, row in enumerate(rows, 2):
+        missing = quote_missing_fields(row)
+        if missing:
+            errors.append(f"cotacoes.csv linha {index}: campos obrigatorios ausentes: {', '.join(missing)}")
+        alerts = manipulation_alerts(rows, row)
+        if alerts:
+            warnings.append(f"cotacoes.csv linha {index} ({row.get('produto_id')}): alertas {', '.join(alerts)}")
+
+    manual_ids = {row.get("produto_id") for row in rows if row.get("fonte") == "manual"}
+    if latest and not manual_ids:
+        warnings.append("Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.")
+
+    return errors, warnings
+
+
 @dataclass
 class Ranked:
     produto_id: str
@@ -418,6 +523,7 @@ class Ranked:
     axes: dict[str, float]
     score: float
     eliminations: list[str]
+    alerts: list[str]
 
 
 def normalize(values: list[float], current: float, invert: bool = False) -> float:
@@ -433,15 +539,15 @@ def normalize(values: list[float], current: float, invert: bool = False) -> floa
     return round(max(0.0, min(1.0, score)), 3)
 
 
-def risk_score(row: dict[str, str]) -> float:
+def risk_score(row: dict[str, str], alerts: list[str] | None = None) -> float:
     vendedor = (row.get("vendedor_tipo") or "").lower()
     garantia = (row.get("garantia_tipo") or "").lower()
     vendedor_score = {"oficial": 1.0, "fisica": 0.85, "terceiro": 0.65}.get(vendedor, 0.55)
     garantia_score = {"nacional": 1.0, "importada": 0.70, "vendedor": 0.55, "nenhuma": 0.10}.get(garantia, 0.45)
     meses = min(quote_float(row.get("garantia_meses")), 36) / 36
     score = (vendedor_score * 0.35) + (garantia_score * 0.40) + (meses * 0.25)
-    if row.get("flag_suspeita"):
-        score -= 0.2
+    alert_count = len(set(alerts or ([] if not row.get("flag_suspeita") else [row.get("flag_suspeita")])))
+    score -= min(0.35, alert_count * 0.15)
     return round(max(0.0, min(1.0, score)), 3)
 
 
@@ -466,6 +572,10 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
     categoria = product.get("categoria") or briefing.get("categoria") or "generico"
     gate = (categories.get(categoria) or categories.get("generico") or {}).get("gate", {})
     eliminations: list[str] = []
+
+    if product.get("estado") == "descartado":
+        motivo = product.get("descartado_porque") or "motivo nao registrado"
+        eliminations.append(f"produto descartado ({motivo})")
 
     preco_teto = briefing.get("preco_teto")
     if preco_teto not in {None, "null", ""} and quote_float(row.get("custo_total")) > quote_float(preco_teto):
@@ -501,36 +611,91 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
     return eliminations
 
 
-def build_ranking(args: argparse.Namespace) -> None:
-    project = project_path(args.projeto)
+def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     rows = read_quotes(project)
     latest = latest_quotes(rows)
     prefs = read_yaml(CONFIG / "preferencias.yaml", {})
     weights = prefs.get("score", {})
 
-    candidates: list[Ranked] = []
-    costs = [quote_float(row.get("custo_total")) for row in latest.values()]
-    ratings = [quote_float(row.get("nota_ajustada")) for row in latest.values()]
-    days = [quote_float(row.get("frete_prazo_dias"), 99) for row in latest.values() if row.get("frete_prazo_dias") not in {"", None}]
-
+    pre_candidates: list[tuple[str, dict[str, str], dict[str, Any], list[str], list[str]]] = []
     for produto_id, row in latest.items():
         product = find_product(produto_id) or {"id": produto_id, "categoria": briefing.get("categoria"), "marca": ""}
         eliminations = gate_eliminations(row, product, briefing)
+        alerts = manipulation_alerts(rows, row)
+        pre_candidates.append((produto_id, row, product, eliminations, alerts))
+
+    scoring_pool = [item for item in pre_candidates if not item[3]] or pre_candidates
+    costs = [quote_float(row.get("custo_total")) for _, row, _, _, _ in scoring_pool]
+    ratings = [quote_float(row.get("nota_ajustada")) for _, row, _, _, _ in scoring_pool]
+    days = [
+        quote_float(row.get("frete_prazo_dias"), 99)
+        for _, row, _, _, _ in scoring_pool
+        if row.get("frete_prazo_dias") not in {"", None}
+    ]
+
+    candidates: list[Ranked] = []
+    for produto_id, row, product, eliminations, alerts in pre_candidates:
         axes = {
             "qualidade": normalize(ratings, quote_float(row.get("nota_ajustada"))),
             "valor": normalize(costs, quote_float(row.get("custo_total")), invert=True),
-            "risco": risk_score(row),
+            "risco": risk_score(row, alerts),
             "aderencia": adherence_score(product),
             "conveniencia": normalize(days, quote_float(row.get("frete_prazo_dias"), 99), invert=True) if days else 0.5,
         }
         score = sum(axes[key] * quote_float(weights.get(key), 0) for key in axes) * 100
         if eliminations:
             score = 0
-        candidates.append(Ranked(produto_id, row, product, axes, round(score, 1), eliminations))
+        candidates.append(Ranked(produto_id, row, product, axes, round(score, 1), eliminations, alerts))
 
     elegiveis = sorted([c for c in candidates if not c.eliminations], key=lambda c: c.score, reverse=True)
     cortados = sorted([c for c in candidates if c.eliminations], key=lambda c: c.produto_id)
+    return elegiveis, cortados
+
+
+def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ranked]) -> None:
+    fields = [
+        "produto_id",
+        "nome",
+        "score",
+        "qualidade",
+        "valor",
+        "risco",
+        "aderencia",
+        "conveniencia",
+        "status",
+        "motivos",
+        "alertas",
+        "fonte",
+        "custo_total",
+    ]
+    with (project / "ranking.csv").open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        for item in [*elegiveis, *cortados]:
+            writer.writerow(
+                {
+                    "produto_id": item.produto_id,
+                    "nome": item.product.get("nome") or item.produto_id,
+                    "score": item.score,
+                    "qualidade": item.axes.get("qualidade"),
+                    "valor": item.axes.get("valor"),
+                    "risco": item.axes.get("risco"),
+                    "aderencia": item.axes.get("aderencia"),
+                    "conveniencia": item.axes.get("conveniencia"),
+                    "status": "cortado" if item.eliminations else "elegivel",
+                    "motivos": "; ".join(item.eliminations),
+                    "alertas": "; ".join(item.alerts),
+                    "fonte": item.quote.get("fonte"),
+                    "custo_total": item.quote.get("custo_total"),
+                }
+            )
+
+
+def build_ranking(args: argparse.Namespace) -> None:
+    project = project_path(args.projeto)
+    rows = read_quotes(project)
+    elegiveis, cortados = compute_ranking(project)
 
     lines = ["# Ranking", "", f"Gerado em {now_iso()}.", ""]
     if not rows:
@@ -548,15 +713,21 @@ def build_ranking(args: argparse.Namespace) -> None:
                     f"{idx}. {product_name} - {item.score:.1f}",
                     f"   {axes}",
                     f"   custo_total R$ {item.quote.get('custo_total')} / {item.quote.get('loja')} / {fonte_alerta}",
-                    "",
                 ]
             )
+            if idx > 1 and elegiveis[0].score - item.score <= 3:
+                lines.append("   empate tecnico com o lider")
+            if item.alerts:
+                lines.append(f"   alertas: {', '.join(item.alerts)}")
+            lines.append("")
         lines.extend(["## Cortados pelos gates", ""])
         if not cortados:
             lines.append("Nenhum corte.")
         for item in cortados:
             product_name = item.product.get("nome") or item.produto_id
-            lines.append(f"- {product_name}: {'; '.join(item.eliminations)}")
+            motivos = "; ".join(item.eliminations)
+            alertas = f" alertas: {', '.join(item.alerts)}" if item.alerts else ""
+            lines.append(f"- {product_name}: {motivos}{alertas}")
         lines.extend(
             [
                 "",
@@ -565,10 +736,12 @@ def build_ranking(args: argparse.Namespace) -> None:
                 "- Score zerado significa corte por gate, nao produto ruim em absoluto.",
                 "- Linha `fonte=web` nao fecha compra; confirme preco, estoque e frete antes de decidir.",
                 "- Diferenca de ate 3 pontos entre finalistas deve ser tratada como empate tecnico.",
+                "- `ranking.csv` e derivado e pode ser sobrescrito; `cotacoes.csv` preserva a serie historica.",
             ]
         )
 
     (project / "ranking.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    write_ranking_csv(project, elegiveis, cortados)
     mark_steps(project, [5, 6])
     if elegiveis:
         lider = elegiveis[0]
@@ -860,6 +1033,7 @@ def status(args: argparse.Namespace) -> None:
     latest = latest_quotes(rows)
     manual_ids = {row.get("produto_id") for row in rows if row.get("fonte") == "manual"}
     web_only_ids = set(latest) - manual_ids
+    errors, warnings = validation_report(project)
     checked_steps = re.findall(r"(?m)^- \[x\] (\d+)\. (.+)$", process)
     open_steps = re.findall(r"(?m)^- \[ \] (\d+)\. (.+)$", process)
     next_action = re.search(r"(?m)^- Proxima acao:\s*(.+)$", process)
@@ -877,8 +1051,40 @@ def status(args: argparse.Namespace) -> None:
     if open_decision:
         print(f"Decisao aberta: {open_decision.group(1).strip()}")
     print(f"Cotacoes: {len(rows)} total, {len(manual_ids)} produtos com cotacao manual, {len(web_only_ids)} so web")
+    print(f"Validacao: {len(errors)} erros, {len(warnings)} avisos")
     if web_only_ids:
         print("Confirmar manualmente: " + ", ".join(sorted(web_only_ids)))
+
+
+def validate(args: argparse.Namespace) -> None:
+    project = project_path(args.projeto)
+    errors, warnings = validation_report(project)
+    lines = ["# Validacao", "", f"Gerado em {now_iso()}.", ""]
+    lines.extend(["## Erros", ""])
+    if errors:
+        lines.extend(f"- {error}" for error in errors)
+    else:
+        lines.append("Nenhum erro.")
+    lines.extend(["", "## Avisos", ""])
+    if warnings:
+        lines.extend(f"- {warning}" for warning in warnings)
+    else:
+        lines.append("Nenhum aviso.")
+    lines.extend(
+        [
+            "",
+            "## Criterio",
+            "",
+            "- Erro: impede decisao confiavel ou viola schema.",
+            "- Aviso: nao impede pesquisa, mas precisa ser considerado antes de comprar.",
+        ]
+    )
+    (project / "validacao.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    print(project / "validacao.md")
+    print(f"Erros: {len(errors)}")
+    print(f"Avisos: {len(warnings)}")
+    if args.strict and errors:
+        raise SystemExit(1)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -935,6 +1141,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ranking", help="gera ranking.md com gates e score aberto")
     p.add_argument("projeto")
     p.set_defaults(func=build_ranking)
+
+    p = sub.add_parser("validar", help="gera validacao.md com campos faltantes e alertas")
+    p.add_argument("projeto")
+    p.add_argument("--strict", action="store_true", help="retorna erro se houver erro de validacao")
+    p.set_defaults(func=validate)
 
     p = sub.add_parser("prompt-ia", help="gera prompt de apoio para uma etapa")
     p.add_argument("projeto")

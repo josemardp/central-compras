@@ -115,6 +115,8 @@ class CliWorkflowTest(unittest.TestCase):
             "nacional",
             "--fonte",
             "manual",
+            "--link",
+            "https://example.com/qcy-h3",
         )
         self.run_cli(
             "cotar",
@@ -155,9 +157,12 @@ class CliWorkflowTest(unittest.TestCase):
             "12",
             "--garantia-tipo",
             "vendedor",
+            "--link",
+            "https://example.com/qcy-x",
         )
         self.run_cli("descartar", "--produto-id", "qcy-x", "--projeto", project, "--porque", "Microfone sem confiabilidade.")
         self.run_cli("ranking", project)
+        validacao = self.run_cli("validar", project)
         self.run_cli(
             "decidir",
             project,
@@ -171,15 +176,21 @@ class CliWorkflowTest(unittest.TestCase):
         status = self.run_cli("status", project)
 
         ranking = (self.tmpdir / project / "ranking.md").read_text(encoding="utf-8")
+        ranking_csv = (self.tmpdir / project / "ranking.csv").read_text(encoding="utf-8")
         processo = (self.tmpdir / project / "processo.md").read_text(encoding="utf-8")
         decisao = (self.tmpdir / project / "decisao.md").read_text(encoding="utf-8")
+        validacao_md = (self.tmpdir / project / "validacao.md").read_text(encoding="utf-8")
         vereditos = list((self.tmpdir / "vereditos").glob("*qcy-h3.md"))
 
         self.assertIn("QCY H3", ranking)
         self.assertIn("qualidade", ranking)
+        self.assertIn("qcy-x", ranking_csv)
+        self.assertIn("produto descartado", ranking_csv)
         self.assertIn("Pesquisar headphone over-ear", processo)
         self.assertIn("Descartado qcy-x", processo)
         self.assertIn("Cotacao manual confirmada", decisao)
+        self.assertIn("Avisos:", validacao.stdout)
+        self.assertIn("atributos obrigatorios ausentes", validacao_md)
         self.assertIn("Escolhido: QCY H3", resumo.stdout)
         self.assertIn("Estado: comprado", status.stdout)
         self.assertTrue(vereditos)

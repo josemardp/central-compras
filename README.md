@@ -13,8 +13,10 @@ Cada compra vira um projeto em `projetos/`.
 3. `01-definir-modelo.md` - conversa com IA para transformar "quero um fone" em requisitos tecnicos.
 4. `cotacoes.csv` - observacoes datadas e append-only.
 5. `ranking.md` - gates, score aberto e motivos de corte.
-6. `decisao.md` - escolhido, motivo, segundo colocado e por que perdeu.
-7. `vereditos/` - D+30 e D+180 para fechar o aprendizado.
+6. `ranking.csv` - saida derivada e sobrescrevivel para auditoria do score.
+7. `validacao.md` - pendencias de schema, cotacao e alertas.
+8. `decisao.md` - escolhido, motivo, segundo colocado e por que perdeu.
+9. `vereditos/` - D+30 e D+180 para fechar o aprendizado.
 
 ## Comandos
 
@@ -26,6 +28,7 @@ python scripts/central_compras.py anotar projetos/2026-fone-bluetooth-para-chama
 python scripts/central_compras.py cotar projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --loja Amazon --vendedor "Loja oficial" --vendedor-tipo oficial --preco 299 --frete 0 --nota 4.6 --avaliacoes 1200 --garantia-meses 12 --garantia-tipo nacional --fonte manual --link "https://..."
 python scripts/central_compras.py promover-cotacao projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --preco 289 --frete 10 --garantia-meses 12 --garantia-tipo nacional
 python scripts/central_compras.py ranking projetos/2026-fone-bluetooth-para-chamadas
+python scripts/central_compras.py validar projetos/2026-fone-bluetooth-para-chamadas
 python scripts/central_compras.py prompt-ia projetos/2026-fone-bluetooth-para-chamadas --etapa modelo
 python scripts/central_compras.py descartar --produto-id anker-q30 --projeto projetos/2026-fone-bluetooth-para-chamadas --porque "Melhor ANC, mas passou do preco teto."
 python scripts/central_compras.py decidir projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --porque "Melhor equilibrio entre microfone, garantia nacional e preco confirmado." --perdedores "anker-q30: melhor ANC, mas passou do preco teto" --comprado
@@ -40,6 +43,7 @@ python scripts/central_compras.py status projetos/2026-fone-bluetooth-para-chama
 - Linha com `fonte=web` ajuda a pesquisar; linha com `fonte=manual` e que fecha compra.
 - Produto descartado precisa de motivo.
 - Decisao final cria veredito automaticamente para D+30 e D+180.
+- `ranking.csv` e `validacao.md` sao derivados; `cotacoes.csv` preserva o historico.
 - Dado pessoal fica fora do repositorio, em `~/.central-compras/dados-privados/`.
 
 ## Estrutura

@@ -56,13 +56,16 @@ Gate de saida:
 
 Meta: deixar score e gates confiaveis para compras de valor maior.
 
+Status: base implementada; falta TCO completo para categorias acima de R$ 20.000.
+
 Entregas:
-- Validacao de schema por categoria.
-- Relatorio de campos faltantes por produto/cotacao.
-- Ranking com vetores de score, cortes e empate tecnico.
-- Suporte a TCO para categorias acima de R$ 20.000.
-- Deteccao inicial de flags `AVAL_SUSPEITA`, `ANCORA` e `RECICLADO`.
-- Testes de gates, nota ajustada, score e TCO.
+- [x] Validacao de schema por categoria.
+- [x] Relatorio de campos faltantes por produto/cotacao.
+- [x] Ranking com vetores de score, cortes e empate tecnico.
+- [ ] Suporte a TCO para categorias acima de R$ 20.000.
+- [x] Deteccao inicial de flags `AVAL_SUSPEITA`, `ANCORA` e `RECICLADO`.
+- [x] Testes de gates, nota ajustada e score.
+- [ ] Testes de TCO.
 
 Gate de saida:
 - Score reproduzivel por teste automatizado.
