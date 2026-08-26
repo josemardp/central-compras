@@ -21,3 +21,8 @@ pagamentos/
 # Exportacoes locais
 exports/
 relatorios-privados/
+
+# Relatorios de cobertura
+.coverage
+coverage.json
+htmlcov/
