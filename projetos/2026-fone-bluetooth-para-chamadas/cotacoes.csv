@@ -1,0 +1,5 @@
+data_coleta,produto_id,loja,vendedor,vendedor_tipo,anuncio_id,variacao,preco,preco_promocional,frete_valor,frete_prazo_dias,custo_extra,custo_total,nota,n_avaliacoes,nota_ajustada,garantia_meses,garantia_tipo,link,flag_suspeita,fonte,score
+2026-08-26T13:48:20,qcy-h3-anc,Amazon,QCY BR Direct,oficial,B0CZ6J92ML,,296.64,,0.0,,0.0,296.64,4.8,5360,4.795,12,vendedor,https://www.amazon.com.br/QCY-H3-Cancelamento-Certifica%C3%A7%C3%A3o-Multipontos/dp/B0CZ6J92ML,,web,
+2026-08-26T13:48:21,edifier-w820nb-plus,MercadoLivre,vendedor a confirmar,terceiro,,,499.0,,0.0,,0.0,499.0,4.9,128,4.731,12,vendedor,https://www.mercadolivre.com.br/fone-de-ouvido-edifier-w820nb-plus-v25-bluetooth-61-cinza-escuro/p/MLB63419175,,web,
+2026-08-26T13:48:21,jbl-tune-770nc,MercadoLivre,vendedor a confirmar,terceiro,,,429.0,,0.0,,0.0,429.0,4.8,0,4.3,12,vendedor,https://lista.mercadolivre.com.br/jbl-770nc,,web,
+2026-08-26T13:48:21,soundcore-anker-life-q30,Amazon,vendedor a confirmar,terceiro,B092JBH9HF,,466.0,,0.0,,0.0,466.0,4.6,288,4.556,12,vendedor,https://www.amazon.com.br/Soundcore-cancelamento-resolu%C3%A7%C3%A3o-reprodu%C3%A7%C3%A3o-carregamento/dp/B092JBH9HF,,web,

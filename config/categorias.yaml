@@ -1,0 +1,66 @@
+carro:
+  atributos_obrigatorios:
+    - motorizacao
+    - autonomia_km
+    - potencia_cv
+    - porta_malas_l
+    - garantia_bateria
+  custo_extra_tipico:
+    - emplacamento
+    - seguro_ano_1
+    - carregador_wallbox
+  tco_meses: 60
+  gate:
+    garantia_minima_meses: 36
+    exige_rede_assistencia: true
+
+celular:
+  atributos_obrigatorios:
+    - armazenamento_gb
+    - ram_gb
+    - bateria_mah
+    - versao_5g
+    - anos_update
+  gate:
+    nota_minima_ajustada: 4.3
+    minimo_avaliacoes: 300
+    garantia_tipo_aceita:
+      - nacional
+
+fone:
+  atributos_obrigatorios:
+    - tipo
+    - conexao
+    - microfone
+    - bateria_horas
+    - garantia_meses
+  gate:
+    nota_minima_ajustada: 4.2
+    minimo_avaliacoes: 150
+    garantia_tipo_aceita:
+      - nacional
+      - vendedor
+
+tenis:
+  atributos_obrigatorios:
+    - numeracao
+    - tipo_pisada
+    - drop_mm
+    - uso
+  gate:
+    nota_minima_ajustada: 4.2
+    minimo_avaliacoes: 150
+
+cosmetico:
+  atributos_obrigatorios:
+    - volume_ml
+    - validade_meses
+    - lacre
+  gate:
+    exige_vendedor_oficial: true
+
+generico:
+  atributos_obrigatorios: []
+  gate:
+    nota_minima_ajustada: 4.0
+    minimo_avaliacoes: 20

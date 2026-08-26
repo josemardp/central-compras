@@ -1,0 +1,39 @@
+score:
+  qualidade: 0.30
+  valor: 0.25
+  risco: 0.20
+  aderencia: 0.15
+  conveniencia: 0.10
+
+nota_bayesiana:
+  media_categoria_padrao: 4.3
+  peso_ancora: 50
+
+lojas_preferidas:
+  - Amazon
+  - Mercado Livre
+  - Magazine Luiza
+
+marcas_vetadas: []
+
+regras_parada:
+  ate_200:
+    valor_maximo: 200
+    tempo_maximo: 20 min
+    candidatos: 3
+    cotacoes_minimas_por_candidato: 1
+  de_200_a_2000:
+    valor_maximo: 2000
+    tempo_maximo: 2 h
+    candidatos: 5
+    cotacoes_minimas_por_candidato: 2
+  de_2000_a_20000:
+    valor_maximo: 20000
+    tempo_maximo: 1 semana
+    candidatos: 5
+    cotacoes_minimas_por_candidato: 3
+  acima_20000:
+    valor_maximo: null
+    tempo_maximo: 30 dias
+    candidatos: 4
+    cotacoes_minimas_por_candidato: 3 + 1 presencial

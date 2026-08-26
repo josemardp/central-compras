@@ -1,0 +1,12 @@
+id: "{{produto_id}}"
+categoria: "{{categoria}}"
+nome: "{{nome}}"
+marca: "{{marca}}"
+estado: pesquisando
+projeto: "{{projeto_id}}"
+
+atributos: {}
+
+requisitos_atendidos: {}
+
+descartado_porque: null

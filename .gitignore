@@ -1,0 +1,23 @@
+# Ambientes locais
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Arquivos gerados temporarios
+.pytest_cache/
+.mypy_cache/
+*.tmp
+*.bak
+
+# Dados sensiveis devem ficar fora da arvore do repositorio
+dados-privados/
+enderecos/
+pagamentos/
+*.cpf
+*.secret
+*.env
+
+# Exportacoes locais
+exports/
+relatorios-privados/

@@ -1,0 +1,16 @@
+id: qcy-h3-anc
+categoria: fone
+nome: QCY H3 ANC
+marca: QCY
+estado: pesquisando
+projeto: 2026-fone-bluetooth-para-chamadas
+atributos:
+  tipo: headphone
+  conexao: bluetooth
+  microfone: true
+  bateria_horas: 70
+  garantia_meses: 12
+requisitos_atendidos:
+  chamadas: parcial
+  conforto: parcial
+descartado_porque: null

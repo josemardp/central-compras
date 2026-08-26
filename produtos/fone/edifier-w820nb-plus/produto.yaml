@@ -1,0 +1,16 @@
+id: edifier-w820nb-plus
+categoria: fone
+nome: Edifier W820NB Plus
+marca: Edifier
+estado: pesquisando
+projeto: 2026-fone-bluetooth-para-chamadas
+atributos:
+  tipo: headphone
+  conexao: bluetooth
+  microfone: true
+  bateria_horas: 49
+  garantia_meses: 12
+requisitos_atendidos:
+  chamadas: parcial
+  conforto: parcial
+descartado_porque: null

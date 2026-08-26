@@ -1,0 +1,16 @@
+id: soundcore-anker-life-q30
+categoria: fone
+nome: Soundcore Anker Life Q30
+marca: Soundcore
+estado: pesquisando
+projeto: 2026-fone-bluetooth-para-chamadas
+atributos:
+  tipo: headphone
+  conexao: bluetooth
+  microfone: true
+  bateria_horas: 80
+  garantia_meses: 12
+requisitos_atendidos:
+  chamadas: parcial
+  conforto: parcial
+descartado_porque: null
