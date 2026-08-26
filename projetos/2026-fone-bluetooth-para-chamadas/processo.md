@@ -3,13 +3,14 @@
 ## Estado atual
 
 - Estado: pesquisando
-- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
+- Proxima acao: reconsultar itens em aguardando_preco antes de decidir
 - Decisao aberta: QCY H3 ANC lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-08-26 | aguardando_preco | qcy-h3-anc aguardando preco | Produto lidera a pesquisa web, mas a compra deve esperar confirmacao manual e preco melhor. |
 | 2026-08-26 | cotacao | Cotacao registrada para soundcore-anker-life-q30 | Amazon / fonte=web / custo_total=466.0 |
 | 2026-08-26 | cotacao | Cotacao registrada para jbl-tune-770nc | MercadoLivre / fonte=web / custo_total=429.0 |
 | 2026-08-26 | cotacao | Cotacao registrada para edifier-w820nb-plus | MercadoLivre / fonte=web / custo_total=499.0 |

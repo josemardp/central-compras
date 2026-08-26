@@ -393,6 +393,122 @@ class CliWorkflowTest(unittest.TestCase):
         self.assertIn("Taxa:", reuse.stdout)
         self.assertTrue((self.tmpdir / "base-conhecimento" / "reaproveitamento.md").exists())
 
+    def test_waiting_price_and_verdict_learning_flow(self):
+        self.run_cli(
+            "novo-projeto",
+            "fone veredito teste",
+            "--categoria",
+            "fone",
+            "--valor-estimado",
+            "500",
+            "--preco-teto",
+            "600",
+        )
+        project = "projetos/2026-fone-veredito-teste"
+        self.run_cli(
+            "novo-produto",
+            project,
+            "QCY H3",
+            "--marca",
+            "QCY",
+            "--categoria",
+            "fone",
+            "--produto-id",
+            "qcy-h3",
+            "--preco-alvo",
+            "260",
+            "--preco-teto",
+            "330",
+        )
+        self.run_cli(
+            "cotar",
+            project,
+            "--produto-id",
+            "qcy-h3",
+            "--loja",
+            "Amazon",
+            "--vendedor",
+            "Loja oficial",
+            "--vendedor-tipo",
+            "oficial",
+            "--preco",
+            "349",
+            "--nota",
+            "4.7",
+            "--avaliacoes",
+            "900",
+            "--garantia-meses",
+            "12",
+            "--garantia-tipo",
+            "nacional",
+            "--fonte",
+            "manual",
+            "--link",
+            "https://example.com/qcy-h3",
+        )
+        self.run_cli(
+            "aguardar-preco",
+            "--produto-id",
+            "qcy-h3",
+            "--projeto",
+            project,
+            "--preco-alvo",
+            "260",
+            "--preco-teto",
+            "330",
+            "--porque",
+            "Produto aprovado, mas acima do preco alvo.",
+        )
+        waiting = self.run_cli("listar-aguardando-preco", "--categoria", "fone")
+        waiting_md = (self.tmpdir / "base-conhecimento" / "aguardando-preco.md").read_text(encoding="utf-8")
+        product_yaml = (self.tmpdir / "produtos" / "fone" / "qcy-h3" / "produto.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("Itens: 1", waiting.stdout)
+        self.assertIn("Produto aprovado", waiting_md)
+        self.assertIn("estado: aguardando_preco", product_yaml)
+
+        self.run_cli(
+            "decidir",
+            project,
+            "--produto-id",
+            "qcy-h3",
+            "--porque",
+            "Preco aceito para testar veredito.",
+            "--comprado",
+        )
+        verdict = next((self.tmpdir / "vereditos").glob("*qcy-h3.md"))
+        self.run_cli(
+            "preencher-veredito",
+            str(verdict),
+            "--fase",
+            "d30",
+            "--nota-arrependimento",
+            "1",
+            "--compraria-de-novo",
+            "sim",
+            "--resumo",
+            "Chegou certo e resolveu chamadas.",
+            "--licao",
+            "QCY H3 foi bom para chamada quando comprado de vendedor confiavel.",
+        )
+        self.run_cli(
+            "aprender-veredito",
+            str(verdict),
+            "--marca",
+            "QCY",
+            "--loja",
+            "Amazon",
+            "--categoria",
+            "fone",
+        )
+        learned = verdict.read_text(encoding="utf-8")
+        lessons = (self.tmpdir / "base-conhecimento" / "licoes.md").read_text(encoding="utf-8")
+        brand = (self.tmpdir / "base-conhecimento" / "marcas" / "qcy.md").read_text(encoding="utf-8")
+
+        self.assertIn("Aprendizado exportado", learned)
+        self.assertIn("QCY H3 foi bom", lessons)
+        self.assertIn("Chegou certo", brand)
+
 
 if __name__ == "__main__":
     unittest.main()

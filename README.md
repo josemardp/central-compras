@@ -35,7 +35,11 @@ python scripts/central_compras.py registrar-licao "Fone para chamadas precisa de
 python scripts/central_compras.py reaproveitamento --categoria fone
 python scripts/central_compras.py prompt-ia projetos/2026-fone-bluetooth-para-chamadas --etapa modelo
 python scripts/central_compras.py descartar --produto-id anker-q30 --projeto projetos/2026-fone-bluetooth-para-chamadas --porque "Melhor ANC, mas passou do preco teto."
+python scripts/central_compras.py aguardar-preco --produto-id qcy-h3 --projeto projetos/2026-fone-bluetooth-para-chamadas --preco-alvo 260 --preco-teto 330 --porque "Produto aprovado, mas acima do alvo."
+python scripts/central_compras.py listar-aguardando-preco --categoria fone
 python scripts/central_compras.py decidir projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --porque "Melhor equilibrio entre microfone, garantia nacional e preco confirmado." --perdedores "anker-q30: melhor ANC, mas passou do preco teto" --comprado
+python scripts/central_compras.py preencher-veredito vereditos/2026-09-25-projeto-produto.md --fase d30 --nota-arrependimento 1 --compraria-de-novo sim --resumo "Chegou certo e resolveu." --licao "Compraria de novo."
+python scripts/central_compras.py aprender-veredito vereditos/2026-09-25-projeto-produto.md --marca QCY --loja Amazon --categoria fone
 python scripts/central_compras.py resumo projetos/2026-fone-bluetooth-para-chamadas
 python scripts/central_compras.py status projetos/2026-fone-bluetooth-para-chamadas
 ```
@@ -57,6 +61,8 @@ Se a categoria tiver `tco_meses` em `config/categorias.yaml`, o ranking usa `tco
 - Decisao final cria veredito automaticamente para D+30 e D+180.
 - `ranking.csv` e `validacao.md` sao derivados; `cotacoes.csv` preserva o historico.
 - Acima de R$ 20.000, compare por TCO, nao por preco de etiqueta.
+- Produto aprovado mas caro deve ir para `aguardando_preco`, com `preco_alvo` e motivo.
+- Veredito preenchido vira aprendizado de marca, loja e categoria.
 - Dado pessoal fica fora do repositorio, em `~/.central-compras/dados-privados/`.
 
 ## Estrutura

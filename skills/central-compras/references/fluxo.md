@@ -40,10 +40,21 @@ python scripts\central_compras.py ranking projetos\2026-fone-bluetooth-para-cham
 python scripts\central_compras.py validar projetos\2026-fone-bluetooth-para-chamadas
 python scripts\central_compras.py status projetos\2026-fone-bluetooth-para-chamadas
 python scripts\central_compras.py descartar --produto-id anker-q30 --projeto projetos\2026-fone-bluetooth-para-chamadas --porque "Passou do preco teto confirmado."
+python scripts\central_compras.py aguardar-preco --produto-id qcy-h3-anc --projeto projetos\2026-fone-bluetooth-para-chamadas --preco-alvo 260 --preco-teto 330 --porque "Aprovado, mas acima do alvo."
+python scripts\central_compras.py listar-aguardando-preco --categoria fone
 python scripts\central_compras.py decidir projetos\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --porque "Melhor equilibrio entre preco confirmado, microfone e garantia." --perdedores "anker-q30: passou do preco teto" --comprado
 ```
 
 `decidir` creates the verdict file automatically.
+
+## Verdict Learning
+
+```powershell
+python scripts\central_compras.py preencher-veredito vereditos\2026-09-25-projeto-produto.md --fase d30 --nota-arrependimento 1 --compraria-de-novo sim --resumo "Chegou certo e resolveu chamadas." --licao "Compraria de novo de vendedor confiavel."
+python scripts\central_compras.py aprender-veredito vereditos\2026-09-25-projeto-produto.md --marca QCY --loja Amazon --categoria fone
+```
+
+`aprender-veredito` exports the verdict into brand/store notes and `base-conhecimento/licoes.md`.
 
 ## Knowledge Base
 

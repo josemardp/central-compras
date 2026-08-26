@@ -2,7 +2,7 @@ id: qcy-h3-anc
 categoria: fone
 nome: QCY H3 ANC
 marca: QCY
-estado: pesquisando
+estado: aguardando_preco
 projeto: 2026-fone-bluetooth-para-chamadas
 atributos:
   tipo: headphone
@@ -14,3 +14,8 @@ requisitos_atendidos:
   chamadas: parcial
   conforto: parcial
 descartado_porque: null
+preco_alvo: 260.0
+preco_teto: 330.0
+aguardando_preco_porque: Produto lidera a pesquisa web, mas a compra deve esperar
+  confirmacao manual e preco melhor.
+aguardando_preco_desde: '2026-08-26'

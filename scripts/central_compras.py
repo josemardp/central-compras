@@ -294,6 +294,8 @@ def new_product(args: argparse.Namespace) -> None:
         "marca": args.marca,
         "estado": "pesquisando",
         "projeto": project.name,
+        "preco_alvo": args.preco_alvo,
+        "preco_teto": args.preco_teto if args.preco_teto is not None else meta.get("preco_teto"),
         "atributos": parse_pairs(args.atributo or []),
         "requisitos_atendidos": parse_pairs(args.requisito or []),
         "descartado_porque": None,
@@ -910,6 +912,79 @@ def discard_product(args: argparse.Namespace) -> None:
     print(f"Descartado: {args.produto_id}")
 
 
+def wait_price(args: argparse.Namespace) -> None:
+    path = find_product_path(args.produto_id)
+    if not path:
+        raise SystemExit(f"Produto nao encontrado: {args.produto_id}")
+    product = read_yaml(path, {})
+    project = project_path(args.projeto or product.get("projeto"))
+    product["estado"] = "aguardando_preco"
+    if args.preco_alvo is not None:
+        product["preco_alvo"] = args.preco_alvo
+    if args.preco_teto is not None:
+        product["preco_teto"] = args.preco_teto
+    product["aguardando_preco_porque"] = args.porque
+    product["aguardando_preco_desde"] = today()
+    write_yaml(path, product)
+    append_timeline(project, "aguardando_preco", f"{args.produto_id} aguardando preco", args.porque)
+    set_process_state(project, proxima_acao="reconsultar itens em aguardando_preco antes de decidir")
+    print(f"Aguardando preco: {args.produto_id}")
+
+
+def waiting_price_rows() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for product_file in PRODUTOS.glob("*/**/produto.yaml"):
+        product = read_yaml(product_file, {})
+        if product.get("estado") != "aguardando_preco":
+            continue
+        project = PROJETOS / str(product.get("projeto"))
+        quote = latest_quotes(read_quotes(project)).get(product.get("id")) if project.exists() else None
+        atual = quote_float(quote.get("custo_total")) if quote else 0
+        alvo = quote_float(product.get("preco_alvo"))
+        teto = quote_float(product.get("preco_teto"))
+        rows.append(
+            {
+                "produto_id": product.get("id"),
+                "nome": product.get("nome"),
+                "categoria": product.get("categoria"),
+                "projeto": product.get("projeto"),
+                "preco_atual": atual or "",
+                "preco_alvo": alvo or "",
+                "preco_teto": teto or "",
+                "distancia_ate_alvo": round(atual - alvo, 2) if atual and alvo else "",
+                "desde": product.get("aguardando_preco_desde", ""),
+                "porque": product.get("aguardando_preco_porque", ""),
+            }
+        )
+    return sorted(rows, key=lambda row: (str(row["categoria"]), str(row["produto_id"])))
+
+
+def list_waiting_price(args: argparse.Namespace) -> None:
+    rows = [row for row in waiting_price_rows() if not args.categoria or row["categoria"] == args.categoria]
+    md_lines = [
+        "# Aguardando preco",
+        "",
+        f"Gerado em {now_iso()}.",
+        "",
+        "| Produto | Categoria | Projeto | Atual | Alvo | Teto | Distancia | Desde | Motivo |",
+        "|---|---|---|---:|---:|---:|---:|---|---|",
+    ]
+    for row in rows:
+        md_lines.append(
+            f"| {row['nome']} | {row['categoria']} | {row['projeto']} | {row['preco_atual']} | {row['preco_alvo']} | {row['preco_teto']} | {row['distancia_ate_alvo']} | {row['desde']} | {row['porque']} |"
+        )
+    report = BASE / "aguardando-preco.md"
+    report.write_text("\n".join(md_lines) + "\n", encoding="utf-8", newline="\n")
+    csv_path = BASE / "aguardando-preco.csv"
+    with csv_path.open("w", encoding="utf-8", newline="") as f:
+        fields = ["produto_id", "nome", "categoria", "projeto", "preco_atual", "preco_alvo", "preco_teto", "distancia_ate_alvo", "desde", "porque"]
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+    print(report.relative_to(ROOT))
+    print(f"Itens: {len(rows)}")
+
+
 def ai_prompt(args: argparse.Namespace) -> None:
     project = project_path(args.projeto)
     briefing_meta, briefing_body = load_frontmatter(project / "briefing.md")
@@ -1070,6 +1145,102 @@ def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quot
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8", newline="\n")
     return path
+
+
+def replace_or_append_bullet(text: str, label: str, value: str) -> str:
+    pattern = rf"(?m)^- {re.escape(label)}:[^\n]*$"
+    replacement = f"- {label}: {value}"
+    if re.search(pattern, text):
+        return re.sub(pattern, replacement, text)
+    return text.rstrip() + f"\n- {label}: {value}\n"
+
+
+def fill_verdict(args: argparse.Namespace) -> None:
+    path = Path(args.veredito)
+    if not path.is_absolute():
+        path = ROOT / args.veredito
+    if not path.exists():
+        raise SystemExit(f"Veredito nao encontrado: {args.veredito}")
+    text = path.read_text(encoding="utf-8")
+    prefix = "D+30" if args.fase == "d30" else "D+180"
+    updates = {
+        f"{prefix} preenchido em": today(),
+        f"{prefix} nota arrependimento": str(args.nota_arrependimento),
+        f"{prefix} compraria de novo": args.compraria_de_novo,
+        f"{prefix} resumo": args.resumo,
+    }
+    if args.problema:
+        updates[f"{prefix} problema"] = args.problema
+    if args.licao:
+        updates[f"{prefix} licao"] = args.licao
+    for label, value in updates.items():
+        text = replace_or_append_bullet(text, label, value)
+    path.write_text(text, encoding="utf-8", newline="\n")
+    print(path)
+
+
+def extract_bullet(text: str, label: str) -> str:
+    for match in re.finditer(rf"(?m)^- {re.escape(label)}:[ \t]*(.*)$", text):
+        value = match.group(1).strip()
+        if value:
+            return value
+    return ""
+
+
+def learn_from_verdict(args: argparse.Namespace) -> None:
+    path = Path(args.veredito)
+    if not path.is_absolute():
+        path = ROOT / args.veredito
+    if not path.exists():
+        raise SystemExit(f"Veredito nao encontrado: {args.veredito}")
+    text = path.read_text(encoding="utf-8")
+    project_name = extract_bullet(text, "Projeto")
+    product_name = extract_bullet(text, "Produto")
+    seller = extract_bullet(text, "Vendedor")
+    categoria = args.categoria or extract_bullet(text, "Categoria") or "geral"
+    marca = args.marca or extract_bullet(text, "Marca")
+    loja = args.loja or extract_bullet(text, "Loja") or seller.split("/")[0].strip()
+    d30_summary = extract_bullet(text, "D+30 resumo")
+    d180_summary = extract_bullet(text, "D+180 resumo")
+    summary = args.resumo or d180_summary or d30_summary or f"Veredito registrado para {product_name}."
+    lesson = args.licao or extract_bullet(text, "D+180 licao") or extract_bullet(text, "D+30 licao")
+    buy_again = args.compraria_de_novo or extract_bullet(text, "D+180 compraria de novo") or extract_bullet(text, "D+30 compraria de novo")
+    regret = args.nota_arrependimento
+    if regret is None:
+        raw_regret = extract_bullet(text, "D+180 nota arrependimento") or extract_bullet(text, "D+30 nota arrependimento")
+        regret = quote_float(raw_regret, 0) if raw_regret else None
+
+    if marca:
+        register_brand(
+            argparse.Namespace(
+                nome=marca,
+                categoria=categoria,
+                projeto=project_name,
+                nota=None if regret is None else max(0, 10 - regret),
+                compraria_de_novo=buy_again if buy_again in {"sim", "nao", "talvez"} else None,
+                resumo=summary,
+                alerta=args.alerta,
+            )
+        )
+    if loja:
+        register_store(
+            argparse.Namespace(
+                nome=loja,
+                categoria=categoria,
+                projeto=project_name,
+                nota=None if regret is None else max(0, 10 - regret),
+                compraria_de_novo=buy_again if buy_again in {"sim", "nao", "talvez"} else None,
+                resumo=summary,
+                alerta=args.alerta,
+            )
+        )
+    if lesson:
+        register_lesson(argparse.Namespace(texto=lesson, categoria=categoria, gate=args.gate))
+
+    marker = f"\n## Aprendizado exportado\n\n- Data: {today()}\n- Marca: {marca}\n- Loja: {loja}\n- Categoria: {categoria}\n- Licao: {lesson}\n"
+    if "## Aprendizado exportado" not in text:
+        append_text(path, marker)
+    print(f"Aprendizado processado: {path}")
 
 
 def new_verdict(args: argparse.Namespace) -> None:
@@ -1350,6 +1521,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--marca", default="")
     p.add_argument("--categoria")
     p.add_argument("--produto-id")
+    p.add_argument("--preco-alvo", type=float)
+    p.add_argument("--preco-teto", type=float)
     p.add_argument("--atributo", action="append", default=[])
     p.add_argument("--requisito", action="append", default=[])
     p.add_argument("--force", action="store_true")
@@ -1476,6 +1649,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--projeto")
     p.set_defaults(func=discard_product)
 
+    p = sub.add_parser("aguardar-preco", help="marca produto como aguardando preco alvo")
+    p.add_argument("--produto-id", required=True)
+    p.add_argument("--porque", required=True)
+    p.add_argument("--preco-alvo", type=float)
+    p.add_argument("--preco-teto", type=float)
+    p.add_argument("--projeto")
+    p.set_defaults(func=wait_price)
+
+    p = sub.add_parser("listar-aguardando-preco", help="gera relatorio de itens aguardando preco")
+    p.add_argument("--categoria")
+    p.set_defaults(func=list_waiting_price)
+
     p = sub.add_parser("anotar", help="registra uma decisao intermediaria no processo.md")
     p.add_argument("projeto")
     p.add_argument("--etapa", required=True)
@@ -1490,6 +1675,29 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("status", help="mostra etapa atual, bloqueios e proximas acoes")
     p.add_argument("projeto")
     p.set_defaults(func=status)
+
+    p = sub.add_parser("preencher-veredito", help="preenche resumo estruturado D+30 ou D+180")
+    p.add_argument("veredito")
+    p.add_argument("--fase", choices=["d30", "d180"], required=True)
+    p.add_argument("--nota-arrependimento", type=float, required=True)
+    p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"], required=True)
+    p.add_argument("--resumo", required=True)
+    p.add_argument("--problema")
+    p.add_argument("--licao")
+    p.set_defaults(func=fill_verdict)
+
+    p = sub.add_parser("aprender-veredito", help="transforma veredito preenchido em marca, loja e licao")
+    p.add_argument("veredito")
+    p.add_argument("--marca")
+    p.add_argument("--loja")
+    p.add_argument("--categoria")
+    p.add_argument("--resumo")
+    p.add_argument("--licao")
+    p.add_argument("--gate")
+    p.add_argument("--alerta")
+    p.add_argument("--nota-arrependimento", type=float)
+    p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"])
+    p.set_defaults(func=learn_from_verdict)
 
     return parser
 

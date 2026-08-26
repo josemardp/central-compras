@@ -12,6 +12,12 @@
 
 ## D+30
 
+- D+30 preenchido em:
+- D+30 nota arrependimento:
+- D+30 compraria de novo:
+- D+30 resumo:
+- D+30 problema:
+- D+30 licao:
 - Chegou no prazo?
 - Produto conforme anuncio?
 - Embalagem/lacre ok?
@@ -21,6 +27,12 @@
 
 ## D+180
 
+- D+180 preenchido em:
+- D+180 nota arrependimento:
+- D+180 compraria de novo:
+- D+180 resumo:
+- D+180 problema:
+- D+180 licao:
 - Ainda usa?
 - Valeu o que pagou?
 - Compraria de novo?

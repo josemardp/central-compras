@@ -110,12 +110,14 @@ Gate de saida:
 
 Meta: fechar o ciclo de aprendizado pos-compra.
 
+Status: concluida como automacao local.
+
 Entregas:
-- Estado `aguardando_preco`.
-- Campos `preco_alvo` e `preco_teto` por produto/projeto.
-- Comando para listar itens aguardando preco.
-- Veredito D+30 e D+180 com perguntas padrao.
-- Comando para transformar veredito em licoes de marca/loja/categoria.
+- [x] Estado `aguardando_preco`.
+- [x] Campos `preco_alvo` e `preco_teto` por produto/projeto.
+- [x] Comando para listar itens aguardando preco.
+- [x] Veredito D+30 e D+180 com perguntas padrao.
+- [x] Comando para transformar veredito em licoes de marca/loja/categoria.
 
 Gate de saida:
 - Um veredito D+30 registrado.
