@@ -1,3 +1,5 @@
+import datetime as dt
+import os
 import shutil
 import subprocess
 import sys
@@ -7,6 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+ANO = dt.date.today().year
 
 
 class CliWorkflowTest(unittest.TestCase):
@@ -51,7 +54,7 @@ class CliWorkflowTest(unittest.TestCase):
             "--preco-teto",
             "600",
         )
-        project = "projetos/2026-fone-chamadas-teste"
+        project = f"projetos/{ANO}-fone-chamadas-teste"
         self.run_cli(
             "anotar",
             project,
@@ -170,6 +173,8 @@ class CliWorkflowTest(unittest.TestCase):
             "qcy-h3",
             "--porque",
             "Cotacao manual confirmada e atende chamadas.",
+            "--perdedores",
+            "qcy-x: microfone sem confiabilidade em chamada.",
             "--comprado",
         )
         resumo = self.run_cli("resumo", project)
@@ -206,7 +211,7 @@ class CliWorkflowTest(unittest.TestCase):
             "--preco-teto",
             "180000",
         )
-        project = "projetos/2026-carro-eletrico-teste"
+        project = f"projetos/{ANO}-carro-eletrico-teste"
         self.run_cli(
             "novo-produto",
             project,
@@ -227,6 +232,8 @@ class CliWorkflowTest(unittest.TestCase):
             "porta_malas_l=230",
             "--atributo",
             "garantia_bateria=8 anos",
+            "--atributo",
+            "rede_assistencia=true",
         )
         self.run_cli(
             "novo-produto",
@@ -248,6 +255,8 @@ class CliWorkflowTest(unittest.TestCase):
             "porta_malas_l=300",
             "--atributo",
             "garantia_bateria=8 anos",
+            "--atributo",
+            "rede_assistencia=true",
         )
         for produto_id, preco, mensal, revenda in [
             ("carro-a", "150000", "300", "85000"),
@@ -302,7 +311,7 @@ class CliWorkflowTest(unittest.TestCase):
             "--preco-teto",
             "500",
         )
-        project = "projetos/2026-fone-conhecimento-teste"
+        project = f"projetos/{ANO}-fone-conhecimento-teste"
         self.run_cli(
             "novo-produto",
             project,
@@ -404,7 +413,7 @@ class CliWorkflowTest(unittest.TestCase):
             "--preco-teto",
             "600",
         )
-        project = "projetos/2026-fone-veredito-teste"
+        project = f"projetos/{ANO}-fone-veredito-teste"
         self.run_cli(
             "novo-produto",
             project,
@@ -520,7 +529,7 @@ class CliWorkflowTest(unittest.TestCase):
             "--preco-teto",
             "500",
         )
-        project = "projetos/2026-fone-dashboard-teste"
+        project = f"projetos/{ANO}-fone-dashboard-teste"
         self.run_cli(
             "novo-produto",
             project,
@@ -572,7 +581,7 @@ class CliWorkflowTest(unittest.TestCase):
         result = self.run_cli("dashboard")
 
         index = self.tmpdir / "dashboard" / "index.html"
-        project_page = self.tmpdir / "dashboard" / "projetos" / "2026-fone-dashboard-teste.html"
+        project_page = self.tmpdir / "dashboard" / "projetos" / f"{ANO}-fone-dashboard-teste.html"
         knowledge_page = self.tmpdir / "dashboard" / "base-conhecimento.html"
         styles = self.tmpdir / "dashboard" / "assets" / "styles.css"
 

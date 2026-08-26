@@ -9,6 +9,24 @@ nota_bayesiana:
   media_categoria_padrao: 4.3
   peso_ancora: 50
 
+# Escala absoluta do score. Sem isso o score usava min-max dentro do projeto,
+# e o segundo colocado sempre tirava 0,00 mesmo perdendo por pouco.
+# Com escala ancorada, 75 significa a mesma coisa em qualquer projeto.
+escala:
+  qualidade:
+    nota_piso: 3.8      # nota_ajustada <= piso  -> 0,00
+    nota_teto: 5.0      # nota_ajustada >= teto  -> 1,00
+  # O eixo valor usa razao (menor_custo / custo deste), sem parametro:
+  # custar o dobro do mais barato vale 0,50.
+  conveniencia:
+    prazo_otimo_dias: 2   # ate aqui -> 1,00
+    prazo_ruim_dias: 30   # daqui em diante -> 0,00
+
+# Preco envelhece. Cotacao velha nao pode ser tratada como preco de hoje.
+frescor:
+  validade_web_dias: 14
+  validade_manual_dias: 7
+
 lojas_preferidas:
   - Amazon
   - Mercado Livre

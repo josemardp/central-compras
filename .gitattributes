@@ -1,0 +1,7 @@
+# O script grava tudo com LF. Sem isto, cada maquina reescreve as quebras de
+# linha e o diff enche de ruido que nao e mudanca de verdade.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary

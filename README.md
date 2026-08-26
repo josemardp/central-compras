@@ -41,6 +41,9 @@ python scripts/central_compras.py decidir projetos/2026-fone-bluetooth-para-cham
 python scripts/central_compras.py preencher-veredito vereditos/2026-09-25-projeto-produto.md --fase d30 --nota-arrependimento 1 --compraria-de-novo sim --resumo "Chegou certo e resolveu." --licao "Compraria de novo."
 python scripts/central_compras.py aprender-veredito vereditos/2026-09-25-projeto-produto.md --marca QCY --loja Amazon --categoria fone
 python scripts/central_compras.py dashboard
+python scripts/central_compras.py historico projetos/2026-fone-bluetooth-para-chamadas
+python scripts/central_compras.py migrar-cotacoes
+python scripts/central_compras.py dados-privados
 python scripts/central_compras.py resumo projetos/2026-fone-bluetooth-para-chamadas
 python scripts/central_compras.py status projetos/2026-fone-bluetooth-para-chamadas
 ```
@@ -53,6 +56,57 @@ python scripts/central_compras.py cotar projetos/2026-comprar-carro --produto-id
 
 Se a categoria tiver `tco_meses` em `config/categorias.yaml`, o ranking usa `tco_total` no eixo valor.
 
+## Como o score funciona
+
+O score vai de 0 a 100 e e sempre exibido aberto, nos cinco eixos do PRD. A escala
+e **absoluta**, nao relativa ao projeto: 75 numa compra de fone significa o mesmo
+que 75 numa compra de carro.
+
+| Eixo | Peso | Como e calculado |
+|---|---|---|
+| qualidade | 0,30 | `nota_ajustada` mapeada de 3,8 (0,00) a 5,0 (1,00) |
+| valor | 0,25 | razao `menor_custo / custo`. Custar o dobro vale 0,50 |
+| risco | 0,20 | vendedor, tipo e prazo de garantia, loja preferida, menos penalidade por alerta |
+| aderencia | 0,15 | percentual de requisitos do briefing atendidos |
+| conveniencia | 0,10 | prazo de frete, de 2 dias (1,00) a 30 dias (0,00) |
+
+Os limites ficam em `config/preferencias.yaml`, em `escala:`. `lojas_preferidas`
+entra no eixo risco: loja da sua lista pesa menos risco que loja desconhecida.
+
+Quando falta dado num eixo, ele conta como 0,50 neutro **e o ranking avisa**
+("score parcial - sem dado em: conveniencia"). Um numero montado sobre campo
+vazio nao pode passar por medida.
+
+`nota_ajustada` e recalculada na hora do ranking a partir de `nota` e
+`n_avaliacoes`, nunca lida congelada do CSV: se voce mudar os pesos da nota
+bayesiana, o gate e o score acompanham.
+
+## Frescor da cotacao
+
+Preco envelhece. Cotacao `web` vale 14 dias e `manual` vale 7 (`frescor:` em
+`preferencias.yaml`). Passou disso:
+
+- `validar` e `status` avisam;
+- `ranking.md` marca a linha como vencida;
+- `decidir` **recusa** fechar, a menos que voce use `--permitir-vencida`.
+
+## Regra de parada
+
+Vem da faixa de valor do projeto (secao 7.5 do PRD) e e escrita no `briefing.md`
+na criacao. `status` e `validar` comparam a pesquisa real contra o orcamento:
+candidatos demais e cotacoes de menos por candidato viram aviso. A regra existe
+para proteger voce de gastar seis horas para economizar R$ 40.
+
+## Historico de preco
+
+```powershell
+python scripts/central_compras.py historico projetos/<projeto>
+```
+
+Mostra, por produto, a serie de custo com minimo, mediana, maximo e variacao. E
+essa serie que desmascara preco ancora: desconto so e desconto contra o seu
+proprio historico. Com uma unica observacao, o relatorio diz isso na cara.
+
 ## Dashboard local
 
 Gere a visao HTML da Central:
@@ -62,6 +116,31 @@ python scripts/central_compras.py dashboard
 ```
 
 Abra `dashboard/index.html` no navegador para ver projetos, itens aguardando preco, ranking por processo, marcas, lojas, licoes, arrependimento, aderencia ao gate e tempo ate decisao.
+
+## Seguranca antes do commit
+
+```powershell
+python scripts/central_compras.py checar-segredos --strict
+```
+
+Procura CPF formatado, numero de cartao (validado no Luhn, para nao acusar CEP,
+EAN nem codigo de anuncio), CVV, senha e token na arvore versionada. Com
+`--strict` ele retorna erro, entao serve de trava.
+
+Para rodar sozinho antes de cada commit, crie `.git/hooks/pre-commit` com:
+
+```sh
+#!/bin/sh
+python scripts/central_compras.py checar-segredos --strict || exit 1
+```
+
+Um exemplo legitimo em teste ou documentacao pode ser liberado escrevendo
+`central-compras:exemplo-nao-e-segredo` na mesma linha. E excecao explicita,
+nunca adivinhacao do varredor.
+
+**Se um dado sensivel ja foi commitado, `git rm` nao resolve**: o historico
+guarda. O procedimento e reescrever o historico com `git filter-repo` e trocar
+o que vazou.
 
 ## Principios
 
@@ -74,7 +153,10 @@ Abra `dashboard/index.html` no navegador para ver projetos, itens aguardando pre
 - Acima de R$ 20.000, compare por TCO, nao por preco de etiqueta.
 - Produto aprovado mas caro deve ir para `aguardando_preco`, com `preco_alvo` e motivo.
 - Veredito preenchido vira aprendizado de marca, loja e categoria.
-- Dado pessoal fica fora do repositorio, em `~/.central-compras/dados-privados/`.
+- Dado pessoal fica fora do repositorio, em `~/.central-compras/dados-privados/` (`dados-privados` cria a pasta).
+- Cotacao vencida nao fecha compra. Preco de tres semanas atras nao e preco.
+- Decisao sem o motivo da derrota do segundo colocado nao e aceita.
+- Coluna que o schema nao conhece nunca e descartada do `cotacoes.csv`.
 
 ## Estrutura
 

@@ -26,6 +26,10 @@ BASE = ROOT / "base-conhecimento"
 VEREDITOS = ROOT / "vereditos"
 DASHBOARD = ROOT / "dashboard"
 
+# O modulo csv grava CRLF por padrao. Como o repo e usado de varias maquinas,
+# tudo aqui e gravado em LF, igual ao que o .gitattributes armazena.
+CSV_EOL = "\n"
+
 COTACOES_HEADER = [
     "data_coleta",
     "produto_id",
@@ -164,11 +168,15 @@ def project_path(value: str) -> Path:
     if not path.is_absolute():
         path = ROOT / value
     if not path.exists():
-        candidates = sorted(PROJETOS.glob(f"*{value}*"))
+        candidates = sorted(p for p in PROJETOS.glob(f"*{value}*") if p.is_dir())
         if len(candidates) == 1:
             return candidates[0]
+        if len(candidates) > 1:
+            nomes = ", ".join(p.name for p in candidates)
+            raise SystemExit(f"`{value}` casa com mais de um projeto: {nomes}. Seja especifico.")
     if not path.exists() or not path.is_dir():
-        raise SystemExit(f"Projeto nao encontrado: {value}")
+        disponiveis = ", ".join(p.name for p in project_dirs()) or "nenhum"
+        raise SystemExit(f"Projeto nao encontrado: {value}. Existentes: {disponiveis}")
     return path
 
 
@@ -199,9 +207,55 @@ def quote_int(value: Any, default: int = 0) -> int:
         return default
 
 
+_PREFS_CACHE: dict[str, Any] = {}
+
+
+def preferences() -> dict[str, Any]:
+    """Le preferencias.yaml uma vez por execucao."""
+    if "data" not in _PREFS_CACHE:
+        _PREFS_CACHE["data"] = read_yaml(CONFIG / "preferencias.yaml", {}) or {}
+    return _PREFS_CACHE["data"]
+
+
+def clamp01(value: float) -> float:
+    return round(max(0.0, min(1.0, value)), 3)
+
+
+def quality_score(nota_ajustada: float) -> float:
+    """Escala absoluta: 4.4 vale o mesmo em qualquer projeto.
+
+    Antes era min-max dentro do projeto, o que dava 0,00 ao segundo colocado
+    mesmo quando ele perdia por 0,2 ponto de nota.
+    """
+    cfg = (preferences().get("escala") or {}).get("qualidade") or {}
+    piso = quote_float(cfg.get("nota_piso"), 3.8)
+    teto = quote_float(cfg.get("nota_teto"), 5.0)
+    if teto <= piso:
+        return 0.5
+    return clamp01((nota_ajustada - piso) / (teto - piso))
+
+
+def value_score(custo: float, menor_custo: float) -> float:
+    """Razao entre o mais barato e este. Custar o dobro vale 0,50, nao 0,00."""
+    if custo <= 0 or menor_custo <= 0:
+        return 0.0
+    return clamp01(menor_custo / custo)
+
+
+def convenience_score(prazo_dias: float | None) -> tuple[float, bool]:
+    """Retorna (nota, tem_dado). Sem prazo informado o eixo e neutro e sinalizado."""
+    if prazo_dias is None:
+        return 0.5, False
+    cfg = (preferences().get("escala") or {}).get("conveniencia") or {}
+    otimo = quote_float(cfg.get("prazo_otimo_dias"), 2)
+    ruim = quote_float(cfg.get("prazo_ruim_dias"), 30)
+    if ruim <= otimo:
+        return 0.5, True
+    return clamp01((ruim - prazo_dias) / (ruim - otimo)), True
+
+
 def adjusted_rating(nota: float, n: int) -> float:
-    prefs = read_yaml(CONFIG / "preferencias.yaml", {})
-    cfg = prefs.get("nota_bayesiana", {})
+    cfg = preferences().get("nota_bayesiana", {})
     media = quote_float(cfg.get("media_categoria_padrao"), 4.3)
     anchor = quote_float(cfg.get("peso_ancora"), 50)
     if n < 0:
@@ -225,6 +279,71 @@ def quote_tco_total(
     if not tco_meses:
         return round(custo_total, 2)
     return round(custo_total + (custo_operacional_mensal * tco_meses) - valor_revenda_estimado, 2)
+
+
+def leading_int(value: Any, default: int = 0) -> int:
+    """`3 + 1 presencial` -> 3. Aceita config escrita em linguagem humana."""
+    match = re.search(r"\d+", str(value or ""))
+    return int(match.group()) if match else default
+
+
+def stop_rule(valor_estimado: float) -> dict[str, Any]:
+    """Regra de parada da secao 7.5 do PRD, derivada da faixa de valor.
+
+    Existia em preferencias.yaml desde o inicio e nunca era lida por ninguem.
+    """
+    regras = preferences().get("regras_parada") or {}
+    faixas = []
+    for nome, regra in regras.items():
+        if not isinstance(regra, dict):
+            continue
+        teto = regra.get("valor_maximo")
+        faixas.append((float("inf") if teto in {None, "", "null"} else quote_float(teto), nome, regra))
+    if not faixas:
+        return {}
+    faixas.sort(key=lambda item: item[0])
+    for teto, nome, regra in faixas:
+        if valor_estimado <= teto:
+            escolhida = (nome, regra)
+            break
+    else:
+        escolhida = (faixas[-1][1], faixas[-1][2])
+    nome, regra = escolhida
+    return {
+        "faixa": nome,
+        "tempo_maximo": regra.get("tempo_maximo", ""),
+        "candidatos": leading_int(regra.get("candidatos"), 0),
+        "cotacoes_minimas_por_candidato": leading_int(regra.get("cotacoes_minimas_por_candidato"), 0),
+        "cotacoes_minimas_texto": str(regra.get("cotacoes_minimas_por_candidato", "")),
+    }
+
+
+def stop_rule_status(project: Path) -> dict[str, Any]:
+    """Compara a pesquisa real contra o orcamento de tempo/candidatos da faixa."""
+    briefing, _ = load_frontmatter(project / "briefing.md")
+    regra = stop_rule(quote_float(briefing.get("valor_estimado")))
+    if not regra:
+        return {}
+    rows = read_quotes(project)
+    por_produto: dict[str, int] = {}
+    for row in rows:
+        produto_id = row.get("produto_id")
+        if produto_id:
+            por_produto[produto_id] = por_produto.get(produto_id, 0) + 1
+    aberto_em = parse_dashboard_date(briefing.get("criado_em"))
+    dias = (dt.date.today() - aberto_em).days if aberto_em else None
+    faltando = sorted(
+        produto_id
+        for produto_id, total in por_produto.items()
+        if total < regra["cotacoes_minimas_por_candidato"]
+    )
+    return {
+        **regra,
+        "candidatos_atuais": len(por_produto),
+        "dias_em_pesquisa": dias,
+        "candidatos_excedidos": bool(regra["candidatos"] and len(por_produto) > regra["candidatos"]),
+        "produtos_sem_cotacoes_suficientes": faltando,
+    }
 
 
 def ensure_structure(_: argparse.Namespace) -> None:
@@ -261,6 +380,16 @@ def new_project(args: argparse.Namespace) -> None:
         data=today(),
         necessidade=necessidade,
     )
+    regra = stop_rule(quote_float(args.valor_estimado))
+    if regra:
+        briefing = briefing.replace(
+            "- Tempo maximo de pesquisa:\n- Numero maximo de candidatos:\n- Cotacoes minimas por candidato:",
+            f"- Faixa de valor: {regra['faixa']}\n"
+            f"- Tempo maximo de pesquisa: {regra['tempo_maximo']}\n"
+            f"- Numero maximo de candidatos: {regra['candidatos']}\n"
+            f"- Cotacoes minimas por candidato: {regra['cotacoes_minimas_texto']}",
+            1,
+        )
     (path / "briefing.md").write_text(briefing, encoding="utf-8", newline="\n")
     (path / "processo.md").write_text(render_template("processo.md", data=today()), encoding="utf-8", newline="\n")
     (path / "01-definir-modelo.md").write_text(
@@ -271,7 +400,7 @@ def new_project(args: argparse.Namespace) -> None:
     (path / "ranking.md").write_text("# Ranking\n\nAinda nao gerado.\n", encoding="utf-8", newline="\n")
     (path / "decisao.md").write_text(render_template("decisao.md"), encoding="utf-8", newline="\n")
     with (path / "cotacoes.csv").open("w", encoding="utf-8", newline="") as f:
-        csv.DictWriter(f, fieldnames=COTACOES_HEADER).writeheader()
+        csv.DictWriter(f, fieldnames=COTACOES_HEADER, lineterminator=CSV_EOL).writeheader()
     set_process_state(path, estado="pesquisando", proxima_acao="definir modelo/requisitos com ajuda da IA")
     print(path.relative_to(ROOT))
 
@@ -310,25 +439,85 @@ def new_product(args: argparse.Namespace) -> None:
     print(path.relative_to(ROOT))
 
 
+EXTRA_COLUMNS_KEY = "__extras__"
+
+
+def raw_quotes_header(project: Path) -> list[str]:
+    """Cabecalho exatamente como esta gravado no arquivo, sem uniao com o schema."""
+    path = project / "cotacoes.csv"
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as f:
+        return [column for column in next(csv.reader(f), []) if column]
+
+
+def quotes_header(project: Path) -> list[str]:
+    """Cabecalho real do arquivo, unido ao schema atual.
+
+    Colunas que o schema nao conhece sao preservadas no fim, nunca descartadas:
+    cotacoes.csv e a serie historica e nao pode perder informacao escrita a mao.
+    """
+    path = project / "cotacoes.csv"
+    header: list[str] = list(COTACOES_HEADER)
+    if path.exists():
+        with path.open("r", encoding="utf-8", newline="") as f:
+            existing = next(csv.reader(f), [])
+        for column in existing:
+            if column and column not in header:
+                header.append(column)
+    return header
+
+
 def read_quotes(project: Path) -> list[dict[str, str]]:
     path = project / "cotacoes.csv"
     if not path.exists():
         return []
     with path.open("r", encoding="utf-8", newline="") as f:
-        return list(csv.DictReader(f))
+        reader = csv.DictReader(f, restkey=EXTRA_COLUMNS_KEY)
+        rows = []
+        for row in reader:
+            # Linha com mais valores que colunas: guarda o excedente em vez de perder.
+            leftovers = row.pop(EXTRA_COLUMNS_KEY, None)
+            if leftovers:
+                row[EXTRA_COLUMNS_KEY] = "|".join(str(value) for value in leftovers)
+            rows.append({key: ("" if value is None else value) for key, value in row.items()})
+        return rows
 
 
 def write_quotes(project: Path, rows: list[dict[str, Any]]) -> None:
+    header = quotes_header(project)
+    for row in rows:
+        for key in row:
+            if key and key != EXTRA_COLUMNS_KEY and key not in header:
+                header.append(key)
+    if any(row.get(EXTRA_COLUMNS_KEY) for row in rows) and EXTRA_COLUMNS_KEY not in header:
+        header.append(EXTRA_COLUMNS_KEY)
     with (project / "cotacoes.csv").open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=COTACOES_HEADER)
+        writer = csv.DictWriter(f, fieldnames=header, lineterminator=CSV_EOL)
         writer.writeheader()
         for row in rows:
-            writer.writerow({field: row.get(field, "") for field in COTACOES_HEADER})
+            writer.writerow({field: row.get(field, "") for field in header})
 
 
 def find_product_path(produto_id: str) -> Path | None:
     matches = list(PRODUTOS.glob(f"*/{produto_id}/produto.yaml"))
     return matches[0] if matches else None
+
+
+def product_id_conflicts() -> list[str]:
+    """Mesmo produto_id em categorias diferentes aponta para pastas diferentes.
+
+    `find_product_path` devolveria a primeira encontrada, e a decisao poderia
+    citar o produto errado. Melhor avisar antes.
+    """
+    seen: dict[str, list[str]] = {}
+    for path in PRODUTOS.glob("*/*/produto.yaml"):
+        seen.setdefault(path.parent.name, []).append(path.parent.parent.name)
+    return [
+        f"produto_id `{produto_id}` existe em mais de uma categoria: {', '.join(sorted(categorias))}"
+        for produto_id, categorias in sorted(seen.items())
+        if len(set(categorias)) > 1
+    ]
 
 
 def set_process_state(project: Path, *, estado: str | None = None, proxima_acao: str | None = None, decisao_aberta: str | None = None) -> None:
@@ -489,6 +678,61 @@ def product_required_attrs(product: dict[str, Any], briefing: dict[str, Any]) ->
     return [field for field in required if attrs.get(field) in {None, ""}]
 
 
+NUMERIC_FIELDS = [
+    "preco",
+    "preco_promocional",
+    "frete_valor",
+    "frete_prazo_dias",
+    "custo_extra",
+    "custo_total",
+    "custo_operacional_mensal",
+    "tco_meses",
+    "valor_revenda_estimado",
+    "tco_total",
+    "nota",
+    "n_avaliacoes",
+    "garantia_meses",
+]
+
+
+def numeric_problems(row: dict[str, str]) -> list[str]:
+    """Numero mal digitado vira 0.0 silenciosamente em quote_float.
+
+    Aqui ele e detectado antes de virar `produto de graca` no ranking.
+    """
+    problems: list[str] = []
+    for field in NUMERIC_FIELDS:
+        raw = row.get(field)
+        if raw in {None, ""}:
+            continue
+        try:
+            valor = float(str(raw).replace(",", "."))
+        except ValueError:
+            problems.append(f"`{field}` nao e numero valido ({raw!r})")
+            continue
+        if valor < 0:
+            problems.append(f"`{field}` negativo ({raw})")
+
+    nota = quote_float(row.get("nota"))
+    if nota and not (0 < nota <= 5):
+        problems.append(f"`nota` fora da escala 0-5 ({row.get('nota')})")
+    if nota and quote_int(row.get("n_avaliacoes")) == 0:
+        problems.append("`nota` informada com `n_avaliacoes` zerado: nota sem volume nao e evidencia")
+
+    preco = quote_float(row.get("preco"))
+    promocional = quote_float(row.get("preco_promocional"))
+    efetivo = promocional or preco
+    esperado = round(efetivo + quote_float(row.get("frete_valor")) + quote_float(row.get("custo_extra")), 2)
+    informado = quote_float(row.get("custo_total"))
+    if efetivo and informado and abs(esperado - informado) > 0.05:
+        problems.append(
+            f"`custo_total` ({informado}) nao bate com preco+frete+extra ({esperado})"
+        )
+    if promocional and preco and promocional > preco:
+        problems.append(f"`preco_promocional` ({promocional}) maior que `preco` ({preco})")
+    return problems
+
+
 def quote_missing_fields(row: dict[str, str]) -> list[str]:
     missing = [field for field in QUOTE_REQUIRED_FIELDS if row.get(field) in {None, ""}]
     if row.get("fonte") == "manual":
@@ -510,12 +754,22 @@ def manipulation_alerts(rows: list[dict[str, str]], row: dict[str, str]) -> list
     preco = quote_float(row.get("preco"))
     promocional = quote_float(row.get("preco_promocional"))
     if preco and promocional and promocional < preco * 0.60:
+        # So vale como defesa o que ja estava registrado ANTES desta coleta.
+        # Comparar com cotacao posterior inverte a logica da serie historica.
+        quando = str(row.get("data_coleta") or "")
         previous_prices = [
             quote_float(other.get("preco"))
             for other in rows
-            if other is not row and other.get("produto_id") == row.get("produto_id") and quote_float(other.get("preco"))
+            if other is not row
+            and other.get("produto_id") == row.get("produto_id")
+            and str(other.get("data_coleta") or "") < quando
+            and quote_float(other.get("preco"))
         ]
-        if not previous_prices or min(previous_prices) > preco * 0.90:
+        # PRD secao 8: e ancora quando o preco "de" nunca apareceu nas cotacoes
+        # anteriores. Se voce ja viu o produto bem mais barato que a ancora, a
+        # ancora e inflada. Se as cotacoes antigas confirmam aquele patamar, o
+        # desconto e real e nao deve ser sinalizado.
+        if not previous_prices or min(previous_prices) < preco * 0.90:
             alerts.append("ANCORA")
 
     anuncio_id = row.get("anuncio_id")
@@ -554,6 +808,8 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
         missing = quote_missing_fields(row)
         if missing:
             errors.append(f"cotacoes.csv linha {index}: campos obrigatorios ausentes: {', '.join(missing)}")
+        for problem in numeric_problems(row):
+            errors.append(f"cotacoes.csv linha {index} ({row.get('produto_id')}): {problem}")
         if tco_required:
             tco_missing = [
                 field
@@ -570,6 +826,46 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
     if latest and not manual_ids:
         warnings.append("Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.")
 
+    for produto_id, row in sorted(latest.items()):
+        if quote_is_stale(row):
+            idade = quote_age_days(row)
+            limite = quote_expiry_days(row.get("fonte"))
+            warnings.append(
+                f"{produto_id}: cotacao usada no ranking tem {idade} dias "
+                f"(limite {limite} para fonte={row.get('fonte')}). Recote antes de decidir."
+            )
+
+    regra = stop_rule_status(project)
+    if regra:
+        if regra["candidatos_excedidos"]:
+            warnings.append(
+                f"Regra de parada ({regra['faixa']}): {regra['candidatos_atuais']} candidatos para um teto de "
+                f"{regra['candidatos']}. Pesquisar demais tambem custa caro."
+            )
+        if regra["produtos_sem_cotacoes_suficientes"]:
+            warnings.append(
+                f"Regra de parada ({regra['faixa']}): minimo de {regra['cotacoes_minimas_texto']} cotacao(oes) "
+                f"por candidato. Abaixo disso: {', '.join(regra['produtos_sem_cotacoes_suficientes'])}."
+            )
+
+    errors.extend(product_id_conflicts())
+
+    header_atual = raw_quotes_header(project)
+    faltando_no_arquivo = [column for column in COTACOES_HEADER if header_atual and column not in header_atual]
+    if faltando_no_arquivo:
+        warnings.append(
+            "cotacoes.csv esta num schema antigo, sem as colunas: "
+            f"{', '.join(faltando_no_arquivo)}. Rode `migrar-cotacoes` para atualizar o cabecalho."
+        )
+
+    categoria_cfg = category_definition(categoria_projeto)
+    extras_tipicos = categoria_cfg.get("custo_extra_tipico") or []
+    if extras_tipicos and rows and all(quote_float(row.get("custo_extra")) == 0 for row in rows):
+        warnings.append(
+            f"Categoria `{categoria_projeto}` costuma ter custo extra obrigatorio "
+            f"({', '.join(extras_tipicos)}) e nenhuma cotacao registrou `custo_extra`."
+        )
+
     return errors, warnings
 
 
@@ -582,19 +878,44 @@ class Ranked:
     score: float
     eliminations: list[str]
     alerts: list[str]
+    eixos_sem_dado: list[str]
+    idade_dias: int | None
+    vencida: bool
 
 
-def normalize(values: list[float], current: float, invert: bool = False) -> float:
-    if not values:
-        return 0.0
-    lo, hi = min(values), max(values)
-    if hi == lo:
-        return 1.0
-    else:
-        score = (current - lo) / (hi - lo)
-    if invert:
-        score = 1.0 - score
-    return round(max(0.0, min(1.0, score)), 3)
+def quote_age_days(row: dict[str, str], reference: dt.date | None = None) -> int | None:
+    data = parse_dashboard_date(row.get("data_coleta"))
+    if not data:
+        return None
+    return ((reference or dt.date.today()) - data).days
+
+
+def quote_expiry_days(fonte: str | None) -> int:
+    cfg = preferences().get("frescor") or {}
+    if (fonte or "").lower() == "manual":
+        return quote_int(cfg.get("validade_manual_dias"), 7) or 7
+    return quote_int(cfg.get("validade_web_dias"), 14) or 14
+
+
+def quote_is_stale(row: dict[str, str], reference: dt.date | None = None) -> bool:
+    idade = quote_age_days(row, reference)
+    if idade is None:
+        return False
+    return idade > quote_expiry_days(row.get("fonte"))
+
+
+def preferred_store(loja: str | None) -> bool:
+    """Loja da sua lista de preferidas, comparada sem acento nem caixa.
+
+    `Mercado Livre` na config precisa casar com `MercadoLivre` no CSV.
+    """
+    if not loja:
+        return False
+    alvo = slugify(loja).replace("-", "")
+    return any(
+        slugify(str(nome)).replace("-", "") == alvo
+        for nome in (preferences().get("lojas_preferidas") or [])
+    )
 
 
 def risk_score(row: dict[str, str], alerts: list[str] | None = None) -> float:
@@ -603,7 +924,10 @@ def risk_score(row: dict[str, str], alerts: list[str] | None = None) -> float:
     vendedor_score = {"oficial": 1.0, "fisica": 0.85, "terceiro": 0.65}.get(vendedor, 0.55)
     garantia_score = {"nacional": 1.0, "importada": 0.70, "vendedor": 0.55, "nenhuma": 0.10}.get(garantia, 0.45)
     meses = min(quote_float(row.get("garantia_meses")), 36) / 36
-    score = (vendedor_score * 0.35) + (garantia_score * 0.40) + (meses * 0.25)
+    # PRD 7.3: o eixo risco inclui a reputacao da loja. `lojas_preferidas` era
+    # declarada em preferencias.yaml e nunca lida por ninguem.
+    loja_score = 1.0 if preferred_store(row.get("loja")) else 0.7
+    score = (vendedor_score * 0.30) + (garantia_score * 0.35) + (meses * 0.20) + (loja_score * 0.15)
     alert_count = len(set(alerts or ([] if not row.get("flag_suspeita") else [row.get("flag_suspeita")])))
     score -= min(0.35, alert_count * 0.15)
     return round(max(0.0, min(1.0, score)), 3)
@@ -626,7 +950,7 @@ def adherence_score(product: dict[str, Any]) -> float:
 
 def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: dict[str, Any]) -> list[str]:
     categories = read_yaml(CONFIG / "categorias.yaml", {})
-    prefs = read_yaml(CONFIG / "preferencias.yaml", {})
+    prefs = preferences()
     categoria = product.get("categoria") or briefing.get("categoria") or "generico"
     gate = (categories.get(categoria) or categories.get("generico") or {}).get("gate", {})
     eliminations: list[str] = []
@@ -640,8 +964,12 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
         eliminations.append(f"custo_total acima do preco_teto ({row.get('custo_total')} > {preco_teto})")
 
     nota_minima = gate.get("nota_minima_ajustada")
-    if nota_minima is not None and quote_float(row.get("nota_ajustada")) < quote_float(nota_minima):
-        eliminations.append(f"nota_ajustada abaixo do gate ({row.get('nota_ajustada')} < {nota_minima})")
+    if nota_minima is not None:
+        # Recalcula em vez de usar o valor congelado no CSV: se os pesos da nota
+        # bayesiana mudarem em preferencias.yaml, o gate acompanha.
+        atual = current_adjusted_rating(row)
+        if atual < quote_float(nota_minima):
+            eliminations.append(f"nota_ajustada abaixo do gate ({atual} < {nota_minima})")
 
     minimo_avaliacoes = gate.get("minimo_avaliacoes")
     if minimo_avaliacoes is not None and quote_int(row.get("n_avaliacoes")) < quote_int(minimo_avaliacoes):
@@ -658,6 +986,15 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
     if gate.get("exige_vendedor_oficial") and row.get("vendedor_tipo") != "oficial":
         eliminations.append("categoria exige vendedor oficial")
 
+    if gate.get("exige_rede_assistencia"):
+        atributos = product.get("atributos") or {}
+        reqs = product.get("requisitos_atendidos") or {}
+        declarado = atributos.get("rede_assistencia", reqs.get("rede_assistencia"))
+        if declarado in {None, ""}:
+            eliminations.append("categoria exige rede de assistencia e o produto nao declara `rede_assistencia`")
+        elif declarado is False or str(declarado).strip().lower() in {"false", "nao", "nenhuma", "no"}:
+            eliminations.append("sem rede de assistencia")
+
     marca = product.get("marca")
     if marca and marca in (prefs.get("marcas_vetadas") or []):
         eliminations.append(f"marca vetada ({marca})")
@@ -669,12 +1006,19 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
     return eliminations
 
 
+def current_adjusted_rating(row: dict[str, str]) -> float:
+    """Nota ajustada recalculada agora, a partir de nota + n_avaliacoes."""
+    nota = quote_float(row.get("nota"))
+    if not nota:
+        return 0.0
+    return adjusted_rating(nota, quote_int(row.get("n_avaliacoes")))
+
+
 def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     rows = read_quotes(project)
     latest = latest_quotes(rows)
-    prefs = read_yaml(CONFIG / "preferencias.yaml", {})
-    weights = prefs.get("score", {})
+    weights = preferences().get("score", {})
     categoria = briefing.get("categoria") or "generico"
     use_tco = bool(category_tco_months(categoria) or quote_float(briefing.get("valor_estimado")) > 20000)
 
@@ -685,29 +1029,58 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
         alerts = manipulation_alerts(rows, row)
         pre_candidates.append((produto_id, row, product, eliminations, alerts))
 
-    scoring_pool = [item for item in pre_candidates if not item[3]] or pre_candidates
     value_field = "tco_total" if use_tco else "custo_total"
-    costs = [quote_float(row.get(value_field) or row.get("custo_total")) for _, row, _, _, _ in scoring_pool]
-    ratings = [quote_float(row.get("nota_ajustada")) for _, row, _, _, _ in scoring_pool]
-    days = [
-        quote_float(row.get("frete_prazo_dias"), 99)
-        for _, row, _, _, _ in scoring_pool
-        if row.get("frete_prazo_dias") not in {"", None}
-    ]
+
+    def cost_of(row: dict[str, str]) -> float:
+        return quote_float(row.get(value_field) or row.get("custo_total"))
+
+    # O eixo valor e relativo ao mais barato que passou nos gates; se ninguem
+    # passou, usa o conjunto inteiro para nao dividir por zero.
+    scoring_pool = [item for item in pre_candidates if not item[3]] or pre_candidates
+    positive_costs = [cost_of(row) for _, row, _, _, _ in scoring_pool if cost_of(row) > 0]
+    menor_custo = min(positive_costs) if positive_costs else 0.0
 
     candidates: list[Ranked] = []
     for produto_id, row, product, eliminations, alerts in pre_candidates:
+        sem_dado: list[str] = []
+
+        nota_ajustada = current_adjusted_rating(row)
+        if not nota_ajustada:
+            sem_dado.append("qualidade")
+
+        prazo_raw = row.get("frete_prazo_dias")
+        prazo = quote_float(prazo_raw) if prazo_raw not in {"", None} else None
+        conveniencia, tem_prazo = convenience_score(prazo)
+        if not tem_prazo:
+            sem_dado.append("conveniencia")
+
+        if not (product.get("requisitos_atendidos") or {}):
+            sem_dado.append("aderencia")
+
         axes = {
-            "qualidade": normalize(ratings, quote_float(row.get("nota_ajustada"))),
-            "valor": normalize(costs, quote_float(row.get(value_field) or row.get("custo_total")), invert=True),
+            "qualidade": quality_score(nota_ajustada),
+            "valor": value_score(cost_of(row), menor_custo),
             "risco": risk_score(row, alerts),
             "aderencia": adherence_score(product),
-            "conveniencia": normalize(days, quote_float(row.get("frete_prazo_dias"), 99), invert=True) if days else 0.5,
+            "conveniencia": conveniencia,
         }
         score = sum(axes[key] * quote_float(weights.get(key), 0) for key in axes) * 100
         if eliminations:
             score = 0
-        candidates.append(Ranked(produto_id, row, product, axes, round(score, 1), eliminations, alerts))
+        candidates.append(
+            Ranked(
+                produto_id,
+                row,
+                product,
+                axes,
+                round(score, 1),
+                eliminations,
+                alerts,
+                sem_dado,
+                quote_age_days(row),
+                quote_is_stale(row),
+            )
+        )
 
     elegiveis = sorted([c for c in candidates if not c.eliminations], key=lambda c: c.score, reverse=True)
     cortados = sorted([c for c in candidates if c.eliminations], key=lambda c: c.produto_id)
@@ -728,6 +1101,9 @@ def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ran
         "motivos",
         "alertas",
         "fonte",
+        "idade_dias",
+        "cotacao_vencida",
+        "eixos_sem_dado",
         "custo_total",
         "custo_operacional_mensal",
         "tco_meses",
@@ -735,7 +1111,7 @@ def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ran
         "tco_total",
     ]
     with (project / "ranking.csv").open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fields)
+        writer = csv.DictWriter(f, fieldnames=fields, lineterminator=CSV_EOL)
         writer.writeheader()
         for item in [*elegiveis, *cortados]:
             writer.writerow(
@@ -752,6 +1128,9 @@ def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ran
                     "motivos": "; ".join(item.eliminations),
                     "alertas": "; ".join(item.alerts),
                     "fonte": item.quote.get("fonte"),
+                    "idade_dias": "" if item.idade_dias is None else item.idade_dias,
+                    "cotacao_vencida": "sim" if item.vencida else "nao",
+                    "eixos_sem_dado": "; ".join(item.eixos_sem_dado),
                     "custo_total": item.quote.get("custo_total"),
                     "custo_operacional_mensal": item.quote.get("custo_operacional_mensal"),
                     "tco_meses": item.quote.get("tco_meses"),
@@ -790,7 +1169,16 @@ def build_ranking(args: argparse.Namespace) -> None:
             if tco_line:
                 lines.append(tco_line)
             if idx > 1 and elegiveis[0].score - item.score <= 3:
-                lines.append("   empate tecnico com o lider")
+                lines.append("   empate tecnico com o lider: decida pelo criterio humano, nao pelo numero")
+            if item.eixos_sem_dado:
+                lines.append(
+                    f"   score parcial - sem dado em: {', '.join(item.eixos_sem_dado)} (contam como 0,50 neutro)"
+                )
+            if item.vencida:
+                lines.append(
+                    f"   cotacao vencida: {item.idade_dias} dias desde a coleta "
+                    f"(limite {quote_expiry_days(item.quote.get('fonte'))} para fonte={item.quote.get('fonte')}); recote antes de decidir"
+                )
             if item.alerts:
                 lines.append(f"   alertas: {', '.join(item.alerts)}")
             lines.append("")
@@ -811,6 +1199,17 @@ def build_ranking(args: argparse.Namespace) -> None:
                 "- Linha `fonte=web` nao fecha compra; confirme preco, estoque e frete antes de decidir.",
                 "- Diferenca de ate 3 pontos entre finalistas deve ser tratada como empate tecnico.",
                 "- `ranking.csv` e derivado e pode ser sobrescrito; `cotacoes.csv` preserva a serie historica.",
+                "",
+                "## Como o score foi montado",
+                "",
+                "- `qualidade`: nota ajustada em escala absoluta "
+                f"({quote_float((preferences().get('escala') or {}).get('qualidade', {}).get('nota_piso'), 3.8)} = 0,00 / "
+                f"{quote_float((preferences().get('escala') or {}).get('qualidade', {}).get('nota_teto'), 5.0)} = 1,00).",
+                "- `valor`: razao entre o custo do mais barato elegivel e o custo deste. Custar o dobro vale 0,50.",
+                "- `risco`: vendedor, tipo e prazo de garantia, menos penalidade por alerta de manipulacao.",
+                "- `aderencia`: percentual de requisitos do briefing atendidos pelo produto.",
+                "- `conveniencia`: prazo de frete em escala absoluta.",
+                "- A escala e absoluta, nao relativa ao projeto: 75 aqui significa o mesmo que 75 em outra compra.",
             ]
         )
 
@@ -828,6 +1227,100 @@ def build_ranking(args: argparse.Namespace) -> None:
             open_decision = f"{product_name} lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual."
         set_process_state(project, proxima_acao=next_action, decisao_aberta=open_decision)
     print(project / "ranking.md")
+
+
+def price_history(project: Path, produto_id: str | None = None) -> list[dict[str, Any]]:
+    """Serie historica de custo por produto. E ela que desmascara preco ancora."""
+    rows = read_quotes(project)
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for row in rows:
+        pid = row.get("produto_id") or ""
+        if produto_id and pid != produto_id:
+            continue
+        grouped.setdefault(pid, []).append(row)
+
+    series: list[dict[str, Any]] = []
+    for pid, values in sorted(grouped.items()):
+        values = sorted(values, key=lambda r: str(r.get("data_coleta") or ""))
+        custos = [quote_float(r.get("custo_total")) for r in values if quote_float(r.get("custo_total")) > 0]
+        if not custos:
+            continue
+        ordenado = sorted(custos)
+        meio = len(ordenado) // 2
+        mediana = ordenado[meio] if len(ordenado) % 2 else round((ordenado[meio - 1] + ordenado[meio]) / 2, 2)
+        atual = custos[-1]
+        product = find_product(pid) or {}
+        series.append(
+            {
+                "produto_id": pid,
+                "nome": product.get("nome") or pid,
+                "observacoes": len(custos),
+                "primeiro": custos[0],
+                "atual": atual,
+                "minimo": min(custos),
+                "maximo": max(custos),
+                "mediana": mediana,
+                "variacao_pct": round(((atual - custos[0]) / custos[0]) * 100, 1) if custos[0] else 0.0,
+                "desconto_real_vs_mediana_pct": round(((mediana - atual) / mediana) * 100, 1) if mediana else 0.0,
+                "primeira_coleta": values[0].get("data_coleta", ""),
+                "ultima_coleta": values[-1].get("data_coleta", ""),
+                "pontos": [
+                    {
+                        "data": r.get("data_coleta", ""),
+                        "custo": quote_float(r.get("custo_total")),
+                        "loja": r.get("loja", ""),
+                        "fonte": r.get("fonte", ""),
+                    }
+                    for r in values
+                    if quote_float(r.get("custo_total")) > 0
+                ],
+            }
+        )
+    return series
+
+
+def show_history(args: argparse.Namespace) -> None:
+    project = project_path(args.projeto)
+    series = price_history(project, args.produto_id)
+    if not series:
+        print("Sem serie historica de custo neste projeto.")
+        return
+    lines = ["# Historico de preco", "", f"Gerado em {now_iso()}.", ""]
+    for item in series:
+        lines.append(f"## {item['nome']}")
+        lines.append("")
+        lines.append(
+            f"- Observacoes: {item['observacoes']} "
+            f"({item['primeira_coleta'][:10]} ate {item['ultima_coleta'][:10]})"
+        )
+        lines.append(
+            f"- Custo: atual R$ {item['atual']} / minimo R$ {item['minimo']} / "
+            f"mediana R$ {item['mediana']} / maximo R$ {item['maximo']}"
+        )
+        lines.append(f"- Variacao desde a primeira coleta: {item['variacao_pct']}%")
+        if item["observacoes"] < 2:
+            lines.append(
+                "- So ha uma observacao. Sem serie nao da para saber se um `desconto` anunciado e real: "
+                "colete de novo em alguns dias."
+            )
+        else:
+            lines.append(
+                f"- Desconto real contra a propria mediana: {item['desconto_real_vs_mediana_pct']}%"
+            )
+        lines.append("")
+        lines.append("| Data | Custo total | Loja | Fonte |")
+        lines.append("|---|---:|---|---|")
+        for ponto in item["pontos"]:
+            lines.append(f"| {ponto['data']} | {ponto['custo']} | {ponto['loja']} | {ponto['fonte']} |")
+        lines.append("")
+    path = project / "historico.md"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    print(path)
+    for item in series:
+        print(
+            f"{item['nome']}: {item['observacoes']} obs / atual R$ {item['atual']} / "
+            f"mediana R$ {item['mediana']} / variacao {item['variacao_pct']}%"
+        )
 
 
 def promote_quote(args: argparse.Namespace) -> None:
@@ -981,11 +1474,88 @@ def list_waiting_price(args: argparse.Namespace) -> None:
     csv_path = BASE / "aguardando-preco.csv"
     with csv_path.open("w", encoding="utf-8", newline="") as f:
         fields = ["produto_id", "nome", "categoria", "projeto", "preco_atual", "preco_alvo", "preco_teto", "distancia_ate_alvo", "desde", "porque"]
-        writer = csv.DictWriter(f, fieldnames=fields)
+        writer = csv.DictWriter(f, fieldnames=fields, lineterminator=CSV_EOL)
         writer.writeheader()
         writer.writerows(rows)
     print(report.relative_to(ROOT))
     print(f"Itens: {len(rows)}")
+
+
+def decision_briefing(project: Path) -> str:
+    """Estado da pesquisa em texto legivel, para o prompt de decisao.
+
+    Antes o prompt despejava o `repr` da lista de cotacoes: campo vazio,
+    aspas e chaves ocupando espaco sem dizer nada, e sem o ranking. A IA
+    precisa ver o score aberto, o corte e o alerta, nao o CSV cru.
+    """
+    elegiveis, cortados = compute_ranking(project)
+    partes: list[str] = []
+
+    if elegiveis:
+        partes.append("Finalistas (score aberto, escala absoluta 0-100):")
+        for posicao, item in enumerate(elegiveis, 1):
+            eixos = " · ".join(f"{k} {v:.2f}" for k, v in item.axes.items())
+            linha = (
+                f"{posicao}. {item.product.get('nome') or item.produto_id} - {item.score:.1f}\n"
+                f"   {eixos}\n"
+                f"   R$ {item.quote.get('custo_total')} em {item.quote.get('loja')} "
+                f"({item.quote.get('vendedor') or 'vendedor nao confirmado'}, "
+                f"garantia {item.quote.get('garantia_meses') or '?'} meses "
+                f"{item.quote.get('garantia_tipo')}), fonte={item.quote.get('fonte')}"
+            )
+            if item.eixos_sem_dado:
+                linha += f"\n   SEM DADO em {', '.join(item.eixos_sem_dado)}: esses eixos entraram como 0,50 neutro"
+            if item.vencida:
+                linha += f"\n   COTACAO VENCIDA: {item.idade_dias} dias desde a coleta"
+            if item.alerts:
+                linha += f"\n   ALERTAS: {', '.join(item.alerts)}"
+            partes.append(linha)
+        if len(elegiveis) > 1 and elegiveis[0].score - elegiveis[1].score <= 3:
+            partes.append(
+                "ATENCAO: os dois primeiros estao dentro de 3 pontos. Isso e empate tecnico. "
+                "Nao invente precisao: diga qual criterio humano deveria desempatar."
+            )
+    else:
+        partes.append("Nenhum candidato passou pelos gates.")
+
+    if cortados:
+        partes.append("\nCortados pelos gates (nao entram no ranking):")
+        for item in cortados:
+            partes.append(
+                f"- {item.product.get('nome') or item.produto_id}: {'; '.join(item.eliminations)}"
+            )
+
+    serie = price_history(project)
+    com_serie = [item for item in serie if item["observacoes"] > 1]
+    if com_serie:
+        partes.append("\nSerie historica de custo:")
+        for item in com_serie:
+            partes.append(
+                f"- {item['nome']}: atual R$ {item['atual']}, mediana R$ {item['mediana']}, "
+                f"minimo R$ {item['minimo']}, variacao {item['variacao_pct']}%"
+            )
+    if len(serie) > len(com_serie):
+        partes.append(
+            "\nOs demais produtos tem uma unica observacao de preco: nao afirme que "
+            "algum desconto e real, porque nao ha serie para comparar."
+        )
+
+    regra = stop_rule_status(project)
+    if regra:
+        partes.append(
+            f"\nRegra de parada da faixa ({regra['faixa']}): ate {regra['tempo_maximo']}, "
+            f"{regra['candidatos']} candidatos, {regra['cotacoes_minimas_texto']} cotacao(oes) cada. "
+            f"Hoje: {regra['candidatos_atuais']} candidatos"
+            + (f", {regra['dias_em_pesquisa']} dias em pesquisa." if regra["dias_em_pesquisa"] is not None else ".")
+        )
+
+    manual = {row.get("produto_id") for row in read_quotes(project) if row.get("fonte") == "manual"}
+    if not manual:
+        partes.append(
+            "\nNenhum produto tem cotacao manual ainda. Toda a comparacao esta sobre estimativa "
+            "web, entao a decisao so pode ser provisoria."
+        )
+    return "\n".join(partes)
 
 
 def ai_prompt(args: argparse.Namespace) -> None:
@@ -1030,8 +1600,8 @@ Responda com:
 """
     elif etapa == "decisao":
         prompt = common + f"""
-Cotacoes atuais:
-{quotes}
+Situacao atual da pesquisa:
+{decision_briefing(project)}
 
 Tarefa: ajude a redigir a decisao.
 
@@ -1058,12 +1628,37 @@ def decide(args: argparse.Namespace) -> None:
     if quote.get("fonte") != "manual" and not args.permitir_web:
         raise SystemExit("A cotacao final nao e manual. Use --permitir-web se quiser registrar mesmo assim.")
 
+    if quote_is_stale(quote) and not args.permitir_vencida:
+        raise SystemExit(
+            f"A cotacao escolhida tem {quote_age_days(quote)} dias "
+            f"(limite {quote_expiry_days(quote.get('fonte'))} para fonte={quote.get('fonte')}). "
+            "Recote antes de fechar, ou use --permitir-vencida para registrar assim mesmo."
+        )
+
     perdedores = []
     for value in args.perdedores or []:
         if ":" not in value:
             raise SystemExit("Use --perdedores produto_id: motivo")
         produto, motivo = value.split(":", 1)
-        perdedores.append((produto.strip(), motivo.strip()))
+        produto, motivo = produto.strip(), motivo.strip()
+        if not motivo:
+            raise SystemExit(f"Perdedor sem motivo: {produto}. O `nao escolhi` vale mais que o `escolhi`.")
+        if not find_product(produto):
+            raise SystemExit(f"Perdedor nao existe em `produtos/`: {produto}. Confira o produto_id.")
+        perdedores.append((produto, motivo))
+
+    # Principio 4 do PRD: registrar por que o segundo colocado perdeu e o que
+    # impede refazer a pesquisa inteira daqui a dois anos.
+    outros = sorted(set(latest_quotes(read_quotes(project))) - {args.produto_id})
+    registrados = {produto for produto, _ in perdedores}
+    faltando = [produto for produto in outros if produto not in registrados]
+    if faltando and not args.sem_perdedores:
+        raise SystemExit(
+            "Faltou registrar por que estes candidatos perderam: "
+            + ", ".join(faltando)
+            + "\nUse --perdedores \"produto_id: motivo\" para cada um, "
+            "ou --sem-perdedores se realmente nao houve concorrente."
+        )
 
     lines = [
         "# Decisao",
@@ -1142,6 +1737,11 @@ def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quot
         "- Vendedor:": f"- Vendedor: {quote.get('loja')} / {quote.get('vendedor')}",
         "- Veredito D+30 previsto:": f"- Veredito D+30 previsto: {d30.isoformat()}",
         "- Veredito D+180 previsto:": f"- Veredito D+180 previsto: {d180.isoformat()}",
+        # Preenchidos aqui para que `aprender-veredito` consiga exportar marca,
+        # loja e categoria sem depender de o usuario redigitar tudo na mao.
+        "- Marca:": f"- Marca: {product.get('marca') or ''}",
+        "- Loja:": f"- Loja: {quote.get('loja') or ''}",
+        "- Categoria:": f"- Categoria: {product.get('categoria') or ''}",
     }
     for needle, replacement in replacements.items():
         text = text.replace(needle, replacement, 1)
@@ -1314,6 +1914,22 @@ def status(args: argparse.Namespace) -> None:
         print(f"Decisao aberta: {open_decision.group(1).strip()}")
     print(f"Cotacoes: {len(rows)} total, {len(manual_ids)} produtos com cotacao manual, {len(web_only_ids)} so web")
     print(f"Validacao: {len(errors)} erros, {len(warnings)} avisos")
+
+    regra = stop_rule_status(project)
+    if regra:
+        dias = regra["dias_em_pesquisa"]
+        print(
+            f"Regra de parada ({regra['faixa']}): teto {regra['tempo_maximo']}, "
+            f"{regra['candidatos']} candidatos, {regra['cotacoes_minimas_texto']} cotacao(oes) cada"
+            + (f" | {dias} dias em pesquisa" if dias is not None else "")
+        )
+        print(f"Candidatos hoje: {regra['candidatos_atuais']}")
+        if regra["produtos_sem_cotacoes_suficientes"]:
+            print("Falta cotacao em: " + ", ".join(regra["produtos_sem_cotacoes_suficientes"]))
+
+    vencidas = sorted(pid for pid, row in latest.items() if quote_is_stale(row))
+    if vencidas:
+        print("Cotacao vencida (recote): " + ", ".join(vencidas))
     if web_only_ids:
         print("Confirmar manualmente: " + ", ".join(sorted(web_only_ids)))
 
@@ -1470,6 +2086,43 @@ def knowledge_context(project: Path) -> str:
     return "\n\n".join(parts)
 
 
+def entry_dates(path: Path) -> list[dt.date]:
+    """Datas das entradas de um arquivo de marca ou loja (`## AAAA-MM-DD`)."""
+    if not path.exists():
+        return []
+    datas = []
+    for match in re.finditer(r"(?m)^##\s*(\d{4}-\d{2}-\d{2})\s*$", path.read_text(encoding="utf-8")):
+        data = parse_dashboard_date(match.group(1))
+        if data:
+            datas.append(data)
+    return datas
+
+
+def knowledge_predating(project: Path) -> dict[str, int]:
+    """Conhecimento que ja existia ANTES desta compra comecar.
+
+    Metrica 1 do PRD: reaproveitamento e a base ja ter informacao util quando a
+    compra abriu. Contar o que o proprio projeto registrou depois faz a taxa dar
+    100% sempre e nao mede nada.
+    """
+    briefing, _ = load_frontmatter(project / "briefing.md")
+    aberto_em = parse_dashboard_date(briefing.get("criado_em"))
+    if not aberto_em:
+        return {"marcas": 0, "lojas": 0, "licoes": 0}
+
+    brand_files, store_files = knowledge_files_for_project(project)
+    marcas = sum(1 for path in brand_files if any(data < aberto_em for data in entry_dates(path)))
+    lojas = sum(1 for path in store_files if any(data < aberto_em for data in entry_dates(path)))
+
+    licoes = 0
+    for linha in lesson_lines_for_category(briefing.get("categoria")):
+        match = re.match(r"^(\d{4}-\d{2}-\d{2})", linha.strip())
+        data = parse_dashboard_date(match.group(1)) if match else None
+        if data and data < aberto_em:
+            licoes += 1
+    return {"marcas": marcas, "lojas": lojas, "licoes": licoes}
+
+
 def reuse_stats(categoria: str | None = None) -> tuple[list[dict[str, Any]], int, int, float]:
     projects = sorted(path for path in PROJETOS.iterdir() if path.is_dir()) if PROJETOS.exists() else []
     rows = []
@@ -1477,16 +2130,15 @@ def reuse_stats(categoria: str | None = None) -> tuple[list[dict[str, Any]], int
         briefing, _ = load_frontmatter(project / "briefing.md")
         if categoria and briefing.get("categoria") != categoria:
             continue
-        brand_files, store_files = knowledge_files_for_project(project)
-        lessons = lesson_lines_for_category(briefing.get("categoria"))
-        useful = bool(brand_files or store_files or lessons)
+        anterior = knowledge_predating(project)
+        useful = any(anterior.values())
         rows.append(
             {
                 "projeto": project.name,
                 "categoria": briefing.get("categoria"),
-                "marcas": len(brand_files),
-                "lojas": len(store_files),
-                "licoes": len(lessons),
+                "marcas": anterior["marcas"],
+                "lojas": anterior["lojas"],
+                "licoes": anterior["licoes"],
                 "reaproveitou": useful,
             }
         )
@@ -1498,9 +2150,31 @@ def reuse_stats(categoria: str | None = None) -> tuple[list[dict[str, Any]], int
 
 def reuse_report(args: argparse.Namespace) -> None:
     rows, total, reused, percent = reuse_stats(args.categoria)
-    lines = ["# Reaproveitamento", "", f"Gerado em {now_iso()}.", "", f"- Projetos analisados: {total}", f"- Projetos com conhecimento reutilizavel: {reused}", f"- Taxa: {percent}%", "", "| Projeto | Categoria | Marcas | Lojas | Licoes | Reaproveitou |", "|---|---|---:|---:|---:|---|"]
+    lines = [
+        "# Reaproveitamento",
+        "",
+        f"Gerado em {now_iso()}.",
+        "",
+        "Conta so o conhecimento que **ja existia antes** da compra abrir. O que o",
+        "proprio projeto registrou durante a pesquisa nao e reaproveitamento: seria",
+        "medir a si mesmo e dar 100% sempre.",
+        "",
+        f"- Projetos analisados: {total}",
+        f"- Projetos que encontraram base pronta: {reused}",
+        f"- Taxa: {percent}% (meta do PRD: acima de 40% a partir da decima compra)",
+        "",
+        "| Projeto | Categoria | Marcas | Lojas | Licoes | Reaproveitou |",
+        "|---|---|---:|---:|---:|---|",
+    ]
     for row in rows:
         lines.append(f"| {row['projeto']} | {row['categoria']} | {row['marcas']} | {row['lojas']} | {row['licoes']} | {'sim' if row['reaproveitou'] else 'nao'} |")
+    if total and not reused:
+        lines.extend([
+            "",
+            "Taxa zero aqui e o esperado nas primeiras compras: a base ainda esta sendo",
+            "construida. Ela so passa a valer quando uma compra nova encontra licao, marca",
+            "ou loja registrada por uma compra anterior.",
+        ])
     path = BASE / "reaproveitamento.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     print(path.relative_to(ROOT))
@@ -1600,7 +2274,7 @@ def verdict_summaries() -> list[dict[str, str]]:
 def dashboard_styles() -> str:
     return """
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   --bg: #f7f5ef;
   --surface: #ffffff;
   --ink: #20201d;
@@ -1611,6 +2285,35 @@ def dashboard_styles() -> str:
   --amber: #b7791f;
   --coral: #b45342;
   --blue: #2563eb;
+  --track: #ede8dc;
+  --pill: #ede8dc;
+  --pill-ok: #dff0df;
+  --pill-warn: #faedcc;
+  --pill-bad: #f5d7d1;
+  --code-bg: #2b2a26;
+  --code-ink: #faf7ef;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14140f;
+    --surface: #1e1e19;
+    --ink: #f0ece2;
+    --muted: #a09b90;
+    --line: #35342c;
+    --teal: #5eead4;
+    --green: #86e08a;
+    --amber: #f0c674;
+    --coral: #f0a08c;
+    --blue: #8ab4f8;
+    --track: #2c2b24;
+    --pill: #2c2b24;
+    --pill-ok: #1e3a1f;
+    --pill-warn: #3d3218;
+    --pill-bad: #43231c;
+    --code-bg: #0d0d0a;
+    --code-ink: #f0ece2;
+  }
 }
 * { box-sizing: border-box; }
 body {
@@ -1655,20 +2358,20 @@ table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; font-size: 13px; }
 th { color: var(--muted); font-weight: 700; }
 td.num, th.num { text-align: right; }
-.pill { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; background: #ede8dc; color: var(--ink); }
-.pill.ok { background: #dff0df; color: var(--green); }
-.pill.warn { background: #faedcc; color: var(--amber); }
-.pill.bad { background: #f5d7d1; color: var(--coral); }
+.pill { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; background: var(--pill); color: var(--ink); }
+.pill.ok { background: var(--pill-ok); color: var(--green); }
+.pill.warn { background: var(--pill-warn); color: var(--amber); }
+.pill.bad { background: var(--pill-bad); color: var(--coral); }
 .bars { display: grid; gap: 8px; }
 .bar-row { display: grid; grid-template-columns: 120px 1fr 42px; align-items: center; gap: 8px; font-size: 13px; }
-.bar-track { height: 10px; background: #ede8dc; border-radius: 999px; overflow: hidden; }
+.bar-track { height: 10px; background: var(--track); border-radius: 999px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--teal); }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .actions a { font-size: 13px; }
 pre {
   white-space: pre-wrap;
-  background: #2b2a26;
-  color: #faf7ef;
+  background: var(--code-bg);
+  color: var(--code-ink);
   padding: 12px;
   border-radius: 8px;
   overflow: auto;
@@ -1678,6 +2381,15 @@ pre {
   .topbar { display: block; }
   .shell { padding: 16px; }
   th, td { font-size: 12px; }
+  /* Tabela larga rola dentro do proprio painel em vez de esmagar o texto
+     e estourar os selos. A pagina nunca rola de lado. */
+  .panel { overflow-x: auto; }
+  table { table-layout: auto; }
+  /* So a tabela com cabecalho (muitas colunas) precisa rolar.
+     A de chave/valor cabe na tela e continua quebrando linha normalmente. */
+  table:has(thead) { min-width: 520px; }
+  table:has(thead) th, table:has(thead) td { white-space: nowrap; }
+  table:has(thead) td:first-child, table:has(thead) th:first-child { white-space: normal; min-width: 120px; }
 }
 """
 
@@ -1765,6 +2477,26 @@ def generate_project_page(project: Path) -> Path:
             f"<td>{safe_html(row.get('alertas'))}</td>"
             "</tr>"
         )
+    history_rows = []
+    for item in price_history(project):
+        unica = item["observacoes"] < 2
+        aviso = (
+            '<span class="pill warn">1 observacao</span>'
+            if unica
+            else f"{item['desconto_real_vs_mediana_pct']}%"
+        )
+        history_rows.append(
+            "<tr>"
+            f"<td>{safe_html(item['nome'])}</td>"
+            f"<td class=\"num\">{safe_html(item['observacoes'])}</td>"
+            f"<td class=\"num\">{safe_html(item['atual'])}</td>"
+            f"<td class=\"num\">{safe_html(item['minimo'])}</td>"
+            f"<td class=\"num\">{safe_html(item['mediana'])}</td>"
+            f"<td class=\"num\">{safe_html(item['maximo'])}</td>"
+            f"<td class=\"num\">{aviso}</td>"
+            "</tr>"
+        )
+
     quote_rows = []
     for row in quotes[-20:]:
         quote_rows.append(
@@ -1806,6 +2538,14 @@ def generate_project_page(project: Path) -> Path:
   <table>
     <thead><tr><th>Produto</th><th class="num">Score</th><th>Status</th><th>Motivos</th><th>Alertas</th></tr></thead>
     <tbody>{''.join(ranking_rows) or '<tr><td colspan="5">Sem ranking gerado.</td></tr>'}</tbody>
+  </table>
+</section>
+<section class="section panel">
+  <h2>Historico de preco</h2>
+  <p class="muted">Desconto so e desconto contra a sua propria serie. Com uma unica observacao, nao da para saber.</p>
+  <table>
+    <thead><tr><th>Produto</th><th class="num">Obs.</th><th class="num">Atual</th><th class="num">Minimo</th><th class="num">Mediana</th><th class="num">Maximo</th><th class="num">vs mediana</th></tr></thead>
+    <tbody>{''.join(history_rows) or '<tr><td colspan="7">Sem historico.</td></tr>'}</tbody>
   </table>
 </section>
 <section class="section panel">
@@ -1954,6 +2694,136 @@ def generate_dashboard(args: argparse.Namespace) -> None:
     print(f"Projetos: {len(projects)}")
 
 
+def migrate_quotes(args: argparse.Namespace) -> None:
+    """Atualiza o cabecalho do cotacoes.csv sem perder linha nem coluna."""
+    alvos = [project_path(args.projeto)] if args.projeto else project_dirs()
+    for project in alvos:
+        path = project / "cotacoes.csv"
+        if not path.exists():
+            continue
+        antes = raw_quotes_header(project)
+        rows = read_quotes(project)
+        write_quotes(project, rows)
+        depois = raw_quotes_header(project)
+        novas = [column for column in depois if column not in antes]
+        if novas:
+            print(f"{project.name}: {len(rows)} linhas preservadas, colunas adicionadas: {', '.join(novas)}")
+        else:
+            print(f"{project.name}: ja no schema atual ({len(rows)} linhas).")
+
+
+def private_data_dir(_: argparse.Namespace) -> None:
+    """Cria a pasta de dados pessoais FORA da arvore do repositorio.
+
+    Secao 11 do PRD: `.gitignore` nao basta, porque um `git add -A` distraido
+    ou um ignore mal escrito sobe o dado e o historico do Git guarda para sempre.
+    """
+    destino = Path.home() / ".central-compras" / "dados-privados"
+    destino.mkdir(parents=True, exist_ok=True)
+    readme = destino / "LEIA-ME.md"
+    if not readme.exists():
+        readme.write_text(
+            "# Dados privados da Central de Compras\n\n"
+            "Esta pasta fica FORA do repositorio de proposito. Arquivo que nao esta\n"
+            "na arvore versionada nao pode subir para o GitHub por acidente.\n\n"
+            "## Pode ficar aqui\n\n"
+            "- Endereco de entrega e CEP\n"
+            "- CPF para nota fiscal\n"
+            "- Numero de pedido, rastreio e protocolo de atendimento\n"
+            "- Comprovante e nota fiscal em PDF\n\n"
+            "## Nunca fica aqui nem em lugar nenhum\n\n"
+            "- Numero de cartao, CVV, senha, token\n\n"
+            "No repositorio, referencie por caminho, nunca por copia do conteudo.\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    print(destino)
+    print("Dado pessoal mora aqui, fora do repositorio. Nunca cartao, CVV ou senha.")
+
+
+SENSITIVE_PATTERNS: list[tuple[str, str, str]] = [
+    ("CPF", r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", "CPF formatado"),
+    ("CARTAO", r"\b(?:\d[ .-]?){13,19}\b", "sequencia com cara de numero de cartao"),
+    ("CVV", r"(?i)\bcvv\b\s*[:=]\s*\d{3,4}\b", "CVV"),
+    ("SENHA", r"(?i)\b(senha|password|passwd)\b\s*[:=]\s*\S+", "senha em texto"),
+    ("TOKEN", r"(?i)\b(token|api[_-]?key|secret|access[_-]?key)\b\s*[:=]\s*[A-Za-z0-9_\-]{12,}", "token/chave"),
+    ("GITHUB", r"\bgh[pousr]_[A-Za-z0-9]{20,}\b", "token do GitHub"),
+]
+
+SCAN_SUFFIXES = {".md", ".csv", ".yaml", ".yml", ".txt", ".json", ".py", ".html", ".css"}
+
+# Marcador de excecao na linha: exemplo em teste ou documentacao.
+ALLOW_SECRET_MARKER = "central-compras:exemplo-nao-e-segredo"
+
+
+def luhn_ok(digits: str) -> bool:
+    total, alt = 0, False
+    for char in reversed(digits):
+        value = int(char)
+        if alt:
+            value *= 2
+            if value > 9:
+                value -= 9
+        total += value
+        alt = not alt
+    return total % 10 == 0
+
+
+def scan_sensitive(root: Path) -> list[tuple[str, int, str, str]]:
+    """Procura dado sensivel na arvore versionada.
+
+    Git guarda historico para sempre: e mais barato barrar antes do commit do
+    que reescrever historico depois.
+    """
+    achados: list[tuple[str, int, str, str]] = []
+    ignorar = {".git", "__pycache__", ".venv", "venv", ".pytest_cache", "dados-privados"}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in SCAN_SUFFIXES:
+            continue
+        if any(part in ignorar for part in path.parts):
+            continue
+        try:
+            linhas = path.read_text(encoding="utf-8").splitlines()
+        except (UnicodeDecodeError, OSError):
+            continue
+        for numero, linha in enumerate(linhas, 1):
+            # Excecao explicita e deliberada, na propria linha. Exemplo em teste
+            # ou documentacao nao pode virar alarme eterno, mas tem que ser
+            # marcado a mao: nunca por adivinhacao do varredor.
+            if ALLOW_SECRET_MARKER in linha:
+                continue
+            for codigo, padrao, descricao in SENSITIVE_PATTERNS:
+                for match in re.finditer(padrao, linha):
+                    trecho = match.group()
+                    if codigo == "CARTAO":
+                        digitos = re.sub(r"\D", "", trecho)
+                        # So acusa o que passa no Luhn: sem isso, todo CEP,
+                        # codigo de barras e MLB longo viraria alarme falso.
+                        if not (13 <= len(digitos) <= 19 and luhn_ok(digitos)):
+                            continue
+                    rel = path.relative_to(root).as_posix()
+                    achados.append((rel, numero, codigo, descricao))
+                    break
+    return achados
+
+
+def check_secrets(args: argparse.Namespace) -> None:
+    achados = scan_sensitive(ROOT)
+    if not achados:
+        print("Nenhum padrao sensivel encontrado na arvore versionada.")
+        print("Lembrete: endereco, CPF e comprovante moram em ~/.central-compras/dados-privados/.")
+        return
+    print(f"{len(achados)} ocorrencia(s) suspeita(s):")
+    for arquivo, linha, codigo, descricao in achados:
+        print(f"  {arquivo}:{linha} [{codigo}] {descricao}")
+    print("")
+    print("Nao commite antes de resolver. Se ja foi commitado, `git rm` NAO basta:")
+    print("o historico guarda. O procedimento e reescrever com `git filter-repo`")
+    print("e trocar o que vazou.")
+    if args.strict:
+        raise SystemExit(1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Central de Compras")
     sub = parser.add_subparsers(required=True)
@@ -2052,6 +2922,22 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("dashboard", help="gera dashboard HTML local")
     p.set_defaults(func=generate_dashboard)
 
+    p = sub.add_parser("historico", help="mostra a serie historica de custo e desmascara preco ancora")
+    p.add_argument("projeto")
+    p.add_argument("--produto-id")
+    p.set_defaults(func=show_history)
+
+    p = sub.add_parser("migrar-cotacoes", help="atualiza o cabecalho do cotacoes.csv preservando linhas e colunas extras")
+    p.add_argument("--projeto", help="um projeto especifico; sem isso, migra todos")
+    p.set_defaults(func=migrate_quotes)
+
+    p = sub.add_parser("dados-privados", help="cria a pasta de dados pessoais fora do repositorio")
+    p.set_defaults(func=private_data_dir)
+
+    p = sub.add_parser("checar-segredos", help="procura CPF, cartao, senha e token na arvore versionada")
+    p.add_argument("--strict", action="store_true", help="retorna erro se encontrar algo (use no pre-commit)")
+    p.set_defaults(func=check_secrets)
+
     p = sub.add_parser("prompt-ia", help="gera prompt de apoio para uma etapa")
     p.add_argument("projeto")
     p.add_argument("--etapa", choices=["modelo", "cotacao", "decisao", "veredito"], default="modelo")
@@ -2064,6 +2950,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--perdedores", action="append", default=[])
     p.add_argument("--risco", action="append", default=[])
     p.add_argument("--permitir-web", action="store_true")
+    p.add_argument("--permitir-vencida", action="store_true", help="aceita cotacao fora do prazo de validade")
+    p.add_argument("--sem-perdedores", action="store_true", help="fecha sem registrar derrotados (nao houve concorrente)")
     p.add_argument("--comprado", action="store_true", help="marca o projeto como comprado ao decidir")
     p.add_argument("--force-veredito", action="store_true", help="sobrescreve veredito existente")
     p.set_defaults(func=decide)

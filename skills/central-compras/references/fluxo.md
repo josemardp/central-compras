@@ -33,6 +33,16 @@ For expensive purchases, include TCO:
 python scripts\central_compras.py cotar projetos\2026-comprar-carro --produto-id byd-dolphin-mini --loja "Concessionaria" --vendedor "Loja fisica" --vendedor-tipo fisica --preco 150000 --nota 4.7 --avaliacoes 1000 --garantia-meses 36 --garantia-tipo nacional --fonte manual --custo-operacional-mensal 300 --valor-revenda-estimado 85000 --link "https://..."
 ```
 
+## Price History
+
+```powershell
+python scripts\central_compras.py historico projetos\2026-fone-bluetooth-para-chamadas
+```
+
+The price series is the only defense against an inflated "de R$ X" anchor. With a
+single observation the report says so explicitly - do not call a discount real
+until there are at least two dated observations.
+
 ## Rank, Validate, Decide
 
 ```powershell
@@ -45,7 +55,20 @@ python scripts\central_compras.py listar-aguardando-preco --categoria fone
 python scripts\central_compras.py decidir projetos\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --porque "Melhor equilibrio entre preco confirmado, microfone e garantia." --perdedores "anker-q30: passou do preco teto" --comprado
 ```
 
-`decidir` creates the verdict file automatically.
+`decidir` creates the verdict file automatically, already filled with brand,
+store and category so `aprender-veredito` can export the learning without
+retyping anything.
+
+`decidir` refuses to close when:
+
+- the chosen quote is not `fonte=manual` (use `--permitir-web` to override);
+- the quote is past its freshness window (`--permitir-vencida` to override);
+- any other candidate with a quote has no recorded reason for losing
+  (`--perdedores "produto_id: motivo"`, or `--sem-perdedores` when there really
+  was no competitor).
+
+That last one is principle 4 of the PRD: the "why I did not choose it" is what
+stops the whole research from being redone in two years.
 
 ## Verdict Learning
 
@@ -66,6 +89,17 @@ python scripts\central_compras.py reaproveitamento --categoria fone
 ```
 
 `prompt-ia` automatically includes relevant lessons, brands, and stores.
+
+## Maintenance
+
+```powershell
+python scripts\central_compras.py migrar-cotacoes
+python scripts\central_compras.py dados-privados
+```
+
+`migrar-cotacoes` upgrades an old `cotacoes.csv` header without losing rows or
+hand-written columns. `dados-privados` creates the personal-data folder OUTSIDE
+the repository tree - address, CPF, order numbers live there, never in Git.
 
 ## Local Dashboard
 

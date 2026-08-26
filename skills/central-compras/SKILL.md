@@ -25,6 +25,10 @@ C:\projetos\central-compras
 - Product discard requires a reason in `descartado_porque` via the CLI.
 - For purchases above R$ 20,000, compare by TCO when possible, not sticker price.
 - Keep personal delivery, CPF, card, password, and payment data out of the repo.
+- A price older than its freshness window is not a price. Recote instead of arguing with the guard.
+- Never close a decision without recording why each other candidate lost.
+- The score is on an absolute scale, so 75 means the same thing in every project. Always show it decomposed into the five axes, and repeat the "score parcial" warning when an axis has no data.
+- A gap of 3 points or less between finalists is a technical tie: say so out loud instead of pretending the number decided.
 
 ## Workflow
 

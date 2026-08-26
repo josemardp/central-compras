@@ -145,18 +145,54 @@ Gate de saida:
 
 Meta: preparar uso continuo por anos.
 
+Status: quase fechada. Falta so a tag `v1.0`.
+
 Entregas:
-- Validacao contra dados sensiveis antes de commit.
-- Documentacao de rotina semanal.
-- Guia de nova categoria.
-- Guia de recuperacao se dado sensivel for commitado.
-- Testes ampliados.
-- Tag `v1.0`.
+- [x] Validacao contra dados sensiveis antes de commit (`checar-segredos --strict`).
+- [x] Guia de recuperacao se dado sensivel for commitado (README, secao de seguranca).
+- [x] Pasta de dados pessoais fora da arvore do repositorio (`dados-privados`).
+- [x] Testes ampliados: 58 testes, cobrindo integridade de CSV, escala do score,
+      frescor, regra de parada, gates, travas de decisao e varredura de segredo.
+- [ ] Documentacao de rotina semanal.
+- [ ] Guia de nova categoria.
+- [ ] Tag `v1.0`.
 
 Gate de saida:
-- `pre-commit` ou comando equivalente bloqueia padroes sensiveis.
-- README cobre o uso diario.
-- Release `v1.0` publicada no GitHub privado.
+- [x] Comando equivalente ao pre-commit bloqueia padroes sensiveis.
+- [x] README cobre o uso diario.
+- [ ] Release `v1.0` publicada no GitHub privado.
+
+## Sprint 8 - Correcao do motor de decisao
+
+Meta: fazer o numero significar o que ele promete significar.
+
+Status: concluida.
+
+O que estava errado e foi corrigido:
+
+- **Score min-max mentia com poucos candidatos.** Com dois finalistas, o segundo
+  sempre tirava 0,00 em qualidade e valor, mesmo perdendo por 0,2 ponto de nota.
+  No projeto real do fone, isso virava 80,6 contra 23,1 para uma diferenca que
+  na verdade era 75,4 contra 57,9. Agora a escala e absoluta e comparavel entre
+  projetos.
+- **Alerta `ANCORA` estava invertido.** Ficava calado na ancora inflada e
+  acusava o desconto legitimo.
+- **`cotacoes.csv` perdia coluna em silencio.** O arquivo e reescrito inteiro a
+  cada gravacao, e qualquer coluna fora do schema era descartada. Contradizia o
+  principio 1 do PRD.
+- **Gate `exige_rede_assistencia` era letra morta.** Declarado em
+  `categorias.yaml` e nunca lido. Agora ha teste que falha se qualquer gate
+  declarado deixar de ser aplicado.
+- **Regra de parada (secao 7.5) nunca foi implementada.** A config existia e
+  ninguem lia.
+- **Nenhum controle de frescor.** Cotacao de dois anos rankeava como preco de
+  hoje, num sistema cujo lema e que preco envelhece em 48 horas.
+- **`decidir` fechava sem o motivo da derrota do segundo colocado**, contra o
+  principio 4 do PRD.
+- **Numero mal digitado virava 0,00** e o produto parecia de graca.
+- **`nota_ajustada` era lida congelada do CSV**, entao mudar os pesos da nota
+  bayesiana nao mexia no gate.
+- **Dashboard so tinha tema claro** e esmagava as tabelas no celular.
 
 ## Backlog posterior ao PRD
 

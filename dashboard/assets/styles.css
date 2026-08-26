@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   --bg: #f7f5ef;
   --surface: #ffffff;
   --ink: #20201d;
@@ -10,6 +10,35 @@
   --amber: #b7791f;
   --coral: #b45342;
   --blue: #2563eb;
+  --track: #ede8dc;
+  --pill: #ede8dc;
+  --pill-ok: #dff0df;
+  --pill-warn: #faedcc;
+  --pill-bad: #f5d7d1;
+  --code-bg: #2b2a26;
+  --code-ink: #faf7ef;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14140f;
+    --surface: #1e1e19;
+    --ink: #f0ece2;
+    --muted: #a09b90;
+    --line: #35342c;
+    --teal: #5eead4;
+    --green: #86e08a;
+    --amber: #f0c674;
+    --coral: #f0a08c;
+    --blue: #8ab4f8;
+    --track: #2c2b24;
+    --pill: #2c2b24;
+    --pill-ok: #1e3a1f;
+    --pill-warn: #3d3218;
+    --pill-bad: #43231c;
+    --code-bg: #0d0d0a;
+    --code-ink: #f0ece2;
+  }
 }
 * { box-sizing: border-box; }
 body {
@@ -54,20 +83,20 @@ table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; font-size: 13px; }
 th { color: var(--muted); font-weight: 700; }
 td.num, th.num { text-align: right; }
-.pill { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; background: #ede8dc; color: var(--ink); }
-.pill.ok { background: #dff0df; color: var(--green); }
-.pill.warn { background: #faedcc; color: var(--amber); }
-.pill.bad { background: #f5d7d1; color: var(--coral); }
+.pill { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; background: var(--pill); color: var(--ink); }
+.pill.ok { background: var(--pill-ok); color: var(--green); }
+.pill.warn { background: var(--pill-warn); color: var(--amber); }
+.pill.bad { background: var(--pill-bad); color: var(--coral); }
 .bars { display: grid; gap: 8px; }
 .bar-row { display: grid; grid-template-columns: 120px 1fr 42px; align-items: center; gap: 8px; font-size: 13px; }
-.bar-track { height: 10px; background: #ede8dc; border-radius: 999px; overflow: hidden; }
+.bar-track { height: 10px; background: var(--track); border-radius: 999px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--teal); }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .actions a { font-size: 13px; }
 pre {
   white-space: pre-wrap;
-  background: #2b2a26;
-  color: #faf7ef;
+  background: var(--code-bg);
+  color: var(--code-ink);
   padding: 12px;
   border-radius: 8px;
   overflow: auto;
@@ -77,4 +106,13 @@ pre {
   .topbar { display: block; }
   .shell { padding: 16px; }
   th, td { font-size: 12px; }
+  /* Tabela larga rola dentro do proprio painel em vez de esmagar o texto
+     e estourar os selos. A pagina nunca rola de lado. */
+  .panel { overflow-x: auto; }
+  table { table-layout: auto; }
+  /* So a tabela com cabecalho (muitas colunas) precisa rolar.
+     A de chave/valor cabe na tela e continua quebrando linha normalmente. */
+  table:has(thead) { min-width: 520px; }
+  table:has(thead) th, table:has(thead) td { white-space: nowrap; }
+  table:has(thead) td:first-child, table:has(thead) th:first-child { white-space: normal; min-width: 120px; }
 }
