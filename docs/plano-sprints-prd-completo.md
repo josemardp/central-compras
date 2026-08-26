@@ -17,7 +17,7 @@ Objetivo: evoluir a Central de Compras do bootstrap atual ate o PRD v2 completo,
 
 ## Sprint 0 - Fundacao versionada
 
-Status: em andamento.
+Status: concluida.
 
 Entregas:
 - Repositorio Git local.
@@ -37,13 +37,15 @@ Gate de saida:
 
 Meta: validar uma compra pequena do inicio ao fim.
 
+Status: automacao implementada; falta fechar uma compra real com cotacao manual para cumprir o gate de negocio.
+
 Entregas:
-- Comando `status` mais detalhado por etapa.
-- Checklist atualizado automaticamente em `processo.md`.
-- Comando para promover cotacao `web` para `manual`.
-- Comando para marcar candidato como descartado com motivo obrigatorio.
-- Compra do fone fechada com `decisao.md` real.
-- Arquivo de veredito criado no ato da decisao.
+- [x] Comando `status` mais detalhado por etapa.
+- [x] Checklist atualizado automaticamente em `processo.md`.
+- [x] Comando para promover cotacao `web` para `manual`.
+- [x] Comando para marcar candidato como descartado com motivo obrigatorio.
+- [ ] Compra do fone fechada com `decisao.md` real.
+- [x] Arquivo de veredito criado no ato da decisao.
 
 Gate de saida:
 - Uma compra real concluida.

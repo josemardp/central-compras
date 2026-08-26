@@ -24,10 +24,13 @@ python scripts/central_compras.py novo-projeto "fone bluetooth para chamadas" --
 python scripts/central_compras.py novo-produto projetos/2026-fone-bluetooth-para-chamadas "QCY H3" --marca QCY --categoria fone --atributo tipo=headphone --atributo cancelamento_ruido=anc
 python scripts/central_compras.py anotar projetos/2026-fone-bluetooth-para-chamadas --etapa modelo --decisao "Pesquisar headphone over-ear com bom microfone" --porque "A prioridade e chamada longa, nao uso esportivo."
 python scripts/central_compras.py cotar projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --loja Amazon --vendedor "Loja oficial" --vendedor-tipo oficial --preco 299 --frete 0 --nota 4.6 --avaliacoes 1200 --garantia-meses 12 --garantia-tipo nacional --fonte manual --link "https://..."
+python scripts/central_compras.py promover-cotacao projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --preco 289 --frete 10 --garantia-meses 12 --garantia-tipo nacional
 python scripts/central_compras.py ranking projetos/2026-fone-bluetooth-para-chamadas
 python scripts/central_compras.py prompt-ia projetos/2026-fone-bluetooth-para-chamadas --etapa modelo
-python scripts/central_compras.py decidir projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --porque "Melhor equilibrio entre microfone, garantia nacional e preco confirmado." --perdedores "anker-q30: melhor ANC, mas passou do preco teto"
+python scripts/central_compras.py descartar --produto-id anker-q30 --projeto projetos/2026-fone-bluetooth-para-chamadas --porque "Melhor ANC, mas passou do preco teto."
+python scripts/central_compras.py decidir projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --porque "Melhor equilibrio entre microfone, garantia nacional e preco confirmado." --perdedores "anker-q30: melhor ANC, mas passou do preco teto" --comprado
 python scripts/central_compras.py resumo projetos/2026-fone-bluetooth-para-chamadas
+python scripts/central_compras.py status projetos/2026-fone-bluetooth-para-chamadas
 ```
 
 ## Principios
@@ -36,6 +39,7 @@ python scripts/central_compras.py resumo projetos/2026-fone-bluetooth-para-chama
 - Gate vem antes de score.
 - Linha com `fonte=web` ajuda a pesquisar; linha com `fonte=manual` e que fecha compra.
 - Produto descartado precisa de motivo.
+- Decisao final cria veredito automaticamente para D+30 e D+180.
 - Dado pessoal fica fora do repositorio, em `~/.central-compras/dados-privados/`.
 
 ## Estrutura

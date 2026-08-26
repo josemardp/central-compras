@@ -7,6 +7,8 @@
 - Data da compra:
 - Valor pago:
 - Vendedor:
+- Veredito D+30 previsto:
+- Veredito D+180 previsto:
 
 ## D+30
 

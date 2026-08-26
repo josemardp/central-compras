@@ -78,6 +78,17 @@ class CliWorkflowTest(unittest.TestCase):
             "chamadas=true",
         )
         self.run_cli(
+            "novo-produto",
+            project,
+            "QCY X",
+            "--marca",
+            "QCY",
+            "--categoria",
+            "fone",
+            "--produto-id",
+            "qcy-x",
+        )
+        self.run_cli(
             "cotar",
             project,
             "--produto-id",
@@ -105,6 +116,47 @@ class CliWorkflowTest(unittest.TestCase):
             "--fonte",
             "manual",
         )
+        self.run_cli(
+            "cotar",
+            project,
+            "--produto-id",
+            "qcy-x",
+            "--loja",
+            "Marketplace",
+            "--vendedor",
+            "Vendedor X",
+            "--vendedor-tipo",
+            "terceiro",
+            "--preco",
+            "199",
+            "--nota",
+            "4.1",
+            "--avaliacoes",
+            "50",
+            "--garantia-tipo",
+            "nenhuma",
+            "--fonte",
+            "web",
+        )
+        self.run_cli(
+            "promover-cotacao",
+            project,
+            "--produto-id",
+            "qcy-x",
+            "--preco",
+            "189",
+            "--frete",
+            "10",
+            "--nota",
+            "4.4",
+            "--avaliacoes",
+            "200",
+            "--garantia-meses",
+            "12",
+            "--garantia-tipo",
+            "vendedor",
+        )
+        self.run_cli("descartar", "--produto-id", "qcy-x", "--projeto", project, "--porque", "Microfone sem confiabilidade.")
         self.run_cli("ranking", project)
         self.run_cli(
             "decidir",
@@ -113,18 +165,24 @@ class CliWorkflowTest(unittest.TestCase):
             "qcy-h3",
             "--porque",
             "Cotacao manual confirmada e atende chamadas.",
+            "--comprado",
         )
         resumo = self.run_cli("resumo", project)
+        status = self.run_cli("status", project)
 
         ranking = (self.tmpdir / project / "ranking.md").read_text(encoding="utf-8")
         processo = (self.tmpdir / project / "processo.md").read_text(encoding="utf-8")
         decisao = (self.tmpdir / project / "decisao.md").read_text(encoding="utf-8")
+        vereditos = list((self.tmpdir / "vereditos").glob("*qcy-h3.md"))
 
         self.assertIn("QCY H3", ranking)
         self.assertIn("qualidade", ranking)
         self.assertIn("Pesquisar headphone over-ear", processo)
+        self.assertIn("Descartado qcy-x", processo)
         self.assertIn("Cotacao manual confirmada", decisao)
         self.assertIn("Escolhido: QCY H3", resumo.stdout)
+        self.assertIn("Estado: comprado", status.stdout)
+        self.assertTrue(vereditos)
 
 
 if __name__ == "__main__":

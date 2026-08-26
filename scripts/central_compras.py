@@ -122,6 +122,11 @@ def load_frontmatter(path: Path) -> tuple[dict[str, Any], str]:
     return meta, parts[2].lstrip()
 
 
+def save_frontmatter(path: Path, meta: dict[str, Any], body: str) -> None:
+    frontmatter = yaml.safe_dump(meta, allow_unicode=True, sort_keys=False).strip()
+    path.write_text(f"---\n{frontmatter}\n---\n\n{body.lstrip()}", encoding="utf-8", newline="\n")
+
+
 def project_path(value: str) -> Path:
     path = Path(value)
     if not path.is_absolute():
@@ -133,6 +138,15 @@ def project_path(value: str) -> Path:
     if not path.exists() or not path.is_dir():
         raise SystemExit(f"Projeto nao encontrado: {value}")
     return path
+
+
+def set_project_state(project: Path, estado: str) -> None:
+    briefing = project / "briefing.md"
+    if not briefing.exists():
+        return
+    meta, body = load_frontmatter(briefing)
+    meta["estado"] = estado
+    save_frontmatter(briefing, meta, body)
 
 
 def quote_float(value: Any, default: float = 0.0) -> float:
@@ -208,6 +222,7 @@ def new_project(args: argparse.Namespace) -> None:
     (path / "decisao.md").write_text(render_template("decisao.md"), encoding="utf-8", newline="\n")
     with (path / "cotacoes.csv").open("w", encoding="utf-8", newline="") as f:
         csv.DictWriter(f, fieldnames=COTACOES_HEADER).writeheader()
+    set_process_state(path, estado="pesquisando", proxima_acao="definir modelo/requisitos com ajuda da IA")
     print(path.relative_to(ROOT))
 
 
@@ -239,6 +254,7 @@ def new_product(args: argparse.Namespace) -> None:
     write_yaml(path / "produto.yaml", data)
     (path / "pesquisa.md").write_text(render_template("pesquisa.md"), encoding="utf-8", newline="\n")
     append_timeline(project, "produto", f"Candidato registrado: {args.nome}", f"id={produto_id}")
+    mark_steps(project, [3])
     print(path.relative_to(ROOT))
 
 
@@ -256,6 +272,43 @@ def write_quotes(project: Path, rows: list[dict[str, Any]]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({field: row.get(field, "") for field in COTACOES_HEADER})
+
+
+def find_product_path(produto_id: str) -> Path | None:
+    matches = list(PRODUTOS.glob(f"*/{produto_id}/produto.yaml"))
+    return matches[0] if matches else None
+
+
+def set_process_state(project: Path, *, estado: str | None = None, proxima_acao: str | None = None, decisao_aberta: str | None = None) -> None:
+    path = project / "processo.md"
+    if not path.exists():
+        return
+    text = path.read_text(encoding="utf-8")
+    replacements = {
+        "Estado": estado,
+        "Proxima acao": proxima_acao,
+        "Decisao aberta": decisao_aberta,
+    }
+    for label, value in replacements.items():
+        if value is None:
+            continue
+        pattern = rf"(?m)^- {re.escape(label)}:.*$"
+        replacement = f"- {label}: {value}"
+        if re.search(pattern, text):
+            text = re.sub(pattern, replacement, text)
+        else:
+            text = text.replace("## Estado atual\n", f"## Estado atual\n\n{replacement}\n", 1)
+    path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def mark_steps(project: Path, steps: list[int]) -> None:
+    path = project / "processo.md"
+    if not path.exists():
+        return
+    text = path.read_text(encoding="utf-8")
+    for step in steps:
+        text = re.sub(rf"(?m)^- \[ \] {step}\.", f"- [x] {step}.", text)
+    path.write_text(text, encoding="utf-8", newline="\n")
 
 
 def add_quote(args: argparse.Namespace) -> None:
@@ -301,6 +354,10 @@ def add_quote(args: argparse.Namespace) -> None:
         f"Cotacao registrada para {args.produto_id}",
         f"{args.loja} / fonte={args.fonte} / custo_total={row['custo_total']}",
     )
+    mark_steps(project, [4])
+    if args.fonte == "manual":
+        mark_steps(project, [7])
+        set_process_state(project, proxima_acao="gerar ranking e comparar finalistas com cotacao manual")
     print(f"Cotacao adicionada: {args.produto_id} - R$ {row['custo_total']}")
 
 
@@ -326,10 +383,10 @@ def append_timeline(project: Path, etapa: str, decisao: str, porque: str) -> Non
 
 
 def find_product(produto_id: str) -> dict[str, Any] | None:
-    matches = list(PRODUTOS.glob(f"*/{produto_id}/produto.yaml"))
-    if not matches:
+    path = find_product_path(produto_id)
+    if not path:
         return None
-    return read_yaml(matches[0], {})
+    return read_yaml(path, {})
 
 
 def latest_quotes(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
@@ -342,6 +399,15 @@ def latest_quotes(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
         pool = manual or values
         latest[produto_id] = sorted(pool, key=lambda r: r.get("data_coleta", ""))[-1]
     return latest
+
+
+def latest_quote_for_product(rows: list[dict[str, str]], produto_id: str, fonte: str | None = None) -> dict[str, str] | None:
+    matches = [row for row in rows if row.get("produto_id") == produto_id]
+    if fonte:
+        matches = [row for row in matches if row.get("fonte") == fonte]
+    if not matches:
+        return None
+    return sorted(matches, key=lambda r: r.get("data_coleta", ""))[-1]
 
 
 @dataclass
@@ -503,7 +569,87 @@ def build_ranking(args: argparse.Namespace) -> None:
         )
 
     (project / "ranking.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    mark_steps(project, [5, 6])
+    if elegiveis:
+        lider = elegiveis[0]
+        product_name = lider.product.get("nome") or lider.produto_id
+        if lider.quote.get("fonte") == "manual":
+            next_action = "registrar decisao final ou comparar segundo colocado"
+            open_decision = f"{product_name} lidera com cotacao manual."
+        else:
+            next_action = "confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas"
+            open_decision = f"{product_name} lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual."
+        set_process_state(project, proxima_acao=next_action, decisao_aberta=open_decision)
     print(project / "ranking.md")
+
+
+def promote_quote(args: argparse.Namespace) -> None:
+    project = project_path(args.projeto)
+    rows = read_quotes(project)
+    base = latest_quote_for_product(rows, args.produto_id, fonte=args.fonte_base)
+    if not base:
+        raise SystemExit(f"Nenhuma cotacao {args.fonte_base} encontrada para {args.produto_id}")
+
+    row = dict(base)
+    row["data_coleta"] = args.data or now_iso()
+    row["fonte"] = "manual"
+    for field, value in {
+        "loja": args.loja,
+        "vendedor": args.vendedor,
+        "vendedor_tipo": args.vendedor_tipo,
+        "anuncio_id": args.anuncio_id,
+        "variacao": args.variacao,
+        "preco": args.preco,
+        "preco_promocional": args.preco_promocional,
+        "frete_valor": args.frete,
+        "frete_prazo_dias": args.frete_prazo_dias,
+        "custo_extra": args.custo_extra,
+        "custo_total": args.custo_total,
+        "nota": args.nota,
+        "n_avaliacoes": args.avaliacoes,
+        "garantia_meses": args.garantia_meses,
+        "garantia_tipo": args.garantia_tipo,
+        "link": args.link,
+        "flag_suspeita": args.flag_suspeita,
+    }.items():
+        if value is not None:
+            row[field] = value
+
+    preco = quote_float(row.get("preco"))
+    promocional = quote_float(row.get("preco_promocional"), 0)
+    preco_efetivo = promocional or preco
+    if args.custo_total is None:
+        row["custo_total"] = round(preco_efetivo + quote_float(row.get("frete_valor")) + quote_float(row.get("custo_extra")), 2)
+    row["nota_ajustada"] = adjusted_rating(quote_float(row.get("nota")), quote_int(row.get("n_avaliacoes"))) if quote_float(row.get("nota")) else ""
+    row["score"] = ""
+
+    rows.append(row)
+    write_quotes(project, rows)
+    append_timeline(
+        project,
+        "cotacao-manual",
+        f"Cotacao manual confirmada para {args.produto_id}",
+        f"{row.get('loja')} / custo_total={row.get('custo_total')}",
+    )
+    mark_steps(project, [7])
+    set_process_state(project, proxima_acao="gerar ranking com a cotacao manual e registrar decisao")
+    print(f"Cotacao manual adicionada: {args.produto_id} - R$ {row.get('custo_total')}")
+
+
+def discard_product(args: argparse.Namespace) -> None:
+    if not args.porque.strip():
+        raise SystemExit("Descarte exige motivo em --porque.")
+    path = find_product_path(args.produto_id)
+    if not path:
+        raise SystemExit(f"Produto nao encontrado: {args.produto_id}")
+    product = read_yaml(path, {})
+    product["estado"] = "descartado"
+    product["descartado_porque"] = args.porque
+    write_yaml(path, product)
+    project = project_path(args.projeto or product.get("projeto"))
+    append_timeline(project, "descarte", f"Descartado {args.produto_id}", args.porque)
+    set_process_state(project, proxima_acao="seguir com finalistas restantes ou registrar nova cotacao")
+    print(f"Descartado: {args.produto_id}")
 
 
 def ai_prompt(args: argparse.Namespace) -> None:
@@ -629,7 +775,40 @@ def decide(args: argparse.Namespace) -> None:
     )
     (project / "decisao.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     append_timeline(project, "decisao", f"Escolhido {args.produto_id}", args.porque)
+    mark_steps(project, [8])
+    if args.comprado:
+        mark_steps(project, [9])
+        set_project_state(project, "comprado")
+        set_process_state(project, estado="comprado", proxima_acao="acompanhar entrega e preencher veredito D+30")
+    else:
+        set_process_state(project, proxima_acao="comprar ou marcar como comprado depois da confirmacao final")
+    verdict_path = create_verdict(project, args.produto_id, product, quote, force=args.force_veredito)
+    append_timeline(project, "veredito", "Arquivo de veredito criado", verdict_path.name)
     print(project / "decisao.md")
+    print(verdict_path)
+
+
+def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quote: dict[str, str], force: bool = False) -> Path:
+    path = VEREDITOS / f"{today()}-{project.name}-{produto_id}.md"
+    if path.exists() and not force:
+        return path
+    d30 = dt.date.today() + dt.timedelta(days=30)
+    d180 = dt.date.today() + dt.timedelta(days=180)
+    text = render_template("veredito.md")
+    replacements = {
+        "- Projeto:": f"- Projeto: {project.name}",
+        "- Produto:": f"- Produto: {product.get('nome') or produto_id}",
+        "- Data da compra:": f"- Data da compra: {today() if quote.get('fonte') == 'manual' else ''}",
+        "- Valor pago:": f"- Valor pago: R$ {quote.get('custo_total')}",
+        "- Vendedor:": f"- Vendedor: {quote.get('loja')} / {quote.get('vendedor')}",
+        "- Veredito D+30 previsto:": f"- Veredito D+30 previsto: {d30.isoformat()}",
+        "- Veredito D+180 previsto:": f"- Veredito D+180 previsto: {d180.isoformat()}",
+    }
+    for needle, replacement in replacements.items():
+        text = text.replace(needle, replacement, 1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return path
 
 
 def new_verdict(args: argparse.Namespace) -> None:
@@ -671,6 +850,35 @@ def summarize(args: argparse.Namespace) -> None:
         first_reason = why_match.group(1).strip()
         if first_reason:
             print(f"Por que: {first_reason}")
+
+
+def status(args: argparse.Namespace) -> None:
+    project = project_path(args.projeto)
+    briefing_meta, _ = load_frontmatter(project / "briefing.md")
+    process = (project / "processo.md").read_text(encoding="utf-8") if (project / "processo.md").exists() else ""
+    rows = read_quotes(project)
+    latest = latest_quotes(rows)
+    manual_ids = {row.get("produto_id") for row in rows if row.get("fonte") == "manual"}
+    web_only_ids = set(latest) - manual_ids
+    checked_steps = re.findall(r"(?m)^- \[x\] (\d+)\. (.+)$", process)
+    open_steps = re.findall(r"(?m)^- \[ \] (\d+)\. (.+)$", process)
+    next_action = re.search(r"(?m)^- Proxima acao:\s*(.+)$", process)
+    open_decision = re.search(r"(?m)^- Decisao aberta:\s*(.+)$", process)
+
+    print(f"Projeto: {project.name}")
+    print(f"Estado: {briefing_meta.get('estado')}")
+    print(f"Categoria: {briefing_meta.get('categoria')}")
+    print(f"Preco teto: {briefing_meta.get('preco_teto')}")
+    print(f"Etapas concluidas: {len(checked_steps)}")
+    if open_steps:
+        print(f"Proxima etapa aberta: {open_steps[0][0]}. {open_steps[0][1]}")
+    if next_action:
+        print(f"Proxima acao: {next_action.group(1).strip()}")
+    if open_decision:
+        print(f"Decisao aberta: {open_decision.group(1).strip()}")
+    print(f"Cotacoes: {len(rows)} total, {len(manual_ids)} produtos com cotacao manual, {len(web_only_ids)} so web")
+    if web_only_ids:
+        print("Confirmar manualmente: " + ", ".join(sorted(web_only_ids)))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -740,12 +948,44 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--perdedores", action="append", default=[])
     p.add_argument("--risco", action="append", default=[])
     p.add_argument("--permitir-web", action="store_true")
+    p.add_argument("--comprado", action="store_true", help="marca o projeto como comprado ao decidir")
+    p.add_argument("--force-veredito", action="store_true", help="sobrescreve veredito existente")
     p.set_defaults(func=decide)
 
     p = sub.add_parser("novo-veredito", help="cria arquivo de veredito pos-compra")
     p.add_argument("projeto")
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=new_verdict)
+
+    p = sub.add_parser("promover-cotacao", help="cria uma cotacao manual baseada na ultima cotacao web")
+    p.add_argument("projeto")
+    p.add_argument("--produto-id", required=True)
+    p.add_argument("--fonte-base", choices=["web", "manual"], default="web")
+    p.add_argument("--loja")
+    p.add_argument("--vendedor")
+    p.add_argument("--vendedor-tipo", choices=["oficial", "terceiro", "fisica"])
+    p.add_argument("--anuncio-id")
+    p.add_argument("--variacao")
+    p.add_argument("--preco", type=float)
+    p.add_argument("--preco-promocional", type=float)
+    p.add_argument("--frete", type=float)
+    p.add_argument("--frete-prazo-dias", type=int)
+    p.add_argument("--custo-extra", type=float)
+    p.add_argument("--custo-total", type=float)
+    p.add_argument("--nota", type=float)
+    p.add_argument("--avaliacoes", type=int)
+    p.add_argument("--garantia-meses", type=int)
+    p.add_argument("--garantia-tipo", choices=["nacional", "importada", "vendedor", "nenhuma"])
+    p.add_argument("--link")
+    p.add_argument("--flag-suspeita", choices=["", "AVAL_SUSPEITA", "ANCORA", "RECICLADO"])
+    p.add_argument("--data")
+    p.set_defaults(func=promote_quote)
+
+    p = sub.add_parser("descartar", help="marca candidato como descartado com motivo obrigatorio")
+    p.add_argument("--produto-id", required=True)
+    p.add_argument("--porque", required=True)
+    p.add_argument("--projeto")
+    p.set_defaults(func=discard_product)
 
     p = sub.add_parser("anotar", help="registra uma decisao intermediaria no processo.md")
     p.add_argument("projeto")
@@ -757,6 +997,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("resumo", help="mostra um resumo rapido da compra")
     p.add_argument("projeto")
     p.set_defaults(func=summarize)
+
+    p = sub.add_parser("status", help="mostra etapa atual, bloqueios e proximas acoes")
+    p.add_argument("projeto")
+    p.set_defaults(func=status)
 
     return parser
 
