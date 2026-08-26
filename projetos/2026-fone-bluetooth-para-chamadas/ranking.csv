@@ -1,5 +1,5 @@
-produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,custo_total
-qcy-h3-anc,QCY H3 ANC,80.6,1.0,1.0,0.653,0.5,0.5,elegivel,,,web,296.64
-soundcore-anker-life-q30,Soundcore Anker Life Q30,23.1,0.0,0.0,0.531,0.5,0.5,elegivel,,,web,466.0
-edifier-w820nb-plus,Edifier W820NB Plus,0,0.732,0.0,0.381,0.5,0.5,cortado,avaliacoes insuficientes (128 < 150),AVAL_SUSPEITA,web,499.0
-jbl-tune-770nc,JBL Tune 770NC,0,0.0,0.218,0.531,0.5,0.5,cortado,avaliacoes insuficientes (0 < 150),,web,429.0
+produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+qcy-h3-anc,QCY H3 ANC,80.6,1.0,1.0,0.653,0.5,0.5,elegivel,,,web,296.64,,,,
+soundcore-anker-life-q30,Soundcore Anker Life Q30,23.1,0.0,0.0,0.531,0.5,0.5,elegivel,,,web,466.0,,,,
+edifier-w820nb-plus,Edifier W820NB Plus,0,0.732,0.0,0.381,0.5,0.5,cortado,avaliacoes insuficientes (128 < 150),AVAL_SUSPEITA,web,499.0,,,,
+jbl-tune-770nc,JBL Tune 770NC,0,0.0,0.218,0.531,0.5,0.5,cortado,avaliacoes insuficientes (0 < 150),,web,429.0,,,,

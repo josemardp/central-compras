@@ -36,6 +36,14 @@ python scripts/central_compras.py resumo projetos/2026-fone-bluetooth-para-chama
 python scripts/central_compras.py status projetos/2026-fone-bluetooth-para-chamadas
 ```
 
+Para compra cara, como carro, informe os campos de TCO:
+
+```powershell
+python scripts/central_compras.py cotar projetos/2026-comprar-carro --produto-id byd-dolphin-mini --loja "Concessionaria" --vendedor "Loja fisica" --vendedor-tipo fisica --preco 150000 --nota 4.7 --avaliacoes 1000 --garantia-meses 36 --garantia-tipo nacional --fonte manual --custo-operacional-mensal 300 --valor-revenda-estimado 85000 --link "https://..."
+```
+
+Se a categoria tiver `tco_meses` em `config/categorias.yaml`, o ranking usa `tco_total` no eixo valor.
+
 ## Principios
 
 - Cotacao nova e linha nova. Nao sobrescreva historico.
@@ -44,6 +52,7 @@ python scripts/central_compras.py status projetos/2026-fone-bluetooth-para-chama
 - Produto descartado precisa de motivo.
 - Decisao final cria veredito automaticamente para D+30 e D+180.
 - `ranking.csv` e `validacao.md` sao derivados; `cotacoes.csv` preserva o historico.
+- Acima de R$ 20.000, compare por TCO, nao por preco de etiqueta.
 - Dado pessoal fica fora do repositorio, em `~/.central-compras/dados-privados/`.
 
 ## Estrutura

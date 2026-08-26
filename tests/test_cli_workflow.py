@@ -195,6 +195,102 @@ class CliWorkflowTest(unittest.TestCase):
         self.assertIn("Estado: comprado", status.stdout)
         self.assertTrue(vereditos)
 
+    def test_tco_changes_value_axis_for_car_project(self):
+        self.run_cli(
+            "novo-projeto",
+            "carro eletrico teste",
+            "--categoria",
+            "carro",
+            "--valor-estimado",
+            "150000",
+            "--preco-teto",
+            "180000",
+        )
+        project = "projetos/2026-carro-eletrico-teste"
+        self.run_cli(
+            "novo-produto",
+            project,
+            "Carro A",
+            "--marca",
+            "Marca A",
+            "--categoria",
+            "carro",
+            "--produto-id",
+            "carro-a",
+            "--atributo",
+            "motorizacao=eletrico",
+            "--atributo",
+            "autonomia_km=380",
+            "--atributo",
+            "potencia_cv=75",
+            "--atributo",
+            "porta_malas_l=230",
+            "--atributo",
+            "garantia_bateria=8 anos",
+        )
+        self.run_cli(
+            "novo-produto",
+            project,
+            "Carro B",
+            "--marca",
+            "Marca B",
+            "--categoria",
+            "carro",
+            "--produto-id",
+            "carro-b",
+            "--atributo",
+            "motorizacao=hibrido",
+            "--atributo",
+            "autonomia_km=900",
+            "--atributo",
+            "potencia_cv=120",
+            "--atributo",
+            "porta_malas_l=300",
+            "--atributo",
+            "garantia_bateria=8 anos",
+        )
+        for produto_id, preco, mensal, revenda in [
+            ("carro-a", "150000", "300", "85000"),
+            ("carro-b", "145000", "900", "70000"),
+        ]:
+            self.run_cli(
+                "cotar",
+                project,
+                "--produto-id",
+                produto_id,
+                "--loja",
+                "Concessionaria",
+                "--vendedor",
+                "Loja",
+                "--vendedor-tipo",
+                "fisica",
+                "--preco",
+                preco,
+                "--nota",
+                "4.7",
+                "--avaliacoes",
+                "1000",
+                "--garantia-meses",
+                "36",
+                "--garantia-tipo",
+                "nacional",
+                "--fonte",
+                "manual",
+                "--link",
+                "https://example.com/carro",
+                "--custo-operacional-mensal",
+                mensal,
+                "--valor-revenda-estimado",
+                revenda,
+            )
+        self.run_cli("ranking", project)
+        ranking = (self.tmpdir / project / "ranking.md").read_text(encoding="utf-8")
+        ranking_csv = (self.tmpdir / project / "ranking.csv").read_text(encoding="utf-8")
+
+        self.assertLess(ranking.index("Carro A"), ranking.index("Carro B"))
+        self.assertIn("TCO 60 meses", ranking)
+        self.assertIn("tco_total", ranking_csv)
+
 
 if __name__ == "__main__":
     unittest.main()

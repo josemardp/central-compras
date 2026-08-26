@@ -37,6 +37,10 @@ COTACOES_HEADER = [
     "frete_prazo_dias",
     "custo_extra",
     "custo_total",
+    "custo_operacional_mensal",
+    "tco_meses",
+    "valor_revenda_estimado",
+    "tco_total",
     "nota",
     "n_avaliacoes",
     "nota_ajustada",
@@ -195,6 +199,24 @@ def adjusted_rating(nota: float, n: int) -> float:
     return round(((n * nota) + (anchor * media)) / (n + anchor), 3) if (n + anchor) else round(nota, 3)
 
 
+def category_tco_months(categoria: str | None) -> int:
+    if not categoria:
+        return 0
+    category = category_definition(categoria)
+    return quote_int(category.get("tco_meses"))
+
+
+def quote_tco_total(
+    custo_total: float,
+    custo_operacional_mensal: float = 0.0,
+    tco_meses: int = 0,
+    valor_revenda_estimado: float = 0.0,
+) -> float:
+    if not tco_meses:
+        return round(custo_total, 2)
+    return round(custo_total + (custo_operacional_mensal * tco_meses) - valor_revenda_estimado, 2)
+
+
 def ensure_structure(_: argparse.Namespace) -> None:
     for path in [
         CONFIG,
@@ -331,6 +353,9 @@ def mark_steps(project: Path, steps: list[int]) -> None:
 
 def add_quote(args: argparse.Namespace) -> None:
     project = project_path(args.projeto)
+    briefing, _ = load_frontmatter(project / "briefing.md")
+    product = find_product(args.produto_id) or {}
+    categoria = product.get("categoria") or briefing.get("categoria")
     rows = read_quotes(project)
     preco = quote_float(args.preco)
     promocional = quote_float(args.preco_promocional, 0)
@@ -338,6 +363,13 @@ def add_quote(args: argparse.Namespace) -> None:
     total = args.custo_total
     if total is None:
         total = preco_efetivo + quote_float(args.frete) + quote_float(args.custo_extra)
+    tco_meses = args.tco_meses if args.tco_meses is not None else category_tco_months(categoria)
+    tco_total = quote_tco_total(
+        float(total),
+        quote_float(args.custo_operacional_mensal),
+        quote_int(tco_meses),
+        quote_float(args.valor_revenda_estimado),
+    )
     nota = quote_float(args.nota)
     avaliacoes = quote_int(args.avaliacoes)
     row = {
@@ -354,6 +386,10 @@ def add_quote(args: argparse.Namespace) -> None:
         "frete_prazo_dias": args.frete_prazo_dias if args.frete_prazo_dias is not None else "",
         "custo_extra": quote_float(args.custo_extra),
         "custo_total": round(float(total), 2),
+        "custo_operacional_mensal": quote_float(args.custo_operacional_mensal),
+        "tco_meses": tco_meses or "",
+        "valor_revenda_estimado": quote_float(args.valor_revenda_estimado),
+        "tco_total": tco_total,
         "nota": nota,
         "n_avaliacoes": avaliacoes,
         "nota_ajustada": adjusted_rating(nota, avaliacoes) if nota else "",
@@ -481,6 +517,8 @@ def manipulation_alerts(rows: list[dict[str, str]], row: dict[str, str]) -> list
 
 def validation_report(project: Path) -> tuple[list[str], list[str]]:
     briefing, _ = load_frontmatter(project / "briefing.md")
+    categoria_projeto = briefing.get("categoria") or "generico"
+    tco_required = bool(category_tco_months(categoria_projeto) or quote_float(briefing.get("valor_estimado")) > 20000)
     rows = read_quotes(project)
     latest = latest_quotes(rows)
     errors: list[str] = []
@@ -504,6 +542,14 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
         missing = quote_missing_fields(row)
         if missing:
             errors.append(f"cotacoes.csv linha {index}: campos obrigatorios ausentes: {', '.join(missing)}")
+        if tco_required:
+            tco_missing = [
+                field
+                for field in ["custo_operacional_mensal", "tco_meses", "valor_revenda_estimado", "tco_total"]
+                if row.get(field) in {None, ""}
+            ]
+            if tco_missing:
+                warnings.append(f"cotacoes.csv linha {index} ({row.get('produto_id')}): TCO incompleto: {', '.join(tco_missing)}")
         alerts = manipulation_alerts(rows, row)
         if alerts:
             warnings.append(f"cotacoes.csv linha {index} ({row.get('produto_id')}): alertas {', '.join(alerts)}")
@@ -617,6 +663,8 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     latest = latest_quotes(rows)
     prefs = read_yaml(CONFIG / "preferencias.yaml", {})
     weights = prefs.get("score", {})
+    categoria = briefing.get("categoria") or "generico"
+    use_tco = bool(category_tco_months(categoria) or quote_float(briefing.get("valor_estimado")) > 20000)
 
     pre_candidates: list[tuple[str, dict[str, str], dict[str, Any], list[str], list[str]]] = []
     for produto_id, row in latest.items():
@@ -626,7 +674,8 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
         pre_candidates.append((produto_id, row, product, eliminations, alerts))
 
     scoring_pool = [item for item in pre_candidates if not item[3]] or pre_candidates
-    costs = [quote_float(row.get("custo_total")) for _, row, _, _, _ in scoring_pool]
+    value_field = "tco_total" if use_tco else "custo_total"
+    costs = [quote_float(row.get(value_field) or row.get("custo_total")) for _, row, _, _, _ in scoring_pool]
     ratings = [quote_float(row.get("nota_ajustada")) for _, row, _, _, _ in scoring_pool]
     days = [
         quote_float(row.get("frete_prazo_dias"), 99)
@@ -638,7 +687,7 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     for produto_id, row, product, eliminations, alerts in pre_candidates:
         axes = {
             "qualidade": normalize(ratings, quote_float(row.get("nota_ajustada"))),
-            "valor": normalize(costs, quote_float(row.get("custo_total")), invert=True),
+            "valor": normalize(costs, quote_float(row.get(value_field) or row.get("custo_total")), invert=True),
             "risco": risk_score(row, alerts),
             "aderencia": adherence_score(product),
             "conveniencia": normalize(days, quote_float(row.get("frete_prazo_dias"), 99), invert=True) if days else 0.5,
@@ -668,6 +717,10 @@ def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ran
         "alertas",
         "fonte",
         "custo_total",
+        "custo_operacional_mensal",
+        "tco_meses",
+        "valor_revenda_estimado",
+        "tco_total",
     ]
     with (project / "ranking.csv").open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
@@ -688,6 +741,10 @@ def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ran
                     "alertas": "; ".join(item.alerts),
                     "fonte": item.quote.get("fonte"),
                     "custo_total": item.quote.get("custo_total"),
+                    "custo_operacional_mensal": item.quote.get("custo_operacional_mensal"),
+                    "tco_meses": item.quote.get("tco_meses"),
+                    "valor_revenda_estimado": item.quote.get("valor_revenda_estimado"),
+                    "tco_total": item.quote.get("tco_total"),
                 }
             )
 
@@ -708,6 +765,9 @@ def build_ranking(args: argparse.Namespace) -> None:
             product_name = item.product.get("nome") or item.produto_id
             axes = " · ".join(f"{key} {value:.2f}" for key, value in item.axes.items())
             fonte_alerta = "confirmada manualmente" if item.quote.get("fonte") == "manual" else "estimativa web"
+            tco_line = ""
+            if item.quote.get("tco_total") and quote_float(item.quote.get("tco_total")) != quote_float(item.quote.get("custo_total")):
+                tco_line = f"   TCO {item.quote.get('tco_meses')} meses R$ {item.quote.get('tco_total')}"
             lines.extend(
                 [
                     f"{idx}. {product_name} - {item.score:.1f}",
@@ -715,6 +775,8 @@ def build_ranking(args: argparse.Namespace) -> None:
                     f"   custo_total R$ {item.quote.get('custo_total')} / {item.quote.get('loja')} / {fonte_alerta}",
                 ]
             )
+            if tco_line:
+                lines.append(tco_line)
             if idx > 1 and elegiveis[0].score - item.score <= 3:
                 lines.append("   empate tecnico com o lider")
             if item.alerts:
@@ -758,6 +820,9 @@ def build_ranking(args: argparse.Namespace) -> None:
 
 def promote_quote(args: argparse.Namespace) -> None:
     project = project_path(args.projeto)
+    briefing, _ = load_frontmatter(project / "briefing.md")
+    product = find_product(args.produto_id) or {}
+    categoria = product.get("categoria") or briefing.get("categoria")
     rows = read_quotes(project)
     base = latest_quote_for_product(rows, args.produto_id, fonte=args.fonte_base)
     if not base:
@@ -778,6 +843,10 @@ def promote_quote(args: argparse.Namespace) -> None:
         "frete_prazo_dias": args.frete_prazo_dias,
         "custo_extra": args.custo_extra,
         "custo_total": args.custo_total,
+        "custo_operacional_mensal": args.custo_operacional_mensal,
+        "tco_meses": args.tco_meses,
+        "valor_revenda_estimado": args.valor_revenda_estimado,
+        "tco_total": args.tco_total,
         "nota": args.nota,
         "n_avaliacoes": args.avaliacoes,
         "garantia_meses": args.garantia_meses,
@@ -793,6 +862,15 @@ def promote_quote(args: argparse.Namespace) -> None:
     preco_efetivo = promocional or preco
     if args.custo_total is None:
         row["custo_total"] = round(preco_efetivo + quote_float(row.get("frete_valor")) + quote_float(row.get("custo_extra")), 2)
+    if not row.get("tco_meses"):
+        row["tco_meses"] = category_tco_months(categoria) or ""
+    if args.tco_total is None:
+        row["tco_total"] = quote_tco_total(
+            quote_float(row.get("custo_total")),
+            quote_float(row.get("custo_operacional_mensal")),
+            quote_int(row.get("tco_meses")),
+            quote_float(row.get("valor_revenda_estimado")),
+        )
     row["nota_ajustada"] = adjusted_rating(quote_float(row.get("nota")), quote_int(row.get("n_avaliacoes"))) if quote_float(row.get("nota")) else ""
     row["score"] = ""
 
@@ -1128,6 +1206,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--frete-prazo-dias", type=int)
     p.add_argument("--custo-extra", type=float, default=0)
     p.add_argument("--custo-total", type=float)
+    p.add_argument("--custo-operacional-mensal", type=float, default=0)
+    p.add_argument("--tco-meses", type=int)
+    p.add_argument("--valor-revenda-estimado", type=float, default=0)
     p.add_argument("--nota", type=float, default=0)
     p.add_argument("--avaliacoes", type=int, default=0)
     p.add_argument("--garantia-meses", type=int)
@@ -1183,6 +1264,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--frete-prazo-dias", type=int)
     p.add_argument("--custo-extra", type=float)
     p.add_argument("--custo-total", type=float)
+    p.add_argument("--custo-operacional-mensal", type=float)
+    p.add_argument("--tco-meses", type=int)
+    p.add_argument("--valor-revenda-estimado", type=float)
+    p.add_argument("--tco-total", type=float)
     p.add_argument("--nota", type=float)
     p.add_argument("--avaliacoes", type=int)
     p.add_argument("--garantia-meses", type=int)

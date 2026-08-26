@@ -37,6 +37,15 @@ class DecisionEngineTest(unittest.TestCase):
         eliminations = central_compras.gate_eliminations(row, product, briefing)
         self.assertIn("produto descartado", eliminations[0])
 
+    def test_tco_total_uses_monthly_cost_and_resale_value(self):
+        total = central_compras.quote_tco_total(
+            custo_total=100000,
+            custo_operacional_mensal=1000,
+            tco_meses=60,
+            valor_revenda_estimado=50000,
+        )
+        self.assertEqual(total, 110000)
+
 
 if __name__ == "__main__":
     unittest.main()
