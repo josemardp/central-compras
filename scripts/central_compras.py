@@ -99,6 +99,13 @@ def write_yaml(path: Path, data: Any) -> None:
         yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
 
 
+def append_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    separator = "" if not existing or existing.endswith("\n") else "\n"
+    path.write_text(existing + separator + text, encoding="utf-8", newline="\n")
+
+
 def render_template(name: str, **values: Any) -> str:
     path = TEMPLATES / name
     text = path.read_text(encoding="utf-8")
@@ -907,6 +914,8 @@ def ai_prompt(args: argparse.Namespace) -> None:
     project = project_path(args.projeto)
     briefing_meta, briefing_body = load_frontmatter(project / "briefing.md")
     quotes = read_quotes(project)
+    known = knowledge_context(project)
+    known_block = f"\n\nBase de conhecimento relevante:\n{known}" if known else "\n\nBase de conhecimento relevante: nada registrado ainda."
     etapa = args.etapa
     common = f"""
 Voce e meu assessor de compras. Use apenas como contexto as informacoes abaixo e deixe claro o que for inferencia.
@@ -917,6 +926,7 @@ Preco teto: {briefing_meta.get('preco_teto')}
 
 Briefing:
 {briefing_body.strip()}
+{known_block}
 """
     if etapa == "modelo":
         prompt = common + """
@@ -1165,6 +1175,159 @@ def validate(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
+def knowledge_entry(args: argparse.Namespace, kind: str) -> tuple[Path, str]:
+    name = args.nome
+    path = BASE / ("lojas" if kind == "loja" else "marcas") / f"{slugify(name)}.md"
+    title = f"# {name}\n\n" if not path.exists() else ""
+    fields = [
+        f"## {today()}",
+        "",
+        f"- Tipo: {kind}",
+        f"- Nome: {name}",
+        f"- Categoria: {args.categoria or 'geral'}",
+        f"- Projeto: {args.projeto or ''}",
+        f"- Nota pessoal: {args.nota if args.nota is not None else ''}",
+        f"- Compraria de novo: {args.compraria_de_novo or ''}",
+        f"- Resumo: {args.resumo}",
+    ]
+    if args.alerta:
+        fields.append(f"- Alerta: {args.alerta}")
+    fields.append("")
+    return path, title + "\n".join(fields) + "\n"
+
+
+def register_store(args: argparse.Namespace) -> None:
+    path, entry = knowledge_entry(args, "loja")
+    append_text(path, entry)
+    print(path.relative_to(ROOT))
+
+
+def register_brand(args: argparse.Namespace) -> None:
+    path, entry = knowledge_entry(args, "marca")
+    append_text(path, entry)
+    print(path.relative_to(ROOT))
+
+
+def apply_lesson_gate(gate: str) -> str:
+    if "=" not in gate or "." not in gate.split("=", 1)[0]:
+        raise SystemExit("Use --gate categoria.campo=valor. Exemplo: cosmetico.exige_vendedor_oficial=true")
+    left, raw_value = gate.split("=", 1)
+    categoria, field = left.split(".", 1)
+    categories = read_yaml(CONFIG / "categorias.yaml", {})
+    category = categories.setdefault(categoria, {})
+    gate_cfg = category.setdefault("gate", {})
+    gate_cfg[field] = parse_scalar(raw_value)
+    write_yaml(CONFIG / "categorias.yaml", categories)
+    return f"{categoria}.{field}={gate_cfg[field]}"
+
+
+def register_lesson(args: argparse.Namespace) -> None:
+    gate_note = ""
+    if args.gate:
+        applied = apply_lesson_gate(args.gate)
+        gate_note = f" Gate atualizado: {applied}."
+    line = f"{today()} - {args.categoria or 'geral'} - {args.texto}{gate_note}\n"
+    append_text(BASE / "licoes.md", line)
+    print(BASE / "licoes.md")
+
+
+def project_product_ids(project: Path) -> set[str]:
+    ids = {row.get("produto_id") for row in read_quotes(project) if row.get("produto_id")}
+    for product_file in PRODUTOS.glob("*/**/produto.yaml"):
+        product = read_yaml(product_file, {})
+        if product.get("projeto") == project.name and product.get("id"):
+            ids.add(product["id"])
+    return ids
+
+
+def project_brands(project: Path) -> set[str]:
+    brands: set[str] = set()
+    for produto_id in project_product_ids(project):
+        product = find_product(produto_id)
+        if product and product.get("marca"):
+            brands.add(str(product["marca"]))
+    return brands
+
+
+def project_stores(project: Path) -> set[str]:
+    return {row.get("loja") for row in read_quotes(project) if row.get("loja")}
+
+
+def knowledge_files_for_project(project: Path) -> tuple[list[Path], list[Path]]:
+    brand_files = [BASE / "marcas" / f"{slugify(name)}.md" for name in project_brands(project)]
+    store_files = [BASE / "lojas" / f"{slugify(name)}.md" for name in project_stores(project)]
+    return [path for path in brand_files if path.exists()], [path for path in store_files if path.exists()]
+
+
+def lesson_lines_for_category(categoria: str | None) -> list[str]:
+    path = BASE / "licoes.md"
+    if not path.exists():
+        return []
+    lines = []
+    wanted = (categoria or "").lower()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        clean = line.strip()
+        if not clean or clean.startswith("#") or clean.startswith("Formato") or clean.startswith("```"):
+            continue
+        lowered = clean.lower()
+        if not wanted or f"- {wanted} -" in lowered or "- geral -" in lowered:
+            lines.append(clean)
+    return lines[-10:]
+
+
+def knowledge_context(project: Path) -> str:
+    briefing, _ = load_frontmatter(project / "briefing.md")
+    categoria = briefing.get("categoria")
+    brand_files, store_files = knowledge_files_for_project(project)
+    lesson_lines = lesson_lines_for_category(categoria)
+    parts: list[str] = []
+    if lesson_lines:
+        parts.append("Licoes relevantes:\n" + "\n".join(f"- {line}" for line in lesson_lines))
+    if brand_files:
+        brand_text = []
+        for path in brand_files:
+            brand_text.append(path.read_text(encoding="utf-8").strip()[-1200:])
+        parts.append("Marcas ja conhecidas:\n" + "\n\n".join(brand_text))
+    if store_files:
+        store_text = []
+        for path in store_files:
+            store_text.append(path.read_text(encoding="utf-8").strip()[-1200:])
+        parts.append("Lojas ja conhecidas:\n" + "\n\n".join(store_text))
+    return "\n\n".join(parts)
+
+
+def reuse_report(args: argparse.Namespace) -> None:
+    projects = sorted(path for path in PROJETOS.iterdir() if path.is_dir())
+    rows = []
+    for project in projects:
+        briefing, _ = load_frontmatter(project / "briefing.md")
+        if args.categoria and briefing.get("categoria") != args.categoria:
+            continue
+        brand_files, store_files = knowledge_files_for_project(project)
+        lessons = lesson_lines_for_category(briefing.get("categoria"))
+        useful = bool(brand_files or store_files or lessons)
+        rows.append(
+            {
+                "projeto": project.name,
+                "categoria": briefing.get("categoria"),
+                "marcas": len(brand_files),
+                "lojas": len(store_files),
+                "licoes": len(lessons),
+                "reaproveitou": useful,
+            }
+        )
+    total = len(rows)
+    reused = sum(1 for row in rows if row["reaproveitou"])
+    percent = round((reused / total) * 100, 1) if total else 0
+    lines = ["# Reaproveitamento", "", f"Gerado em {now_iso()}.", "", f"- Projetos analisados: {total}", f"- Projetos com conhecimento reutilizavel: {reused}", f"- Taxa: {percent}%", "", "| Projeto | Categoria | Marcas | Lojas | Licoes | Reaproveitou |", "|---|---|---:|---:|---:|---|"]
+    for row in rows:
+        lines.append(f"| {row['projeto']} | {row['categoria']} | {row['marcas']} | {row['lojas']} | {row['licoes']} | {'sim' if row['reaproveitou'] else 'nao'} |")
+    path = BASE / "reaproveitamento.md"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    print(path.relative_to(ROOT))
+    print(f"Taxa: {percent}%")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Central de Compras")
     sub = parser.add_subparsers(required=True)
@@ -1227,6 +1390,36 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("projeto")
     p.add_argument("--strict", action="store_true", help="retorna erro se houver erro de validacao")
     p.set_defaults(func=validate)
+
+    p = sub.add_parser("registrar-loja", help="adiciona experiencia propria sobre uma loja")
+    p.add_argument("nome")
+    p.add_argument("--resumo", required=True)
+    p.add_argument("--categoria")
+    p.add_argument("--projeto")
+    p.add_argument("--nota", type=float)
+    p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"])
+    p.add_argument("--alerta")
+    p.set_defaults(func=register_store)
+
+    p = sub.add_parser("registrar-marca", help="adiciona experiencia propria sobre uma marca")
+    p.add_argument("nome")
+    p.add_argument("--resumo", required=True)
+    p.add_argument("--categoria")
+    p.add_argument("--projeto")
+    p.add_argument("--nota", type=float)
+    p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"])
+    p.add_argument("--alerta")
+    p.set_defaults(func=register_brand)
+
+    p = sub.add_parser("registrar-licao", help="adiciona licao e opcionalmente converte em gate")
+    p.add_argument("texto")
+    p.add_argument("--categoria")
+    p.add_argument("--gate", help="atualiza gate no formato categoria.campo=valor")
+    p.set_defaults(func=register_lesson)
+
+    p = sub.add_parser("reaproveitamento", help="gera relatorio de conhecimento reutilizavel")
+    p.add_argument("--categoria")
+    p.set_defaults(func=reuse_report)
 
     p = sub.add_parser("prompt-ia", help="gera prompt de apoio para uma etapa")
     p.add_argument("projeto")

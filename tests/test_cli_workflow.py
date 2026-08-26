@@ -291,6 +291,108 @@ class CliWorkflowTest(unittest.TestCase):
         self.assertIn("TCO 60 meses", ranking)
         self.assertIn("tco_total", ranking_csv)
 
+    def test_knowledge_base_feeds_prompt_and_reuse_report(self):
+        self.run_cli(
+            "novo-projeto",
+            "fone conhecimento teste",
+            "--categoria",
+            "fone",
+            "--valor-estimado",
+            "300",
+            "--preco-teto",
+            "500",
+        )
+        project = "projetos/2026-fone-conhecimento-teste"
+        self.run_cli(
+            "novo-produto",
+            project,
+            "QCY H3",
+            "--marca",
+            "QCY",
+            "--categoria",
+            "fone",
+            "--produto-id",
+            "qcy-h3",
+            "--atributo",
+            "tipo=headphone",
+            "--atributo",
+            "conexao=bluetooth",
+            "--atributo",
+            "microfone=true",
+            "--atributo",
+            "bateria_horas=70",
+            "--atributo",
+            "garantia_meses=12",
+        )
+        self.run_cli(
+            "cotar",
+            project,
+            "--produto-id",
+            "qcy-h3",
+            "--loja",
+            "Amazon",
+            "--vendedor",
+            "Loja oficial",
+            "--vendedor-tipo",
+            "oficial",
+            "--preco",
+            "299",
+            "--nota",
+            "4.6",
+            "--avaliacoes",
+            "1200",
+            "--garantia-meses",
+            "12",
+            "--garantia-tipo",
+            "nacional",
+            "--fonte",
+            "manual",
+            "--link",
+            "https://example.com/qcy-h3",
+        )
+        self.run_cli(
+            "registrar-marca",
+            "QCY",
+            "--categoria",
+            "fone",
+            "--projeto",
+            project,
+            "--nota",
+            "8",
+            "--compraria-de-novo",
+            "sim",
+            "--resumo",
+            "Bom custo-beneficio em fones baratos.",
+        )
+        self.run_cli(
+            "registrar-loja",
+            "Amazon",
+            "--categoria",
+            "fone",
+            "--projeto",
+            project,
+            "--nota",
+            "9",
+            "--compraria-de-novo",
+            "sim",
+            "--resumo",
+            "Entrega e devolucao costumam reduzir risco.",
+        )
+        self.run_cli(
+            "registrar-licao",
+            "Fone para chamada precisa ter relato explicito de microfone.",
+            "--categoria",
+            "fone",
+        )
+        prompt = self.run_cli("prompt-ia", project, "--etapa", "decisao")
+        reuse = self.run_cli("reaproveitamento", "--categoria", "fone")
+
+        self.assertIn("Bom custo-beneficio", prompt.stdout)
+        self.assertIn("Entrega e devolucao", prompt.stdout)
+        self.assertIn("relato explicito de microfone", prompt.stdout)
+        self.assertIn("Taxa:", reuse.stdout)
+        self.assertTrue((self.tmpdir / "base-conhecimento" / "reaproveitamento.md").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

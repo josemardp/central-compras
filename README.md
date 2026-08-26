@@ -29,6 +29,10 @@ python scripts/central_compras.py cotar projetos/2026-fone-bluetooth-para-chamad
 python scripts/central_compras.py promover-cotacao projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --preco 289 --frete 10 --garantia-meses 12 --garantia-tipo nacional
 python scripts/central_compras.py ranking projetos/2026-fone-bluetooth-para-chamadas
 python scripts/central_compras.py validar projetos/2026-fone-bluetooth-para-chamadas
+python scripts/central_compras.py registrar-marca QCY --categoria fone --projeto projetos/2026-fone-bluetooth-para-chamadas --nota 8 --compraria-de-novo talvez --resumo "Boa relacao custo-beneficio; falta veredito proprio."
+python scripts/central_compras.py registrar-loja Amazon --categoria fone --projeto projetos/2026-fone-bluetooth-para-chamadas --nota 9 --compraria-de-novo sim --resumo "Entrega e devolucao reduzem risco."
+python scripts/central_compras.py registrar-licao "Fone para chamadas precisa de relato especifico de microfone." --categoria fone
+python scripts/central_compras.py reaproveitamento --categoria fone
 python scripts/central_compras.py prompt-ia projetos/2026-fone-bluetooth-para-chamadas --etapa modelo
 python scripts/central_compras.py descartar --produto-id anker-q30 --projeto projetos/2026-fone-bluetooth-para-chamadas --porque "Melhor ANC, mas passou do preco teto."
 python scripts/central_compras.py decidir projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --porque "Melhor equilibrio entre microfone, garantia nacional e preco confirmado." --perdedores "anker-q30: melhor ANC, mas passou do preco teto" --comprado
@@ -81,6 +85,8 @@ A IA ajuda principalmente em tres momentos:
 - definir o modelo certo a partir de uma necessidade vaga;
 - mapear candidatos e problemas recorrentes em reviews;
 - explicar a decisao, inclusive por que os finalistas perderam.
+
+Os prompts gerados por `prompt-ia` incluem automaticamente licoes da categoria, marcas e lojas ja registradas na base de conhecimento.
 
 Ela nao deve fingir que confirmou preco, estoque, frete ou cupom quando isso depende do site no momento da compra. Esses dados entram como `fonte=manual`.
 

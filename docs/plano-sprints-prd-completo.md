@@ -76,12 +76,14 @@ Gate de saida:
 
 Meta: fazer compras novas reaproveitarem aprendizado antigo.
 
+Status: concluida como base operacional.
+
 Entregas:
-- Comando para registrar licao.
-- Comando para atualizar reputacao de loja.
-- Comando para atualizar experiencia com marca.
-- Leitura da base de conhecimento no prompt de IA.
-- Relatorio de reaproveitamento por categoria.
+- [x] Comando para registrar licao.
+- [x] Comando para atualizar reputacao de loja.
+- [x] Comando para atualizar experiencia com marca.
+- [x] Leitura da base de conhecimento no prompt de IA.
+- [x] Relatorio de reaproveitamento por categoria.
 
 Gate de saida:
 - Pelo menos 3 lojas e 3 marcas com registro.
