@@ -597,6 +597,23 @@ def _bloco_produto(linha: dict[str, Any], cortado: bool) -> str:
     )
 
 
+def artifact_fragmento() -> str:
+    """A pagina sem o esqueleto do documento.
+
+    Publicar como artifact do claude.ai exige o conteudo direto: o `<!doctype>`,
+    `<html>`, `<head>` e `<body>` sao postos pela plataforma. Gerar aqui, e nao
+    remover na mao depois, mantem as duas versoes sempre iguais.
+    """
+    completa = artifact_html()
+    corpo = completa.split("<body>", 1)[1].rsplit("</body>", 1)[0]
+    estilo = completa.split("<style>", 1)[1].split("</style>", 1)[0]
+    return (
+        "<title>Central de Compras</title>\n"
+        f"<style>{estilo}</style>\n"
+        f"{corpo}\n"
+    )
+
+
 def artifact_html() -> str:
     """Foto do repositorio inteiro, so leitura, boa de ler no celular."""
     from html import escape as esc
@@ -659,4 +676,8 @@ def gerar_artifact(args: argparse.Namespace) -> None:
     destino = cc.DASHBOARD / "artifact.html"
     cc.atomic_write_text(destino, artifact_html())
     print(destino)
+    if getattr(args, "fragmento", None):
+        alvo = Path(args.fragmento)
+        cc.atomic_write_text(alvo, artifact_fragmento())
+        print(alvo)
     print("Pagina unica, so leitura. Pronta para publicar como artifact.")

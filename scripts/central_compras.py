@@ -3967,6 +3967,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=generate_dashboard)
 
     p = sub.add_parser("artifact", help="gera a pagina unica so-leitura para publicar")
+    p.add_argument("--fragmento", help="tambem grava a versao sem <html>/<body>, para publicar")
     p.set_defaults(func=build_artifact)
 
     p = sub.add_parser("painel", help="abre a grade editavel no navegador (grava no repo)")
