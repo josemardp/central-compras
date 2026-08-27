@@ -3849,6 +3849,25 @@ def check_secrets(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
+def build_artifact(args: argparse.Namespace) -> None:
+    try:
+        from scripts import painel
+    except ImportError:
+        import painel
+
+    painel.gerar_artifact(args)
+
+
+def serve_panel(args: argparse.Namespace) -> None:
+    """O painel vive em `scripts/painel.py`: este arquivo ja tem tamanho demais."""
+    try:
+        from scripts import painel
+    except ImportError:
+        import painel
+
+    painel.servir(args)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Central de Compras")
     sub = parser.add_subparsers(required=True, dest="comando")
@@ -3946,6 +3965,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("dashboard", help="gera dashboard HTML local")
     p.set_defaults(func=generate_dashboard)
+
+    p = sub.add_parser("artifact", help="gera a pagina unica so-leitura para publicar")
+    p.set_defaults(func=build_artifact)
+
+    p = sub.add_parser("painel", help="abre a grade editavel no navegador (grava no repo)")
+    p.add_argument("--projeto", help="sem isso, abre o projeto mais recente")
+    p.add_argument("--porta", type=int, default=8800)
+    p.add_argument("--sem-navegador", action="store_true", help="nao abre o navegador sozinho")
+    p.set_defaults(func=serve_panel)
 
     p = sub.add_parser("historico", help="mostra a serie historica de custo e desmascara preco ancora")
     p.add_argument("projeto")

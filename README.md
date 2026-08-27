@@ -186,6 +186,40 @@ Mostra, por produto, a serie de custo com minimo, mediana, maximo e variacao. E
 essa serie que desmascara preco ancora: desconto so e desconto contra o seu
 proprio historico. Com uma unica observacao, o relatorio diz isso na cara.
 
+## Painel local: a grade no navegador
+
+```powershell
+python scripts/central_compras.py painel
+```
+
+Sobe um servidor em `127.0.0.1:8800` e abre a grade editavel: ranking com score
+aberto, confianca, avisos e um formulario de nova cotacao que **grava direto no
+repositorio**.
+
+No VS Code, `Ctrl+Shift+P` > `Simple Browser: Show` > cole a URL. A grade fica
+ao lado do chat, na mesma janela.
+
+O painel **nao e porta dos fundos**: toda gravacao passa pelos mesmos caminhos do
+CLI, com a mesma trava por projeto, a mesma validacao de entrada e o mesmo
+append-only. `NaN` e recusado ali igual e recusado no terminal. Editar cotacao
+antiga nao existe no painel de proposito: preco novo e linha nova.
+
+Ele so escuta em `127.0.0.1` — escreve no repo, entao nao pode aceitar conexao
+de fora.
+
+## Artifact: consultar do celular
+
+```powershell
+python scripts/central_compras.py artifact
+```
+
+Gera `dashboard/artifact.html`, pagina unica e autossuficiente, boa de ler no
+celular. **So leitura**, e a propria pagina diz isso: cotar e decidir e no painel
+local, onde o repositorio e a verdade.
+
+E uma foto tirada quando voce gera. Se cotar depois e nao regerar, ela mostra o
+estado anterior — nao e defeito, e o que uma foto e.
+
 ## Dashboard local
 
 Gere a visao HTML da Central:

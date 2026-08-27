@@ -446,3 +446,34 @@ Testes: de 167 para 169.
   confianca, confirmacao manual, snapshots e aprendizado em duas fases.
 
 Testes: de 169 para 176.
+
+## Sprint 15 - Painel local e artifact
+
+Meta: parar de operar a Central so por linha de comando.
+
+Status: concluida.
+
+O incomodo era concreto: dava para ver os dados OU conversar comigo, nunca as
+duas coisas. A referencia foi o Google Sheets com o Gemini na lateral.
+
+**O que foi construido.**
+
+- `painel` sobe um servidor em `127.0.0.1` com a grade editavel: ranking com
+  score aberto e barras por eixo, confianca, avisos, regra de parada, ultimas
+  cotacoes e formulario de nova cotacao. No VS Code abre no Simple Browser, ao
+  lado do chat: a mesma tela do Sheets, com o assistente que conhece gate,
+  confianca e TCO.
+- `artifact` gera uma pagina unica so-leitura, para consultar do celular.
+
+**A regra de desenho que guiou tudo:** o painel nao pode ser porta dos fundos.
+`scripts/painel.py` tem tres camadas — `estado()` puro que so calcula,
+`acao()` que grava chamando os MESMOS caminhos do CLI sob a mesma trava, e a
+casca HTTP. Ha teste que falha se o painel oferecer uma acao sem comando
+equivalente no CLI, e teste de que `NaN` e recusado no painel igual no terminal.
+
+**Por que Google Sheets foi recusado.** Sincronizar nos dois sentidos criaria
+duas verdades, o Sheets permite apagar linha do que e append-only, e o Gemini de
+la nao conhece nenhuma regra do sistema. O painel resolve o mesmo incomodo sem
+criar o problema.
+
+Testes: de 169 para 195.
