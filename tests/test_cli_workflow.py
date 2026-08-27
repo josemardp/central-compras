@@ -585,7 +585,7 @@ class CliWorkflowTest(unittest.TestCase):
         self.assertTrue(knowledge_page.exists())
         self.assertTrue(styles.exists())
         self.assertIn("Central de Compras", index.read_text(encoding="utf-8"))
-        self.assertIn("Aderencia ao gate", index.read_text(encoding="utf-8"))
+        self.assertIn("Candidatos cortados pelo gate", index.read_text(encoding="utf-8"))
         self.assertIn("dias medios ate decisao", index.read_text(encoding="utf-8"))
         self.assertIn("QCY H3", project_page.read_text(encoding="utf-8"))
         self.assertIn("Base de conhecimento", knowledge_page.read_text(encoding="utf-8"))

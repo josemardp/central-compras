@@ -59,13 +59,18 @@ Se a categoria tiver `tco_meses` em `config/categorias.yaml`, o ranking usa `tco
 
 ## Como o score funciona
 
-O score vai de 0 a 100 e e sempre exibido aberto, nos cinco eixos do PRD. A escala
-e **absoluta**, nao relativa ao projeto: 75 numa compra de fone significa o mesmo
-que 75 numa compra de carro.
+O score vai de 0 a 100 e e sempre exibido aberto, nos cinco eixos do PRD.
+
+**Atencao ao que o score nao e.** `qualidade`, `risco` e `conveniencia` sao
+absolutos: a mesma cotacao da o mesmo numero em qualquer projeto. `valor` e
+`aderencia` nao sao. `valor` e a razao contra o mais barato do conjunto, entao
+entrar um candidato barato rebaixa os outros sem que nada neles tenha mudado.
+Isso e proposital (valor so existe em comparacao), mas significa que **o score
+total nao e comparavel entre projetos diferentes** - so dentro do mesmo.
 
 | Eixo | Peso | Como e calculado |
 |---|---|---|
-| qualidade | 0,30 | `nota_ajustada` mapeada de 3,8 (0,00) a 5,0 (1,00) |
+| qualidade | 0,30 | `nota_ajustada` mapeada de 4,0 (0,00) a 4,8 (1,00) |
 | valor | 0,25 | razao `menor_custo / custo`. Custar o dobro vale 0,50 |
 | risco | 0,20 | vendedor, tipo e prazo de garantia, loja preferida, menos penalidade por alerta |
 | aderencia | 0,15 | percentual de requisitos do briefing atendidos |
@@ -92,12 +97,17 @@ A criticidade ja esta embutida: o peso do eixo **e** a criticidade dele. Faltar
 
 | Falta | Confianca | Compra ate R$ 20 mil | Acima de R$ 20 mil |
 |---|---:|---|---|
-| so conveniencia | 90% | passa | passa |
-| so aderencia | 85% | passa | barra |
+| so conveniencia | 90% | passa | barra |
+| so aderencia | 85% | barra (eixo obrigatorio) | barra |
 | aderencia + conveniencia | 75% | barra | barra |
 | qualidade | 70% | barra | barra |
 
 Os minimos ficam em `confianca_minima_para_decidir`. Compra cara exige mais.
+
+Limite alto sozinho nao resolve: omitir um eixo ruim continuava rendendo score
+maior que informar um valor ruim. Por isso `valor` e `aderencia` sao
+**obrigatorios** numa decisao final (`eixos_obrigatorios_para_decidir`) - sem
+eles a comparacao simplesmente nao existe, qualquer que seja a confianca.
 
 `nota_ajustada` e recalculada na hora do ranking a partir de `nota` e
 `n_avaliacoes`, nunca lida congelada do CSV: se voce mudar os pesos da nota
@@ -187,7 +197,13 @@ Abra `dashboard/index.html` no navegador para ver projetos, itens aguardando pre
 e `dashboard/` sao derivados, mas ficam versionados de proposito: o `ranking.md`
 ao lado do `decisao.md` e a evidencia de por que voce decidiu naquele dia.
 
-Se der conflito num deles, **nao resolva a mao**. Fique com qualquer lado e rode:
+No ato da decisao, o ranking daquele dia e **congelado** em
+`decisao-<data>-ranking.md`. Sem isso, uma cotacao nova depois faria `regenerar`
+reescrever o `ranking.md` e a decisao passaria a apontar para um ranking em que
+ela nem venceria. O congelado nunca e regenerado, e `regenerar` falha se algum
+for alterado.
+
+Se der conflito num derivado, **nao resolva a mao**. Fique com qualquer lado e rode:
 
 ```powershell
 python scripts/central_compras.py regenerar

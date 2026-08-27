@@ -18,6 +18,8 @@
 - D+30 resumo:
 - D+30 problema:
 - D+30 licao:
+- D+30 nota vendedor:
+- D+30 compraria do mesmo vendedor:
 - Chegou no prazo?
 - Produto conforme anuncio?
 - Embalagem/lacre ok?
@@ -33,6 +35,8 @@
 - D+180 resumo:
 - D+180 problema:
 - D+180 licao:
+- D+180 nota vendedor:
+- D+180 compraria do mesmo vendedor:
 - Ainda usa?
 - Valeu o que pagou?
 - Compraria de novo?

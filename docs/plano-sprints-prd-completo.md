@@ -380,3 +380,50 @@ defeito ja corrigido num comando e vivo no vizinho.
   copiar dado real.
 
 Testes: de 143 para 167.
+
+## Sprint 14 - Segunda auditoria, segundo retorno
+
+Meta: aplicar o que sobreviveu da revisao da rodada anterior.
+
+A auditoria rodou em `6c8c5f6`, antes do pacote `ffeb3b1`. Parte dos achados ja
+tinha caido (NaN barrado na entrada, concorrencia da base de conhecimento em
+25/25). O resto era real, e tres nasceram das proprias correcoes.
+
+**Regressao causada pela correcao anterior.** Ao tirar o `0,50 neutro` e
+renormalizar o score, esqueci de renormalizar a memoria de calculo: o ranking
+publicava 79,5 e o `auditar` publicava 76,5, e o texto ainda prometia que eixo
+sem dado valia 0,50. O principio 3 caiu por causa do proprio conserto. Agora a
+memoria mostra quais eixos entraram, a soma dos pesos uteis e a divisao.
+
+**Falso-positivo criado pela correcao anterior.** Tirar a fronteira de palavra a
+esquerda de `api_key` fez `notapi_key` virar alarme, e valores entre aspas
+(`OPENAI_API_KEY="sk-..."`, formato comum em `.env`) continuavam escapando. A
+fronteira certa aceita inicio de linha, separador ou `_`, e recusa letra.
+
+**O argumento sobre derivados versionados era do auditor.** Eu tinha justificado
+mante-los dizendo que o `ranking.md` ao lado do `decisao.md` era a evidencia da
+decisao. Ele reproduziu que nao era: `regenerar` reescreve com o ranking de hoje,
+e a decisao passa a apontar para um ranking em que ela nem venceria. Agora
+`decidir` congela `decisao-<data>-ranking.md`, e `regenerar` falha se algum
+congelado for alterado.
+
+Outros:
+- `aprender-veredito` em veredito vazio retornava sucesso, nao gravava nada e
+  ainda carimbava o arquivo como exportado, bloqueando a exportacao de verdade.
+- O veredito confundia julgamento do produto com o do vendedor: arrependimento 9
+  derrubava a loja para nota 1 junto, mesmo com a loja tendo resolvido bem. Marca
+  e loja passam a ter nota e "compraria de novo" proprios.
+- "Aderencia ao gate" no dashboard media erro de validacao, nao corte de gate: um
+  projeto com o unico candidato cortado aparecia com 100%.
+- A trava desistia em 10s mas so considerava orfa aos 60s: o impasse nunca se
+  resolvia sozinho. O tempo de espera passou a ser maior que o de orfandade.
+- O score nao e absoluto como o README afirmava: `valor` e razao contra o
+  conjunto, entao entrar um candidato barato rebaixa os outros. A alegacao foi
+  corrigida em vez de o comportamento, porque o comportamento esta certo.
+
+**Calibragem, seguindo a recomendacao do auditor:** `m` de 50 para 250 (com 150
+avaliacoes, m=50 deixava 75% da nota nas maos do marketplace), qualidade de
+3,8-5,0 para 4,0-4,8, confianca minima de 80% para 90% (95% em compra cara), e
+`valor`/`aderencia` viraram eixos obrigatorios.
+
+Testes: de 167 para 169.

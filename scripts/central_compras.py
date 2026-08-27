@@ -160,8 +160,10 @@ def slugify(value: str) -> str:
 
 _TEMP_SEQ = itertools.count()
 _REPLACE_RETRIES = 8
-_LOCK_TIMEOUT_S = 10.0
+# Esperar menos do que o prazo de orfandade fazia o comando desistir antes de
+# a trava poder ser considerada velha: o impasse nunca se resolvia sozinho.
 _LOCK_STALE_S = 60.0
+_LOCK_TIMEOUT_S = _LOCK_STALE_S + 15.0
 
 
 @contextlib.contextmanager
@@ -1965,7 +1967,10 @@ def decision_briefing(project: Path) -> str:
                 f"{item.quote.get('garantia_tipo')}), fonte={item.quote.get('fonte')}"
             )
             if item.eixos_sem_dado:
-                linha += f"\n   SEM DADO em {', '.join(item.eixos_sem_dado)}: esses eixos entraram como 0,50 neutro"
+                linha += (
+                    f"\n   SEM DADO em {', '.join(item.eixos_sem_dado)}: esses eixos ficaram FORA "
+                    f"da conta e o score foi renormalizado. Confianca {item.confianca:.0%}."
+                )
             if item.vencida:
                 linha += f"\n   COTACAO VENCIDA: {item.idade_dias} dias desde a coleta"
             if item.alerts:
@@ -2162,6 +2167,16 @@ def decide(args: argparse.Namespace) -> None:
         (item for item in [*elegiveis, *cortados] if item.produto_id == args.produto_id),
         None,
     )
+    obrigatorios = [
+        eixo for eixo in (preferences().get("eixos_obrigatorios_para_decidir") or [])
+        if ranqueado and eixo in ranqueado.eixos_sem_dado
+    ]
+    if obrigatorios and not args.permitir_incompleto:
+        raise SystemExit(
+            f"Faltam eixos que nao podem faltar numa decisao final: {', '.join(obrigatorios)}.\n"
+            "Nenhum limite de confianca cobre isso: sem esses dados a comparacao nao existe.\n"
+            "Preencha, ou use --permitir-incompleto se for de proposito."
+        )
     if ranqueado and ranqueado.confianca < minima and not args.permitir_incompleto:
         raise SystemExit(
             f"Confianca de apenas {ranqueado.confianca:.0%} no score de {args.produto_id} "
@@ -2226,9 +2241,26 @@ def decide(args: argparse.Namespace) -> None:
         set_process_state(project, estado="comprado", proxima_acao="acompanhar entrega e preencher veredito D+30")
     else:
         set_process_state(project, proxima_acao="comprar ou marcar como comprado depois da confirmacao final")
+    # Instantaneo imutavel do ranking no dia da decisao.
+    # Eu tinha justificado versionar os derivados dizendo que o `ranking.md` ao
+    # lado do `decisao.md` era a evidencia da decisao. A auditoria mostrou que
+    # nao era: `regenerar` reescreve o ranking com o de hoje, e a decisao passa
+    # a apontar para um ranking em que ela nem venceria. O congelado resolve.
+    congelado = project / f"decisao-{today()}-ranking.md"
+    if not congelado.exists() or args.force_veredito:
+        atual = (project / "ranking.md").read_text(encoding="utf-8") if (project / "ranking.md").exists() else ""
+        atomic_write_text(
+            congelado,
+            f"# Ranking no dia da decisao ({today()})\n\n"
+            f"Congelado quando `{args.produto_id}` foi escolhido. **Nao regenerar.**\n"
+            "Os derivados atuais mudam quando uma cotacao nova chega; este nao." + '\n\n'
+            + atual,
+        )
+
     verdict_path = create_verdict(project, args.produto_id, product, quote, force=args.force_veredito)
     append_timeline(project, "veredito", "Arquivo de veredito criado", verdict_path.name)
     print(project / "decisao.md")
+    print(congelado)
     print(verdict_path)
 
 
@@ -2286,6 +2318,12 @@ def fill_verdict(args: argparse.Namespace) -> None:
         updates[f"{prefix} problema"] = args.problema
     if args.licao:
         updates[f"{prefix} licao"] = args.licao
+    # O vendedor tem julgamento proprio: a loja pode ter resolvido bem uma
+    # compra da qual voce se arrependeu, e o contrario tambem acontece.
+    if args.nota_vendedor is not None:
+        updates[f"{prefix} nota vendedor"] = str(args.nota_vendedor)
+    if args.compraria_do_vendedor:
+        updates[f"{prefix} compraria do mesmo vendedor"] = args.compraria_do_vendedor
     for label, value in updates.items():
         text = replace_or_append_bullet(text, label, value)
     atomic_write_text(path, text)
@@ -2315,6 +2353,21 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
             f"Veja o bloco `## Aprendizado exportado` em {path}.\n"
             "Use --force se quiser exportar de novo mesmo assim."
         )
+    # Veredito em branco exportava "com sucesso", nao gravava nada e ainda
+    # carimbava o arquivo como exportado, bloqueando a exportacao de verdade
+    # quando o D+30 fosse preenchido. Silencio pior que erro.
+    preenchido = any(
+        extract_bullet(text, rotulo)
+        for rotulo in ["D+30 resumo", "D+180 resumo", "D+30 licao", "D+180 licao",
+                       "D+30 nota arrependimento", "D+180 nota arrependimento"]
+    )
+    if not preenchido and not (args.resumo or args.licao):
+        raise SystemExit(
+            f"Veredito ainda em branco: {path}\n"
+            "Preencha com `preencher-veredito --fase d30` (ou d180) antes de exportar, "
+            "ou passe --resumo/--licao aqui."
+        )
+
     project_name = extract_bullet(text, "Projeto")
     product_name = extract_bullet(text, "Produto")
     seller = extract_bullet(text, "Vendedor")
@@ -2331,14 +2384,33 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
         raw_regret = extract_bullet(text, "D+180 nota arrependimento") or extract_bullet(text, "D+30 nota arrependimento")
         regret = quote_float(raw_regret, 0) if raw_regret else None
 
+    # Julgamento do PRODUTO e do VENDEDOR sao coisas diferentes. Antes, um
+    # arrependimento 9 com o produto derrubava a loja para nota 1 junto, mesmo
+    # quando a loja tinha resolvido a devolucao perfeitamente. Cada um tem o
+    # proprio campo; sem campo proprio, a entrada fica sem nota em vez de herdar
+    # a nota alheia.
+    nota_produto = None if regret is None else max(0, 10 - regret)
+    nota_loja = args.nota_loja
+    if nota_loja is None:
+        bruto = extract_bullet(text, "D+180 nota vendedor") or extract_bullet(text, "D+30 nota vendedor")
+        nota_loja = quote_float(bruto) if bruto else None
+    compraria_produto = buy_again if buy_again in {"sim", "nao", "talvez"} else None
+    compraria_loja = args.compraria_do_vendedor or (
+        extract_bullet(text, "D+180 compraria do mesmo vendedor")
+        or extract_bullet(text, "D+30 compraria do mesmo vendedor")
+        or None
+    )
+    if compraria_loja not in {"sim", "nao", "talvez", None}:
+        compraria_loja = None
+
     if marca:
         register_brand(
             argparse.Namespace(
                 nome=marca,
                 categoria=categoria,
                 projeto=project_name,
-                nota=None if regret is None else max(0, 10 - regret),
-                compraria_de_novo=buy_again if buy_again in {"sim", "nao", "talvez"} else None,
+                nota=nota_produto,
+                compraria_de_novo=compraria_produto,
                 resumo=summary,
                 alerta=args.alerta,
             )
@@ -2349,9 +2421,9 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
                 nome=loja,
                 categoria=categoria,
                 projeto=project_name,
-                nota=None if regret is None else max(0, 10 - regret),
-                compraria_de_novo=buy_again if buy_again in {"sim", "nao", "talvez"} else None,
-                resumo=summary,
+                nota=nota_loja,
+                compraria_de_novo=compraria_loja,
+                resumo=args.resumo_vendedor or summary,
                 alerta=args.alerta,
             )
         )
@@ -2819,7 +2891,7 @@ def project_counts(project: Path) -> dict[str, Any]:
     latest = latest_quotes(quotes)
     # Calcula com o motor em vez de ler o `ranking.csv` do disco: o dashboard
     # mostrava numero velho quando o ranking nao tinha sido regerado.
-    elegiveis, _ = compute_ranking(project)
+    elegiveis, cortados = compute_ranking(project)
     errors, warnings = validation_report(project)
     chosen, why = project_decision_summary(project)
     manual_ids = {row.get("produto_id") for row in quotes if row.get("fonte") == "manual"}
@@ -2851,7 +2923,11 @@ def project_counts(project: Path) -> dict[str, Any]:
         "criado_em": opened_at.isoformat() if opened_at else "",
         "data_decisao": decided_at.isoformat() if decided_at else "",
         "dias_ate_decisao": decision_days,
-        "gate_ok": len(errors) == 0,
+        # `gate_ok` media erro de validacao, nao corte de gate: um projeto com o
+        # unico candidato cortado aparecia com "Aderencia ao gate 100%".
+        "validacao_ok": len(errors) == 0,
+        "candidatos_cortados": len(cortados),
+        "candidatos_elegiveis": len(elegiveis),
     }
 
 
@@ -3130,7 +3206,8 @@ def generate_project_page(project: Path) -> Path:
     <tbody>
       <tr><td>Escolhido</td><td>{safe_html(summary['escolhido'])}</td></tr>
       <tr><td>Por que</td><td>{safe_html(summary['porque'])}</td></tr>
-      <tr><td>Gate</td><td><span class="pill {'ok' if summary['gate_ok'] else 'bad'}">{'ok' if summary['gate_ok'] else 'com erro'}</span></td></tr>
+      <tr><td>Validacao</td><td><span class="pill {'ok' if summary['validacao_ok'] else 'bad'}">{'sem erro' if summary['validacao_ok'] else 'com erro'}</span></td></tr>
+      <tr><td>Candidatos</td><td>{summary['candidatos_elegiveis']} elegiveis, {summary['candidatos_cortados']} cortados pelo gate</td></tr>
       <tr><td>Aguardando preco</td><td>{safe_html(summary['aguardando_preco'])}</td></tr>
     </tbody>
   </table>
@@ -3211,8 +3288,11 @@ def generate_dashboard(args: argparse.Namespace) -> None:
     reuse_rate = f"{reuse_percent}%"
     manual_projects = sum(1 for summary in summaries if summary["manual"])
     warnings_total = sum(int(summary["avisos"]) for summary in summaries)
-    gate_ok = sum(1 for summary in summaries if summary["gate_ok"])
-    gate_rate = round((gate_ok / len(summaries)) * 100, 1) if summaries else 0
+    sem_erro = sum(1 for summary in summaries if summary["validacao_ok"])
+    validacao_rate = round((sem_erro / len(summaries)) * 100, 1) if summaries else 0
+    total_cortados = sum(int(summary["candidatos_cortados"]) for summary in summaries)
+    total_candidatos = total_cortados + sum(int(summary["candidatos_elegiveis"]) for summary in summaries)
+    corte_rate = round((total_cortados / total_candidatos) * 100, 1) if total_candidatos else 0
     decision_days_values = [int(summary["dias_ate_decisao"]) for summary in summaries if summary["dias_ate_decisao"] != ""]
     avg_decision_days = round(sum(decision_days_values) / len(decision_days_values), 1) if decision_days_values else ""
     regrets = [
@@ -3277,7 +3357,7 @@ def generate_dashboard(args: argparse.Namespace) -> None:
 </section>
 <section class="two section">
   <div class="panel"><h2>Estados</h2>{bar_chart(states)}</div>
-  <div class="panel"><h2>Indicadores</h2><table><tbody><tr><td>Reaproveitamento</td><td class="num">{safe_html(reuse_rate)}</td></tr><tr><td>Aderencia ao gate</td><td class="num">{gate_rate}%</td></tr><tr><td>Avisos abertos</td><td class="num">{warnings_total}</td></tr><tr><td>Arrependimento medio</td><td class="num">{safe_html(avg_regret)}</td></tr><tr><td>Vereditos</td><td class="num">{len(verdicts)}</td></tr></tbody></table></div>
+  <div class="panel"><h2>Indicadores</h2><table><tbody><tr><td>Reaproveitamento</td><td class="num">{safe_html(reuse_rate)}</td></tr><tr><td>Projetos sem erro de validacao</td><td class="num">{validacao_rate}%</td></tr><tr><td>Candidatos cortados pelo gate</td><td class="num">{total_cortados} de {total_candidatos} ({corte_rate}%)</td></tr><tr><td>Avisos abertos</td><td class="num">{warnings_total}</td></tr><tr><td>Arrependimento medio</td><td class="num">{safe_html(avg_regret)}</td></tr><tr><td>Vereditos</td><td class="num">{len(verdicts)}</td></tr></tbody></table></div>
 </section>
 <section class="section panel">
   <h2>Projetos</h2>
@@ -3396,12 +3476,12 @@ def audit_score(args: argparse.Namespace) -> None:
                 linhas.append(f"- {chave}: {valor} vale {peso_req}")
             linhas.append(f"- aderencia = media = **{item.axes['aderencia']:.3f}**")
         else:
-            linhas.append("- nenhum requisito registrado no produto: entra como **0,50 neutro**")
+            linhas.append("- nenhum requisito registrado: o eixo fica **fora da conta** (nao vale 0,50)")
 
         linhas.extend(["", "### Conveniencia", ""])
         prazo = row.get("frete_prazo_dias")
         if prazo in {"", None}:
-            linhas.append("- prazo de frete nao informado: entra como **0,50 neutro**")
+            linhas.append("- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)")
         else:
             cfg_conv = (preferences().get("escala") or {}).get("conveniencia") or {}
             otimo = quote_float(cfg_conv.get("prazo_otimo_dias"), 2)
@@ -3410,13 +3490,31 @@ def audit_score(args: argparse.Namespace) -> None:
                 f"- conveniencia = ({ruim} - {prazo}) / ({ruim} - {otimo}) = **{item.axes['conveniencia']:.3f}**"
             )
 
-        linhas.extend(["", "### Score final", "", "| Eixo | Nota | Peso | Contribui |", "|---|---:|---:|---:|"])
+        linhas.extend(["", "### Score final", "", "| Eixo | Nota | Peso | Entra na conta? | Contribui |", "|---|---:|---:|:--:|---:|"])
         total = 0.0
+        peso_util = 0.0
         for eixo, nota in item.axes.items():
             peso = quote_float(pesos.get(eixo), 0)
+            if eixo in item.eixos_sem_dado:
+                linhas.append(f"| {eixo} | -- | {peso} | nao (sem dado) | 0 |")
+                continue
+            peso_util += peso
             total += nota * peso
-            linhas.append(f"| {eixo} | {nota:.3f} | {peso} | {nota * peso:.4f} |")
-        linhas.append(f"| **total x 100** | | | **{total * 100:.1f}** |")
+            linhas.append(f"| {eixo} | {nota:.3f} | {peso} | sim | {nota * peso:.4f} |")
+        # Renormaliza como o ranking faz. Sem isto a memoria publicava um numero
+        # diferente do score publicado, e o principio 3 caia por causa da propria
+        # correcao que tirou o 0,50 neutro.
+        if item.eixos_sem_dado:
+            linhas.append(f"| soma dos que entraram | | {round(peso_util, 4)} | | **{total:.4f}** |")
+            linhas.append(
+                f"| **renormalizado: {total:.4f} / {round(peso_util, 4)} x 100** | | | | "
+                f"**{(total / peso_util * 100) if peso_util else 0:.1f}** |"
+            )
+            total = (total / peso_util) if peso_util else 0.0
+        else:
+            linhas.append(f"| **total x 100** | | | | **{total * 100:.1f}** |")
+        linhas.append("")
+        linhas.append(f"Confianca: **{item.confianca:.0%}** do peso do score apoiado em dado real.")
         if item.eliminations:
             linhas.append("")
             linhas.append(f"Score publicado: **0** (cortado no gate, nao os {total * 100:.1f} acima).")
@@ -3456,6 +3554,8 @@ def regenerate(args: argparse.Namespace) -> None:
     lado e rode isto.
     """
     projetos = [project_path(args.projeto)] if args.projeto else project_dirs()
+    congelados = [c for p in projetos for c in p.glob("decisao-*-ranking.md")]
+    antes = {c: c.read_text(encoding="utf-8") for c in congelados}
     with sources_frozen():
         for project in projetos:
             alvo = argparse.Namespace(projeto=str(project), produto_id=None, strict=False)
@@ -3467,7 +3567,13 @@ def regenerate(args: argparse.Namespace) -> None:
     list_waiting_price(argparse.Namespace(categoria=None))
     reuse_report(argparse.Namespace(categoria=None))
     generate_dashboard(argparse.Namespace())
-    print(f"{len(projetos)} projeto(s) regenerado(s). Nenhuma fonte foi tocada.")
+    for caminho, conteudo in antes.items():
+        if caminho.read_text(encoding="utf-8") != conteudo:
+            raise SystemExit(f"BUG: `regenerar` alterou um ranking congelado: {caminho}")
+    print(
+        f"{len(projetos)} projeto(s) regenerado(s). Nenhuma fonte foi tocada"
+        + (f", {len(congelados)} ranking(s) congelado(s) preservado(s)." if congelados else ".")
+    )
 
 
 def migrate_quotes(args: argparse.Namespace) -> None:
@@ -3525,10 +3631,17 @@ SENSITIVE_PATTERNS: list[tuple[str, str, str]] = [
     ("CVV", r"(?i)\bcvv\b\s*[:=]\s*\d{3,4}\b", "CVV"),
     # Sem `\b` a esquerda pelo mesmo motivo do api_key: em `database_password`
     # e em `MINHA_SENHA` o `_` e caractere de palavra e o padrao nunca casaria.
-    ("SENHA", r"(?i)(senha|password|passwd)\b\s*[:=]\s*\S+", "senha em texto"),
-    # Sem `\b` a esquerda de proposito: em `OPENAI_API_KEY` o `_` e caractere de
-    # palavra, entao `\bapi_key` nunca casaria.
-    ("TOKEN", r"(?i)(token|api[_-]?key|secret|access[_-]?key)\b\s*[:=]\s*[A-Za-z0-9_\-]{12,}", "token/chave"),
+    # Mesma fronteira do TOKEN: `MINHA_SENHA` casa, `resenha:` nao.
+    ("SENHA", r"(?i)(?:^|[^A-Za-z])(senha|password|passwd)\b\s*[:=]\s*\S+", "senha em texto"),
+    # A esquerda aceita inicio de linha, separador ou `_`/`-`, mas nao letra:
+    # sem isso `\bapi_key` nunca casaria `OPENAI_API_KEY`, e tirar a fronteira
+    # inteira fazia `notapi_key` virar alarme.
+    # A direita aceita o valor entre aspas, que e o formato comum em `.env`.
+    (
+        "TOKEN",
+        r"(?i)(?:^|[^A-Za-z])(token|api[_-]?key|secret|access[_-]?key)\b\s*[:=]\s*[\"']?[A-Za-z0-9_\-\.]{12,}",
+        "token/chave",
+    ),
     ("GITHUB", r"\bgh[pousr]_[A-Za-z0-9]{20,}\b", "token do GitHub"),
 ]
 
@@ -3828,6 +3941,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resumo", required=True)
     p.add_argument("--problema")
     p.add_argument("--licao")
+    p.add_argument("--nota-vendedor", type=real_number, help="0 a 10 para o VENDEDOR, separado do produto")
+    p.add_argument("--compraria-do-vendedor", choices=["sim", "nao", "talvez"])
     p.set_defaults(func=fill_verdict)
 
     p = sub.add_parser("aprender-veredito", help="transforma veredito preenchido em marca, loja e licao")
@@ -3841,6 +3956,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--alerta")
     p.add_argument("--nota-arrependimento", type=float)
     p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"])
+    p.add_argument("--nota-loja", type=real_number, help="nota do VENDEDOR, separada da nota do produto")
+    p.add_argument("--compraria-do-vendedor", choices=["sim", "nao", "talvez"])
+    p.add_argument("--resumo-vendedor", help="o que a loja fez de bom ou de ruim, separado do produto")
     p.add_argument("--force", action="store_true", help="exporta de novo um veredito ja exportado")
     p.set_defaults(func=learn_from_verdict)
 

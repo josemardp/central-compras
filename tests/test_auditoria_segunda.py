@@ -258,11 +258,22 @@ class ConfidenceCalibrationTest(unittest.TestCase):
         self.assertAlmostEqual(faltando_os_dois, 0.75, places=6)
         self.assertLess(faltando_os_dois, cc.minimum_confidence({"valor_estimado": 400}))
 
-    def test_missing_only_one_soft_axis_still_passes(self):
+    def test_a_transparent_product_is_not_beaten_by_a_silent_one(self):
+        """O silencioso vencia o transparente: score 85,8 com 75% de confianca
+        contra 71,8 com 100%. Agora o silencioso nem chega a decidir."""
+        self.assertGreaterEqual(cc.minimum_confidence({"valor_estimado": 400}), 0.90)
+
+    def test_missing_only_the_softest_axis_still_passes(self):
         pesos = cc.preferences()["score"]
-        for eixo in ["aderencia", "conveniencia"]:
-            confianca = 1 - pesos[eixo]
-            self.assertGreaterEqual(confianca, cc.minimum_confidence({"valor_estimado": 400}), eixo)
+        confianca = 1 - pesos["conveniencia"]
+        self.assertGreaterEqual(confianca, cc.minimum_confidence({"valor_estimado": 400}))
+
+    def test_value_and_adherence_are_mandatory_regardless_of_confidence(self):
+        """Elevar o limite nao basta: omitir um eixo ruim ainda subia o score.
+        `valor` e `aderencia` nao podem simplesmente faltar numa decisao."""
+        obrigatorios = cc.preferences()["eixos_obrigatorios_para_decidir"]
+        self.assertIn("valor", obrigatorios)
+        self.assertIn("aderencia", obrigatorios)
 
     def test_an_expensive_purchase_is_stricter(self):
         self.assertGreater(

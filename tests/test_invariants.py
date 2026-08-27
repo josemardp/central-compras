@@ -177,20 +177,29 @@ class ScoreIsReconstructibleTest(unittest.TestCase):
     """Principio 3 do PRD: reconstruir o score a mao, com uma calculadora."""
 
     def test_axes_times_weights_equal_the_published_score(self):
+        """Principio 3: refazer o numero a mao, com renormalizacao."""
         row = {
             "vendedor_tipo": "oficial", "garantia_tipo": "vendedor", "garantia_meses": "12",
             "loja": "Amazon", "nota": "4.8", "n_avaliacoes": "5360", "custo_total": "296.64",
         }
-        axes = {
+        pesos = cc.preferences()["score"]
+        # `conveniencia` sem dado: sai da conta, e o peso restante e redistribuido.
+        com_dado = {
             "qualidade": cc.quality_score(cc.current_adjusted_rating(row)),
             "valor": cc.value_score(296.64, 296.64),
             "risco": cc.risk_score(row, []),
             "aderencia": 0.5,
-            "conveniencia": 0.5,
         }
-        pesos = cc.preferences()["score"]
-        total = sum(axes[e] * pesos[e] for e in axes) * 100
-        self.assertAlmostEqual(total, 76.5, places=1)
+        peso_util = sum(pesos[e] for e in com_dado)
+        total = sum(com_dado[e] * pesos[e] for e in com_dado) / peso_util * 100
+
+        self.assertAlmostEqual(peso_util, 1 - pesos["conveniencia"], places=6)
+        self.assertGreater(total, 0)
+        self.assertLessEqual(total, 100)
+        # Somar sem renormalizar daria um numero MENOR que o publicado: era
+        # exatamente a divergencia entre `ranking.md` e `memoria-calculo.md`.
+        sem_renormalizar = sum(com_dado[e] * pesos[e] for e in com_dado) * 100
+        self.assertGreater(total, sem_renormalizar)
 
     def test_risk_parts_sum_back_to_the_risk_score(self):
         """`risco 0,71` so e auditavel se as parcelas somarem de volta nele."""

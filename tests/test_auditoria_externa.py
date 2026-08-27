@@ -260,9 +260,10 @@ class ConfidenceTest(BaseCli):
         r = self.cli("decidir", projeto, "--produto-id", "fone-y", "--porque", "vai",
                      "--sem-perdedores", check=False)
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("Confianca", r.stderr)
+        # `aderencia` e eixo obrigatorio: a mensagem diz isso antes de falar
+        # em confianca, porque nenhum limite cobre um eixo que simplesmente falta.
         self.assertIn("aderencia", r.stderr)
-        self.assertIn("conveniencia", r.stderr)
+        self.assertIn("nao podem faltar", r.stderr)
 
         # Declarando que aceita decidir sobre dado incompleto, fecha.
         self.cli("decidir", projeto, "--produto-id", "fone-y", "--porque", "vai",

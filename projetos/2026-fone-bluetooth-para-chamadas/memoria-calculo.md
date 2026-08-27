@@ -1,14 +1,14 @@
 # Memoria de calculo
 
-Gerado em 2026-08-27T08:49:46.
+Gerado em 2026-08-27T09:26:08.
 
 ## QCY H3 ANC
 
 ### Qualidade
 
 - nota bruta 4.8 com 5360 avaliacoes
-- nota ajustada = (5360 x 4.8 + 50.0 x 4.3) / (5360 + 50.0) = **4.795**
-- qualidade = (4.795 - 3.8) / (5.0 - 3.8) = **0.829**
+- nota ajustada = (5360 x 4.8 + 250.0 x 4.3) / (5360 + 250.0) = **4.778**
+- qualidade = (4.778 - 4.0) / (4.8 - 4.0) = **0.972**
 
 ### Valor
 
@@ -36,26 +36,29 @@ Gerado em 2026-08-27T08:49:46.
 
 ### Conveniencia
 
-- prazo de frete nao informado: entra como **0,50 neutro**
+- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)
 
 ### Score final
 
-| Eixo | Nota | Peso | Contribui |
-|---|---:|---:|---:|
-| qualidade | 0.829 | 0.3 | 0.2487 |
-| valor | 1.000 | 0.25 | 0.2500 |
-| risco | 0.709 | 0.2 | 0.1418 |
-| aderencia | 0.500 | 0.15 | 0.0750 |
-| conveniencia | 0.500 | 0.1 | 0.0500 |
-| **total x 100** | | | **76.5** |
+| Eixo | Nota | Peso | Entra na conta? | Contribui |
+|---|---:|---:|:--:|---:|
+| qualidade | 0.972 | 0.3 | sim | 0.2916 |
+| valor | 1.000 | 0.25 | sim | 0.2500 |
+| risco | 0.709 | 0.2 | sim | 0.1418 |
+| aderencia | 0.500 | 0.15 | sim | 0.0750 |
+| conveniencia | -- | 0.1 | nao (sem dado) | 0 |
+| soma dos que entraram | | 0.9 | | **0.7584** |
+| **renormalizado: 0.7584 / 0.9 x 100** | | | | **84.3** |
+
+Confianca: **90%** do peso do score apoiado em dado real.
 
 ## Soundcore Anker Life Q30
 
 ### Qualidade
 
 - nota bruta 4.6 com 288 avaliacoes
-- nota ajustada = (288 x 4.6 + 50.0 x 4.3) / (288 + 50.0) = **4.556**
-- qualidade = (4.556 - 3.8) / (5.0 - 3.8) = **0.630**
+- nota ajustada = (288 x 4.6 + 250.0 x 4.3) / (288 + 250.0) = **4.461**
+- qualidade = (4.461 - 4.0) / (4.8 - 4.0) = **0.576**
 
 ### Valor
 
@@ -83,18 +86,21 @@ Gerado em 2026-08-27T08:49:46.
 
 ### Conveniencia
 
-- prazo de frete nao informado: entra como **0,50 neutro**
+- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)
 
 ### Score final
 
-| Eixo | Nota | Peso | Contribui |
-|---|---:|---:|---:|
-| qualidade | 0.630 | 0.3 | 0.1890 |
-| valor | 0.637 | 0.25 | 0.1593 |
-| risco | 0.604 | 0.2 | 0.1208 |
-| aderencia | 0.500 | 0.15 | 0.0750 |
-| conveniencia | 0.500 | 0.1 | 0.0500 |
-| **total x 100** | | | **59.4** |
+| Eixo | Nota | Peso | Entra na conta? | Contribui |
+|---|---:|---:|:--:|---:|
+| qualidade | 0.576 | 0.3 | sim | 0.1728 |
+| valor | 0.637 | 0.25 | sim | 0.1593 |
+| risco | 0.604 | 0.2 | sim | 0.1208 |
+| aderencia | 0.500 | 0.15 | sim | 0.0750 |
+| conveniencia | -- | 0.1 | nao (sem dado) | 0 |
+| soma dos que entraram | | 0.9 | | **0.5278** |
+| **renormalizado: 0.5278 / 0.9 x 100** | | | | **58.6** |
+
+Confianca: **90%** do peso do score apoiado em dado real.
 
 ## Edifier W820NB Plus
 
@@ -107,8 +113,8 @@ Os eixos abaixo sao informativos: gate vem antes de score.
 ### Qualidade
 
 - nota bruta 4.9 com 128 avaliacoes
-- nota ajustada = (128 x 4.9 + 50.0 x 4.3) / (128 + 50.0) = **4.731**
-- qualidade = (4.731 - 3.8) / (5.0 - 3.8) = **0.776**
+- nota ajustada = (128 x 4.9 + 250.0 x 4.3) / (128 + 250.0) = **4.503**
+- qualidade = (4.503 - 4.0) / (4.8 - 4.0) = **0.629**
 
 ### Valor
 
@@ -137,20 +143,23 @@ Os eixos abaixo sao informativos: gate vem antes de score.
 
 ### Conveniencia
 
-- prazo de frete nao informado: entra como **0,50 neutro**
+- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)
 
 ### Score final
 
-| Eixo | Nota | Peso | Contribui |
-|---|---:|---:|---:|
-| qualidade | 0.776 | 0.3 | 0.2328 |
-| valor | 0.594 | 0.25 | 0.1485 |
-| risco | 0.454 | 0.2 | 0.0908 |
-| aderencia | 0.500 | 0.15 | 0.0750 |
-| conveniencia | 0.500 | 0.1 | 0.0500 |
-| **total x 100** | | | **59.7** |
+| Eixo | Nota | Peso | Entra na conta? | Contribui |
+|---|---:|---:|:--:|---:|
+| qualidade | 0.629 | 0.3 | sim | 0.1887 |
+| valor | 0.594 | 0.25 | sim | 0.1485 |
+| risco | 0.454 | 0.2 | sim | 0.0908 |
+| aderencia | 0.500 | 0.15 | sim | 0.0750 |
+| conveniencia | -- | 0.1 | nao (sem dado) | 0 |
+| soma dos que entraram | | 0.9 | | **0.5030** |
+| **renormalizado: 0.5030 / 0.9 x 100** | | | | **55.9** |
 
-Score publicado: **0** (cortado no gate, nao os 59.7 acima).
+Confianca: **90%** do peso do score apoiado em dado real.
+
+Score publicado: **0** (cortado no gate, nao os 55.9 acima).
 
 ## JBL Tune 770NC
 
@@ -163,8 +172,8 @@ Os eixos abaixo sao informativos: gate vem antes de score.
 ### Qualidade
 
 - nota bruta 4.8 com 0 avaliacoes
-- nota ajustada = (0 x 4.8 + 50.0 x 4.3) / (0 + 50.0) = **4.3**
-- qualidade = (4.3 - 3.8) / (5.0 - 3.8) = **0.417**
+- nota ajustada = (0 x 4.8 + 250.0 x 4.3) / (0 + 250.0) = **4.3**
+- qualidade = (4.3 - 4.0) / (4.8 - 4.0) = **0.375**
 
 ### Valor
 
@@ -192,18 +201,21 @@ Os eixos abaixo sao informativos: gate vem antes de score.
 
 ### Conveniencia
 
-- prazo de frete nao informado: entra como **0,50 neutro**
+- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)
 
 ### Score final
 
-| Eixo | Nota | Peso | Contribui |
-|---|---:|---:|---:|
-| qualidade | 0.417 | 0.3 | 0.1251 |
-| valor | 0.691 | 0.25 | 0.1727 |
-| risco | 0.604 | 0.2 | 0.1208 |
-| aderencia | 0.500 | 0.15 | 0.0750 |
-| conveniencia | 0.500 | 0.1 | 0.0500 |
-| **total x 100** | | | **54.4** |
+| Eixo | Nota | Peso | Entra na conta? | Contribui |
+|---|---:|---:|:--:|---:|
+| qualidade | 0.375 | 0.3 | sim | 0.1125 |
+| valor | 0.691 | 0.25 | sim | 0.1727 |
+| risco | 0.604 | 0.2 | sim | 0.1208 |
+| aderencia | 0.500 | 0.15 | sim | 0.0750 |
+| conveniencia | -- | 0.1 | nao (sem dado) | 0 |
+| soma dos que entraram | | 0.9 | | **0.4811** |
+| **renormalizado: 0.4811 / 0.9 x 100** | | | | **53.4** |
 
-Score publicado: **0** (cortado no gate, nao os 54.4 acima).
+Confianca: **90%** do peso do score apoiado em dado real.
+
+Score publicado: **0** (cortado no gate, nao os 53.4 acima).
 

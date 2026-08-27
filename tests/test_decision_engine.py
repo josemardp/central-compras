@@ -5,8 +5,11 @@ from scripts import central_compras
 
 class DecisionEngineTest(unittest.TestCase):
     def test_adjusted_rating_shrinks_low_volume_perfect_score(self):
-        self.assertLess(central_compras.adjusted_rating(5.0, 4), 4.4)
-        self.assertGreater(central_compras.adjusted_rating(4.7, 6000), 4.69)
+        # Com m=250, nota 5,0 com 4 avaliacoes quase nao sai da media da
+        # categoria: volume e evidencia, e 4 avaliacoes nao sao evidencia.
+        self.assertLess(central_compras.adjusted_rating(5.0, 4), 4.35)
+        # Ja 6.000 avaliacoes dominam a ancora com folga.
+        self.assertGreater(central_compras.adjusted_rating(4.7, 6000), 4.68)
 
     def test_risk_score_penalizes_alerts(self):
         row = {

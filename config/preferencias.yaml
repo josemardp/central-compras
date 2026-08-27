@@ -7,15 +7,25 @@ score:
 
 nota_bayesiana:
   media_categoria_padrao: 4.3
-  peso_ancora: 50
+  # Com m=50, um produto de 150 avaliacoes tem 75% da nota ajustada vinda da
+  # media do marketplace, nao dele. m=250 derruba isso para 37,5%: em
+  # marketplace grande, produto popular passa dos milhares de avaliacoes.
+  peso_ancora: 250
 
-# Escala absoluta do score. Sem isso o score usava min-max dentro do projeto,
-# e o segundo colocado sempre tirava 0,00 mesmo perdendo por pouco.
-# Com escala ancorada, 75 significa a mesma coisa em qualquer projeto.
+# Escalas do score. Antes era min-max dentro do projeto, e o segundo colocado
+# tirava 0,00 mesmo perdendo por pouco.
+#
+# `qualidade`, `risco` e `conveniencia` sao absolutos: a mesma cotacao da o
+# mesmo numero em qualquer projeto. `valor` e `aderencia` NAO sao: valor e a
+# razao contra o mais barato do conjunto, entao entrar um candidato barato
+# rebaixa os outros. Isso e proposital (valor so existe em comparacao), mas
+# significa que o score total nao e comparavel entre projetos diferentes.
 escala:
   qualidade:
-    nota_piso: 3.8      # nota_ajustada <= piso  -> 0,00
-    nota_teto: 5.0      # nota_ajustada >= teto  -> 1,00
+    # 4,8 ja e qualidade maxima pratica em marketplace: reservar o topo para
+    # 5,0 comprimia demais os produtos bons. E abaixo de 4,0 ja e ruim.
+    nota_piso: 4.0      # nota_ajustada <= piso  -> 0,00
+    nota_teto: 4.8      # nota_ajustada >= teto  -> 1,00
   # O eixo valor usa razao (menor_custo / custo deste), sem parametro:
   # custar o dobro do mais barato vale 0,50.
   conveniencia:
@@ -65,8 +75,15 @@ frescor:
 #   falta qualidade ................ 0,70  barra
 # Quanto mais cara a compra, menos tolerancia a dado faltando.
 confianca_minima_para_decidir:
-  padrao: 0.80
-  acima_de_20000: 0.90
+  padrao: 0.90
+  acima_de_20000: 0.95
+
+# Eixos que nao podem simplesmente faltar numa decisao final, qualquer que seja
+# a confianca. Omitir um eixo ruim ainda subia o score: o remedio nao e so o
+# limite, e exigir semanticamente o que nao pode faltar.
+eixos_obrigatorios_para_decidir:
+  - valor
+  - aderencia
 
 lojas_preferidas:
   - Amazon
