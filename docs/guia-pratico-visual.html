@@ -1,0 +1,1184 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guia Pratico Visual | Central de Compras</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f2ea;
+      --surface: #fffdfa;
+      --surface-2: #f0ebe0;
+      --ink: #1f241f;
+      --muted: #656b61;
+      --line: #d9d1c2;
+      --teal: #0f766e;
+      --teal-soft: #d8f2ed;
+      --green: #2f7d32;
+      --green-soft: #e0f1dd;
+      --amber: #b7791f;
+      --amber-soft: #f7e7bd;
+      --coral: #b45342;
+      --coral-soft: #f1d9d2;
+      --blue: #2563eb;
+      --blue-soft: #dbe6ff;
+      --code-bg: #252822;
+      --code-ink: #f8f5ec;
+      --shadow: 0 18px 48px rgba(35, 32, 25, 0.12);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121411;
+        --surface: #1d211d;
+        --surface-2: #282d27;
+        --ink: #f3efe5;
+        --muted: #a9ad9f;
+        --line: #383d36;
+        --teal: #5eead4;
+        --teal-soft: #173d38;
+        --green: #95df8d;
+        --green-soft: #203b20;
+        --amber: #f0c674;
+        --amber-soft: #433618;
+        --coral: #f0a08c;
+        --coral-soft: #442821;
+        --blue: #8ab4f8;
+        --blue-soft: #1e315a;
+        --code-bg: #090b09;
+        --code-ink: #f3efe5;
+        --shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        linear-gradient(180deg, rgba(15, 118, 110, 0.12), transparent 360px),
+        var(--bg);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    a {
+      color: var(--teal);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 56px;
+    }
+
+    .hero {
+      min-height: 440px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 22px;
+      align-items: stretch;
+      padding: 18px 0 28px;
+    }
+
+    .hero-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--surface) 78%, transparent);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(40px, 6vw, 76px);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 720px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .button,
+    .copy-btn,
+    .step-button,
+    .tab-button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 10px 14px;
+      font-weight: 700;
+    }
+
+    .button.primary {
+      border-color: color-mix(in srgb, var(--teal) 72%, var(--line));
+      background: var(--teal);
+      color: white;
+    }
+
+    .button:hover,
+    .copy-btn:hover,
+    .step-button:hover,
+    .tab-button:hover {
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+
+    .hero-map {
+      display: grid;
+      align-content: center;
+      min-width: 0;
+    }
+
+    .system-map {
+      position: relative;
+      display: grid;
+      gap: 12px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--surface) 88%, transparent);
+      box-shadow: var(--shadow);
+    }
+
+    .map-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .map-title strong {
+      font-size: 18px;
+    }
+
+    .map-title span {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .map-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .map-lane {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .lane-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .lane-box {
+      display: grid;
+      gap: 8px;
+    }
+
+    .file-chip {
+      padding: 9px 10px;
+      border-radius: 8px;
+      background: var(--surface-2);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .toc {
+      position: sticky;
+      top: 14px;
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      box-shadow: 0 8px 24px rgba(35, 32, 25, 0.08);
+    }
+
+    .toc a {
+      display: block;
+      padding: 9px 10px;
+      border-radius: 8px;
+      color: var(--ink);
+      font-size: 14px;
+    }
+
+    .toc a:hover,
+    .toc a.active {
+      background: var(--teal-soft);
+      text-decoration: none;
+    }
+
+    .content {
+      display: grid;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .section {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .section h2 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      line-height: 1.15;
+    }
+
+    .section p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .section p + p {
+      margin-top: 10px;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .quick-card {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+
+    .quick-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .quick-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .rule-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .rule {
+      min-height: 104px;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+
+    .rule[data-tone="teal"] { border-top: 4px solid var(--teal); }
+    .rule[data-tone="amber"] { border-top: 4px solid var(--amber); }
+    .rule[data-tone="coral"] { border-top: 4px solid var(--coral); }
+    .rule[data-tone="blue"] { border-top: 4px solid var(--blue); }
+
+    .rule strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .rule span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .steps-panel {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 16px;
+      margin-top: 14px;
+      align-items: stretch;
+    }
+
+    .step-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .step-button {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      padding: 9px;
+      text-align: left;
+    }
+
+    .step-button .num {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .step-button .label {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .step-button.active {
+      border-color: color-mix(in srgb, var(--teal) 65%, var(--line));
+      background: var(--teal-soft);
+    }
+
+    .step-button.active .num {
+      background: var(--teal);
+      color: white;
+    }
+
+    .step-detail {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+      overflow: hidden;
+    }
+
+    .step-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .step-head h3 {
+      margin: 0 0 6px;
+      font-size: 20px;
+    }
+
+    .step-head p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 5px 9px;
+      border-radius: 8px;
+      background: var(--amber-soft);
+      color: var(--amber);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .step-body {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+    }
+
+    .command {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--code-bg);
+    }
+
+    .command-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.76);
+      font-size: 12px;
+    }
+
+    .copy-btn {
+      min-height: 30px;
+      padding: 5px 9px;
+      border-color: rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--code-ink);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    pre {
+      margin: 0;
+      padding: 13px;
+      overflow-x: auto;
+      color: var(--code-ink);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: 13px/1.5 Consolas, "Courier New", monospace;
+    }
+
+    .file-tree {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tree-row {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+
+    .tree-row code {
+      color: var(--ink);
+      font-family: Consolas, "Courier New", monospace;
+      overflow-wrap: anywhere;
+    }
+
+    .tree-row span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .flow {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .flow-card {
+      min-height: 96px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+
+    .flow-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .flow-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .decision-band {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .decision {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+
+    .decision strong {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 15px;
+    }
+
+    .decision p {
+      margin: 0 0 10px;
+      font-size: 13px;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tab-button {
+      min-height: 36px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .tab-button.active {
+      border-color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .tab-panel {
+      display: none;
+      margin-top: 12px;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .check-item {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+
+    .check-item input {
+      width: 18px;
+      height: 18px;
+      margin: 1px 0 0;
+      accent-color: var(--teal);
+    }
+
+    .check-item span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .check-item input:checked + span {
+      color: var(--ink);
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
+    }
+
+    .footer {
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .split,
+      .steps-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .toc {
+        position: static;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .quick-grid,
+      .rule-strip,
+      .decision-band,
+      .flow-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: min(100% - 22px, 1180px);
+        padding-top: 14px;
+      }
+
+      .hero {
+        min-height: auto;
+        padding-top: 4px;
+      }
+
+      h1 {
+        font-size: 40px;
+      }
+
+      .lead {
+        font-size: 16px;
+      }
+
+      .map-columns,
+      .quick-grid,
+      .rule-strip,
+      .decision-band,
+      .flow-row,
+      .toc,
+      .tree-row {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        padding: 14px;
+      }
+
+      .step-head {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero" id="inicio">
+      <div class="hero-copy">
+        <div class="eyebrow">Central de Compras | guia de uso</div>
+        <h1>Use cada compra como um processo, nao como uma tabela solta.</h1>
+        <p class="lead">
+          Este guia mostra onde abrir a Central, qual comando rodar quando voce se perde,
+          como registrar cotacoes e quando a decisao esta pronta para virar memoria.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="#roteiro">Ver roteiro</a>
+          <a class="button" href="../dashboard/index.html">Abrir dashboard</a>
+          <a class="button" href="guia-pratico-visual.md">Versao Markdown</a>
+        </div>
+      </div>
+
+      <div class="hero-map" aria-label="Mapa da Central">
+        <div class="system-map">
+          <div class="map-title">
+            <strong>Dois lugares, uma compra</strong>
+            <span>olhar no navegador<br>registrar no terminal</span>
+          </div>
+          <div class="map-columns">
+            <div class="map-lane">
+              <div class="lane-label"><span>Olhar</span><span>HTML</span></div>
+              <div class="lane-box">
+                <div class="file-chip">dashboard/index.html</div>
+                <div class="file-chip">ranking.md</div>
+                <div class="file-chip">validacao.md</div>
+                <div class="file-chip">memoria-calculo.md</div>
+              </div>
+            </div>
+            <div class="map-lane">
+              <div class="lane-label"><span>Alimentar</span><span>CLI</span></div>
+              <div class="lane-box">
+                <div class="file-chip">novo-projeto</div>
+                <div class="file-chip">novo-produto</div>
+                <div class="file-chip">cotar</div>
+                <div class="file-chip">decidir</div>
+              </div>
+            </div>
+          </div>
+          <div class="command" data-command="cd C:\projetos\central-compras&#10;python scripts\central_compras.py status projetos\2026-fone-bluetooth-para-chamadas">
+            <div class="command-top">
+              <span>quando travar, rode isto</span>
+              <button class="copy-btn" type="button">copiar</button>
+            </div>
+            <pre>cd C:\projetos\central-compras
+python scripts\central_compras.py status projetos\2026-fone-bluetooth-para-chamadas</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="split">
+      <nav class="toc" aria-label="Navegacao do guia">
+        <a href="#abrir">O que abrir</a>
+        <a href="#regras">Regras de ouro</a>
+        <a href="#roteiro">Roteiro clicavel</a>
+        <a href="#decisao">Decidir ou esperar</a>
+        <a href="#fone">Compra do fone</a>
+        <a href="#veredito">Depois da compra</a>
+      </nav>
+
+      <div class="content">
+        <section class="section" id="abrir">
+          <h2>O que eu abro</h2>
+          <p>O navegador serve para enxergar a Central. O terminal serve para registrar fatos. Essa separacao evita mexer sem querer no livro-razao.</p>
+          <div class="quick-grid">
+            <div class="quick-card">
+              <strong>Painel geral</strong>
+              <span>Abra `dashboard/index.html` para ver projetos, pendencias, itens aguardando preco e aprendizados.</span>
+            </div>
+            <div class="quick-card">
+              <strong>Projeto da compra</strong>
+              <span>Entre em `projetos/&lt;ano&gt;-&lt;compra&gt;` para ler briefing, ranking, validacao e decisao.</span>
+            </div>
+            <div class="quick-card">
+              <strong>Terminal</strong>
+              <span>Rode `status` sempre que nao souber o proximo passo. Ele mostra bloqueios e comando sugerido.</span>
+            </div>
+          </div>
+
+          <div class="file-tree">
+            <div class="tree-row"><code>dashboard/index.html</code><span>Painel visual da Central.</span></div>
+            <div class="tree-row"><code>projetos/.../briefing.md</code><span>O que voce quer, teto, urgencia e criterios.</span></div>
+            <div class="tree-row"><code>projetos/.../cotacoes.csv</code><span>Preco datado. Nao edite linha antiga; preco novo vira linha nova.</span></div>
+            <div class="tree-row"><code>projetos/.../ranking.md</code><span>Gates, score, confianca e motivo de corte.</span></div>
+            <div class="tree-row"><code>projetos/.../decisao.md</code><span>Escolhido, motivo e por que os outros perderam.</span></div>
+            <div class="tree-row"><code>vereditos/</code><span>D+30 e D+180: a compra realmente deu certo?</span></div>
+          </div>
+
+          <div class="command" data-command="cd C:\projetos\central-compras&#10;python scripts\central_compras.py dashboard&#10;start .\dashboard\index.html">
+            <div class="command-top">
+              <span>abrir painel</span>
+              <button class="copy-btn" type="button">copiar</button>
+            </div>
+            <pre>cd C:\projetos\central-compras
+python scripts\central_compras.py dashboard
+start .\dashboard\index.html</pre>
+          </div>
+        </section>
+
+        <section class="section" id="regras">
+          <h2>Regras de ouro</h2>
+          <p>Se lembrar so disto, voce ja usa a Central com seguranca.</p>
+          <div class="rule-strip">
+            <div class="rule" data-tone="coral">
+              <strong>Nao apague fato antigo</strong>
+              <span>Preco novo e linha nova. O historico e parte da decisao.</span>
+            </div>
+            <div class="rule" data-tone="amber">
+              <strong>Web nao fecha compra</strong>
+              <span>Cotacao web ajuda a pesquisar. Decisao final exige confirmacao manual.</span>
+            </div>
+            <div class="rule" data-tone="teal">
+              <strong>Gate vem antes do score</strong>
+              <span>Produto reprovado nao ganha porque tirou numero bonito.</span>
+            </div>
+            <div class="rule" data-tone="blue">
+              <strong>Perdedor tambem tem motivo</strong>
+              <span>Registrar por que nao escolheu evita refazer pesquisa no futuro.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="roteiro">
+          <h2>Roteiro clicavel</h2>
+          <p>Clique em uma etapa para ver o comando principal e o que ela produz.</p>
+
+          <div class="steps-panel">
+            <div class="step-list" role="tablist" aria-label="Etapas da compra">
+              <button class="step-button active" type="button" data-step="0"><span class="num">0</span><span class="label">Checar estado</span></button>
+              <button class="step-button" type="button" data-step="1"><span class="num">1</span><span class="label">Abrir projeto</span></button>
+              <button class="step-button" type="button" data-step="2"><span class="num">2</span><span class="label">Definir modelo</span></button>
+              <button class="step-button" type="button" data-step="3"><span class="num">3</span><span class="label">Registrar candidato</span></button>
+              <button class="step-button" type="button" data-step="4"><span class="num">4</span><span class="label">Cotar web</span></button>
+              <button class="step-button" type="button" data-step="5"><span class="num">5</span><span class="label">Validar e rankear</span></button>
+              <button class="step-button" type="button" data-step="6"><span class="num">6</span><span class="label">Confirmar manual</span></button>
+              <button class="step-button" type="button" data-step="7"><span class="num">7</span><span class="label">Decidir</span></button>
+            </div>
+
+            <div class="step-detail">
+              <div class="step-head">
+                <div>
+                  <h3 id="step-title">Checar estado</h3>
+                  <p id="step-text">Antes de mexer, veja se o repo esta limpo e se o CLI responde.</p>
+                </div>
+                <span class="badge" id="step-output">ponto de partida</span>
+              </div>
+              <div class="step-body">
+                <div class="command" id="step-command" data-command="cd C:\projetos\central-compras&#10;git status --short --branch&#10;python scripts\central_compras.py --help">
+                  <div class="command-top">
+                    <span id="step-command-label">comando</span>
+                    <button class="copy-btn" type="button">copiar</button>
+                  </div>
+                  <pre id="step-pre">cd C:\projetos\central-compras
+git status --short --branch
+python scripts\central_compras.py --help</pre>
+                </div>
+                <div class="checklist" id="step-checklist"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="decisao">
+          <h2>Quando chega no ranking</h2>
+          <p>O ranking nao e uma ordem para comprar. Ele te joga para uma destas tres saidas.</p>
+          <div class="decision-band">
+            <div class="decision">
+              <strong>Descartar</strong>
+              <p>Falhou em gate, passou do teto ou perdeu por motivo claro.</p>
+              <div class="command" data-command="python scripts\central_compras.py descartar --produto-id anker-q30 --projeto projetos\2026-fone-bluetooth-para-chamadas --porque &quot;Melhor ANC, mas passou do preco teto confirmado.&quot;">
+                <div class="command-top"><span>comando</span><button class="copy-btn" type="button">copiar</button></div>
+                <pre>python scripts\central_compras.py descartar --produto-id anker-q30 --projeto projetos\2026-fone-bluetooth-para-chamadas --porque "Melhor ANC, mas passou do preco teto confirmado."</pre>
+              </div>
+            </div>
+            <div class="decision">
+              <strong>Aguardar preco</strong>
+              <p>Produto aprovado, mas ainda acima do preco que faz sentido.</p>
+              <div class="command" data-command="python scripts\central_compras.py aguardar-preco --produto-id qcy-h3-anc --projeto projetos\2026-fone-bluetooth-para-chamadas --preco-alvo 260 --preco-teto 330 --porque &quot;Aprovado, mas vale esperar desconto.&quot;">
+                <div class="command-top"><span>comando</span><button class="copy-btn" type="button">copiar</button></div>
+                <pre>python scripts\central_compras.py aguardar-preco --produto-id qcy-h3-anc --projeto projetos\2026-fone-bluetooth-para-chamadas --preco-alvo 260 --preco-teto 330 --porque "Aprovado, mas vale esperar desconto."</pre>
+              </div>
+            </div>
+            <div class="decision">
+              <strong>Comprar</strong>
+              <p>Tem cotacao manual fresca, confianca suficiente e motivo dos perdedores.</p>
+              <div class="command" data-command="python scripts\central_compras.py decidir projetos\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --porque &quot;Melhor equilibrio entre preco confirmado, microfone, conforto e garantia.&quot; --perdedores &quot;anker-q30: passou do preco teto; jbl-770nc: menos vantagem pelo custo&quot; --comprado">
+                <div class="command-top"><span>comando</span><button class="copy-btn" type="button">copiar</button></div>
+                <pre>python scripts\central_compras.py decidir projetos\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --porque "Melhor equilibrio entre preco confirmado, microfone, conforto e garantia." --perdedores "anker-q30: passou do preco teto; jbl-770nc: menos vantagem pelo custo" --comprado</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="fone">
+          <h2>Compra atual do fone</h2>
+          <p>A Central ja apontou o caminho: a pesquisa existe, mas falta confirmacao manual. Comece pelo lider e pelo segundo colocado.</p>
+          <div class="tabs" role="tablist" aria-label="Comandos para a compra atual">
+            <button class="tab-button active" type="button" data-tab="fone-status">1. Ver status</button>
+            <button class="tab-button" type="button" data-tab="fone-manual">2. Confirmar finalista</button>
+            <button class="tab-button" type="button" data-tab="fone-rever">3. Regerar leitura</button>
+          </div>
+
+          <div class="tab-panel active" id="fone-status">
+            <div class="command" data-command="cd C:\projetos\central-compras&#10;python scripts\central_compras.py status projetos\2026-fone-bluetooth-para-chamadas">
+              <div class="command-top"><span>status da compra</span><button class="copy-btn" type="button">copiar</button></div>
+              <pre>cd C:\projetos\central-compras
+python scripts\central_compras.py status projetos\2026-fone-bluetooth-para-chamadas</pre>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="fone-manual">
+            <div class="command" data-command="python scripts\central_compras.py promover-cotacao projetos\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --preco VALOR --frete VALOR --garantia-meses 12 --garantia-tipo nacional --link &quot;LINK_ATUAL&quot;">
+              <div class="command-top"><span>confirmacao manual</span><button class="copy-btn" type="button">copiar</button></div>
+              <pre>python scripts\central_compras.py promover-cotacao projetos\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --preco VALOR --frete VALOR --garantia-meses 12 --garantia-tipo nacional --link "LINK_ATUAL"</pre>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="fone-rever">
+            <div class="command" data-command="python scripts\central_compras.py validar projetos\2026-fone-bluetooth-para-chamadas&#10;python scripts\central_compras.py ranking projetos\2026-fone-bluetooth-para-chamadas&#10;python scripts\central_compras.py auditar projetos\2026-fone-bluetooth-para-chamadas&#10;start .\projetos\2026-fone-bluetooth-para-chamadas\ranking.md">
+              <div class="command-top"><span>validar e abrir ranking</span><button class="copy-btn" type="button">copiar</button></div>
+              <pre>python scripts\central_compras.py validar projetos\2026-fone-bluetooth-para-chamadas
+python scripts\central_compras.py ranking projetos\2026-fone-bluetooth-para-chamadas
+python scripts\central_compras.py auditar projetos\2026-fone-bluetooth-para-chamadas
+start .\projetos\2026-fone-bluetooth-para-chamadas\ranking.md</pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="veredito">
+          <h2>Depois da compra</h2>
+          <p>A memoria que vale ouro nasce no D+30 e no D+180: voce descobre se a decisao foi boa, se a marca presta e se a loja merece confianca.</p>
+
+          <div class="flow">
+            <div class="flow-row">
+              <div class="flow-card"><strong>decisao.md</strong><span>O motivo da escolha fica registrado.</span></div>
+              <div class="flow-card"><strong>snapshots/</strong><span>Ranking e cotacao do dia ficam congelados.</span></div>
+              <div class="flow-card"><strong>veredito D+30</strong><span>Chegou certo? Defeito? Loja resolveu?</span></div>
+              <div class="flow-card"><strong>veredito D+180</strong><span>Durou? Valeu o preco? Compraria de novo?</span></div>
+            </div>
+          </div>
+
+          <div class="command" data-command="python scripts\central_compras.py preencher-veredito vereditos\2026-09-25-projeto-produto.md --fase d30 --nota-arrependimento 1 --compraria-de-novo sim --resumo &quot;Chegou certo e resolveu chamadas.&quot; --chegou-no-prazo sim --produto-conforme sim --defeito nao --licao &quot;Compraria de novo de vendedor confiavel.&quot;&#10;python scripts\central_compras.py aprender-veredito vereditos\2026-09-25-projeto-produto.md --fase d30">
+            <div class="command-top"><span>D+30</span><button class="copy-btn" type="button">copiar</button></div>
+            <pre>python scripts\central_compras.py preencher-veredito vereditos\2026-09-25-projeto-produto.md --fase d30 --nota-arrependimento 1 --compraria-de-novo sim --resumo "Chegou certo e resolveu chamadas." --chegou-no-prazo sim --produto-conforme sim --defeito nao --licao "Compraria de novo de vendedor confiavel."
+python scripts\central_compras.py aprender-veredito vereditos\2026-09-25-projeto-produto.md --fase d30</pre>
+          </div>
+        </section>
+
+        <section class="section" id="perdido">
+          <h2>Quando der branco</h2>
+          <p>O comando abaixo e a bussola. Ele diz estado, proxima etapa, bloqueios e comando sugerido.</p>
+          <div class="command" data-command="python scripts\central_compras.py status CAMINHO_DO_PROJETO">
+            <div class="command-top"><span>bussola</span><button class="copy-btn" type="button">copiar</button></div>
+            <pre>python scripts\central_compras.py status CAMINHO_DO_PROJETO</pre>
+          </div>
+          <div class="checklist">
+            <label class="check-item"><input type="checkbox"><span>Tenho pelo menos dois candidatos reais ou motivo para nao ter.</span></label>
+            <label class="check-item"><input type="checkbox"><span>O finalista tem cotacao manual fresca.</span></label>
+            <label class="check-item"><input type="checkbox"><span>Li `validacao.md` e resolvi erros.</span></label>
+            <label class="check-item"><input type="checkbox"><span>Li `ranking.md` e entendi por que o lider ganhou.</span></label>
+            <label class="check-item"><input type="checkbox"><span>Registrei por que os outros perderam.</span></label>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="footer">
+      Guia local e autonomo. Para atualizar os dados do painel, rode
+      <code>python scripts\central_compras.py dashboard</code> e abra
+      <code>dashboard/index.html</code>.
+    </div>
+  </main>
+
+  <script>
+    const steps = [
+      {
+        title: "Checar estado",
+        text: "Antes de mexer, veja se o repo esta limpo e se o CLI responde.",
+        output: "ponto de partida",
+        label: "comando",
+        command: "cd C:\\projetos\\central-compras\ngit status --short --branch\npython scripts\\central_compras.py --help",
+        checks: [
+          "Voce esta na pasta C:\\projetos\\central-compras.",
+          "O git nao mostra mudanca inesperada.",
+          "O comando --help lista os subcomandos."
+        ]
+      },
+      {
+        title: "Abrir projeto",
+        text: "Toda compra vira uma pasta em projetos/. Isso cria briefing, processo e cotacoes.",
+        output: "projeto novo",
+        label: "novo-projeto",
+        command: "python scripts\\central_compras.py novo-projeto \"fone bluetooth para chamadas\" --categoria fone --valor-estimado 400 --preco-teto 600 --necessidade \"Quero um fone confortavel para chamadas longas.\"",
+        checks: [
+          "A pasta do projeto foi criada.",
+          "O briefing registra necessidade e teto.",
+          "Rode status logo depois."
+        ]
+      },
+      {
+        title: "Definir modelo",
+        text: "Antes de cotar, transforme desejo em criterio: tipo, uso, riscos e requisitos.",
+        output: "decisao intermediaria",
+        label: "modelo + anotar",
+        command: "python scripts\\central_compras.py prompt-ia projetos\\2026-fone-bluetooth-para-chamadas --etapa modelo\npython scripts\\central_compras.py anotar projetos\\2026-fone-bluetooth-para-chamadas --etapa modelo --decisao \"Pesquisar headphone over-ear Bluetooth com bom microfone\" --porque \"A prioridade e chamada longa e conforto, nao academia.\"",
+        checks: [
+          "Voce sabe qual tipo de produto esta procurando.",
+          "A decisao ficou gravada em processo.md.",
+          "O criterio combina com o uso real."
+        ]
+      },
+      {
+        title: "Registrar candidato",
+        text: "Cada produto que pode ganhar precisa existir como produto, com atributos estaveis.",
+        output: "produto.yaml",
+        label: "novo-produto",
+        command: "python scripts\\central_compras.py novo-produto projetos\\2026-fone-bluetooth-para-chamadas \"QCY H3 ANC\" --marca QCY --categoria fone --produto-id qcy-h3-anc --atributo tipo=headphone --atributo conexao=bluetooth --atributo microfone=true --atributo bateria_horas=70 --atributo garantia_meses=12",
+        checks: [
+          "O produto tem id claro e estavel.",
+          "A marca e categoria foram preenchidas.",
+          "Os atributos ajudam a comparar, nao so descrever."
+        ]
+      },
+      {
+        title: "Cotar web",
+        text: "Registre a pesquisa web como observacao datada. Ela informa, mas ainda nao autoriza comprar.",
+        output: "cotacoes.csv",
+        label: "cotar",
+        command: "python scripts\\central_compras.py cotar projetos\\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --loja Amazon --vendedor \"QCY BR Direct\" --vendedor-tipo oficial --preco 296.64 --frete 0 --nota 4.8 --avaliacoes 5360 --garantia-meses 12 --garantia-tipo vendedor --fonte web --link \"https://...\"",
+        checks: [
+          "A fonte esta como web.",
+          "Preco, frete, loja, vendedor e garantia foram informados quando conhecidos.",
+          "Nada foi editado em linha antiga."
+        ]
+      },
+      {
+        title: "Validar e rankear",
+        text: "Aqui voce descobre erros, cortes de gate, score, confianca e memoria de calculo.",
+        output: "ranking.md",
+        label: "validar + ranking",
+        command: "python scripts\\central_compras.py validar projetos\\2026-fone-bluetooth-para-chamadas\npython scripts\\central_compras.py ranking projetos\\2026-fone-bluetooth-para-chamadas\npython scripts\\central_compras.py auditar projetos\\2026-fone-bluetooth-para-chamadas\nstart .\\projetos\\2026-fone-bluetooth-para-chamadas\\ranking.md",
+        checks: [
+          "validacao.md nao tem erro bloqueante ignorado.",
+          "ranking.md mostra confianca suficiente ou aponta o que falta.",
+          "memoria-calculo.md fecha a conta se voce quiser auditar."
+        ]
+      },
+      {
+        title: "Confirmar manual",
+        text: "Antes de fechar compra, confirme agora preco, frete, estoque, vendedor e garantia.",
+        output: "cotacao manual",
+        label: "promover-cotacao",
+        command: "python scripts\\central_compras.py promover-cotacao projetos\\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --preco 289 --frete 10 --garantia-meses 12 --garantia-tipo nacional --link \"https://...\"",
+        checks: [
+          "Voce conferiu a pagina agora.",
+          "A nova linha e fonte manual.",
+          "A cotacao antiga web continua preservada."
+        ]
+      },
+      {
+        title: "Decidir",
+        text: "A decisao registra escolhido, motivo e perdedores. Tambem congela a evidencia do dia.",
+        output: "decisao.md + snapshots",
+        label: "decidir",
+        command: "python scripts\\central_compras.py decidir projetos\\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --porque \"Melhor equilibrio entre preco confirmado, microfone, conforto e garantia.\" --perdedores \"anker-q30: passou do preco teto; jbl-770nc: menos vantagem pelo custo\" --comprado",
+        checks: [
+          "O produto escolhido nao esta cortado no gate.",
+          "A cotacao manual esta fresca.",
+          "Cada perdedor tem motivo."
+        ]
+      }
+    ];
+
+    function setStep(index) {
+      const step = steps[index];
+      document.querySelectorAll(".step-button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.step === String(index));
+      });
+      document.getElementById("step-title").textContent = step.title;
+      document.getElementById("step-text").textContent = step.text;
+      document.getElementById("step-output").textContent = step.output;
+      document.getElementById("step-command-label").textContent = step.label;
+      document.getElementById("step-pre").textContent = step.command;
+      document.getElementById("step-command").dataset.command = step.command;
+      document.getElementById("step-checklist").innerHTML = step.checks.map((item) => (
+        `<label class="check-item"><input type="checkbox"><span>${item}</span></label>`
+      )).join("");
+    }
+
+    document.querySelectorAll(".step-button").forEach((button) => {
+      button.addEventListener("click", () => setStep(Number(button.dataset.step)));
+    });
+
+    document.querySelectorAll(".tab-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        const tab = button.dataset.tab;
+        document.querySelectorAll(".tab-button").forEach((item) => {
+          item.classList.toggle("active", item === button);
+        });
+        document.querySelectorAll(".tab-panel").forEach((panel) => {
+          panel.classList.toggle("active", panel.id === tab);
+        });
+      });
+    });
+
+    document.querySelectorAll(".copy-btn").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const block = button.closest(".command");
+        const text = block.dataset.command || block.querySelector("pre").textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          const old = button.textContent;
+          button.textContent = "copiado";
+          window.setTimeout(() => { button.textContent = old; }, 1400);
+        } catch (error) {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(block.querySelector("pre"));
+          selection.removeAllRanges();
+          selection.addRange(range);
+          button.textContent = "selecionado";
+          window.setTimeout(() => { button.textContent = "copiar"; }, 1400);
+        }
+      });
+    });
+
+    const tocLinks = Array.from(document.querySelectorAll(".toc a"));
+    const sections = tocLinks.map((link) => document.querySelector(link.getAttribute("href")));
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          tocLinks.forEach((link) => {
+            link.classList.toggle("active", link.getAttribute("href") === `#${entry.target.id}`);
+          });
+        }
+      });
+    }, { rootMargin: "-30% 0px -55% 0px", threshold: 0.01 });
+    sections.forEach((section) => section && observer.observe(section));
+
+    setStep(0);
+  </script>
+</body>
+</html>

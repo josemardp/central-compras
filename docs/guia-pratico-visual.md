@@ -1,5 +1,8 @@
 # Guia pratico visual da Central de Compras
 
+Versao interativa para abrir no navegador:
+[`guia-pratico-visual.html`](guia-pratico-visual.html).
+
 Este e o mapa para usar a Central sem ficar perdido.
 
 Pense nela assim:
