@@ -2,7 +2,7 @@ id: vedapren-parede-36
 categoria: material_construcao
 nome: Vedacit Vedapren Parede Branco 3,6 kg
 marca: Vedacit
-estado: pesquisando
+estado: descartado
 projeto: 2026-decor-bloqueador
 preco_alvo: null
 preco_teto: 800
@@ -16,4 +16,6 @@ atributos:
   demaos: 3
   aceita_pintura: true
 requisitos_atendidos: {}
-descartado_porque: null
+descartado_porque: 'Membrana acrilica de face positiva. Nao resiste a contrapressao:
+  descola sob umidade negativa. A ficha do fabricante posiciona o produto contra batida
+  de chuva na fachada, nao contra agua empurrando por tras.'

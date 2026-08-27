@@ -11,23 +11,24 @@ criado_em: "2026-08-27"
 
 ## Necessidade
 
-Impermeabilizar parede com infiltracao vinda de fora. O pedido original foi
-"Decor Bloqueador", mas o problema confirmado e infiltracao externa, entao a
-compra tem duas frentes: vedar a face que recebe a chuva (causa) e, se ainda
-necessario, bloquear a face interna (sintoma).
+Bloquear UMIDADE NEGATIVA em parede: a agua vem do outro lado e o produto vai
+na face oposta, porque a face que recebe a agua nao esta acessivel. E o caso
+classico de parede de divisa, encosta ou subsolo. O pedido original foi "Decor
+Bloqueador"; o requisito de contrapressao e o que define a compra, nao a marca.
 
 ## Contexto de uso
 
 - Quem vai usar: Josemar, aplicacao propria
-- Onde vai usar: parede com infiltracao externa; area a tratar entre 5 e 15 m2
+- Onde vai usar: face interna de parede com infiltracao vinda de fora; area a
+  tratar entre 5 e 15 m2
 - Frequencia de uso: compra pontual, aplicacao unica com repasse futuro
-- Restricoes fisicas, tecnicas ou de compatibilidade: face externa precisa
-  aceitar o produto sobre reboco/pintura existente; face interna precisa
-  aceitar pintura por cima
+- Restricoes fisicas, tecnicas ou de compatibilidade: a face externa NAO esta
+  acessivel, entao todo o tratamento e por dentro, sob contrapressao; a
+  superficie tratada precisa receber acabamento depois
 - Prazo limite para comprar ou receber: nao definido
 - Vida util esperada: pelo menos 5 anos sem retorno da mancha
-- Experiencia ruim anterior que nao pode se repetir: tratar so por dentro e a
-  mancha voltar na proxima chuva forte
+- Experiencia ruim anterior que nao pode se repetir: aplicar o produto, pintar
+  por cima e a mancha voltar em poucos meses
 
 ## Custo e pos-compra
 
@@ -38,22 +39,30 @@ necessario, bloquear a face interna (sintoma).
 
 ## Criterios obrigatorios
 
-- [ ] Indicado para a face externa de parede exposta a chuva
-- [ ] Rendimento declarado pelo fabricante em m2 por embalagem
-- [ ] Aceita pintura por cima (ou serve como acabamento)
+- [ ] Resistencia a umidade NEGATIVA declarada na ficha tecnica do fabricante,
+      com o termo explicito (contrapressao, pressao negativa ou umidade
+      ascendente) - nao basta "impermeabilizante de parede"
+- [ ] Sistema cimenticio (argamassa polimerica ou cristalizante), que atua
+      dentro do substrato
+- [ ] Rendimento declarado em m2 por embalagem, com consumo em kg/m2
+- [ ] Evidencia de uso real: nota com volume de avaliacoes, ou ausencia de
+      reclamacao formal recorrente sobre falha na propria funcao
 - [ ] Custo por m2 tratado dentro do teto para a area real
 
 ## Criterios desejaveis
 
-- [ ] Aplicacao a rolo, sem necessidade de tela ou manta
-- [ ] Marca com assistencia e ficha tecnica publica
+- [ ] Monocomponente, sem risco de erro de traco na mistura
+- [ ] Serve como acabamento ou aceita pintura, dispensando revestimento extra
+- [ ] Marca com ficha tecnica publica e datada
 - [ ] Disponivel em loja fisica proxima, evitando frete de material pesado
 
 ## Deal-breakers
 
-- [ ] Produto que so trata a face interna e ignora a origem da agua
+- [ ] Membrana ou pintura acrilica de face positiva: sob contrapressao a agua
+      empurra por tras do filme e ele bolha e descola
+- [ ] Produto sem declaracao de negativa na ficha tecnica
+- [ ] Historico de reclamacao formal por nao segurar a umidade que promete
 - [ ] Rendimento tao baixo que a area de 5-15 m2 estoura o teto de R$ 800
-- [ ] Exigir remocao total do reboco para aplicar
 
 ## Regra de parada
 
@@ -64,7 +73,8 @@ necessario, bloquear a face interna (sintoma).
 
 ## Perguntas para a IA
 
-- Para infiltracao externa, o tratamento correto e na face externa ou interna?
+- O produto declara resistencia a pressao negativa, e ate quantos m.c.a.?
+- Qual o consumo em kg/m2 no regime de negativa, que costuma ser maior?
 - Qual o custo por m2 de cada linha de produto considerada?
 - Que preparo de superficie o produto exige antes da aplicacao?
-- Quais problemas recorrentes aparecem em reviews de impermeabilizante de parede?
+- O que dizem as avaliacoes e as reclamacoes formais de quem ja usou?

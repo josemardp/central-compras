@@ -1,0 +1,18 @@
+id: sikatop-107
+categoria: material_construcao
+nome: Sika SikaTop 107 Cinza 18 kg
+marca: Sika
+estado: pesquisando
+projeto: 2026-decor-bloqueador
+preco_alvo: null
+preco_teto: 800
+atributos:
+  tipo: argamassa_polimerica_bicomponente
+  uso: umidade_negativa_e_positiva
+  superficie: concreto_argamassa_alvenaria
+  rendimento_m2: 6
+  embalagem_kg: 18
+  demaos: 3
+  aceita_pintura: requer_revestimento
+requisitos_atendidos: {}
+descartado_porque: null

@@ -4,12 +4,21 @@
 
 - Estado: pesquisando
 - Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
-- Decisao aberta: Sika Igolflex Fachada Branco 3,6 L lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
+- Decisao aberta: Viapol Viaplus 1000 18 kg lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-08-27 | cotacao | Cotacao registrada para sikatop-107 | Superpro Atacado / fonte=web / custo_total=779.7 |
+| 2026-08-27 | cotacao | Cotacao registrada para viaplus-1000 | LPK Home Center / fonte=web / custo_total=359.97 |
+| 2026-08-27 | cotacao | Cotacao registrada para viaplus-1000 | Elos Cimento / fonte=web / custo_total=192.9 |
+| 2026-08-27 | produto | Candidato registrado: Sika SikaTop 107 Cinza 18 kg | id=sikatop-107 |
+| 2026-08-27 | produto | Candidato registrado: Viapol Viaplus 1000 18 kg | id=viaplus-1000 |
+| 2026-08-27 | descarte | Descartado igolflex-fachada-36 | Mesma limitacao do Vedapren: pintura acrilica para fachada, pressao positiva. A propria Sika separa a linha Igolflex Fachada da linha SikaTop, que e a indicada para negativa. |
+| 2026-08-27 | descarte | Descartado vedapren-parede-36 | Membrana acrilica de face positiva. Nao resiste a contrapressao: descola sob umidade negativa. A ficha do fabricante posiciona o produto contra batida de chuva na fachada, nao contra agua empurrando por tras. |
+| 2026-08-27 | modelo | Classe correta: argamassa polimerica / cimenticio cristalizante. Membrana acrilica esta fora | Tinta acrilica de fachada (Vedapren, Igolflex) so trabalha sob pressao positiva: sob contrapressao a agua empurra por tras do filme e ela bolha e descola. Para negativa o sistema tem que ser cimenticio, que cristaliza dentro do substrato em vez de formar pelicula sobre ele. |
+| 2026-08-27 | modelo | Requisito corrigido: o produto tem que bloquear umidade NEGATIVA (contrapressao) | Josemar corrigiu o escopo. Umidade negativa e quando a agua empurra pela face oposta a que recebe o produto: trata-se por dentro porque a face externa nao esta acessivel. Isso muda a classe do produto, nao so o modelo. |
 | 2026-08-27 | cotacao | Normalizar todas as cotacoes para o mesmo servico: 15 m2 tratados | Comparar preco de embalagem esconde o rendimento, que e justamente onde o Block Total perde. Com tudo em 15 m2 a conta fica: Igolflex R$ 145,90, Vedapren R$ 193,80 e Block Total R$ 1.139,97. |
 | 2026-08-27 | cotacao | Tratar o preco de R$ 69,89 do Igolflex na Redemac como suspeito, nao como preco de referencia | Mesma embalagem sai a R$ 145,90 na Casa Falci. As duas lojas estao SEM ESTOQUE. Spread de 2x com ruptura nos dois lugares sugere preco velho na pagina, nao oportunidade. O preco realista de comparacao e o de R$ 145,90. |
 | 2026-08-27 | cotacao | Cotacao registrada para igolflex-fachada-36 | Casa Falci / fonte=web / custo_total=145.9 |
@@ -44,34 +53,51 @@
 
 ## O que ja sei
 
-- O problema e infiltracao externa, nao umidade ascendente nem mofo de pouca
-  ventilacao. Isso muda o lado da parede que recebe o produto.
+- O requisito e umidade NEGATIVA: a agua vem do outro lado e o produto vai na
+  face oposta, porque a face que recebe a agua nao esta acessivel.
+- Isso separa a compra em duas classes, e so uma serve. Membrana acrilica
+  (Vedapren, Igolflex) trabalha sob pressao positiva e descola sob
+  contrapressao. Sistema cimenticio (Viaplus, SikaTop, Block Total) cristaliza
+  dentro do substrato e e o que resiste a negativa.
 - A area fica entre 5 e 15 m2. Todas as cotacoes foram normalizadas para 15 m2,
   o pior caso, para que o rendimento entre na comparacao.
-- Impermeabilizante acrilico de fachada custa entre R$ 10 e R$ 14 por m2
-  tratado. O bloqueador interno cotado custa R$ 76 por m2.
-- Os dois candidatos de fachada aceitam pintura acrilica por cima, entao o
-  acabamento nao fica preso ao produto.
-- Consumo real e sempre 0,12 kg/m2 por demao nas duas marcas. O numero de
-  demaos e o que muda: 2 no Igolflex, 2 a 3 no Vedapren.
+- Custo por m2 tratado entre os cimenticios: Viaplus 1000 de R$ 13 a R$ 24,
+  SikaTop 107 cerca de R$ 52, Block Total cerca de R$ 76.
+- Viaplus e SikaTop sao cinza e pedem revestimento por cima. Block Total serve
+  como acabamento e aceita pintura a base de agua. Essa e a unica vantagem
+  real do Block Total no conjunto.
+- Viaplus e SikaTop sao bicomponentes, com risco de erro de traco na obra.
+  Block Total e monocomponente.
+- Consumo muda com o regime. No Viaplus: 2 a 3 kg/m2 para umidade do solo,
+  mas 4 a 5 kg/m2 e 4 a 5 demaos para contrapressao hidrostatica ate 10 mca.
+- Avaliacao real so existe para um candidato: Viaplus 1000, 4,9 com 67
+  opinioes. O sistema marcou AVAL_SUSPEITA porque nota 4,9 com menos de 150
+  avaliacoes e base fina - o alerta esta correto e foi mantido.
+- Block Total tem evidencia de uso real, e ela e negativa: tres reclamacoes
+  no Reclame Aqui pelo produto nao segurar a umidade, uma delas com retorno
+  da mancha em 2 meses e outra com 6 unidades compradas sem resultado. A
+  Decor Colors tem nota 6,3 de 10 e 49,6% de quem avaliou voltaria a comprar.
 
 ## O que ainda preciso descobrir
 
 - Medida real da area em m2. A conta de quantas embalagens comprar depende
   disso e a faixa 5-15 m2 muda o resultado por um fator de 3.
-- De onde a agua entra: parede exposta a chuva, trinca, rufo, calha ou
-  respingo do piso. Impermeabilizante nao corrige trinca estrutural nem
-  calha entupida.
-- Estoque real do Igolflex Fachada. As duas lojas cotadas estao em ruptura.
-- Estado da superficie externa: se tem tinta velha descascando ou mofo,
-  entra custo de preparo que nenhuma cotacao cobre ainda.
-- Se a face interna vai precisar de tratamento tambem, depois que a externa
-  secar.
+- Qual regime de consumo se aplica: umidade do solo (2-3 kg/m2) ou
+  contrapressao hidrostatica (4-5 kg/m2). Isso quase dobra a quantidade e o
+  custo. Depende de haver ou nao coluna d'agua empurrando, nao so umidade.
+- Preco real do Viaplus 1000. As cotacoes web vao de R$ 53,50 a R$ 119,99
+  pela mesma caixa de 18 kg e nenhuma pagina abriu para confirmar.
+- Estado da superficie interna: se tem tinta velha descascando, reboco solto
+  ou mofo, entra custo de preparo que nenhuma cotacao cobre ainda.
+- Qual acabamento vai por cima do Viaplus ou do SikaTop, que sao cinza. Esse
+  custo ainda nao esta em nenhuma cotacao e reduz a vantagem deles sobre o
+  Block Total.
 
 ## Hipoteses descartadas
 
 | Hipotese | Motivo do descarte |
 |---|---|
-| Resolver so pela face interna com Decor Bloqueador / Block Total | O problema e infiltracao externa. Bloquear so por dentro deixa a agua na alvenaria e o revestimento tende a descolar. |
-| Block Total como produto principal | Rendimento de 5 m2 por embalagem de 12 kg. Para 15 m2 sao 3 embalagens, R$ 1.139,97, acima do teto de R$ 800. Cortado pelo gate. |
-| Preco de R$ 69,89 do Igolflex na Redemac como referencia | Mesma embalagem a R$ 145,90 em outra loja e ruptura de estoque nas duas. Preco tratado como desatualizado. |
+| Tratar pela face externa com impermeabilizante de fachada | A face externa nao esta acessivel. A compra e de umidade negativa, e por isso Vedapren Parede e Igolflex Fachada sairam. |
+| Membrana acrilica sob contrapressao | Trabalha so sob pressao positiva. Sob umidade negativa a agua empurra por tras do filme, que bolha e descola. |
+| Block Total como produto principal | Atende o requisito de negativa, mas tem o pior rendimento do conjunto (5 m2 por 12 kg, R$ 76/m2, acima do teto para 15 m2) e reclamacao formal recorrente por nao segurar a umidade. |
+| Preco de R$ 69,89 do Igolflex na Redemac como referencia | Mesma embalagem a R$ 145,90 em outra loja e ruptura de estoque nas duas. Candidato descartado depois por motivo tecnico. |

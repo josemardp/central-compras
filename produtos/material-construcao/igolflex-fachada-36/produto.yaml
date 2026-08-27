@@ -2,7 +2,7 @@ id: igolflex-fachada-36
 categoria: material_construcao
 nome: Sika Igolflex Fachada Branco 3,6 L
 marca: Sika
-estado: pesquisando
+estado: descartado
 projeto: 2026-decor-bloqueador
 preco_alvo: null
 preco_teto: 800
@@ -16,4 +16,6 @@ atributos:
   demaos: 2
   aceita_pintura: true
 requisitos_atendidos: {}
-descartado_porque: null
+descartado_porque: 'Mesma limitacao do Vedapren: pintura acrilica para fachada, pressao
+  positiva. A propria Sika separa a linha Igolflex Fachada da linha SikaTop, que e
+  a indicada para negativa.'
