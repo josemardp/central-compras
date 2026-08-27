@@ -4,6 +4,9 @@ Sistema local para transformar cada compra em um processo decisorio rastreavel.
 
 A ideia principal e simples: preco envelhece rapido, mas a memoria da decisao continua valendo. Para cada compra, o repositorio guarda o que voce queria comprar, quais modelos foram considerados, quais cotacoes foram vistas, quais criterios eliminaram candidatos e por que a decisao final fez sentido naquele momento.
 
+Perdido sobre como usar na pratica? Comece pelo guia visual:
+[`docs/guia-pratico-visual.md`](docs/guia-pratico-visual.md).
+
 ## Fluxo de uma compra
 
 Cada compra vira um projeto em `projetos/`.
