@@ -7,6 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import ambiente
+
 
 ROOT = Path(__file__).resolve().parents[1]
 ANO = dt.date.today().year
@@ -15,21 +17,7 @@ ANO = dt.date.today().year
 class CliWorkflowTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-test-"))
-        for name in [
-            "README.md",
-            ".gitignore",
-            "requirements.txt",
-            "config",
-            "templates",
-            "base-conhecimento",
-            "scripts",
-        ]:
-            src = ROOT / name
-            dst = self.tmpdir / name
-            if src.is_dir():
-                shutil.copytree(src, dst)
-            else:
-                shutil.copy2(src, dst)
+        ambiente.montar(self.tmpdir, extras=["README.md", ".gitignore", "requirements.txt"])
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -428,6 +416,8 @@ class CliWorkflowTest(unittest.TestCase):
             "260",
             "--preco-teto",
             "330",
+            "--requisito",
+            "uso=true",
         )
         self.run_cli(
             "cotar",

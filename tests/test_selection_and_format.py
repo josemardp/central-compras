@@ -14,6 +14,7 @@ from pathlib import Path
 
 import yaml
 
+import ambiente
 from scripts import central_compras as cc
 
 
@@ -125,8 +126,7 @@ class CategoryGateEditTest(unittest.TestCase):
 class VerdictIdempotencyTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-idem-"))
-        for name in ["config", "templates", "base-conhecimento", "scripts"]:
-            shutil.copytree(ROOT / name, self.tmpdir / name)
+        ambiente.montar(self.tmpdir)
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -142,7 +142,8 @@ class VerdictIdempotencyTest(unittest.TestCase):
                      "--valor-estimado", "400", "--preco-teto", "600")
         project = f"projetos/{ANO}-fone-idem"
         self.run_cli("novo-produto", project, "Fone A", "--marca", "MarcaUnica",
-                     "--categoria", "fone", "--produto-id", "fone-a")
+                     "--categoria", "fone", "--produto-id", "fone-a",
+                     "--requisito", "uso=true")
         self.run_cli("cotar", project, "--produto-id", "fone-a", "--loja", "Amazon",
                      "--vendedor", "V", "--vendedor-tipo", "oficial", "--preco", "299",
                      "--nota", "4.6", "--avaliacoes", "900", "--garantia-meses", "12",
@@ -176,8 +177,7 @@ class VerdictIdempotencyTest(unittest.TestCase):
 class DecisionIntegrityTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-dec-"))
-        for name in ["config", "templates", "base-conhecimento", "scripts"]:
-            shutil.copytree(ROOT / name, self.tmpdir / name)
+        ambiente.montar(self.tmpdir)
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -192,7 +192,8 @@ class DecisionIntegrityTest(unittest.TestCase):
         self.run_cli("novo-projeto", "fone self", "--categoria", "fone", "--valor-estimado", "400")
         project = f"projetos/{ANO}-fone-self"
         self.run_cli("novo-produto", project, "Fone A", "--marca", "M",
-                     "--categoria", "fone", "--produto-id", "fone-a")
+                     "--categoria", "fone", "--produto-id", "fone-a",
+                     "--requisito", "uso=true")
         self.run_cli("cotar", project, "--produto-id", "fone-a", "--loja", "Amazon",
                      "--vendedor", "V", "--vendedor-tipo", "oficial", "--preco", "299",
                      "--nota", "4.6", "--avaliacoes", "900", "--garantia-meses", "12",

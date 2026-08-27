@@ -14,6 +14,7 @@ from pathlib import Path
 
 import yaml
 
+import ambiente
 from scripts import central_compras as cc
 
 
@@ -65,8 +66,7 @@ class ConfigCoverageTest(unittest.TestCase):
 class ReuseMetricTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-reuse-"))
-        for name in ["config", "templates", "base-conhecimento", "scripts"]:
-            shutil.copytree(ROOT / name, self.tmpdir / name)
+        ambiente.montar(self.tmpdir)
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -112,8 +112,7 @@ class ReuseMetricTest(unittest.TestCase):
 class DecisionPromptTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-prompt-"))
-        for name in ["config", "templates", "base-conhecimento", "scripts"]:
-            shutil.copytree(ROOT / name, self.tmpdir / name)
+        ambiente.montar(self.tmpdir)
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)

@@ -12,6 +12,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import ambiente
+
 
 ROOT = Path(__file__).resolve().parents[1]
 ANO = dt.date.today().year
@@ -20,8 +22,7 @@ ANO = dt.date.today().year
 class CliGuardrailsTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-guard-"))
-        for name in ["config", "templates", "base-conhecimento", "scripts"]:
-            shutil.copytree(ROOT / name, self.tmpdir / name)
+        ambiente.montar(self.tmpdir)
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -41,7 +42,8 @@ class CliGuardrailsTest(unittest.TestCase):
         project = f"projetos/{ANO}-fone-guardrail"
         for produto_id, nome, preco in [("fone-a", "Fone A", "299"), ("fone-b", "Fone B", "399")]:
             self.run_cli("novo-produto", project, nome, "--marca", "MarcaX",
-                         "--categoria", "fone", "--produto-id", produto_id)
+                         "--categoria", "fone", "--produto-id", produto_id,
+                         "--requisito", "chamadas=true")
             self.run_cli("cotar", project, "--produto-id", produto_id, "--loja", "Amazon",
                          "--vendedor", "Loja oficial", "--vendedor-tipo", "oficial",
                          "--preco", preco, "--frete", "0", "--frete-prazo-dias", "3",

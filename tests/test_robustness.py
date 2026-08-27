@@ -14,6 +14,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import ambiente
 from scripts import central_compras as cc
 
 
@@ -146,8 +147,7 @@ class WaitingPriceTest(unittest.TestCase):
 class PromoteQuoteTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-promote-"))
-        for name in ["config", "templates", "base-conhecimento", "scripts"]:
-            shutil.copytree(ROOT / name, self.tmpdir / name)
+        ambiente.montar(self.tmpdir)
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -163,7 +163,8 @@ class PromoteQuoteTest(unittest.TestCase):
                      "--valor-estimado", "400", "--preco-teto", "600")
         project = f"projetos/{ANO}-fone-flag"
         self.run_cli("novo-produto", project, "Fone A", "--marca", "M",
-                     "--categoria", "fone", "--produto-id", "fone-a")
+                     "--categoria", "fone", "--produto-id", "fone-a",
+                     "--requisito", "uso=true")
         self.run_cli("cotar", project, "--produto-id", "fone-a", "--loja", "Amazon",
                      "--vendedor", "V", "--vendedor-tipo", "oficial", "--preco", "299",
                      "--nota", "4.6", "--avaliacoes", "900", "--garantia-meses", "12",
@@ -182,7 +183,8 @@ class PromoteQuoteTest(unittest.TestCase):
         self.run_cli("novo-projeto", "fone data", "--categoria", "fone", "--valor-estimado", "400")
         project = f"projetos/{ANO}-fone-data"
         self.run_cli("novo-produto", project, "Fone A", "--marca", "M",
-                     "--categoria", "fone", "--produto-id", "fone-a")
+                     "--categoria", "fone", "--produto-id", "fone-a",
+                     "--requisito", "uso=true")
         resultado = self.run_cli("cotar", project, "--produto-id", "fone-a", "--loja", "Amazon",
                                  "--vendedor", "V", "--vendedor-tipo", "oficial", "--preco", "299",
                                  "--nota", "4.6", "--avaliacoes", "900", "--garantia-meses", "12",
@@ -196,7 +198,8 @@ class PromoteQuoteTest(unittest.TestCase):
                      "--valor-estimado", "400", "--preco-teto", "600")
         project = f"projetos/{ANO}-fone-espera"
         self.run_cli("novo-produto", project, "Fone A", "--marca", "M",
-                     "--categoria", "fone", "--produto-id", "fone-a")
+                     "--categoria", "fone", "--produto-id", "fone-a",
+                     "--requisito", "uso=true")
         self.run_cli("cotar", project, "--produto-id", "fone-a", "--loja", "Amazon",
                      "--vendedor", "V", "--vendedor-tipo", "oficial", "--preco", "349",
                      "--nota", "4.6", "--avaliacoes", "900", "--garantia-meses", "12",

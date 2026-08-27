@@ -343,3 +343,40 @@ versionados geram conflito de merge entre maquinas; em vez de despublicar (o
 `regenerar`, que refaz tudo a partir das fontes e torna o conflito trivial.
 
 Testes: de 118 para 140.
+
+## Sprint 13 - Segunda auditoria externa
+
+Meta: aplicar os nove achados da segunda revisao independente.
+
+Status: concluida. Todos reproduzidos antes de corrigidos.
+
+**O padrao que apareceu: correcao pela metade.** Tres achados eram o mesmo
+defeito ja corrigido num comando e vivo no vizinho.
+
+- **`historico` comparava por preco de etiqueta** enquanto o ranking comparava
+  por TCO. Era o defeito achado no `auditar` na rodada anterior, sobrevivendo ao
+  lado. Agora os tres usam `value_field_for()` e o relatorio diz qual base usou.
+- **`NaN`, `Infinity` e `1e309` entravam pelo CLI** e viravam 0,0 em silencio:
+  nem bloqueados na entrada, nem acusados na validacao, porque 0,0 e valido. A
+  correcao anterior so pegava CSV editado a mao. Agora `real_number` barra na
+  porta, e cotacao sem custo utilizavel e cortada no gate.
+- **A base de conhecimento perdia dado em silencio.** Medido: 20 licoes em
+  paralelo viravam 7 gravadas, com zero erro. Mesma corrida ja corrigida no
+  `cotacoes.csv`. Agora tem trava propria, e 20 de 20 sobrevivem.
+- **O dashboard nao publicava `confianca`** e lia o `ranking.csv` do disco,
+  podendo mostrar numero velho. Passou a calcular com o motor.
+- **`regenerar` alterava o `processo.md`** enquanto imprimia "nenhuma fonte foi
+  tocada". Agora congela as fontes de verdade.
+- **`--sem-alteracao` nao deixava rastro**: a linha ficava indistinguivel de uma
+  conferencia com alteracao. Nasceu a coluna `confirmacao`.
+- **O limite de 75% de confianca era quase inerte**: o caso mais comum de dado
+  faltando dava exatamente 0,75 e passava raspando. Subiu para 80%, e 90% acima
+  de R$ 20.000.
+- **A fronteira de palavra cegava o padrao de senha** em `database_password` e
+  `MINHA_SENHA`, exatamente como cegava `api_key` antes.
+- **Os testes copiavam a base de conhecimento real**, com as datas reais. O teste
+  de reaproveitamento passou no dia em que foi escrito e falhou no seguinte.
+  Nasceu `tests/ambiente.py`, e ha teste que falha se alguma fixture voltar a
+  copiar dado real.
+
+Testes: de 143 para 167.

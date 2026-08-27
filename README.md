@@ -83,8 +83,21 @@ Isso corrige um incentivo perverso: com o eixo ausente valendo 0,50 neutro,
 disso". O score premiava o silencio.
 
 Score 80 com confianca 60% **nao e comparavel** com score 80 com confianca 100%.
-Abaixo de `confianca_minima_para_decidir` (75% por padrao), `decidir` recusa
-fechar sem `--permitir-incompleto`.
+A confianca aparece no `ranking.md`, no `ranking.csv`, na memoria de calculo e
+no dashboard.
+
+A criticidade ja esta embutida: o peso do eixo **e** a criticidade dele. Faltar
+`qualidade` (0,30) derruba a confianca tres vezes mais que faltar `conveniencia`
+(0,10), sem precisar de uma segunda tabela de numeros.
+
+| Falta | Confianca | Compra ate R$ 20 mil | Acima de R$ 20 mil |
+|---|---:|---|---|
+| so conveniencia | 90% | passa | passa |
+| so aderencia | 85% | passa | barra |
+| aderencia + conveniencia | 75% | barra | barra |
+| qualidade | 70% | barra | barra |
+
+Os minimos ficam em `confianca_minima_para_decidir`. Compra cara exige mais.
 
 `nota_ajustada` e recalculada na hora do ranking a partir de `nota` e
 `n_avaliacoes`, nunca lida congelada do CSV: se voce mudar os pesos da nota
@@ -231,7 +244,12 @@ o que vazou.
 - `promover-cotacao` exige dizer o que foi conferido no site: `manual` sem
   conferencia seria carimbar preco velho de novo.
 - Produto reprovado no gate nao fecha compra, so com excecao declarada.
-- `NaN`, infinito e data no futuro nao entram como numero de ranking.
+- `NaN`, infinito, negativo e data no futuro sao recusados na entrada do CLI.
+- Cotacao sem custo utilizavel e cortada no gate: produto sem preco nao e candidato.
+- `historico` compara pela mesma base do ranking (TCO quando for o caso).
+- A base de conhecimento tem trava propria: registrar licao em paralelo nao perde nada.
+- `regenerar` refaz derivado e nao encosta em fonte.
+- O CSV registra se a cotacao manual foi coleta, conferencia com alteracao ou reconfirmacao.
 - Manual vencida nao vence observacao recente.
 - `aprender-veredito` roda uma vez por veredito; repetir exige `--force`.
 - Editar gate por `--gate` preserva os comentarios do `categorias.yaml`.

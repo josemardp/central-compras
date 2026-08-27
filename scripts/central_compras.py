@@ -61,6 +61,7 @@ COTACOES_HEADER = [
     "link",
     "flag_suspeita",
     "fonte",
+    "confirmacao",
     "score",
 ]
 
@@ -100,6 +101,26 @@ def iso_datetime(value: str) -> str:
     raise argparse.ArgumentTypeError(
         f"data invalida: {value!r}. Use AAAA-MM-DD ou AAAA-MM-DDTHH:MM:SS."
     )
+
+
+def real_number(value: str) -> float:
+    """Valida numero na entrada do CLI.
+
+    `type=float` do argparse aceita `NaN`, `inf` e `1e309`. Eles chegavam ate o
+    `quote_float`, que os zerava em silencio: o CSV ficava com 0,0 e a validacao
+    nao tinha o que reclamar, porque 0,0 e valido. O lixo tem que morrer na porta.
+    """
+    try:
+        numero = float(str(value).replace(",", "."))
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"nao e numero: {value!r}") from None
+    if math.isnan(numero):
+        raise argparse.ArgumentTypeError(f"nao e numero: {value!r}")
+    if math.isinf(numero):
+        raise argparse.ArgumentTypeError(f"valor infinito: {value!r}")
+    if numero < 0:
+        raise argparse.ArgumentTypeError(f"valor negativo: {value!r}")
+    return numero
 
 
 def reject_future(momento: dt.datetime) -> dt.datetime:
@@ -239,9 +260,31 @@ def write_yaml(path: Path, data: Any) -> None:
 
 
 def append_text(path: Path, text: str) -> None:
-    existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    separator = "" if not existing or existing.endswith("\n") else "\n"
-    atomic_write_text(path, existing + separator + text)
+    """Anexa ao fim do arquivo, sem reler e reescrever.
+
+    Ler-modificar-escrever aqui perdia dado em silencio sob concorrencia:
+    medido, 20 licoes em paralelo viravam 7 gravadas e 13 sumidas, sem um
+    unico erro. E o mesmo defeito que ja tinha sido corrigido no cotacoes.csv
+    e que tinha sobrevivido na base de conhecimento, que e onde o aprendizado
+    de verdade mora.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    separador = ""
+    if path.exists() and path.stat().st_size:
+        with path.open("rb") as f:
+            f.seek(-1, os.SEEK_END)
+            if f.read(1) != b"\n":
+                separador = "\n"
+    # Uma unica chamada de escrita em bytes, com O_APPEND: o sistema garante
+    # atomicidade para escrita pequena. `f.write()` em modo texto pode virar
+    # mais de uma escrita subjacente e ainda intercalar com outro processo.
+    dados = (separador + text).encode("utf-8")
+    descritor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+    try:
+        os.write(descritor, dados)
+        os.fsync(descritor)
+    finally:
+        os.close(descritor)
 
 
 def render_template(name: str, **values: Any) -> str:
@@ -788,6 +831,7 @@ def add_quote(args: argparse.Namespace) -> None:
         "link": args.link or "",
         "flag_suspeita": args.flag_suspeita or "",
         "fonte": args.fonte,
+        "confirmacao": "coleta",
         "score": "",
     }
     append_quote(project, row)
@@ -1233,6 +1277,11 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
         motivo = product.get("descartado_porque") or "motivo nao registrado"
         eliminations.append(f"produto descartado ({motivo})")
 
+    # Produto sem custo utilizavel nao e candidato: era tratado como "eixo valor
+    # sem dado" e seguia elegivel, com score alto sobre os eixos restantes.
+    if quote_float(row.get("custo_total")) <= 0:
+        eliminations.append("cotacao sem custo utilizavel (custo_total zerado ou invalido)")
+
     # O teto do proprio produto e mais especifico que o do briefing e vence
     # quando for menor. Era aceito pelo CLI, gravado no produto.yaml e ignorado
     # aqui: campo que o usuario preenche e que nao fazia nada.
@@ -1318,6 +1367,22 @@ def current_adjusted_rating(row: dict[str, str]) -> float:
     if not nota:
         return 0.0
     return adjusted_rating(nota, quote_int(row.get("n_avaliacoes")))
+
+
+def minimum_confidence(briefing: dict[str, Any]) -> float:
+    """Confianca minima para fechar, mais exigente em compra cara.
+
+    Nao existe uma segunda tabela de criticidade porque o peso do eixo ja e a
+    criticidade dele: faltar `qualidade` (0,30) derruba a confianca tres vezes
+    mais que faltar `conveniencia` (0,10).
+    """
+    cfg = preferences().get("confianca_minima_para_decidir")
+    if not isinstance(cfg, dict):
+        return quote_float(cfg, 0.80) or 0.80
+    padrao = quote_float(cfg.get("padrao"), 0.80) or 0.80
+    if quote_float(briefing.get("valor_estimado")) > 20000:
+        return quote_float(cfg.get("acima_de_20000"), padrao) or padrao
+    return padrao
 
 
 def value_field_for(briefing: dict[str, Any]) -> tuple[str, str]:
@@ -1575,7 +1640,18 @@ def build_ranking(args: argparse.Namespace) -> None:
 
 
 def price_history(project: Path, produto_id: str | None = None) -> list[dict[str, Any]]:
-    """Serie historica de custo por produto. E ela que desmascara preco ancora."""
+    """Serie historica de custo por produto. E ela que desmascara preco ancora.
+
+    Usa a MESMA base de comparacao do ranking. Mostrar preco de etiqueta aqui
+    enquanto o ranking compara por TCO faz a serie contar outra historia: foi
+    o defeito que a auditoria achou no `auditar` e que tinha sobrevivido aqui.
+    """
+    briefing, _ = load_frontmatter(project / "briefing.md")
+    campo_valor, rotulo_valor = value_field_for(briefing)
+
+    def custo_de(row: dict[str, str]) -> float:
+        return quote_float(row.get(campo_valor) or row.get("custo_total"))
+
     rows = read_quotes(project)
     grouped: dict[str, list[dict[str, str]]] = {}
     for row in rows:
@@ -1587,7 +1663,7 @@ def price_history(project: Path, produto_id: str | None = None) -> list[dict[str
     series: list[dict[str, Any]] = []
     for pid, values in sorted(grouped.items()):
         values = sorted(values, key=lambda r: str(r.get("data_coleta") or ""))
-        custos = [quote_float(r.get("custo_total")) for r in values if quote_float(r.get("custo_total")) > 0]
+        custos = [custo_de(r) for r in values if custo_de(r) > 0]
         if not custos:
             continue
         ordenado = sorted(custos)
@@ -1607,17 +1683,18 @@ def price_history(project: Path, produto_id: str | None = None) -> list[dict[str
                 "mediana": mediana,
                 "variacao_pct": round(((atual - custos[0]) / custos[0]) * 100, 1) if custos[0] else 0.0,
                 "desconto_real_vs_mediana_pct": round(((mediana - atual) / mediana) * 100, 1) if mediana else 0.0,
+                "base": rotulo_valor,
                 "primeira_coleta": values[0].get("data_coleta", ""),
                 "ultima_coleta": values[-1].get("data_coleta", ""),
                 "pontos": [
                     {
                         "data": r.get("data_coleta", ""),
-                        "custo": quote_float(r.get("custo_total")),
+                        "custo": custo_de(r),
                         "loja": r.get("loja", ""),
                         "fonte": r.get("fonte", ""),
                     }
                     for r in values
-                    if quote_float(r.get("custo_total")) > 0
+                    if custo_de(r) > 0
                 ],
             }
         )
@@ -1630,7 +1707,11 @@ def show_history(args: argparse.Namespace) -> None:
     if not series:
         print("Sem serie historica de custo neste projeto.")
         return
-    lines = ["# Historico de preco", "", f"Gerado em {now_iso()}.", ""]
+    base = series[0]["base"]
+    lines = [
+        "# Historico de preco", "", f"Gerado em {now_iso()}.", "",
+        f"Base de comparacao: **{base}** (a mesma do ranking).", "",
+    ]
     for item in series:
         lines.append(f"## {item['nome']}")
         lines.append("")
@@ -1639,7 +1720,7 @@ def show_history(args: argparse.Namespace) -> None:
             f"({item['primeira_coleta'][:10]} ate {item['ultima_coleta'][:10]})"
         )
         lines.append(
-            f"- Custo: atual {brl(item['atual'])} / minimo {brl(item['minimo'])} / "
+            f"- {item['base']}: atual {brl(item['atual'])} / minimo {brl(item['minimo'])} / "
             f"mediana {brl(item['mediana'])} / maximo {brl(item['maximo'])}"
         )
         lines.append(f"- Variacao desde a primeira coleta: {item['variacao_pct']}%")
@@ -1663,7 +1744,7 @@ def show_history(args: argparse.Namespace) -> None:
     print(path)
     for item in series:
         print(
-            f"{item['nome']}: {item['observacoes']} obs / atual {brl(item['atual'])} / "
+            f"{item['nome']} [{item['base']}]: {item['observacoes']} obs / atual {brl(item['atual'])} / "
             f"mediana {brl(item['mediana'])} / variacao {item['variacao_pct']}%"
         )
 
@@ -1705,6 +1786,12 @@ def promote_quote(args: argparse.Namespace) -> None:
     row = dict(base)
     row["data_coleta"] = args.data or now_iso()
     row["fonte"] = "manual"
+    # Sem isto, a linha promovida sem alteracao ficava indistinguivel de uma
+    # conferencia em que algo mudou: eu exigia a declaracao e nao a registrava.
+    row["confirmacao"] = (
+        "reconfirmado sem alteracao" if not confirmados
+        else "conferido: " + ", ".join(c.lstrip("-") for c in confirmados)
+    )
     # A suspeita da linha web se referia ao que se via na pesquisa. A conferencia
     # manual e uma observacao nova: ou voce reafirma a suspeita com --flag-suspeita,
     # ou ela nao se aplica. Herdar calado congela um alerta que talvez ja morreu.
@@ -2014,20 +2101,6 @@ def decide(args: argparse.Namespace) -> None:
             "ou ajuste o gate da categoria se ele esta calibrado errado."
         )
 
-    minima = quote_float(preferences().get("confianca_minima_para_decidir"), 0.75)
-    elegiveis, cortados = compute_ranking(project)
-    ranqueado = next(
-        (item for item in [*elegiveis, *cortados] if item.produto_id == args.produto_id),
-        None,
-    )
-    if ranqueado and ranqueado.confianca < minima and not args.permitir_incompleto:
-        raise SystemExit(
-            f"Confianca de apenas {ranqueado.confianca:.0%} no score de {args.produto_id} "
-            f"(minimo {minima:.0%}).\n"
-            f"Sem dado em: {', '.join(ranqueado.eixos_sem_dado)}.\n"
-            "Preencha esses campos ou use --permitir-incompleto para decidir assim mesmo."
-        )
-
     if quote_is_stale(quote) and not args.permitir_vencida:
         raise SystemExit(
             f"A cotacao escolhida tem {quote_age_days(quote)} dias "
@@ -2079,6 +2152,22 @@ def decide(args: argparse.Namespace) -> None:
             + ", ".join(faltando)
             + "\nUse --perdedores \"produto_id: motivo\" para cada um, "
             "ou --sem-perdedores se realmente nao houve concorrente."
+        )
+
+    # Trava mais branda de todas, entao vem por ultimo: as anteriores dizem
+    # respeito a regra do sistema; esta so diz que falta dado.
+    minima = minimum_confidence(briefing_meta)
+    elegiveis, cortados = compute_ranking(project)
+    ranqueado = next(
+        (item for item in [*elegiveis, *cortados] if item.produto_id == args.produto_id),
+        None,
+    )
+    if ranqueado and ranqueado.confianca < minima and not args.permitir_incompleto:
+        raise SystemExit(
+            f"Confianca de apenas {ranqueado.confianca:.0%} no score de {args.produto_id} "
+            f"(minimo {minima:.0%}).\n"
+            f"Sem dado em: {', '.join(ranqueado.eixos_sem_dado)}.\n"
+            "Preencha esses campos ou use --permitir-incompleto para decidir assim mesmo."
         )
 
     lines = [
@@ -2689,6 +2778,17 @@ def safe_html(value: Any) -> str:
     return html.escape("" if value is None else str(value))
 
 
+def pct(value: Any) -> str:
+    """Confianca como porcentagem, com selo quando esta baixa."""
+    if value in {None, ""}:
+        return "-"
+    fracao = quote_float(value)
+    rotulo = f"{fracao:.0%}"
+    if fracao < 0.80:
+        return f'<span class="pill warn">{rotulo}</span>'
+    return safe_html(rotulo)
+
+
 def dashboard_link(from_dir: Path, target: Path, label: str) -> str:
     rel = os.path.relpath(target, from_dir).replace("\\", "/")
     return f'<a href="{safe_html(rel)}">{safe_html(label)}</a>'
@@ -2717,11 +2817,13 @@ def project_counts(project: Path) -> dict[str, Any]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     quotes = read_quotes(project)
     latest = latest_quotes(quotes)
-    ranking = read_csv_file(project / "ranking.csv")
+    # Calcula com o motor em vez de ler o `ranking.csv` do disco: o dashboard
+    # mostrava numero velho quando o ranking nao tinha sido regerado.
+    elegiveis, _ = compute_ranking(project)
     errors, warnings = validation_report(project)
     chosen, why = project_decision_summary(project)
     manual_ids = {row.get("produto_id") for row in quotes if row.get("fonte") == "manual"}
-    leader = next((row for row in ranking if row.get("status") == "elegivel"), None)
+    leader = elegiveis[0] if elegiveis else None
     opened_at = parse_dashboard_date(briefing.get("criado_em"))
     decided_at = decision_date(project)
     decision_days = (decided_at - opened_at).days if opened_at and decided_at else ""
@@ -2739,8 +2841,10 @@ def project_counts(project: Path) -> dict[str, Any]:
         "candidatos": len(latest),
         "erros": len(errors),
         "avisos": len(warnings),
-        "lider": leader.get("nome") if leader else "",
-        "score": leader.get("score") if leader else "",
+        "lider": (leader.product.get("nome") or leader.produto_id) if leader else "",
+        "score": leader.score if leader else "",
+        "confianca": leader.confianca if leader else "",
+        "confianca_minima": len([c for c in elegiveis if c.confianca < minimum_confidence(briefing)]),
         "escolhido": chosen,
         "porque": why,
         "aguardando_preco": len(waiting),
@@ -2951,7 +3055,7 @@ def generate_project_page(project: Path) -> Path:
     page_dir.mkdir(parents=True, exist_ok=True)
     page = page_dir / f"{project.name}.html"
     summary = project_counts(project)
-    ranking = read_csv_file(project / "ranking.csv")
+    elegiveis_p, cortados_p = compute_ranking(project)
     quotes = read_quotes(project)
     source_links = " · ".join(
         [
@@ -2963,15 +3067,16 @@ def generate_project_page(project: Path) -> Path:
         ]
     )
     ranking_rows = []
-    for row in ranking:
-        status_class = "bad" if row.get("status") == "cortado" else "ok"
+    for item in [*elegiveis_p, *cortados_p]:
+        cortado = bool(item.eliminations)
         ranking_rows.append(
             "<tr>"
-            f"<td>{safe_html(row.get('nome'))}</td>"
-            f"<td class=\"num\">{safe_html(row.get('score'))}</td>"
-            f"<td><span class=\"pill {status_class}\">{safe_html(row.get('status'))}</span></td>"
-            f"<td>{safe_html(row.get('motivos'))}</td>"
-            f"<td>{safe_html(row.get('alertas'))}</td>"
+            f"<td>{safe_html(item.product.get('nome') or item.produto_id)}</td>"
+            f"<td class=\"num\">{safe_html(item.score)}</td>"
+            f"<td class=\"num\">{pct(item.confianca)}</td>"
+            f"<td><span class=\"pill {'bad' if cortado else 'ok'}\">{'cortado' if cortado else 'elegivel'}</span></td>"
+            f"<td>{safe_html('; '.join(item.eliminations))}</td>"
+            f"<td>{safe_html('; '.join(item.alerts))}</td>"
             "</tr>"
         )
     history_rows = []
@@ -3033,8 +3138,8 @@ def generate_project_page(project: Path) -> Path:
 <section class="section panel">
   <h2>Ranking</h2>
   <table>
-    <thead><tr><th>Produto</th><th class="num">Score</th><th>Status</th><th>Motivos</th><th>Alertas</th></tr></thead>
-    <tbody>{''.join(ranking_rows) or '<tr><td colspan="5">Sem ranking gerado.</td></tr>'}</tbody>
+    <thead><tr><th>Produto</th><th class="num">Score</th><th class="num">Confianca</th><th>Status</th><th>Motivos</th><th>Alertas</th></tr></thead>
+    <tbody>{''.join(ranking_rows) or '<tr><td colspan="6">Sem ranking gerado.</td></tr>'}</tbody>
   </table>
 </section>
 <section class="section panel">
@@ -3128,6 +3233,7 @@ def generate_dashboard(args: argparse.Namespace) -> None:
             f"<td><span class=\"pill {pill_class}\">{safe_html(summary['estado'])}</span></td>"
             f"<td>{safe_html(summary['lider'])}</td>"
             f"<td class=\"num\">{safe_html(summary['score'])}</td>"
+            f"<td class=\"num\">{pct(summary['confianca'])}</td>"
             f"<td class=\"num\">{safe_html(summary['cotacoes'])}</td>"
             f"<td class=\"num\">{safe_html(summary['manual'])}</td>"
             f"<td class=\"num\">{safe_html(summary['dias_ate_decisao'])}</td>"
@@ -3176,8 +3282,8 @@ def generate_dashboard(args: argparse.Namespace) -> None:
 <section class="section panel">
   <h2>Projetos</h2>
   <table>
-    <thead><tr><th>Projeto</th><th>Categoria</th><th>Estado</th><th>Lider</th><th class="num">Score</th><th class="num">Cotacoes</th><th class="num">Manual</th><th class="num">Dias</th></tr></thead>
-    <tbody>{''.join(project_rows) or '<tr><td colspan="8">Nenhum projeto.</td></tr>'}</tbody>
+    <thead><tr><th>Projeto</th><th>Categoria</th><th>Estado</th><th>Lider</th><th class="num">Score</th><th class="num">Confianca</th><th class="num">Cotacoes</th><th class="num">Manual</th><th class="num">Dias</th></tr></thead>
+    <tbody>{''.join(project_rows) or '<tr><td colspan="9">Nenhum projeto.</td></tr>'}</tbody>
   </table>
 </section>
 <section class="two section">
@@ -3324,6 +3430,23 @@ def audit_score(args: argparse.Namespace) -> None:
         print(f"{nome}: score {item.score}")
 
 
+@contextlib.contextmanager
+def sources_frozen():
+    """Congela as fontes: derivados podem ser refeitos, fonte nao muda.
+
+    `build_ranking` marca etapas e reescreve "Proxima acao" no `processo.md`,
+    que e fonte. Rodar `regenerar` mexia no historico decisorio enquanto
+    imprimia "Nenhuma fonte foi tocada".
+    """
+    originais = (globals()["mark_steps"], globals()["set_process_state"])
+    globals()["mark_steps"] = lambda *a, **k: None
+    globals()["set_process_state"] = lambda *a, **k: None
+    try:
+        yield
+    finally:
+        globals()["mark_steps"], globals()["set_process_state"] = originais
+
+
 def regenerate(args: argparse.Namespace) -> None:
     """Refaz todo arquivo derivado a partir das fontes.
 
@@ -3333,13 +3456,14 @@ def regenerate(args: argparse.Namespace) -> None:
     lado e rode isto.
     """
     projetos = [project_path(args.projeto)] if args.projeto else project_dirs()
-    for project in projetos:
-        alvo = argparse.Namespace(projeto=str(project), produto_id=None, strict=False)
-        build_ranking(alvo)
-        validate(alvo)
-        show_history(alvo)
-        audit_score(alvo)
-        print(f"  {project.name}: ranking, validacao, historico e memoria de calculo refeitos")
+    with sources_frozen():
+        for project in projetos:
+            alvo = argparse.Namespace(projeto=str(project), produto_id=None, strict=False)
+            build_ranking(alvo)
+            validate(alvo)
+            show_history(alvo)
+            audit_score(alvo)
+            print(f"  {project.name}: ranking, validacao, historico e memoria de calculo refeitos")
     list_waiting_price(argparse.Namespace(categoria=None))
     reuse_report(argparse.Namespace(categoria=None))
     generate_dashboard(argparse.Namespace())
@@ -3399,7 +3523,9 @@ SENSITIVE_PATTERNS: list[tuple[str, str, str]] = [
     ("CPF", r"(?i)\bcpf\b[^0-9]{0,12}\d{11}\b", "CPF sem pontuacao, rotulado"),
     ("CARTAO", r"\b(?:\d[ ._-]?){13,19}\b", "sequencia com cara de numero de cartao"),
     ("CVV", r"(?i)\bcvv\b\s*[:=]\s*\d{3,4}\b", "CVV"),
-    ("SENHA", r"(?i)\b(senha|password|passwd)\b\s*[:=]\s*\S+", "senha em texto"),
+    # Sem `\b` a esquerda pelo mesmo motivo do api_key: em `database_password`
+    # e em `MINHA_SENHA` o `_` e caractere de palavra e o padrao nunca casaria.
+    ("SENHA", r"(?i)(senha|password|passwd)\b\s*[:=]\s*\S+", "senha em texto"),
     # Sem `\b` a esquerda de proposito: em `OPENAI_API_KEY` o `_` e caractere de
     # palavra, entao `\bapi_key` nunca casaria.
     ("TOKEN", r"(?i)(token|api[_-]?key|secret|access[_-]?key)\b\s*[:=]\s*[A-Za-z0-9_\-]{12,}", "token/chave"),
@@ -3493,8 +3619,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("novo-projeto", help="cria um processo de compra")
     p.add_argument("nome")
     p.add_argument("--categoria", default="generico")
-    p.add_argument("--valor-estimado", type=float, default=0)
-    p.add_argument("--preco-teto", type=float)
+    p.add_argument("--valor-estimado", type=real_number, default=0)
+    p.add_argument("--preco-teto", type=real_number)
     p.add_argument("--necessidade")
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=new_project)
@@ -3505,8 +3631,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--marca", default="")
     p.add_argument("--categoria")
     p.add_argument("--produto-id")
-    p.add_argument("--preco-alvo", type=float)
-    p.add_argument("--preco-teto", type=float)
+    p.add_argument("--preco-alvo", type=real_number)
+    p.add_argument("--preco-teto", type=real_number)
     p.add_argument("--atributo", action="append", default=[])
     p.add_argument("--requisito", action="append", default=[])
     p.add_argument("--force", action="store_true")
@@ -3520,16 +3646,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--vendedor-tipo", choices=["oficial", "terceiro", "fisica"], default="terceiro")
     p.add_argument("--anuncio-id")
     p.add_argument("--variacao")
-    p.add_argument("--preco", type=float, required=True)
-    p.add_argument("--preco-promocional", type=float)
-    p.add_argument("--frete", type=float, default=0)
+    p.add_argument("--preco", type=real_number, required=True)
+    p.add_argument("--preco-promocional", type=real_number)
+    p.add_argument("--frete", type=real_number, default=0)
     p.add_argument("--frete-prazo-dias", type=int)
-    p.add_argument("--custo-extra", type=float, default=0)
-    p.add_argument("--custo-total", type=float)
-    p.add_argument("--custo-operacional-mensal", type=float, default=0)
+    p.add_argument("--custo-extra", type=real_number, default=0)
+    p.add_argument("--custo-total", type=real_number)
+    p.add_argument("--custo-operacional-mensal", type=real_number, default=0)
     p.add_argument("--tco-meses", type=int)
-    p.add_argument("--valor-revenda-estimado", type=float, default=0)
-    p.add_argument("--nota", type=float, default=0)
+    p.add_argument("--valor-revenda-estimado", type=real_number, default=0)
+    p.add_argument("--nota", type=real_number, default=0)
     p.add_argument("--avaliacoes", type=int, default=0)
     p.add_argument("--garantia-meses", type=int)
     p.add_argument("--garantia-tipo", choices=["nacional", "importada", "vendedor", "nenhuma"], default="nenhuma")
@@ -3553,7 +3679,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resumo", required=True)
     p.add_argument("--categoria")
     p.add_argument("--projeto")
-    p.add_argument("--nota", type=float)
+    p.add_argument("--nota", type=real_number)
     p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"])
     p.add_argument("--alerta")
     p.set_defaults(func=register_store)
@@ -3563,7 +3689,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resumo", required=True)
     p.add_argument("--categoria")
     p.add_argument("--projeto")
-    p.add_argument("--nota", type=float)
+    p.add_argument("--nota", type=real_number)
     p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"])
     p.add_argument("--alerta")
     p.set_defaults(func=register_brand)
@@ -3641,17 +3767,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--vendedor-tipo", choices=["oficial", "terceiro", "fisica"])
     p.add_argument("--anuncio-id")
     p.add_argument("--variacao")
-    p.add_argument("--preco", type=float)
-    p.add_argument("--preco-promocional", type=float)
-    p.add_argument("--frete", type=float)
+    p.add_argument("--preco", type=real_number)
+    p.add_argument("--preco-promocional", type=real_number)
+    p.add_argument("--frete", type=real_number)
     p.add_argument("--frete-prazo-dias", type=int)
-    p.add_argument("--custo-extra", type=float)
-    p.add_argument("--custo-total", type=float)
-    p.add_argument("--custo-operacional-mensal", type=float)
+    p.add_argument("--custo-extra", type=real_number)
+    p.add_argument("--custo-total", type=real_number)
+    p.add_argument("--custo-operacional-mensal", type=real_number)
     p.add_argument("--tco-meses", type=int)
-    p.add_argument("--valor-revenda-estimado", type=float)
-    p.add_argument("--tco-total", type=float)
-    p.add_argument("--nota", type=float)
+    p.add_argument("--valor-revenda-estimado", type=real_number)
+    p.add_argument("--tco-total", type=real_number)
+    p.add_argument("--nota", type=real_number)
     p.add_argument("--avaliacoes", type=int)
     p.add_argument("--garantia-meses", type=int)
     p.add_argument("--garantia-tipo", choices=["nacional", "importada", "vendedor", "nenhuma"])
@@ -3670,8 +3796,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("aguardar-preco", help="marca produto como aguardando preco alvo")
     p.add_argument("--produto-id", required=True)
     p.add_argument("--porque", required=True)
-    p.add_argument("--preco-alvo", type=float)
-    p.add_argument("--preco-teto", type=float)
+    p.add_argument("--preco-alvo", type=real_number)
+    p.add_argument("--preco-teto", type=real_number)
     p.add_argument("--projeto")
     p.set_defaults(func=wait_price)
 
@@ -3727,6 +3853,15 @@ MUTATING_COMMANDS = {
     "novo-veredito", "regenerar", "migrar-cotacoes",
 }
 
+# Comandos que escrevem em `base-conhecimento/`. No Windows o O_APPEND e
+# emulado (posiciona e escreve), entao anexar nao basta: sem trava, 30 licoes
+# em paralelo viravam 29 e ninguem era avisado.
+KNOWLEDGE_COMMANDS = {
+    "registrar-marca", "registrar-loja", "registrar-licao", "aprender-veredito",
+    "reaproveitamento", "listar-aguardando-preco", "regenerar", "decidir",
+    "preencher-veredito",
+}
+
 
 def locked_project(args: argparse.Namespace) -> Path | None:
     """Projeto que este comando vai escrever, se houver um so."""
@@ -3745,12 +3880,14 @@ def main(argv: list[str] | None = None) -> int:
     # Um comando escrevendo por vez em cada projeto. Sem isso, dois `cotar`
     # simultaneos disputam `processo.md` e, no Windows, `os.replace` falha
     # porque o outro processo tem o destino aberto.
-    projeto = locked_project(args) if args.comando in MUTATING_COMMANDS else None
-    if projeto is None:
+    with contextlib.ExitStack() as travas:
+        if args.comando in MUTATING_COMMANDS:
+            projeto = locked_project(args)
+            if projeto is not None:
+                travas.enter_context(project_lock(projeto))
+        if args.comando in KNOWLEDGE_COMMANDS:
+            travas.enter_context(project_lock(BASE))
         args.func(args)
-    else:
-        with project_lock(projeto):
-            args.func(args)
     return 0
 
 

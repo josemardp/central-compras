@@ -53,7 +53,20 @@ frescor:
 
 # Fracao minima do peso do score que precisa estar apoiada em dado real para
 # fechar uma compra. Abaixo disso, `decidir` pede --permitir-incompleto.
-confianca_minima_para_decidir: 0.75
+#
+# A criticidade ja esta embutida: o peso do eixo E a criticidade dele. Faltar
+# `qualidade` (0,30) derruba a confianca tres vezes mais que faltar
+# `conveniencia` (0,10), sem precisar de uma segunda tabela de numeros magicos.
+#
+# Calibragem com os pesos atuais:
+#   falta so conveniencia .......... 0,90  passa
+#   falta so aderencia ............. 0,85  passa
+#   falta aderencia + conveniencia . 0,75  barra
+#   falta qualidade ................ 0,70  barra
+# Quanto mais cara a compra, menos tolerancia a dado faltando.
+confianca_minima_para_decidir:
+  padrao: 0.80
+  acima_de_20000: 0.90
 
 lojas_preferidas:
   - Amazon

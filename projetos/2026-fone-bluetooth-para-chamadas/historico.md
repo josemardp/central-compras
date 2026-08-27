@@ -1,11 +1,13 @@
 # Historico de preco
 
-Gerado em 2026-08-26T21:37:47.
+Gerado em 2026-08-27T08:49:46.
+
+Base de comparacao: **custo total** (a mesma do ranking).
 
 ## Edifier W820NB Plus
 
 - Observacoes: 1 (2026-08-26 ate 2026-08-26)
-- Custo: atual R$ 499,00 / minimo R$ 499,00 / mediana R$ 499,00 / maximo R$ 499,00
+- custo total: atual R$ 499,00 / minimo R$ 499,00 / mediana R$ 499,00 / maximo R$ 499,00
 - Variacao desde a primeira coleta: 0.0%
 - So ha uma observacao. Sem serie nao da para saber se um `desconto` anunciado e real: colete de novo em alguns dias.
 
@@ -16,7 +18,7 @@ Gerado em 2026-08-26T21:37:47.
 ## JBL Tune 770NC
 
 - Observacoes: 1 (2026-08-26 ate 2026-08-26)
-- Custo: atual R$ 429,00 / minimo R$ 429,00 / mediana R$ 429,00 / maximo R$ 429,00
+- custo total: atual R$ 429,00 / minimo R$ 429,00 / mediana R$ 429,00 / maximo R$ 429,00
 - Variacao desde a primeira coleta: 0.0%
 - So ha uma observacao. Sem serie nao da para saber se um `desconto` anunciado e real: colete de novo em alguns dias.
 
@@ -27,7 +29,7 @@ Gerado em 2026-08-26T21:37:47.
 ## QCY H3 ANC
 
 - Observacoes: 1 (2026-08-26 ate 2026-08-26)
-- Custo: atual R$ 296,64 / minimo R$ 296,64 / mediana R$ 296,64 / maximo R$ 296,64
+- custo total: atual R$ 296,64 / minimo R$ 296,64 / mediana R$ 296,64 / maximo R$ 296,64
 - Variacao desde a primeira coleta: 0.0%
 - So ha uma observacao. Sem serie nao da para saber se um `desconto` anunciado e real: colete de novo em alguns dias.
 
@@ -38,7 +40,7 @@ Gerado em 2026-08-26T21:37:47.
 ## Soundcore Anker Life Q30
 
 - Observacoes: 1 (2026-08-26 ate 2026-08-26)
-- Custo: atual R$ 466,00 / minimo R$ 466,00 / mediana R$ 466,00 / maximo R$ 466,00
+- custo total: atual R$ 466,00 / minimo R$ 466,00 / mediana R$ 466,00 / maximo R$ 466,00
 - Variacao desde a primeira coleta: 0.0%
 - So ha uma observacao. Sem serie nao da para saber se um `desconto` anunciado e real: colete de novo em alguns dias.
 

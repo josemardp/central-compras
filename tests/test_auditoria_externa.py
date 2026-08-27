@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import ambiente
 from scripts import central_compras as cc
 
 
@@ -22,8 +23,7 @@ ANO = dt.date.today().year
 class BaseCli(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-aud-"))
-        for nome in ["config", "templates", "base-conhecimento", "scripts"]:
-            shutil.copytree(ROOT / nome, self.tmpdir / nome)
+        ambiente.montar(self.tmpdir)
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -44,7 +44,8 @@ class BaseCli(unittest.TestCase):
 
     def candidato(self, projeto, produto_id, nome, **kw):
         self.cli("novo-produto", projeto, nome, "--marca", kw.get("marca", "M"),
-                 "--categoria", "fone", "--produto-id", produto_id)
+                 "--categoria", "fone", "--produto-id", produto_id,
+                 *([] if kw.get("sem_requisitos") else ["--requisito", "uso=true"]))
         prazo = kw.get("prazo", 3)
         extra = ["--frete-prazo-dias", str(prazo)] if prazo is not None else []
         self.cli("cotar", projeto, "--produto-id", produto_id,
@@ -251,23 +252,31 @@ class ConfidenceTest(BaseCli):
         self.assertIn("cortado pelos gates", r.stderr)
 
     def test_deciding_on_a_low_confidence_score_is_refused(self):
-        """Passa no gate mas com custo, prazo e requisitos ausentes: o score
-        cobre pouco do peso total e nao serve para fechar compra."""
+        """Passa no gate, mas sem requisitos e sem prazo de frete a confianca
+        fica em 75%, abaixo do minimo de 80%."""
         projeto = self.projeto("fone incerto2", teto=600)
-        self.cli("novo-produto", projeto, "Fone Incerto", "--marca", "M",
-                 "--categoria", "fone", "--produto-id", "fone-y")
-        self.cli("cotar", projeto, "--produto-id", "fone-y", "--loja", "Amazon",
-                 "--vendedor", "V", "--vendedor-tipo", "oficial", "--preco", "0",
-                 "--nota", "4.7", "--avaliacoes", "900",
-                 "--garantia-meses", "12", "--garantia-tipo", "nacional",
-                 "--fonte", "manual", "--link", "https://exemplo.com/y")
+        self.candidato(projeto, "fone-y", "Fone Incerto", sem_requisitos=True, prazo=None)
+
         r = self.cli("decidir", projeto, "--produto-id", "fone-y", "--porque", "vai",
                      "--sem-perdedores", check=False)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("Confianca", r.stderr)
+        self.assertIn("aderencia", r.stderr)
+        self.assertIn("conveniencia", r.stderr)
 
+        # Declarando que aceita decidir sobre dado incompleto, fecha.
         self.cli("decidir", projeto, "--produto-id", "fone-y", "--porque", "vai",
                  "--sem-perdedores", "--permitir-incompleto")
+
+    def test_an_expensive_purchase_demands_more_confidence(self):
+        """Faltar so o prazo (confianca 90%) passa numa compra barata e barra
+        numa compra cara, onde o minimo e 90%."""
+        import yaml as _yaml
+        cfg = _yaml.safe_load((self.tmpdir / "config" / "preferencias.yaml").read_text(encoding="utf-8"))
+        minimos = cfg["confianca_minima_para_decidir"]
+        self.assertGreater(minimos["acima_de_20000"], minimos["padrao"])
+        self.assertEqual(cc.minimum_confidence({"valor_estimado": 400}), minimos["padrao"])
+        self.assertEqual(cc.minimum_confidence({"valor_estimado": 150000}), minimos["acima_de_20000"])
 
 
 class NoLosersFlagTest(BaseCli):
