@@ -1,0 +1,19 @@
+id: igolflex-fachada-36
+categoria: material_construcao
+nome: Sika Igolflex Fachada Branco 3,6 L
+marca: Sika
+estado: pesquisando
+projeto: 2026-decor-bloqueador
+preco_alvo: null
+preco_teto: 800
+atributos:
+  tipo: impermeabilizante_acrilico_fachada
+  uso: face_externa_fachada_parede_cega
+  superficie: concreto_argamassa_fibrocimento
+  rendimento_m2: 30
+  embalagem_kg: 4.7
+  consumo_kg_m2_demao: 0.12
+  demaos: 2
+  aceita_pintura: true
+requisitos_atendidos: {}
+descartado_porque: null

@@ -585,10 +585,11 @@ def _bloco_produto(linha: dict[str, Any], cortado: bool) -> str:
         marca = '<span class="pill warn">aguardando preco</span>'
     elif linha["vencida"]:
         marca = '<span class="pill warn">cotacao vencida</span>'
+    score_texto = "cortado" if cortado else f"{linha['score']:.1f}"
     return (
         f'<div class="rowc{" cut" if cortado else ""}">'
         f'<div class="top"><span class="nm">{esc(linha["nome"])}</span>'
-        f'<span class="sc{" z" if cortado else ""}">{"cortado" if cortado else f"{linha['score']:.1f}"}</span></div>'
+        f'<span class="sc{" z" if cortado else ""}">{score_texto}</span></div>'
         f'<div class="mini">{esc(linha["custo_texto"])} &middot; {esc(linha["loja"])} '
         f'&middot; confianca {linha["confianca"]:.0%}</div>'
         f"{barras}"

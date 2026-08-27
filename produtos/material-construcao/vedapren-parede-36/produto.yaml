@@ -1,0 +1,19 @@
+id: vedapren-parede-36
+categoria: material_construcao
+nome: Vedacit Vedapren Parede Branco 3,6 kg
+marca: Vedacit
+estado: pesquisando
+projeto: 2026-decor-bloqueador
+preco_alvo: null
+preco_teto: 800
+atributos:
+  tipo: impermeabilizante_acrilico_fachada
+  uso: face_externa_parede_exposta_chuva
+  superficie: reboco_concreto_fibrocimento
+  rendimento_m2: 30
+  embalagem_kg: 3.6
+  consumo_kg_m2_demao: 0.12
+  demaos: 3
+  aceita_pintura: true
+requisitos_atendidos: {}
+descartado_porque: null

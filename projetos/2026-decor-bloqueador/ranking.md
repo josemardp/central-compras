@@ -1,17 +1,22 @@
 # Ranking
 
-Gerado em 2026-08-27T10:27:15.
+Gerado em 2026-08-27T16:44:55.
 
 ## Elegiveis
 
-1. Impermeabilizante Block Total Decor Colors - 75.1
+1. Sika Igolflex Fachada Branco 3,6 L - 75.1
    qualidade -- · valor 1.00 · risco 0.44 · aderencia -- · conveniencia --
-   custo total R$ 379,99 / Loja Decor Colors / estimativa web
+   custo total R$ 145,90 / Casa Falci / estimativa web
+   confianca 45% - sem dado em: qualidade, conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+
+2. Vedacit Vedapren Parede Branco 3,6 kg - 59.6
+   qualidade -- · valor 0.72 · risco 0.44 · aderencia -- · conveniencia --
+   custo total R$ 202,40 / Tosel Materiais de Construcao / estimativa web
    confianca 45% - sem dado em: qualidade, conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
 ## Cortados pelos gates
 
-Nenhum corte.
+- Impermeabilizante Block Total Decor Colors: custo_total acima do preco_teto do briefing (1139.97 > 800.0)
 
 ## Observacoes
 

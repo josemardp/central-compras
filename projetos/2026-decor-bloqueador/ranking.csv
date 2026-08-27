@@ -1,2 +1,4 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
-decor-bloqueador,Impermeabilizante Block Total Decor Colors,75.1,0.0,1.0,0.44,0.5,0.5,elegivel,,,web,0.45,0,nao,qualidade; conveniencia; aderencia,379.99,0.0,,0.0,379.99
+igolflex-fachada-36,"Sika Igolflex Fachada Branco 3,6 L",75.1,0.0,1.0,0.44,0.5,0.5,elegivel,,,web,0.45,0,nao,qualidade; conveniencia; aderencia,145.9,0.0,,0.0,145.9
+vedapren-parede-36,"Vedacit Vedapren Parede Branco 3,6 kg",59.6,0.0,0.721,0.44,0.5,0.5,elegivel,,,web,0.45,0,nao,qualidade; conveniencia; aderencia,202.4,0.0,,0.0,202.4
+decor-bloqueador,Impermeabilizante Block Total Decor Colors,0,0.0,0.128,0.44,0.5,0.5,cortado,custo_total acima do preco_teto do briefing (1139.97 > 800.0),,web,0.45,0,nao,qualidade; conveniencia; aderencia,1139.97,0.0,,0.0,1139.97
