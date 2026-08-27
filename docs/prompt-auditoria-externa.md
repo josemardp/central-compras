@@ -1,190 +1,197 @@
-# Prompt para auditoria externa (Codex)
+# Prompt para auditoria externa (Codex) — segunda rodada
 
 Copie tudo daqui para baixo e cole no Codex, com o repositório aberto.
 
 ---
 
-Você é um engenheiro sênior contratado para **auditar de fora** um repositório
-que já passou por cinco rodadas de revisão interna. Seu trabalho **não é elogiar
-nem confirmar** o que já foi feito: é achar o que o revisor anterior não achou.
+Você já auditou este repositório uma vez. **Todos os seus seis achados eram
+reais**, foram reproduzidos e corrigidos, e viraram teste de regressão. Esta é a
+segunda rodada, e ela tem um objetivo diferente da primeira.
 
-Trate cada afirmação abaixo como **alegação a verificar**, não como fato dado.
-Se eu digo "isto foi corrigido", seu trabalho é conferir se foi mesmo, se a
-correção está completa, e se ela criou problema novo.
+Na primeira, você procurou defeito num código que ninguém de fora tinha olhado.
+Agora você procura duas coisas mais difíceis:
+
+1. **Correção que criou problema novo.** Toda correção mexe em algo. Seis
+   correções suas mais três minhas foram aplicadas de uma vez.
+2. **O que nenhuma das duas auditorias tocou.** A primeira olhou o motor de
+   decisão e a integridade. Ninguém olhou a skill, os templates, o ciclo de
+   veredito, o dashboard como produto, nem o sistema como *ferramenta de compra*.
 
 ## O repositório
 
-`C:\projetos\central-compras` — GitHub privado `josemardp/central-compras`, branch `main`.
+`C:\projetos\central-compras` — GitHub privado `josemardp/central-compras`, `main`.
 
-É a **memória permanente de decisão de compra** de uma pessoa física. A premissa
-do produto: preço envelhece em 48 horas, mas o par *decisão + veredito* ("por que
-escolhi X" e, seis meses depois, "deu certo?") vale para sempre. Serve tanto para
-um perfume de R$ 70 quanto para um carro elétrico de R$ 150.000 — o que muda é a
-profundidade da pesquisa e o rigor do gate, nunca a estrutura.
+Memória permanente de decisão de compra de uma pessoa física. Preço envelhece em
+48 horas; o par *decisão + veredito* ("por que escolhi X" e, seis meses depois,
+"deu certo?") vale para sempre. Serve para um perfume de R$ 70 e para um carro
+elétrico de R$ 150.000 — muda a profundidade da pesquisa, nunca a estrutura.
 
-O PRD v2 está resumido em `docs/plano-sprints-prd-completo.md`. Os cinco
-princípios invioláveis dele, que valem como **critério de auditoria**:
+- Python 3, dependência única `PyYAML`. Arquivo único, 30 subcomandos.
+- 143 testes: `python -m unittest discover -s tests`.
+- Usado de **várias máquinas Windows**, PowerShell e Git Bash.
+- Fontes: `cotacoes.csv` (append-only, o livro-razão), `produto.yaml`,
+  `briefing.md`, `config/*.yaml`, `base-conhecimento/`, `vereditos/`.
+- Derivados: `ranking.md`, `ranking.csv`, `validacao.md`, `historico.md`,
+  `memoria-calculo.md`, `dashboard/`. Versionados de propósito; `regenerar`
+  refaz todos.
 
-1. Fato datado nunca é sobrescrito. Preço novo é linha nova, não célula editada.
-2. Gate antes de score. Quem não passa nos critérios eliminatórios não entra no ranking.
-3. Todo número é rastreável. Se o score é 82, dá para reconstruir os 82 a partir do CSV, à mão, com uma calculadora.
-4. O "não escolhi" vale mais que o "escolhi". Registrar por que o segundo colocado perdeu é o que impede refazer a pesquisa em 2028.
-5. Dado pessoal não mora em repositório versionado. Nem privado.
+Os cinco princípios do PRD, que continuam sendo o critério:
 
-### Forma
+1. Fato datado nunca é sobrescrito.
+2. Gate antes de score.
+3. Todo número é rastreável, reconstruível à mão com uma calculadora.
+4. O "não escolhi" vale mais que o "escolhi".
+5. Dado pessoal não mora em repositório versionado.
 
-- Python 3, dependência única `PyYAML`. Sem framework, sem banco.
-- `scripts/central_compras.py` — arquivo único, 29 subcomandos.
-- `tests/` — 140 testes. `python -m unittest discover -s tests`.
-- Dados em CSV/YAML/Markdown versionados. Dashboard HTML estático gerado.
-- Usado de **várias máquinas Windows**, via PowerShell e Git Bash.
-- Os 29 comandos: `aguardar-preco`, `anotar`, `aprender-veredito`, `auditar`, `checar-segredos`, `cotar`, `dados-privados`, `dashboard`, `decidir`, `descartar`, `historico`, `init`, `listar-aguardando-preco`, `migrar-cotacoes`, `novo-produto`, `novo-projeto`, `novo-veredito`, `preencher-veredito`, `promover-cotacao`, `prompt-ia`, `ranking`, `reaproveitamento`, `regenerar`, `registrar-licao`, `registrar-loja`, `registrar-marca`, `resumo`, `status`, `validar`.
+## O que mudou desde a sua auditoria
 
-### Modelo de dados
+`git log 447aa0d..HEAD` mostra tudo. Dois commits: `e28af86` (seus achados) e
+`c321550` (concorrência).
 
-- `projetos/<ano>-<compra>/cotacoes.csv` — **append-only**, uma linha = uma observação datada. É o livro-razão.
-- `produtos/<categoria>/<id>/produto.yaml` — a dimensão estável (o que o produto é).
-- `config/categorias.yaml` — schema e gates por categoria. Feito para ser editado e comentado à mão.
-- `config/preferencias.yaml` — pesos do score, escalas, frescor, regra de parada.
-- `base-conhecimento/` — marcas, lojas e lições nascidas de veredito pós-compra.
-- `vereditos/` — D+30 e D+180, que retroalimentam a base.
+**Seus seis achados, corrigidos assim:**
 
-Derivados e sobrescrevíveis: `ranking.md`, `ranking.csv`, `validacao.md`,
-`historico.md`, `memoria-calculo.md`, `dashboard/`.
+| Achado | Correção |
+|---|---|
+| `decidir` fechava produto cortado no gate | `decide()` agora chama `gate_eliminations`; recusa sem `--permitir-cortado` |
+| `promover-cotacao` lavava web antiga como manual | exige informar ao menos um campo conferido, ou `--sem-alteracao` explícito |
+| `NaN`/infinito passavam como preço | barrados em `quote_float` via `math.isnan`/`isinf`; reportados em `validar` |
+| Data futura passava | `reject_future()` no `iso_datetime`; `validar` também acusa |
+| `auditar` usava `custo_total` com ranking em `tco_total` | regra extraída para `value_field_for()`, única, usada pelos dois |
+| Varredor com falsos-negativos | CPF rotulado sem pontuação, `_` como separador de cartão, `.env` varrido, `\b` removido antes de `api_key` |
 
-## O que já foi corrigido (verifique se está mesmo resolvido)
+**Seu achado de julgamento (o 0,50 neutro premiando o silêncio)** virou uma
+mudança estrutural: o eixo sem dado agora **sai da conta** e os pesos restantes
+são renormalizados. O score mede só o que se sabe. Nasceu um índice `confianca`
+(fração do peso apoiada em dado real), publicado no `ranking.md`, no
+`ranking.csv` e na memória de cálculo, e `decidir` recusa fechar abaixo de 75%.
 
-Quatro commits, de `c3c5b12` a `447aa0d`. `git log 92dff2a..HEAD` mostra todos.
+**Sobre derivados versionados eu discordei de você** e quero que reavalie: não
+tirei do Git, porque o `ranking.md` ao lado do `decisao.md` é a evidência de por
+que a decisão foi tomada naquele dia. Em vez disso criei `regenerar`. Diga se
+continua achando errado.
 
-**Rodada 1 — motor de decisão.** O score usava min-max dentro do projeto: com
-dois candidatos, o segundo sempre tirava 0,00 em qualidade e valor, perdesse por
-0,2 ou por 2 pontos. Trocado por escala absoluta (qualidade mapeada de 3,8 a 5,0;
-valor por razão `menor_custo / custo`). O alerta `ANCORA` estava **invertido** —
-ficava calado na âncora inflada e acusava o desconto legítimo. O `cotacoes.csv`
-descartava em silêncio qualquer coluna fora do schema. O gate
-`exige_rede_assistencia` era letra morta. A regra de parada (seção 7.5 do PRD)
-nunca tinha sido implementada apesar de a config existir. Nenhum controle de
-frescor. `decidir` fechava sem o motivo da derrota do segundo colocado. Número
-mal digitado virava 0,00 e o produto parecia de graça.
+**Três achados que eu mesmo encontrei ao preparar esta rodada**, seguindo a sua
+pista de concorrência (você tinha testado 30 `cotar` paralelos e não visto perda;
+a corrida existia mas seu teste não a expôs):
 
-**Rodada 2 — config morta e métrica falsa.** `lojas_preferidas` declarada e nunca
-lida. `prompt-ia --etapa decisao` despejava o `repr` cru do CSV na IA, sem o
-ranking. A métrica de reaproveitamento contava o conhecimento que o **próprio
-projeto** tinha acabado de criar, dando 100% sempre.
+- `cotar` relia e reescrevia o CSV inteiro para acrescentar uma linha. Dois
+  comandos simultâneos liam a mesma base e um sobrescrevia o outro. Agora anexa
+  de verdade, sem reler.
+- `atomic_write_text` usava nome de temporário **fixo**: dois processos
+  escreviam no mesmo `.processo.md.tmp` e um apagava o do outro.
+- No Windows, `os.replace` falha se outro processo tiver o destino aberto, mesmo
+  só para leitura. Adicionei repetição com espera e uma trava por projeto.
 
-**Rodada 3 — robustez.** `cotacoes.csv` era aberto em modo `w`, que trunca antes
-de gravar: um Ctrl+C zerava a série histórica (medido, foi de 2 linhas para 0).
-Toda gravação virou atômica. `--data ontem` era aceito e, sem data ISO, aquela
-cotação escapava calada de toda guarda de data. `preco_teto` do produto era
-ignorado pelo gate. `promover-cotacao` herdava `flag_suspeita` da linha web.
+Medido: 25 `cotar` em paralelo saíram de 6 linhas gravadas / 20 processos com
+erro para **25 linhas e zero erros**.
 
-**Rodada 4 — seleção e leitura.** `latest_quotes` preferia `manual` sem olhar a
-data: um preço manual de 2024 (R$ 900) rankeava no lugar de uma cotação web de
-hoje (R$ 400). `aprender-veredito` não era idempotente. `registrar-licao --gate`
-apagava os comentários do `categorias.yaml`. Dinheiro saía como `R$ 1234.5`.
+## O que eu quero desta rodada
 
-**Rodada 5 — auditabilidade.** O princípio 3 era meia-verdade: de eixos para
-score fechava, mas de CSV para eixos não, porque os pesos internos do risco
-viviam cravados no código. Foram para `preferencias.yaml` (`escala.risco`) e
-nasceu o comando `auditar`, que gera `memoria-calculo.md` com a conta inteira.
-Um fuzz com invariantes (80 rodadas, semente fixa, metade patológica) não achou
-violação nenhuma.
+### 1. As correções criaram problema novo?
 
-## Onde eu quero que você olhe
+Esta é a pergunta principal. Especificamente:
 
-Seja **adversarial**. Prefiro um achado real e incômodo a dez observações
-educadas. Priorize nesta ordem:
+- **A trava por projeto** (`project_lock` em `central_compras.py`). Ela pode
+  emperrar? Deadlock, trava órfã que não expira, comando que morre segurando,
+  Ctrl+C no meio, dois comandos em projetos diferentes se bloqueando à toa?
+  O `MUTATING_COMMANDS` cobre os comandos certos, ou sobrou um que escreve sem
+  travar, ou trava um que só lê?
+- **O `append_quote`** substituiu o ciclo ler-modificar-reescrever. Ele preserva
+  colunas extras escritas à mão? Lida com arquivo sem newline final? E se o
+  cabeçalho tiver coluna a mais que o schema, em vez de a menos?
+- **A renormalização do score.** Ela pode produzir divisão por zero, score fora
+  de 0-100, ou um caso em que *todos* os eixos faltam? A `confianca` bate com o
+  que realmente entrou na conta? Compare `ranking.csv` com `memoria-calculo.md`.
+- **As quatro travas do `decidir`** (`--permitir-cortado`, `--permitir-vencida`,
+  `--permitir-aguardando`, `--permitir-incompleto`). Elas se contradizem? Existe
+  ordem em que uma esconde a outra? Existe caminho que passa por todas?
+- **Os padrões novos do varredor.** `(?i)(token|api[_-]?key|...)` sem `\b` à
+  esquerda: isso gera falso-positivo em texto comum? E o CPF rotulado?
 
-### 1. Correção que ficou pela metade
+### 2. O território que ninguém auditou
 
-Para cada correção acima: ela cobre todos os caminhos, ou só o que estava sendo
-testado? Exemplos do tipo de coisa que quero que você cace:
+Nenhuma das duas rodadas olhou isto:
 
-- A escrita virou atômica em **todos** os pontos que gravam dado que importa, ou sobrou algum?
-- A validação de data cobre todas as portas de entrada de `data_coleta`, ou só o `--data` do CLI?
-- `latest_quotes` mudou; algum outro lugar ainda escolhe cotação por conta própria com a regra antiga?
-- As constantes de score saíram todas do código, ou sobrou número mágico em algum eixo?
+- **A skill** (`skills/central-compras/`). Ela descreve o sistema como ele é
+  hoje, ou ficou defasada depois de 12 sprints? Um agente seguindo só ela
+  conseguiria conduzir uma compra do início ao fim? Ela ensina algum comando
+  que não existe mais, ou omite trava que faria o agente travar sem entender?
+- **Os templates** (`templates/`). As perguntas do `briefing.md` e do
+  `veredito.md` extraem o que precisa ser extraído? O que falta perguntar para
+  uma compra dar errado menos vezes?
+- **O ciclo de veredito de ponta a ponta.** Rode: compra → `decidir` →
+  `preencher-veredito` D+30 → `aprender-veredito` → veja se a lição vira gate →
+  abra uma compra nova da mesma categoria e veja se o `prompt-ia` aproveita.
+  Esse loop é o produto inteiro. Ele fecha de verdade ou tem elo solto?
+- **O dashboard como produto**, não como código. Abra
+  `dashboard/index.html`. Ele responde as perguntas que alguém realmente faz
+  ("o que estou esperando baixar de preço?", "me arrependi de quê?"), ou é
+  tabela bonita de dado que não decide nada?
+- **A experiência de erro.** Erre de propósito em dez lugares. As mensagens
+  dizem o que fazer, ou só o que aconteceu?
 
-### 2. Os cinco princípios, testados contra o código
+### 3. O teste dirigido pelo produto
 
-Não contra a documentação. Especificamente:
+Faça uma compra fictícia inteira, de ponta a ponta, como se você fosse o dono,
+**sem ler o README antes**. Só `--help`. Anote onde travou, onde teve que
+adivinhar, onde a ferramenta te fez trabalhar por ela.
 
-- **Princípio 1**: existe algum caminho, por qualquer comando, em que uma linha de `cotacoes.csv` some ou seja alterada? Inclua falha de disco, execução concorrente de dois comandos, e `git checkout` no meio.
-- **Princípio 2**: existe caminho em que um produto cortado no gate influencie o score de outro? (Dica: olhe como o `scoring_pool` e o `menor_custo` são formados quando *todos* são cortados.)
-- **Princípio 3**: rode `auditar` e tente refazer o número na mão. Falta alguma constante para fechar a conta?
-- **Princípio 4**: dá para produzir um `decisao.md` sem o motivo da derrota, por qualquer caminho?
-- **Princípio 5**: `checar-segredos` tem falso-negativo? Tente CPF sem pontuação, cartão com separador incomum, chave de API em formato que o regex não pega.
+Depois faça a mesma compra lendo o README. O que o README não conta e deveria?
 
-### 3. Modelo de dados e evolução
+### 4. Julgamento, de novo
 
-O sistema tem que durar dez anos e ser usado de várias máquinas.
+Você já opinou sobre escalas e pesos. Agora que o 0,50 virou renormalização mais
+confiança, reavalie:
 
-- O que acontece se duas máquinas editarem o mesmo `cotacoes.csv` e o Git der merge? O formato tolera merge textual ou vai corromper em silêncio?
-- Adicionar uma categoria nova exige tocar em código?
-- Adicionar um eixo novo ao score exige tocar em quantos lugares?
-- O `produto_id` é único onde precisa ser? Dois projetos diferentes com o mesmo produto — funciona ou colide?
-- `historico.md`, `memoria-calculo.md` e `ranking.csv` são derivados versionados. Isso gera conflito de merge inútil entre máquinas? Deveriam estar no `.gitignore`?
+- O limite de **75% de confiança** para decidir é bem calibrado? Com que
+  frequência ele vai atrapalhar sem motivo?
+- A **renormalização** resolveu o incentivo perverso, ou só mudou de lugar?
+  Continua valendo a pena omitir dado?
+- `μ=4,3` e `m=50` na nota bayesiana: você disse que `m=50` é fraco para
+  marketplace grande. Que valor você usaria, e por quê?
+- Qualidade de **3,8 a 5,0**: você disse que é otimista. Qual faixa?
 
-### 4. Qualidade do julgamento, não só do código
+Se você mantiver uma crítica que eu não implementei, **insista com argumento**.
+Eu discordei da sua sugestão sobre derivados versionados; se você continuar
+achando que estou errado, diga por quê de novo.
 
-Esta é a parte que mais me interessa e a que um revisor de código normalmente pula.
+## Regras
 
-- As **escalas** fazem sentido? Qualidade de 3,8 a 5,0 é a faixa certa para nota de marketplace brasileiro? Valor por razão penaliza demais ou de menos?
-- Os **pesos** (0,30 / 0,25 / 0,20 / 0,15 / 0,10) produzem ranking sensato? Faça o teste de sensibilidade: mexer num peso muda o vencedor?
-- O eixo que **não tem dado** entra como 0,50 neutro. Isso é honesto ou é um número inventado que contamina o score? Existe alternativa melhor?
-- A **nota bayesiana** usa μ=4,3 e m=50. Esse m é adequado para marketplace onde produto popular tem 5.000 avaliações?
-- O corte de **empate técnico** em 3 pontos é defensável na escala nova?
-- As heurísticas de manipulação (`AVAL_SUSPEITA`, `ANCORA`, `RECICLADO`) têm falso-positivo alto? Elas rebaixam no eixo risco em vez de eliminar — é a escolha certa?
+- **Reproduza antes de reportar.** Comando e saída real. Sem reprodução eu descarto.
+- **Não conserte.** Diagnóstico primeiro; correção, se propuser, em diff separado.
+- **Não invente.** `[NÃO VERIFICADO: motivo]` em vez de completar com plausibilidade.
+- Os 143 testes passam aqui. Se falhar aí, isso já é achado — reporte o ambiente.
+- **Se não achar nada crítico, diga isso.** Não invente achado para justificar a
+  auditoria. "Procurei em X, Y e Z e está sólido" é resultado válido e útil.
 
-### 5. O que está faltando que ninguém notou
+## Já sei, não gaste tempo
 
-Olhe o PRD e pergunte o que ele promete e o código não entrega. E olhe além dele:
-que buraco existe que nem o PRD viu?
+- `nota 4.8` com `n_avaliacoes 0` na linha do JBL: dado de entrada errado, a
+  validação acusa, aguarda decisão do dono.
+- As 4 cotações daquele projeto são `fonte=web`; nenhuma compra fechada ainda.
+- O carro elétrico (Dolphin Mini GL, Geely EX2 Pro, King GL, Atto 2 DM-i) ainda
+  não foi registrado. É o próximo passo.
+- Falta a tag `v1.0`, o guia de nova categoria e a rotina semanal.
 
-## Regras da auditoria
-
-- **Reproduza antes de reportar.** Todo achado precisa vir com o comando que o demonstra e a saída real. Achado sem reprodução eu vou descartar.
-- **Não conserte nada ainda.** Quero o diagnóstico primeiro. Se propuser correção, proponha como diff comentado, separado do relatório.
-- **Diga também o que está certo**, mas curto. Se você auditou os cinco princípios e três estão sólidos, diga em uma linha cada e gaste o espaço no que está torto.
-- **Não invente.** Se não deu para verificar, escreva `[NÃO VERIFICADO: motivo]`. Não estime, não suponha, não complete lacuna com plausibilidade.
-- Os testes passam hoje (118, `python -m unittest discover -s tests`). Se algum falhar na sua máquina, isso já é um achado — reporte o ambiente.
-
-## Já sei disto, não precisa reportar
-
-Para você não gastar tempo:
-
-- `projetos/2026-fone-bluetooth-para-chamadas/cotacoes.csv` tem uma linha com
-  `nota 4.8` e `n_avaliacoes 0` (o JBL). É dado de entrada errado, a validação já
-  acusa, e a correção está esperando decisão do dono.
-- As 4 cotações daquele projeto são `fonte=web`; nenhuma compra foi fechada ainda.
-- A comparação do carro elétrico (Dolphin Mini GL, Geely EX2 Pro, King GL, Atto 2
-  DM-i) ainda não foi registrada. É o próximo passo, não um esquecimento.
-- `skills/central-compras/` está em inglês enquanto o resto está em português.
-  É deliberado (arquivo lido por modelo), mas comente se achar que atrapalha.
-- Falta a tag `v1.0`, o guia de nova categoria e a rotina semanal do Sprint 7.
-
-## Formato da entrega
+## Formato
 
 ```
 ## Veredito em uma linha
-[o sistema está pronto para uso sério? sim/não/com ressalva, e por quê]
 
-## Achados críticos
-[perda de dado, número errado, princípio violado — com reprodução]
+## As correções criaram problema novo?
+[o principal; com reprodução, ou "não encontrei, procurei em X e Y"]
 
-## Achados relevantes
-[funciona mas está errado conceitualmente, ou vai quebrar quando crescer]
+## Território não auditado (skill, templates, ciclo de veredito, dashboard, erros)
 
-## Julgamento sobre escalas, pesos e heurísticas
-[a parte 4 acima, com sua opinião fundamentada]
+## O teste dirigido pelo produto
+[onde a ferramenta te fez trabalhar por ela]
 
-## O que o revisor anterior acertou
-[curto]
+## Julgamento revisado
 
-## O que eu não consegui verificar
-[explícito]
+## Onde eu continuo discordando de você
+[se for o caso]
+
+## O que não consegui verificar
 ```
 
-Ordene os achados por **impacto na decisão de compra**, não por severidade
-técnica. Um número enviesado que faz escolher o produto errado importa mais que
-um `except` largo demais.
+Ordene por **impacto na decisão de compra**, não por severidade técnica.
