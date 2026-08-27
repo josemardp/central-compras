@@ -26,7 +26,7 @@ Memória permanente de decisão de compra de uma pessoa física. Preço envelhec
 "deu certo?") vale para sempre. Serve para um perfume de R$ 70 e para um carro
 elétrico de R$ 150.000 — muda a profundidade da pesquisa, nunca a estrutura.
 
-- Python 3, dependência única `PyYAML`. Arquivo único, 30 subcomandos.
+- Python 3, dependência única `PyYAML`. Arquivo único, 29 subcomandos.
 - 143 testes: `python -m unittest discover -s tests`.
 - Usado de **várias máquinas Windows**, PowerShell e Git Bash.
 - Fontes: `cotacoes.csv` (append-only, o livro-razão), `produto.yaml`,
