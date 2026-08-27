@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import datetime as dt
 import html
 import io
+import itertools
 import math
 import os
 import re
 import sys
 import textwrap
+import time
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
@@ -134,6 +137,54 @@ def slugify(value: str) -> str:
     return slug or "item"
 
 
+_TEMP_SEQ = itertools.count()
+_REPLACE_RETRIES = 8
+_LOCK_TIMEOUT_S = 10.0
+_LOCK_STALE_S = 60.0
+
+
+@contextlib.contextmanager
+def project_lock(project: Path):
+    """Serializa comandos que escrevem no mesmo projeto.
+
+    Escrita atomica garante que nenhum arquivo fique pela metade, mas nao que
+    dois comandos simultaneos nao atrapalhem um ao outro: no Windows,
+    `os.replace` falha se outro processo tiver o destino aberto, e a leitura
+    de `processo.md` por um enquanto o outro grava perde atualizacao.
+
+    O lock e um arquivo criado com O_EXCL. Se ficar orfao (processo morto no
+    meio), expira sozinho depois de um minuto.
+    """
+    project.mkdir(parents=True, exist_ok=True)
+    lock = project / ".central-compras.lock"
+    limite = time.monotonic() + _LOCK_TIMEOUT_S
+    descritor = None
+    while descritor is None:
+        try:
+            descritor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                idade = time.time() - lock.stat().st_mtime
+            except OSError:
+                idade = 0.0
+            if idade > _LOCK_STALE_S:
+                lock.unlink(missing_ok=True)
+                continue
+            if time.monotonic() > limite:
+                raise SystemExit(
+                    f"Outro comando esta escrevendo em {project.name} "
+                    f"(trava em {lock}).\nEspere terminar, ou apague a trava se "
+                    "nenhum comando estiver rodando."
+                )
+            time.sleep(0.05)
+    try:
+        os.write(descritor, str(os.getpid()).encode("ascii"))
+        os.close(descritor)
+        yield
+    finally:
+        lock.unlink(missing_ok=True)
+
+
 def atomic_write_text(path: Path, text: str) -> None:
     """Grava por arquivo temporario e troca de uma vez so.
 
@@ -142,13 +193,27 @@ def atomic_write_text(path: Path, text: str) -> None:
     serie historica inteira. `os.replace` e atomico no Windows e no POSIX.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporario = path.with_name(f".{path.name}.tmp")
+    # Nome unico por processo: com um nome fixo, dois comandos rodando ao mesmo
+    # tempo escreviam no MESMO temporario e um apagava o do outro, quebrando o
+    # `os.replace` com PermissionError ou FileNotFoundError no Windows.
+    temporario = path.with_name(f".{path.name}.{os.getpid()}.{next(_TEMP_SEQ)}.tmp")
     try:
         with temporario.open("w", encoding="utf-8", newline="") as f:
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(temporario, path)
+        # No Windows, `os.replace` falha com PermissionError se outro processo
+        # tiver o destino aberto, mesmo so para leitura. Com dois comandos
+        # rodando ao mesmo tempo isso acontece o tempo todo, entao insiste um
+        # pouco antes de desistir.
+        for tentativa in range(_REPLACE_RETRIES):
+            try:
+                os.replace(temporario, path)
+                break
+            except PermissionError:
+                if tentativa == _REPLACE_RETRIES - 1:
+                    raise
+                time.sleep(0.05 * (tentativa + 1))
     except BaseException:
         temporario.unlink(missing_ok=True)
         raise
@@ -568,6 +633,43 @@ def read_quotes(project: Path) -> list[dict[str, str]]:
         return rows
 
 
+def append_quote(project: Path, row: dict[str, Any]) -> None:
+    """Acrescenta UMA observacao ao fim do arquivo, sem reler nem reescrever.
+
+    Reescrever o arquivo inteiro para acrescentar uma linha cria corrida de
+    perda de atualizacao: dois `cotar` ao mesmo tempo leem a mesma base, cada um
+    grava a sua versao, e a observacao de um some. Escrita atomica nao resolve
+    isso, porque o problema nao e arquivo pela metade, e sim leitura velha.
+
+    Anexar de verdade elimina a corrida e e o que "append-only" sempre quis
+    dizer. Se o cabecalho do arquivo estiver defasado, para e manda migrar, em
+    vez de reescrever tudo pelas costas.
+    """
+    path = project / "cotacoes.csv"
+    header = raw_quotes_header(project)
+    if not header:
+        atomic_write_text(path, ",".join(COTACOES_HEADER) + CSV_EOL)
+        header = list(COTACOES_HEADER)
+
+    desconhecidas = [campo for campo in row if campo and campo != EXTRA_COLUMNS_KEY and campo not in header]
+    if desconhecidas:
+        raise SystemExit(
+            f"cotacoes.csv nao tem as colunas: {', '.join(desconhecidas)}.\n"
+            "Rode `migrar-cotacoes` para atualizar o cabecalho antes de cotar."
+        )
+
+    buffer = io.StringIO()
+    csv.DictWriter(buffer, fieldnames=header, lineterminator=CSV_EOL).writerow(
+        {campo: row.get(campo, "") for campo in header}
+    )
+    conteudo = path.read_text(encoding="utf-8") if path.exists() else ""
+    separador = "" if not conteudo or conteudo.endswith(CSV_EOL) else CSV_EOL
+    with path.open("a", encoding="utf-8", newline="") as f:
+        f.write(separador + buffer.getvalue())
+        f.flush()
+        os.fsync(f.fileno())
+
+
 def write_quotes(project: Path, rows: list[dict[str, Any]]) -> None:
     header = quotes_header(project)
     for row in rows:
@@ -688,8 +790,7 @@ def add_quote(args: argparse.Namespace) -> None:
         "fonte": args.fonte,
         "score": "",
     }
-    rows.append(row)
-    write_quotes(project, rows)
+    append_quote(project, row)
     append_timeline(
         project,
         "cotacao",
@@ -1652,8 +1753,7 @@ def promote_quote(args: argparse.Namespace) -> None:
     row["nota_ajustada"] = adjusted_rating(quote_float(row.get("nota")), quote_int(row.get("n_avaliacoes"))) if quote_float(row.get("nota")) else ""
     row["score"] = ""
 
-    rows.append(row)
-    write_quotes(project, rows)
+    append_quote(project, row)
     append_timeline(
         project,
         "cotacao-manual",
@@ -3385,7 +3485,7 @@ def check_secrets(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Central de Compras")
-    sub = parser.add_subparsers(required=True)
+    sub = parser.add_subparsers(required=True, dest="comando")
 
     p = sub.add_parser("init", help="confere/cria a estrutura de diretorios")
     p.set_defaults(func=ensure_structure)
@@ -3621,10 +3721,36 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+MUTATING_COMMANDS = {
+    "cotar", "promover-cotacao", "decidir", "anotar", "novo-produto",
+    "ranking", "validar", "auditar", "historico", "descartar", "aguardar-preco",
+    "novo-veredito", "regenerar", "migrar-cotacoes",
+}
+
+
+def locked_project(args: argparse.Namespace) -> Path | None:
+    """Projeto que este comando vai escrever, se houver um so."""
+    alvo = getattr(args, "projeto", None)
+    if not alvo:
+        return None
+    try:
+        return project_path(alvo)
+    except SystemExit:
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    args.func(args)
+    # Um comando escrevendo por vez em cada projeto. Sem isso, dois `cotar`
+    # simultaneos disputam `processo.md` e, no Windows, `os.replace` falha
+    # porque o outro processo tem o destino aberto.
+    projeto = locked_project(args) if args.comando in MUTATING_COMMANDS else None
+    if projeto is None:
+        args.func(args)
+    else:
+        with project_lock(projeto):
+            args.func(args)
     return 0
 
 

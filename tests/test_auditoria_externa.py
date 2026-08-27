@@ -322,3 +322,57 @@ class SecretScanGapsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LostUpdateTest(BaseCli):
+    """Achado proprio, surgido ao preparar a segunda auditoria.
+
+    Escrita atomica protege contra arquivo pela metade, nao contra leitura
+    velha. Enquanto `cotar` relia e reescrevia o arquivo inteiro, duas cotacoes
+    concorrentes faziam uma observacao sumir em silencio: violacao direta do
+    principio 1, que a atomicidade nao cobre.
+    """
+
+    def test_two_concurrent_quotes_do_not_erase_each_other(self):
+        projeto = self.projeto("fone corrida", teto=600)
+        self.cli("novo-produto", projeto, "Fone A", "--marca", "M",
+                 "--categoria", "fone", "--produto-id", "fone-a")
+        caminho = self.tmpdir / projeto
+
+        # Os dois "processos" leem a mesma base e gravam cada um a sua linha.
+        cc.read_quotes(caminho)
+        cc.append_quote(caminho, {"data_coleta": "2026-01-01T10:00:00",
+                                  "produto_id": "fone-a", "custo_total": "100", "fonte": "manual"})
+        cc.append_quote(caminho, {"data_coleta": "2026-01-02T10:00:00",
+                                  "produto_id": "fone-a", "custo_total": "200", "fonte": "manual"})
+
+        custos = {r.get("custo_total") for r in cc.read_quotes(caminho)}
+        self.assertIn("100", custos, "observacao perdida por leitura velha")
+        self.assertIn("200", custos)
+
+    def test_parallel_cotar_processes_keep_every_observation(self):
+        import concurrent.futures as cf
+        projeto = self.projeto("fone paralelo", teto=600)
+        self.cli("novo-produto", projeto, "Fone A", "--marca", "M",
+                 "--categoria", "fone", "--produto-id", "fone-a")
+
+        def cotar(indice):
+            return self.cli("cotar", projeto, "--produto-id", "fone-a", "--loja", "Amazon",
+                            "--vendedor", "V", "--vendedor-tipo", "oficial",
+                            "--preco", str(100 + indice), "--nota", "4.6", "--avaliacoes", "900",
+                            "--garantia-meses", "12", "--garantia-tipo", "nacional",
+                            "--fonte", "web", "--link", "https://exemplo.com/a", check=False)
+
+        with cf.ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(cotar, range(12)))
+
+        linhas = cc.read_quotes(self.tmpdir / projeto)
+        self.assertEqual(len(linhas), 12, f"esperava 12 observacoes, ficaram {len(linhas)}")
+
+    def test_appending_refuses_a_stale_header_instead_of_rewriting_it(self):
+        projeto = self.projeto("fone header", teto=600)
+        caminho = self.tmpdir / projeto
+        (caminho / "cotacoes.csv").write_text("data_coleta,produto_id\n", encoding="utf-8", newline="")
+        with self.assertRaises(SystemExit) as ctx:
+            cc.append_quote(caminho, {"data_coleta": "2026-01-01", "produto_id": "a", "custo_total": "1"})
+        self.assertIn("migrar-cotacoes", str(ctx.exception))

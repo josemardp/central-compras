@@ -26,3 +26,6 @@ relatorios-privados/
 .coverage
 coverage.json
 htmlcov/
+
+# Trava de escrita concorrente
+.central-compras.lock
