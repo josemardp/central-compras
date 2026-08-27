@@ -20,12 +20,11 @@
 - D+30 licao:
 - D+30 nota vendedor:
 - D+30 compraria do mesmo vendedor:
-- Chegou no prazo?
-- Produto conforme anuncio?
-- Embalagem/lacre ok?
-- Apareceu defeito?
-- Vendedor respondeu bem?
-- Nota do arrependimento: 0 a 10
+- D+30 chegou no prazo:
+- D+30 produto conforme:
+- D+30 defeito:
+- D+30 vendedor respondeu:
+- D+30 o que aprendi:
 
 ## D+180
 
@@ -37,11 +36,11 @@
 - D+180 licao:
 - D+180 nota vendedor:
 - D+180 compraria do mesmo vendedor:
-- Ainda usa?
-- Valeu o que pagou?
-- Compraria de novo?
-- Compraria do mesmo vendedor?
-- O que eu nao sabia na hora e agora sei?
+- D+180 ainda usa:
+- D+180 valeu o que pagou:
+- D+180 defeito:
+- D+180 vendedor respondeu:
+- D+180 o que aprendi:
 
 ## Licoes para a base
 

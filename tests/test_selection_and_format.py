@@ -173,6 +173,26 @@ class VerdictIdempotencyTest(unittest.TestCase):
         marca = (self.tmpdir / "base-conhecimento" / "marcas" / "marcaunica.md").read_text(encoding="utf-8")
         self.assertEqual(marca.count("- Tipo: marca"), 2)
 
+    def test_d30_does_not_block_the_later_d180_learning(self):
+        veredito = self.preparar_veredito()
+        self.run_cli("aprender-veredito", str(veredito), "--fase", "d30")
+        self.run_cli(
+            "preencher-veredito", str(veredito), "--fase", "d180",
+            "--nota-arrependimento", "0", "--compraria-de-novo", "sim",
+            "--resumo", "Continua funcionando depois de seis meses.",
+            "--o-que-aprendi", "Durabilidade confirmou a escolha.",
+            "--ainda-usa", "sim", "--valeu-o-que-pagou", "sim",
+        )
+        self.run_cli("aprender-veredito", str(veredito), "--fase", "d180")
+
+        texto = veredito.read_text(encoding="utf-8")
+        self.assertIn("## Aprendizado exportado D+30", texto)
+        self.assertIn("## Aprendizado exportado D+180", texto)
+        marca = (self.tmpdir / "base-conhecimento" / "marcas" / "marcaunica.md").read_text(encoding="utf-8")
+        self.assertEqual(marca.count("- Tipo: marca"), 2)
+        licoes = (self.tmpdir / "base-conhecimento" / "licoes.md").read_text(encoding="utf-8")
+        self.assertIn("Durabilidade confirmou a escolha", licoes)
+
 
 class DecisionIntegrityTest(unittest.TestCase):
     def setUp(self):

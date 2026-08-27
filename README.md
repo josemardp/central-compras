@@ -197,11 +197,11 @@ Abra `dashboard/index.html` no navegador para ver projetos, itens aguardando pre
 e `dashboard/` sao derivados, mas ficam versionados de proposito: o `ranking.md`
 ao lado do `decisao.md` e a evidencia de por que voce decidiu naquele dia.
 
-No ato da decisao, o ranking daquele dia e **congelado** em
-`decisao-<data>-ranking.md`. Sem isso, uma cotacao nova depois faria `regenerar`
-reescrever o `ranking.md` e a decisao passaria a apontar para um ranking em que
-ela nem venceria. O congelado nunca e regenerado, e `regenerar` falha se algum
-for alterado.
+No ato da decisao, o motor recalcula o ranking e congela `ranking.md`,
+`ranking.csv` e a cotacao usada em `snapshots/<instante>-<produto>/`. O
+`decisao.md` registra o caminho e o SHA-256 da cotacao. Uma cotacao nova pode
+mudar os derivados atuais, mas nunca essa evidencia; `regenerar` ignora
+`snapshots/`.
 
 Se der conflito num derivado, **nao resolva a mao**. Fique com qualquer lado e rode:
 
@@ -324,8 +324,9 @@ Ela nao deve fingir que confirmou preco, estoque, frete ou cupom quando isso dep
 python -m unittest discover -s tests
 ```
 
-118 testes. Alem dos casos de exemplo, ha teste de invariante que gera cotacoes
+176 testes. Alem dos casos de exemplo, ha teste de invariante que gera cotacoes
 aleatorias (inclusive patologicas: preco negativo, `1e309`, data impossivel,
 unicode) e confere propriedades que tem que valer sempre: score entre 0 e 100,
 eixo entre 0 e 1, cortado nunca pontua, o mais barato elegivel sempre tira 1,00
-no eixo valor, e reescrever o CSV lido nao muda o arquivo nem perde linha.
+no eixo valor, processos concorrentes nao perdem linha e um processo morto nao
+deixa trava orfa.

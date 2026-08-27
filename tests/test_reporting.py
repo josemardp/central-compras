@@ -144,6 +144,9 @@ class DecisionPromptTest(unittest.TestCase):
         self.assertIn("qualidade", saida)
         self.assertIn("Fone A", saida)
         self.assertIn("Regra de parada", saida)
+        self.assertIn("comparativo dentro deste projeto", saida)
+        self.assertIn("conveniencia --", saida)
+        self.assertNotIn("escala absoluta 0-100", saida)
         # ...e nao o repr cru do CSV.
         self.assertNotIn("'produto_id':", saida)
         self.assertNotIn("'variacao':", saida)

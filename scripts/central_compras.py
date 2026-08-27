@@ -5,9 +5,11 @@ import argparse
 import contextlib
 import csv
 import datetime as dt
+import hashlib
 import html
 import io
 import itertools
+import json
 import math
 import os
 import re
@@ -160,10 +162,8 @@ def slugify(value: str) -> str:
 
 _TEMP_SEQ = itertools.count()
 _REPLACE_RETRIES = 8
-# Esperar menos do que o prazo de orfandade fazia o comando desistir antes de
-# a trava poder ser considerada velha: o impasse nunca se resolvia sozinho.
-_LOCK_STALE_S = 60.0
-_LOCK_TIMEOUT_S = _LOCK_STALE_S + 15.0
+# Espera limitada para informar disputa; a liberacao por crash e do SO.
+_LOCK_TIMEOUT_S = 30.0
 
 
 @contextlib.contextmanager
@@ -175,37 +175,56 @@ def project_lock(project: Path):
     `os.replace` falha se outro processo tiver o destino aberto, e a leitura
     de `processo.md` por um enquanto o outro grava perde atualizacao.
 
-    O lock e um arquivo criado com O_EXCL. Se ficar orfao (processo morto no
-    meio), expira sozinho depois de um minuto.
+    O arquivo permanece no disco, mas a trava pertence ao descritor aberto.
+    O proprio sistema operacional a libera se o processo terminar, inclusive
+    por Ctrl+C ou encerramento forcado. Isso evita expirar uma trava legitima
+    de um comando demorado e evita que um processo apague a trava de outro.
     """
     project.mkdir(parents=True, exist_ok=True)
     lock = project / ".central-compras.lock"
     limite = time.monotonic() + _LOCK_TIMEOUT_S
-    descritor = None
-    while descritor is None:
+    arquivo = lock.open("a+b")
+    arquivo.seek(0, os.SEEK_END)
+    if arquivo.tell() == 0:
+        arquivo.write(b"\0")
+        arquivo.flush()
+    adquirido = False
+    while not adquirido:
         try:
-            descritor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            try:
-                idade = time.time() - lock.stat().st_mtime
-            except OSError:
-                idade = 0.0
-            if idade > _LOCK_STALE_S:
-                lock.unlink(missing_ok=True)
-                continue
+            arquivo.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(arquivo.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(arquivo.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            adquirido = True
+        except (BlockingIOError, OSError):
             if time.monotonic() > limite:
+                arquivo.close()
                 raise SystemExit(
                     f"Outro comando esta escrevendo em {project.name} "
-                    f"(trava em {lock}).\nEspere terminar, ou apague a trava se "
-                    "nenhum comando estiver rodando."
+                    f"(trava em {lock}).\nEspere terminar e tente novamente. "
+                    "O arquivo de trava permanece no disco e nao deve ser apagado."
                 )
             time.sleep(0.05)
     try:
-        os.write(descritor, str(os.getpid()).encode("ascii"))
-        os.close(descritor)
         yield
     finally:
-        lock.unlink(missing_ok=True)
+        try:
+            arquivo.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(arquivo.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(arquivo.fileno(), fcntl.LOCK_UN)
+        finally:
+            arquivo.close()
 
 
 def atomic_write_text(path: Path, text: str) -> None:
@@ -597,6 +616,7 @@ def new_project(args: argparse.Namespace) -> None:
     atomic_write_text(path / "cotacoes.csv", ",".join(COTACOES_HEADER) + CSV_EOL)
     set_process_state(path, estado="pesquisando", proxima_acao="definir modelo/requisitos com ajuda da IA")
     print(path.relative_to(ROOT))
+    print(f"Proximo comando: python scripts/central_compras.py prompt-ia projetos/{projeto_id} --etapa modelo")
 
 
 def product_dir(categoria: str, produto_id: str) -> Path:
@@ -1144,6 +1164,42 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
 
 
 @dataclass
+class ScoreBreakdown:
+    weights: dict[str, float]
+    included_axes: tuple[str, ...]
+    missing_axes: tuple[str, ...]
+    weighted_sum: float
+    used_weight: float
+    total_weight: float
+    confidence: float
+    score: float
+
+
+def score_breakdown(
+    axes: dict[str, float], missing_axes: list[str], weights: dict[str, Any]
+) -> ScoreBreakdown:
+    """Calcula score e confianca uma vez para todos os consumidores."""
+    normalized_weights = {axis: quote_float(weights.get(axis), 0) for axis in axes}
+    missing = tuple(axis for axis in axes if axis in missing_axes)
+    included = tuple(axis for axis in axes if axis not in missing)
+    total_weight = sum(normalized_weights.values())
+    used_weight = sum(normalized_weights[axis] for axis in included)
+    weighted_sum = sum(axes[axis] * normalized_weights[axis] for axis in included)
+    confidence = used_weight / total_weight if total_weight else 0.0
+    score = weighted_sum / used_weight * 100 if used_weight else 0.0
+    return ScoreBreakdown(
+        normalized_weights,
+        included,
+        missing,
+        weighted_sum,
+        used_weight,
+        total_weight,
+        round(confidence, 3),
+        round(max(0.0, min(100.0, score)), 1),
+    )
+
+
+@dataclass
 class Ranked:
     produto_id: str
     quote: dict[str, str]
@@ -1156,6 +1212,7 @@ class Ranked:
     idade_dias: int | None
     vencida: bool
     confianca: float
+    breakdown: ScoreBreakdown
 
 
 def quote_age_days(row: dict[str, str], reference: dt.date | None = None) -> int | None:
@@ -1454,14 +1511,8 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
         # valia 5 pontos a mais que "o prazo e pessimo e eu sei disso": o score
         # premiava o silencio. Agora o score mede o que se sabe, e `confianca`
         # diz quanto do peso total esta de fato apoiado em dado.
-        com_dado = {k: v for k, v in axes.items() if k not in sem_dado}
-        peso_total = sum(quote_float(weights.get(k), 0) for k in axes)
-        peso_com_dado = sum(quote_float(weights.get(k), 0) for k in com_dado)
-        confianca = round(peso_com_dado / peso_total, 3) if peso_total else 0.0
-        if peso_com_dado:
-            score = sum(axes[k] * quote_float(weights.get(k), 0) for k in com_dado) / peso_com_dado * 100
-        else:
-            score = 0.0
+        breakdown = score_breakdown(axes, sem_dado, weights)
+        score = breakdown.score
         if eliminations:
             score = 0
         candidates.append(
@@ -1470,13 +1521,14 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
                 row,
                 product,
                 axes,
-                round(score, 1),
+                score,
                 eliminations,
                 alerts,
                 sem_dado,
                 quote_age_days(row),
                 quote_is_stale(row),
-                confianca,
+                breakdown.confidence,
+                breakdown,
             )
         )
 
@@ -1621,7 +1673,8 @@ def build_ranking(args: argparse.Namespace) -> None:
                 "- `risco`: vendedor, tipo e prazo de garantia, menos penalidade por alerta de manipulacao.",
                 "- `aderencia`: percentual de requisitos do briefing atendidos pelo produto.",
                 "- `conveniencia`: prazo de frete em escala absoluta.",
-                "- A escala e absoluta, nao relativa ao projeto: 75 aqui significa o mesmo que 75 em outra compra.",
+                "- O score e comparativo dentro do projeto: qualidade e conveniencia usam escalas fixas, "
+                "mas valor depende do candidato elegivel mais barato. Compare candidatos da mesma compra.",
             ]
         )
 
@@ -1955,9 +2008,12 @@ def decision_briefing(project: Path) -> str:
     partes: list[str] = []
 
     if elegiveis:
-        partes.append("Finalistas (score aberto, escala absoluta 0-100):")
+        partes.append("Finalistas (score aberto, comparativo dentro deste projeto, 0-100):")
         for posicao, item in enumerate(elegiveis, 1):
-            eixos = " · ".join(f"{k} {v:.2f}" for k, v in item.axes.items())
+            eixos = " · ".join(
+                f"{k} --" if k in item.eixos_sem_dado else f"{k} {v:.2f}"
+                for k, v in item.axes.items()
+            )
             linha = (
                 f"{posicao}. {item.product.get('nome') or item.produto_id} - {item.score:.1f}\n"
                 f"   {eixos}\n"
@@ -2185,6 +2241,35 @@ def decide(args: argparse.Namespace) -> None:
             "Preencha esses campos ou use --permitir-incompleto para decidir assim mesmo."
         )
 
+    # O snapshot precisa nascer da mesma execucao que fecha a compra. Um
+    # ranking.md antigo nao e evidencia do que o motor calculou agora.
+    build_ranking(argparse.Namespace(projeto=args.projeto))
+    instante = dt.datetime.now().strftime("%Y%m%dT%H%M%S%f")
+    snapshot_dir = project / "snapshots" / f"{instante}-{slugify(args.produto_id)}"
+    snapshot_dir.mkdir(parents=True, exist_ok=False)
+    quote_canonical = json.dumps(quote, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    quote_hash = hashlib.sha256(quote_canonical.encode("utf-8")).hexdigest()
+    for nome in ("ranking.md", "ranking.csv"):
+        origem = project / nome
+        if not origem.exists():
+            raise SystemExit(f"Nao foi possivel congelar a decisao: {origem} nao existe.")
+        atomic_write_text(snapshot_dir / nome, origem.read_text(encoding="utf-8"))
+    snapshot_rel = snapshot_dir.relative_to(project).as_posix()
+    atomic_write_text(
+        snapshot_dir / "metadados.json",
+        json.dumps(
+            {
+                "criado_em": now_iso(),
+                "produto_id": args.produto_id,
+                "cotacao_sha256": quote_hash,
+                "cotacao": quote,
+            },
+            ensure_ascii=True,
+            indent=2,
+            sort_keys=True,
+        ) + "\n",
+    )
+
     lines = [
         "# Decisao",
         "",
@@ -2195,6 +2280,8 @@ def decide(args: argparse.Namespace) -> None:
         f"- Cotacao usada: {quote.get('loja')} / {quote.get('vendedor')}",
         f"- Data: {today()}",
         f"- Custo total confirmado: {brl(quote.get('custo_total'))}",
+        f"- Evidencia congelada: {snapshot_rel}/ranking.md",
+        f"- Cotacao SHA-256: {quote_hash}",
         "",
         "## Por que escolhi",
         "",
@@ -2241,26 +2328,10 @@ def decide(args: argparse.Namespace) -> None:
         set_process_state(project, estado="comprado", proxima_acao="acompanhar entrega e preencher veredito D+30")
     else:
         set_process_state(project, proxima_acao="comprar ou marcar como comprado depois da confirmacao final")
-    # Instantaneo imutavel do ranking no dia da decisao.
-    # Eu tinha justificado versionar os derivados dizendo que o `ranking.md` ao
-    # lado do `decisao.md` era a evidencia da decisao. A auditoria mostrou que
-    # nao era: `regenerar` reescreve o ranking com o de hoje, e a decisao passa
-    # a apontar para um ranking em que ela nem venceria. O congelado resolve.
-    congelado = project / f"decisao-{today()}-ranking.md"
-    if not congelado.exists() or args.force_veredito:
-        atual = (project / "ranking.md").read_text(encoding="utf-8") if (project / "ranking.md").exists() else ""
-        atomic_write_text(
-            congelado,
-            f"# Ranking no dia da decisao ({today()})\n\n"
-            f"Congelado quando `{args.produto_id}` foi escolhido. **Nao regenerar.**\n"
-            "Os derivados atuais mudam quando uma cotacao nova chega; este nao." + '\n\n'
-            + atual,
-        )
-
     verdict_path = create_verdict(project, args.produto_id, product, quote, force=args.force_veredito)
     append_timeline(project, "veredito", "Arquivo de veredito criado", verdict_path.name)
     print(project / "decisao.md")
-    print(congelado)
+    print(snapshot_dir)
     print(verdict_path)
 
 
@@ -2324,6 +2395,18 @@ def fill_verdict(args: argparse.Namespace) -> None:
         updates[f"{prefix} nota vendedor"] = str(args.nota_vendedor)
     if args.compraria_do_vendedor:
         updates[f"{prefix} compraria do mesmo vendedor"] = args.compraria_do_vendedor
+    structured = {
+        "chegou no prazo": args.chegou_no_prazo,
+        "produto conforme": args.produto_conforme,
+        "defeito": args.defeito,
+        "vendedor respondeu": args.vendedor_respondeu,
+        "ainda usa": args.ainda_usa,
+        "valeu o que pagou": args.valeu_o_que_pagou,
+        "o que aprendi": args.o_que_aprendi,
+    }
+    for label, value in structured.items():
+        if value:
+            updates[f"{prefix} {label}"] = value
     for label, value in updates.items():
         text = replace_or_append_bullet(text, label, value)
     atomic_write_text(path, text)
@@ -2345,26 +2428,34 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     if not path.exists():
         raise SystemExit(f"Veredito nao encontrado: {args.veredito}")
     text = path.read_text(encoding="utf-8")
-    # Rodar duas vezes duplicava marca e loja na base, e a base alimenta o
-    # `prompt-ia`: o mesmo aprendizado passava a contar dobrado.
-    if "## Aprendizado exportado" in text and not args.force:
+    preenchidas = {
+        fase: any(
+            extract_bullet(text, f"{prefix} {rotulo}")
+            for rotulo in ("resumo", "licao", "nota arrependimento", "preenchido em")
+        )
+        for fase, prefix in (("d30", "D+30"), ("d180", "D+180"))
+    }
+    fase = args.fase or ("d180" if preenchidas["d180"] else "d30")
+    prefix = "D+30" if fase == "d30" else "D+180"
+    marker_heading = f"## Aprendizado exportado {prefix}"
+
+    # Cada fase e uma observacao diferente. D+30 exportado nao pode bloquear o
+    # aprendizado de uso prolongado em D+180, mas repetir a mesma fase tambem
+    # nao pode pesar duas vezes na base.
+    legacy_export = "## Aprendizado exportado\n" in text
+    if (marker_heading in text or legacy_export) and not args.force:
         raise SystemExit(
-            f"Este veredito ja foi exportado para a base de conhecimento.\n"
-            f"Veja o bloco `## Aprendizado exportado` em {path}.\n"
+            f"Este veredito ja foi exportado na fase {prefix} para a base de conhecimento.\n"
+            f"Veja o bloco `{marker_heading}` em {path}.\n"
             "Use --force se quiser exportar de novo mesmo assim."
         )
     # Veredito em branco exportava "com sucesso", nao gravava nada e ainda
     # carimbava o arquivo como exportado, bloqueando a exportacao de verdade
     # quando o D+30 fosse preenchido. Silencio pior que erro.
-    preenchido = any(
-        extract_bullet(text, rotulo)
-        for rotulo in ["D+30 resumo", "D+180 resumo", "D+30 licao", "D+180 licao",
-                       "D+30 nota arrependimento", "D+180 nota arrependimento"]
-    )
-    if not preenchido and not (args.resumo or args.licao):
+    if not preenchidas[fase] and not (args.resumo or args.licao):
         raise SystemExit(
-            f"Veredito ainda em branco: {path}\n"
-            "Preencha com `preencher-veredito --fase d30` (ou d180) antes de exportar, "
+            f"Fase {prefix} ainda em branco: {path}\n"
+            f"Preencha com `preencher-veredito --fase {fase}` antes de exportar, "
             "ou passe --resumo/--licao aqui."
         )
 
@@ -2374,14 +2465,12 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     categoria = args.categoria or extract_bullet(text, "Categoria") or "geral"
     marca = args.marca or extract_bullet(text, "Marca")
     loja = args.loja or extract_bullet(text, "Loja") or seller.split("/")[0].strip()
-    d30_summary = extract_bullet(text, "D+30 resumo")
-    d180_summary = extract_bullet(text, "D+180 resumo")
-    summary = args.resumo or d180_summary or d30_summary or f"Veredito registrado para {product_name}."
-    lesson = args.licao or extract_bullet(text, "D+180 licao") or extract_bullet(text, "D+30 licao")
-    buy_again = args.compraria_de_novo or extract_bullet(text, "D+180 compraria de novo") or extract_bullet(text, "D+30 compraria de novo")
+    summary = args.resumo or extract_bullet(text, f"{prefix} resumo") or f"Veredito {prefix} registrado para {product_name}."
+    lesson = args.licao or extract_bullet(text, f"{prefix} licao") or extract_bullet(text, f"{prefix} o que aprendi")
+    buy_again = args.compraria_de_novo or extract_bullet(text, f"{prefix} compraria de novo")
     regret = args.nota_arrependimento
     if regret is None:
-        raw_regret = extract_bullet(text, "D+180 nota arrependimento") or extract_bullet(text, "D+30 nota arrependimento")
+        raw_regret = extract_bullet(text, f"{prefix} nota arrependimento")
         regret = quote_float(raw_regret, 0) if raw_regret else None
 
     # Julgamento do PRODUTO e do VENDEDOR sao coisas diferentes. Antes, um
@@ -2392,13 +2481,11 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     nota_produto = None if regret is None else max(0, 10 - regret)
     nota_loja = args.nota_loja
     if nota_loja is None:
-        bruto = extract_bullet(text, "D+180 nota vendedor") or extract_bullet(text, "D+30 nota vendedor")
+        bruto = extract_bullet(text, f"{prefix} nota vendedor")
         nota_loja = quote_float(bruto) if bruto else None
     compraria_produto = buy_again if buy_again in {"sim", "nao", "talvez"} else None
     compraria_loja = args.compraria_do_vendedor or (
-        extract_bullet(text, "D+180 compraria do mesmo vendedor")
-        or extract_bullet(text, "D+30 compraria do mesmo vendedor")
-        or None
+        extract_bullet(text, f"{prefix} compraria do mesmo vendedor") or None
     )
     if compraria_loja not in {"sim", "nao", "talvez", None}:
         compraria_loja = None
@@ -2430,8 +2517,8 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     if lesson:
         register_lesson(argparse.Namespace(texto=lesson, categoria=categoria, gate=args.gate))
 
-    marker = f"\n## Aprendizado exportado\n\n- Data: {today()}\n- Marca: {marca}\n- Loja: {loja}\n- Categoria: {categoria}\n- Licao: {lesson}\n"
-    if "## Aprendizado exportado" not in text:
+    marker = f"\n{marker_heading}\n\n- Data: {today()}\n- Marca: {marca}\n- Loja: {loja}\n- Categoria: {categoria}\n- Licao: {lesson}\n"
+    if marker_heading not in text:
         append_text(path, marker)
     print(f"Aprendizado processado: {path}")
 
@@ -2522,6 +2609,26 @@ def status(args: argparse.Namespace) -> None:
         print("Cotacao vencida (recote): " + ", ".join(vencidas))
     if web_only_ids:
         print("Confirmar manualmente: " + ", ".join(sorted(web_only_ids)))
+        primeiro = sorted(web_only_ids)[0]
+        print(
+            "Comando sugerido: python scripts/central_compras.py promover-cotacao "
+            f"projetos/{project.name} --produto-id {primeiro} [campos conferidos]"
+        )
+    elif not latest:
+        print(
+            "Comando sugerido: python scripts/central_compras.py prompt-ia "
+            f"projetos/{project.name} --etapa modelo"
+        )
+    elif errors:
+        print(
+            "Comando sugerido: python scripts/central_compras.py validar "
+            f"projetos/{project.name} --strict"
+        )
+    else:
+        print(
+            "Comando sugerido: python scripts/central_compras.py ranking "
+            f"projetos/{project.name}"
+        )
 
 
 def validate(args: argparse.Namespace) -> None:
@@ -2932,6 +3039,20 @@ def project_counts(project: Path) -> dict[str, Any]:
 
 
 def verdict_summaries() -> list[dict[str, str]]:
+    def phase_status(text: str, prefix: str) -> str:
+        filled = parse_dashboard_date(extract_bullet(text, f"{prefix} preenchido em"))
+        if filled:
+            return f"preenchido {filled.isoformat()}"
+        expected = parse_dashboard_date(extract_bullet(text, f"Veredito {prefix} previsto"))
+        if not expected:
+            return "sem data"
+        delta = (expected - dt.date.today()).days
+        if delta < 0:
+            return f"atrasado {abs(delta)} dia(s)"
+        if delta == 0:
+            return "vence hoje"
+        return f"pendente, faltam {delta} dia(s)"
+
     rows: list[dict[str, str]] = []
     for path in sorted(VEREDITOS.glob("*.md")):
         text = path.read_text(encoding="utf-8")
@@ -2942,6 +3063,8 @@ def verdict_summaries() -> list[dict[str, str]]:
                 "produto": extract_bullet(text, "Produto"),
                 "d30": extract_bullet(text, "D+30 nota arrependimento"),
                 "d180": extract_bullet(text, "D+180 nota arrependimento"),
+                "d30_status": phase_status(text, "D+30"),
+                "d180_status": phase_status(text, "D+180"),
                 "resumo": extract_bullet(text, "D+180 resumo") or extract_bullet(text, "D+30 resumo"),
             }
         )
@@ -3302,6 +3425,11 @@ def generate_dashboard(args: argparse.Namespace) -> None:
         if value not in {None, ""}
     ]
     avg_regret = round(sum(regrets) / len(regrets), 1) if regrets else ""
+    verdicts_overdue = sum(
+        1 for row in verdicts
+        for key in ("d30_status", "d180_status")
+        if str(row.get(key) or "").startswith("atrasado")
+    )
     project_rows = []
     for project, summary in zip(projects, summaries):
         page = DASHBOARD / "projetos" / f"{project.name}.html"
@@ -3338,6 +3466,8 @@ def generate_dashboard(args: argparse.Namespace) -> None:
             f"<td>{safe_html(row['projeto'])}</td>"
             f"<td class=\"num\">{safe_html(row['d30'])}</td>"
             f"<td class=\"num\">{safe_html(row['d180'])}</td>"
+            f"<td>{safe_html(row['d30_status'])}</td>"
+            f"<td>{safe_html(row['d180_status'])}</td>"
             f"<td>{safe_html(row['resumo'])}</td>"
             "</tr>"
         )
@@ -3357,7 +3487,7 @@ def generate_dashboard(args: argparse.Namespace) -> None:
 </section>
 <section class="two section">
   <div class="panel"><h2>Estados</h2>{bar_chart(states)}</div>
-  <div class="panel"><h2>Indicadores</h2><table><tbody><tr><td>Reaproveitamento</td><td class="num">{safe_html(reuse_rate)}</td></tr><tr><td>Projetos sem erro de validacao</td><td class="num">{validacao_rate}%</td></tr><tr><td>Candidatos cortados pelo gate</td><td class="num">{total_cortados} de {total_candidatos} ({corte_rate}%)</td></tr><tr><td>Avisos abertos</td><td class="num">{warnings_total}</td></tr><tr><td>Arrependimento medio</td><td class="num">{safe_html(avg_regret)}</td></tr><tr><td>Vereditos</td><td class="num">{len(verdicts)}</td></tr></tbody></table></div>
+  <div class="panel"><h2>Indicadores</h2><table><tbody><tr><td>Reaproveitamento</td><td class="num">{safe_html(reuse_rate)}</td></tr><tr><td>Projetos sem erro de validacao</td><td class="num">{validacao_rate}%</td></tr><tr><td>Candidatos cortados pelo gate</td><td class="num">{total_cortados} de {total_candidatos} ({corte_rate}%)</td></tr><tr><td>Avisos abertos</td><td class="num">{warnings_total}</td></tr><tr><td>Arrependimento medio</td><td class="num">{safe_html(avg_regret)}</td></tr><tr><td>Vereditos</td><td class="num">{len(verdicts)}</td></tr><tr><td>Fases de veredito atrasadas</td><td class="num">{verdicts_overdue}</td></tr></tbody></table></div>
 </section>
 <section class="section panel">
   <h2>Projetos</h2>
@@ -3368,7 +3498,7 @@ def generate_dashboard(args: argparse.Namespace) -> None:
 </section>
 <section class="two section">
   <div class="panel"><h2>Aguardando Preco</h2><table><thead><tr><th>Produto</th><th>Projeto</th><th class="num">Atual</th><th class="num">Alvo</th><th class="num">Distancia</th></tr></thead><tbody>{''.join(waiting_rows) or '<tr><td colspan="5">Nenhum item.</td></tr>'}</tbody></table></div>
-  <div class="panel"><h2>Vereditos</h2><table><thead><tr><th>Produto</th><th>Projeto</th><th class="num">D+30</th><th class="num">D+180</th><th>Resumo</th></tr></thead><tbody>{''.join(verdict_rows) or '<tr><td colspan="5">Nenhum veredito.</td></tr>'}</tbody></table></div>
+  <div class="panel"><h2>Vereditos</h2><table><thead><tr><th>Produto</th><th>Projeto</th><th class="num">D+30</th><th class="num">D+180</th><th>Situacao D+30</th><th>Situacao D+180</th><th>Resumo</th></tr></thead><tbody>{''.join(verdict_rows) or '<tr><td colspan="7">Nenhum veredito.</td></tr>'}</tbody></table></div>
 </section>
 """
     index = DASHBOARD / "index.html"
@@ -3392,7 +3522,6 @@ def audit_score(args: argparse.Namespace) -> None:
         if not todos:
             raise SystemExit(f"Produto sem cotacao neste projeto: {args.produto_id}")
 
-    pesos = preferences().get("score", {})
     escala = (preferences().get("escala") or {}).get("qualidade") or {}
     piso = quote_float(escala.get("nota_piso"), 3.8)
     teto = quote_float(escala.get("nota_teto"), 5.0)
@@ -3491,33 +3620,31 @@ def audit_score(args: argparse.Namespace) -> None:
             )
 
         linhas.extend(["", "### Score final", "", "| Eixo | Nota | Peso | Entra na conta? | Contribui |", "|---|---:|---:|:--:|---:|"])
-        total = 0.0
-        peso_util = 0.0
+        breakdown = item.breakdown
         for eixo, nota in item.axes.items():
-            peso = quote_float(pesos.get(eixo), 0)
-            if eixo in item.eixos_sem_dado:
+            peso = breakdown.weights[eixo]
+            if eixo not in breakdown.included_axes:
                 linhas.append(f"| {eixo} | -- | {peso} | nao (sem dado) | 0 |")
                 continue
-            peso_util += peso
-            total += nota * peso
-            linhas.append(f"| {eixo} | {nota:.3f} | {peso} | sim | {nota * peso:.4f} |")
-        # Renormaliza como o ranking faz. Sem isto a memoria publicava um numero
-        # diferente do score publicado, e o principio 3 caia por causa da propria
-        # correcao que tirou o 0,50 neutro.
-        if item.eixos_sem_dado:
-            linhas.append(f"| soma dos que entraram | | {round(peso_util, 4)} | | **{total:.4f}** |")
+            linhas.append(f"| {eixo} | {nota:.3f} | {peso} | sim | {nota * peso:.6f} |")
+        if breakdown.missing_axes:
             linhas.append(
-                f"| **renormalizado: {total:.4f} / {round(peso_util, 4)} x 100** | | | | "
-                f"**{(total / peso_util * 100) if peso_util else 0:.1f}** |"
+                f"| soma dos que entraram | | {breakdown.used_weight:.6f} | | "
+                f"**{breakdown.weighted_sum:.6f}** |"
             )
-            total = (total / peso_util) if peso_util else 0.0
+            linhas.append(
+                f"| **renormalizado: {breakdown.weighted_sum:.6f} / "
+                f"{breakdown.used_weight:.6f} x 100** | | | | **{breakdown.score:.1f}** |"
+            )
         else:
-            linhas.append(f"| **total x 100** | | | | **{total * 100:.1f}** |")
+            linhas.append(f"| **total x 100** | | | | **{breakdown.score:.1f}** |")
         linhas.append("")
-        linhas.append(f"Confianca: **{item.confianca:.0%}** do peso do score apoiado em dado real.")
+        linhas.append(f"Confianca: **{breakdown.confidence:.0%}** do peso do score apoiado em dado real.")
         if item.eliminations:
             linhas.append("")
-            linhas.append(f"Score publicado: **0** (cortado no gate, nao os {total * 100:.1f} acima).")
+            linhas.append(
+                f"Score publicado: **0** (cortado no gate, nao os {breakdown.score:.1f} acima)."
+            )
         linhas.append("")
 
     caminho = project / "memoria-calculo.md"
@@ -3943,10 +4070,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--licao")
     p.add_argument("--nota-vendedor", type=real_number, help="0 a 10 para o VENDEDOR, separado do produto")
     p.add_argument("--compraria-do-vendedor", choices=["sim", "nao", "talvez"])
+    p.add_argument("--chegou-no-prazo", choices=["sim", "nao", "parcial"])
+    p.add_argument("--produto-conforme", choices=["sim", "nao", "parcial"])
+    p.add_argument("--defeito", choices=["sim", "nao", "parcial"])
+    p.add_argument("--vendedor-respondeu", choices=["sim", "nao", "parcial"])
+    p.add_argument("--ainda-usa", choices=["sim", "nao", "parcial"])
+    p.add_argument("--valeu-o-que-pagou", choices=["sim", "nao", "parcial"])
+    p.add_argument("--o-que-aprendi")
     p.set_defaults(func=fill_verdict)
 
     p = sub.add_parser("aprender-veredito", help="transforma veredito preenchido em marca, loja e licao")
     p.add_argument("veredito")
+    p.add_argument("--fase", choices=["d30", "d180"], help="fase a exportar; sem isso usa a mais recente preenchida")
     p.add_argument("--marca")
     p.add_argument("--loja")
     p.add_argument("--categoria")
@@ -3980,6 +4115,9 @@ KNOWLEDGE_COMMANDS = {
     "preencher-veredito",
 }
 
+PRODUCT_COMMANDS = {"novo-produto", "descartar", "aguardar-preco"}
+ALL_PROJECT_COMMANDS = {"dashboard", "regenerar", "migrar-cotacoes"}
+
 
 def locked_project(args: argparse.Namespace) -> Path | None:
     """Projeto que este comando vai escrever, se houver um so."""
@@ -3995,16 +4133,26 @@ def locked_project(args: argparse.Namespace) -> Path | None:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    # Um comando escrevendo por vez em cada projeto. Sem isso, dois `cotar`
-    # simultaneos disputam `processo.md` e, no Windows, `os.replace` falha
-    # porque o outro processo tem o destino aberto.
+    # Todas as travas sao adquiridas em ordem lexicografica. Assim, comandos
+    # que tocam projeto + produtos + conhecimento nunca formam ciclo entre si.
     with contextlib.ExitStack() as travas:
+        alvos: set[Path] = set()
         if args.comando in MUTATING_COMMANDS:
             projeto = locked_project(args)
             if projeto is not None:
-                travas.enter_context(project_lock(projeto))
+                alvos.add(projeto)
         if args.comando in KNOWLEDGE_COMMANDS:
-            travas.enter_context(project_lock(BASE))
+            alvos.add(BASE)
+        if args.comando in PRODUCT_COMMANDS:
+            alvos.add(PRODUTOS)
+        if args.comando == "novo-projeto":
+            alvos.add(PROJETOS)
+        if args.comando == "dashboard":
+            alvos.update({BASE, DASHBOARD, PROJETOS, *project_dirs()})
+        if args.comando in ALL_PROJECT_COMMANDS and not getattr(args, "projeto", None):
+            alvos.update(project_dirs())
+        for alvo in sorted(alvos, key=lambda path: str(path.resolve()).casefold()):
+            travas.enter_context(project_lock(alvo))
         args.func(args)
     return 0
 
