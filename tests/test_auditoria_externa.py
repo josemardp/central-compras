@@ -374,10 +374,21 @@ class LostUpdateTest(BaseCli):
                             "--fonte", "web", "--link", "https://exemplo.com/a", check=False)
 
         with cf.ThreadPoolExecutor(max_workers=8) as pool:
-            list(pool.map(cotar, range(12)))
+            resultados = list(pool.map(cotar, range(12)))
+
+        falhas = [
+            f"rc={r.returncode}\nstdout={r.stdout}\nstderr={r.stderr}"
+            for r in resultados if r.returncode != 0
+        ]
+        self.assertFalse(falhas, "subprocessos de cotacao falharam:\n" + "\n".join(falhas))
 
         linhas = cc.read_quotes(self.tmpdir / projeto)
         self.assertEqual(len(linhas), 12, f"esperava 12 observacoes, ficaram {len(linhas)}")
+        self.assertEqual(
+            {float(linha["preco"]) for linha in linhas},
+            {float(100 + indice) for indice in range(12)},
+            "alguma observacao foi duplicada ou substituida",
+        )
 
     def test_appending_refuses_a_stale_header_instead_of_rewriting_it(self):
         projeto = self.projeto("fone header", teto=600)

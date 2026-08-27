@@ -1,6 +1,6 @@
 # Ranking
 
-Gerado em 2026-08-27T09:26:08.
+Gerado em 2026-08-27T09:53:38.
 
 ## Elegiveis
 
@@ -35,4 +35,4 @@ Gerado em 2026-08-27T09:26:08.
 - `risco`: vendedor, tipo e prazo de garantia, menos penalidade por alerta de manipulacao.
 - `aderencia`: percentual de requisitos do briefing atendidos pelo produto.
 - `conveniencia`: prazo de frete em escala absoluta.
-- A escala e absoluta, nao relativa ao projeto: 75 aqui significa o mesmo que 75 em outra compra.
+- O score e comparativo dentro do projeto: qualidade e conveniencia usam escalas fixas, mas valor depende do candidato elegivel mais barato. Compare candidatos da mesma compra.

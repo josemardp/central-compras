@@ -173,8 +173,9 @@ O que estava errado e foi corrigido:
 - **Score min-max mentia com poucos candidatos.** Com dois finalistas, o segundo
   sempre tirava 0,00 em qualidade e valor, mesmo perdendo por 0,2 ponto de nota.
   No projeto real do fone, isso virava 80,6 contra 23,1 para uma diferenca que
-  na verdade era 75,4 contra 57,9. Agora a escala e absoluta e comparavel entre
-  projetos.
+  na verdade era 75,4 contra 57,9. Qualidade passou a uma escala fixa e valor
+  a uma razao de custo mais estavel; o total continua comparavel apenas dentro
+  do mesmo projeto.
 - **Alerta `ANCORA` estava invertido.** Ficava calado na ancora inflada e
   acusava o desconto legitimo.
 - **`cotacoes.csv` perdia coluna em silencio.** O arquivo e reescrito inteiro a
@@ -404,8 +405,8 @@ fronteira certa aceita inicio de linha, separador ou `_`, e recusa letra.
 mante-los dizendo que o `ranking.md` ao lado do `decisao.md` era a evidencia da
 decisao. Ele reproduziu que nao era: `regenerar` reescreve com o ranking de hoje,
 e a decisao passa a apontar para um ranking em que ela nem venceria. Agora
-`decidir` congela `decisao-<data>-ranking.md`, e `regenerar` falha se algum
-congelado for alterado.
+`decidir` congela a evidencia da decisao. O pacote final abaixo fortaleceu esse
+primeiro formato para snapshots completos e identificados por hash.
 
 Outros:
 - `aprender-veredito` em veredito vazio retornava sucesso, nao gravava nada e
@@ -427,3 +428,21 @@ avaliacoes, m=50 deixava 75% da nota nas maos do marketplace), qualidade de
 `valor`/`aderencia` viraram eixos obrigatorios.
 
 Testes: de 167 para 169.
+
+### Pacote final de estabilizacao v1
+
+- A trava por arquivo com expiracao foi substituida pela trava consultiva do
+  sistema operacional. Processo morto, Ctrl+C e encerramento forcado liberam o
+  recurso sem janela de roubo de trava; projetos diferentes continuam isolados.
+- Score e confianca agora nascem de uma unica decomposicao consumida por
+  ranking e auditoria. O caso sem peso retorna zero sem divisao por zero.
+- Toda decisao recalcula e congela Markdown, CSV e a cotacao canonica em
+  `snapshots/`, com SHA-256 registrado em `decisao.md`.
+- D+30 e D+180 podem ser preenchidos e exportados uma vez cada. Produto e
+  vendedor continuam com julgamentos separados.
+- O dashboard mostra fases de veredito pendentes e atrasadas; briefing e CLI
+  passaram a orientar prazo, vida util, devolucao, manutencao e proximo comando.
+- A skill versionada e a instalada foram alinhadas ao score comparativo,
+  confianca, confirmacao manual, snapshots e aprendizado em duas fases.
+
+Testes: de 169 para 176.

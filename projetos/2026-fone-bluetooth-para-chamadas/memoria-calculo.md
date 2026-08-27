@@ -1,6 +1,6 @@
 # Memoria de calculo
 
-Gerado em 2026-08-27T09:26:08.
+Gerado em 2026-08-27T09:53:38.
 
 ## QCY H3 ANC
 
@@ -42,13 +42,13 @@ Gerado em 2026-08-27T09:26:08.
 
 | Eixo | Nota | Peso | Entra na conta? | Contribui |
 |---|---:|---:|:--:|---:|
-| qualidade | 0.972 | 0.3 | sim | 0.2916 |
-| valor | 1.000 | 0.25 | sim | 0.2500 |
-| risco | 0.709 | 0.2 | sim | 0.1418 |
-| aderencia | 0.500 | 0.15 | sim | 0.0750 |
+| qualidade | 0.972 | 0.3 | sim | 0.291600 |
+| valor | 1.000 | 0.25 | sim | 0.250000 |
+| risco | 0.709 | 0.2 | sim | 0.141800 |
+| aderencia | 0.500 | 0.15 | sim | 0.075000 |
 | conveniencia | -- | 0.1 | nao (sem dado) | 0 |
-| soma dos que entraram | | 0.9 | | **0.7584** |
-| **renormalizado: 0.7584 / 0.9 x 100** | | | | **84.3** |
+| soma dos que entraram | | 0.900000 | | **0.758400** |
+| **renormalizado: 0.758400 / 0.900000 x 100** | | | | **84.3** |
 
 Confianca: **90%** do peso do score apoiado em dado real.
 
@@ -92,13 +92,13 @@ Confianca: **90%** do peso do score apoiado em dado real.
 
 | Eixo | Nota | Peso | Entra na conta? | Contribui |
 |---|---:|---:|:--:|---:|
-| qualidade | 0.576 | 0.3 | sim | 0.1728 |
-| valor | 0.637 | 0.25 | sim | 0.1593 |
-| risco | 0.604 | 0.2 | sim | 0.1208 |
-| aderencia | 0.500 | 0.15 | sim | 0.0750 |
+| qualidade | 0.576 | 0.3 | sim | 0.172800 |
+| valor | 0.637 | 0.25 | sim | 0.159250 |
+| risco | 0.604 | 0.2 | sim | 0.120800 |
+| aderencia | 0.500 | 0.15 | sim | 0.075000 |
 | conveniencia | -- | 0.1 | nao (sem dado) | 0 |
-| soma dos que entraram | | 0.9 | | **0.5278** |
-| **renormalizado: 0.5278 / 0.9 x 100** | | | | **58.6** |
+| soma dos que entraram | | 0.900000 | | **0.527850** |
+| **renormalizado: 0.527850 / 0.900000 x 100** | | | | **58.6** |
 
 Confianca: **90%** do peso do score apoiado em dado real.
 
@@ -149,13 +149,13 @@ Os eixos abaixo sao informativos: gate vem antes de score.
 
 | Eixo | Nota | Peso | Entra na conta? | Contribui |
 |---|---:|---:|:--:|---:|
-| qualidade | 0.629 | 0.3 | sim | 0.1887 |
-| valor | 0.594 | 0.25 | sim | 0.1485 |
-| risco | 0.454 | 0.2 | sim | 0.0908 |
-| aderencia | 0.500 | 0.15 | sim | 0.0750 |
+| qualidade | 0.629 | 0.3 | sim | 0.188700 |
+| valor | 0.594 | 0.25 | sim | 0.148500 |
+| risco | 0.454 | 0.2 | sim | 0.090800 |
+| aderencia | 0.500 | 0.15 | sim | 0.075000 |
 | conveniencia | -- | 0.1 | nao (sem dado) | 0 |
-| soma dos que entraram | | 0.9 | | **0.5030** |
-| **renormalizado: 0.5030 / 0.9 x 100** | | | | **55.9** |
+| soma dos que entraram | | 0.900000 | | **0.503000** |
+| **renormalizado: 0.503000 / 0.900000 x 100** | | | | **55.9** |
 
 Confianca: **90%** do peso do score apoiado em dado real.
 
@@ -207,13 +207,13 @@ Os eixos abaixo sao informativos: gate vem antes de score.
 
 | Eixo | Nota | Peso | Entra na conta? | Contribui |
 |---|---:|---:|:--:|---:|
-| qualidade | 0.375 | 0.3 | sim | 0.1125 |
-| valor | 0.691 | 0.25 | sim | 0.1727 |
-| risco | 0.604 | 0.2 | sim | 0.1208 |
-| aderencia | 0.500 | 0.15 | sim | 0.0750 |
+| qualidade | 0.375 | 0.3 | sim | 0.112500 |
+| valor | 0.691 | 0.25 | sim | 0.172750 |
+| risco | 0.604 | 0.2 | sim | 0.120800 |
+| aderencia | 0.500 | 0.15 | sim | 0.075000 |
 | conveniencia | -- | 0.1 | nao (sem dado) | 0 |
-| soma dos que entraram | | 0.9 | | **0.4811** |
-| **renormalizado: 0.4811 / 0.9 x 100** | | | | **53.4** |
+| soma dos que entraram | | 0.900000 | | **0.481050** |
+| **renormalizado: 0.481050 / 0.900000 x 100** | | | | **53.4** |
 
 Confianca: **90%** do peso do score apoiado em dado real.
 

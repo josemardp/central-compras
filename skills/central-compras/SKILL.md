@@ -27,8 +27,12 @@ C:\projetos\central-compras
 - Keep personal delivery, CPF, card, password, and payment data out of the repo.
 - A price older than its freshness window is not a price. Recote instead of arguing with the guard.
 - Never close a decision without recording why each other candidate lost.
-- The score is on an absolute scale, so 75 means the same thing in every project. Always show it decomposed into the five axes, and repeat the "score parcial" warning when an axis has no data.
+- The total score is comparative within one project because the value axis uses the cheapest eligible candidate. Never compare total scores from different purchases.
+- Missing axes stay out of the score and reduce `confianca`; do not describe them as neutral 0.50. Decision requires the configured confidence and mandatory axes unless Josemar explicitly records an exception.
 - A gap of 3 points or less between finalists is a technical tie: say so out loud instead of pretending the number decided.
+- `promover-cotacao` requires the fields confirmed now, or explicit `--sem-alteracao`; never refresh an old price implicitly.
+- A final decision freezes its current evidence under `projeto/snapshots/`. Current derived files may be regenerated; snapshots must not be edited or regenerated.
+- D+30 and D+180 are separate observations. Fill and export each phase independently so early experience does not block long-term learning.
 
 ## Workflow
 
@@ -43,6 +47,8 @@ Use the CLI instead of hand-editing whenever it covers the operation:
 ```powershell
 python scripts\central_compras.py --help
 ```
+
+After opening or resuming a project, prefer `status`; it prints the next executable command and the current blockers.
 
 For command examples and stage routing, read [references/fluxo.md](references/fluxo.md) when you need to create or operate a purchase process.
 

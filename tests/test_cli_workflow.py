@@ -479,6 +479,19 @@ class CliWorkflowTest(unittest.TestCase):
             "--permitir-cortado",
             "--comprado",
         )
+        snapshots = list((self.tmpdir / project / "snapshots").glob("*/ranking.md"))
+        self.assertEqual(len(snapshots), 1)
+        snapshot_dir = snapshots[0].parent
+        self.assertTrue((snapshot_dir / "ranking.csv").exists())
+        self.assertTrue((snapshot_dir / "metadados.json").exists())
+        decisao = (self.tmpdir / project / "decisao.md").read_text(encoding="utf-8")
+        self.assertIn(snapshot_dir.relative_to(self.tmpdir / project).as_posix(), decisao)
+        self.assertRegex(decisao, r"Cotacao SHA-256: [0-9a-f]{64}")
+
+        congelado = snapshots[0].read_text(encoding="utf-8")
+        self.run_cli("regenerar", "--projeto", project)
+        self.assertEqual(snapshots[0].read_text(encoding="utf-8"), congelado)
+
         verdict = next((self.tmpdir / "vereditos").glob("*qcy-h3.md"))
         self.run_cli(
             "preencher-veredito",

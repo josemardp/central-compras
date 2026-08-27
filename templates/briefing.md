@@ -19,6 +19,15 @@ criado_em: "{{data}}"
 - Onde vai usar:
 - Frequencia de uso:
 - Restricoes fisicas, tecnicas ou de compatibilidade:
+- Prazo limite para comprar ou receber:
+- Vida util esperada:
+- Experiencia ruim anterior que nao pode se repetir:
+
+## Custo e pos-compra
+
+- Politica minima de troca/devolucao:
+- Manutencao, consumiveis ou assinaturas esperadas:
+- Custo total aceitavel durante a vida util:
 
 ## Criterios obrigatorios
 

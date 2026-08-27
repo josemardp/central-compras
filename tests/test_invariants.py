@@ -201,6 +201,30 @@ class ScoreIsReconstructibleTest(unittest.TestCase):
         sem_renormalizar = sum(com_dado[e] * pesos[e] for e in com_dado) * 100
         self.assertGreater(total, sem_renormalizar)
 
+    def test_canonical_breakdown_is_the_published_score(self):
+        axes = {
+            "qualidade": 0.8,
+            "valor": 1.0,
+            "risco": 0.7,
+            "aderencia": 0.5,
+            "conveniencia": 0.5,
+        }
+        breakdown = cc.score_breakdown(
+            axes, ["conveniencia"], cc.preferences()["score"]
+        )
+        manual = breakdown.weighted_sum / breakdown.used_weight * 100
+
+        self.assertEqual(breakdown.missing_axes, ("conveniencia",))
+        self.assertAlmostEqual(breakdown.confidence, 0.9, places=3)
+        self.assertAlmostEqual(breakdown.score, round(manual, 1), places=1)
+        self.assertGreaterEqual(breakdown.score, 0)
+        self.assertLessEqual(breakdown.score, 100)
+
+    def test_breakdown_with_no_weight_never_divides_by_zero(self):
+        breakdown = cc.score_breakdown({"novo_eixo": 0.9}, [], {})
+        self.assertEqual(breakdown.confidence, 0)
+        self.assertEqual(breakdown.score, 0)
+
     def test_risk_parts_sum_back_to_the_risk_score(self):
         """`risco 0,71` so e auditavel se as parcelas somarem de volta nele."""
         row = {"vendedor_tipo": "oficial", "garantia_tipo": "vendedor",

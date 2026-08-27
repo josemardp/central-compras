@@ -27,6 +27,10 @@ When Josemar confirms the real price/freight/stock/seller/warranty, append a man
 python scripts\central_compras.py promover-cotacao projetos\2026-fone-bluetooth-para-chamadas --produto-id qcy-h3-anc --preco 289 --frete 10 --garantia-meses 12 --garantia-tipo nacional --link "https://..."
 ```
 
+State every field checked now. When the listing was checked and nothing changed,
+use `--sem-alteracao` explicitly. Promotion never silently refreshes an old web
+observation.
+
 For expensive purchases, include TCO:
 
 ```powershell
@@ -63,6 +67,11 @@ retyping anything.
 
 - the chosen quote is not `fonte=manual` (use `--permitir-web` to override);
 - the quote is past its freshness window (`--permitir-vencida` to override);
+- the selected product fails a gate (`--permitir-cortado` to record a conscious exception);
+- required score axes are missing or confidence is below the configured minimum
+  (`--permitir-incompleto` to record a conscious exception);
+- a product marked `aguardando_preco` is still above its target
+  (`--permitir-aguardando` to record a conscious exception);
 - any other candidate with a quote has no recorded reason for losing
   (`--perdedores "produto_id: motivo"`, or `--sem-perdedores` when there really
   was no competitor).
@@ -70,14 +79,22 @@ retyping anything.
 That last one is principle 4 of the PRD: the "why I did not choose it" is what
 stops the whole research from being redone in two years.
 
+The total score is comparable only inside this purchase. Missing axes stay out
+of the calculation and reduce `confianca`; they never count as neutral 0.50.
+Every decision stores immutable `ranking.md`, `ranking.csv`, and quote metadata
+under the project's `snapshots/` directory.
+
 ## Verdict Learning
 
 ```powershell
-python scripts\central_compras.py preencher-veredito vereditos\2026-09-25-projeto-produto.md --fase d30 --nota-arrependimento 1 --compraria-de-novo sim --resumo "Chegou certo e resolveu chamadas." --licao "Compraria de novo de vendedor confiavel."
-python scripts\central_compras.py aprender-veredito vereditos\2026-09-25-projeto-produto.md --marca QCY --loja Amazon --categoria fone
+python scripts\central_compras.py preencher-veredito vereditos\2026-09-25-projeto-produto.md --fase d30 --nota-arrependimento 1 --compraria-de-novo sim --resumo "Chegou certo e resolveu chamadas." --chegou-no-prazo sim --produto-conforme sim --defeito nao --licao "Compraria de novo de vendedor confiavel."
+python scripts\central_compras.py aprender-veredito vereditos\2026-09-25-projeto-produto.md --fase d30
+python scripts\central_compras.py preencher-veredito vereditos\2026-09-25-projeto-produto.md --fase d180 --nota-arrependimento 0 --compraria-de-novo sim --resumo "Continua funcionando." --ainda-usa sim --valeu-o-que-pagou sim --o-que-aprendi "Durabilidade confirmou a escolha."
+python scripts\central_compras.py aprender-veredito vereditos\2026-09-25-projeto-produto.md --fase d180
 ```
 
-`aprender-veredito` exports the verdict into brand/store notes and `base-conhecimento/licoes.md`.
+`aprender-veredito` exports each phase once into brand/store notes and
+`base-conhecimento/licoes.md`. D+30 does not block D+180.
 
 ## Knowledge Base
 
@@ -95,6 +112,7 @@ python scripts\central_compras.py reaproveitamento --categoria fone
 ```powershell
 python scripts\central_compras.py migrar-cotacoes
 python scripts\central_compras.py dados-privados
+python scripts\central_compras.py checar-segredos --strict
 ```
 
 `migrar-cotacoes` upgrades an old `cotacoes.csv` header without losing rows or
