@@ -59,6 +59,15 @@ cosmetico:
   gate:
     exige_vendedor_oficial: true
 
+material_construcao:
+  atributos_obrigatorios:
+    - tipo
+    - uso
+    - superficie
+    - rendimento_m2
+    - embalagem_kg
+  gate: {}
+
 generico:
   atributos_obrigatorios: []
   gate:

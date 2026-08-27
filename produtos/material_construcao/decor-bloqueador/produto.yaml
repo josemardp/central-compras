@@ -1,0 +1,17 @@
+id: decor-bloqueador
+categoria: material_construcao
+nome: Impermeabilizante Block Total Decor Colors
+marca: Decor Colors
+estado: pesquisando
+projeto: 2026-decor-bloqueador
+preco_alvo: null
+preco_teto: null
+atributos:
+  tipo: impermeabilizante
+  uso: umidade_paredes_rodapes
+  embalagem_kg: 12
+  rendimento_m2: 5
+  diluicao_litros: 3
+  superficie: reboque_integro_concreto_bloco_ceramico
+requisitos_atendidos: {}
+descartado_porque: null

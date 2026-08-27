@@ -1,0 +1,2 @@
+data_coleta,produto_id,loja,vendedor,vendedor_tipo,anuncio_id,variacao,preco,preco_promocional,frete_valor,frete_prazo_dias,custo_extra,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total,nota,n_avaliacoes,nota_ajustada,garantia_meses,garantia_tipo,link,flag_suspeita,fonte,confirmacao,score
+2026-08-27T10:25:29,decor-bloqueador,Loja Decor Colors,Decor Colors,oficial,,12 kg,379.99,,0.0,,0.0,379.99,0.0,,0.0,379.99,0.0,0,,,nenhuma,https://loja.decorcolors.com.br/impermeabilizante-block-total-decor-colors/p,,web,coleta,
