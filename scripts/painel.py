@@ -505,6 +505,11 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path != "/api/acao":
             self.send_error(404)
             return
+        content_type = self.headers.get("Content-Type") or ""
+        parts = [p.strip() for p in content_type.split(";")]
+        if not parts or parts[0].lower() != "application/json":
+            self._json({"ok": False, "erro": "Content-Type precisa ser application/json."}, 415)
+            return
         tamanho = int(self.headers.get("Content-Length") or 0)
         if tamanho > 1_000_000:
             self._json({"ok": False, "erro": "Pedido grande demais."}, 413)

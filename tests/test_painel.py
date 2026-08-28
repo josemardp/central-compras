@@ -226,6 +226,20 @@ class ServidorTest(Base):
         self.assertFalse(r["ok"])
         self.assertIn("nao e numero", r["erro"])
 
+    def test_post_refuses_invalid_content_type(self):
+        pedido = urllib.request.Request(
+            self.url("/api/acao"),
+            data=json.dumps({"projeto": self.projeto.name, "acao": "ranking"}).encode(),
+            headers={"Content-Type": "text/plain"}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(pedido, timeout=15)
+        self.assertEqual(ctx.exception.code, 415)
+        corpo = ctx.exception.read().decode("utf-8")
+        dados = json.loads(corpo)
+        self.assertFalse(dados["ok"])
+        self.assertEqual(dados["erro"], "Content-Type precisa ser application/json.")
+
     def test_unknown_route_is_404(self):
         for rota in ["/api/qualquer", "/etc/passwd", "/../config/preferencias.yaml"]:
             with self.assertRaises(urllib.error.HTTPError, msg=rota):
