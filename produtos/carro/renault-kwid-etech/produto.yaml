@@ -1,0 +1,13 @@
+id: renault-kwid-etech
+categoria: carro
+nome: Renault Kwid E-Tech
+marca: Renault
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  origem: nacional
+requisitos_atendidos: {}
+descartado_porque: null

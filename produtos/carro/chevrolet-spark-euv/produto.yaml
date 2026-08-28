@@ -1,0 +1,12 @@
+id: chevrolet-spark-euv
+categoria: carro
+nome: Chevrolet Spark EUV
+marca: Chevrolet
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+requisitos_atendidos: {}
+descartado_porque: null

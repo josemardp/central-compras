@@ -1,0 +1,12 @@
+id: caoa-chery-icar
+categoria: carro
+nome: Caoa Chery iCar
+marca: Caoa Chery
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+requisitos_atendidos: {}
+descartado_porque: null

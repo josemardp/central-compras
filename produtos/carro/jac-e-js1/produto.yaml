@@ -1,0 +1,13 @@
+id: jac-e-js1
+categoria: carro
+nome: JAC e-JS1
+marca: JAC
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  origem: importado
+requisitos_atendidos: {}
+descartado_porque: null

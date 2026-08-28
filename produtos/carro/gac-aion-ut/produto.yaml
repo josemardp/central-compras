@@ -1,0 +1,13 @@
+id: gac-aion-ut
+categoria: carro
+nome: GAC Aion UT
+marca: GAC
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  origem: importado
+requisitos_atendidos: {}
+descartado_porque: null

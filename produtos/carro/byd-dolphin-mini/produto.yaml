@@ -1,0 +1,14 @@
+id: byd-dolphin-mini
+categoria: carro
+nome: BYD Dolphin Mini
+marca: BYD
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  origem: nacional
+  planta: Camacari/BA
+requisitos_atendidos: {}
+descartado_porque: null
