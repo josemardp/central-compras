@@ -365,11 +365,18 @@ def project_path(value: str) -> Path:
     if not path.exists():
         candidates = sorted(p for p in PROJETOS.glob(f"*{value}*") if p.is_dir())
         if len(candidates) == 1:
-            return candidates[0]
-        if len(candidates) > 1:
+            path = candidates[0]
+        elif len(candidates) > 1:
             nomes = ", ".join(p.name for p in candidates)
             raise SystemExit(f"`{value}` casa com mais de um projeto: {nomes}. Seja especifico.")
-    if not path.exists() or not path.is_dir():
+    
+    try:
+        resolved_path = path.resolve()
+        dentro = resolved_path.is_relative_to(PROJETOS.resolve())
+    except Exception:
+        dentro = False
+
+    if not dentro or not path.exists() or not path.is_dir():
         disponiveis = ", ".join(p.name for p in project_dirs()) or "nenhum"
         raise SystemExit(f"Projeto nao encontrado: {value}. Existentes: {disponiveis}")
     return path

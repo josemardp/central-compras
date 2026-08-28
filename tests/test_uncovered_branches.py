@@ -133,6 +133,11 @@ class ProjectLookupTest(unittest.TestCase):
             cc.project_path("carro")
         self.assertIn("2026-fone-bluetooth", str(ctx.exception))
 
+    def test_project_path_traversal_is_blocked(self):
+        with self.assertRaises(SystemExit) as ctx:
+            cc.project_path(str(cc.CONFIG.resolve()))
+        self.assertIn("Projeto nao encontrado", str(ctx.exception))
+
 
 class VerdictBulletTest(unittest.TestCase):
     """`preencher-veredito` grava campo que o template pode nao ter."""
