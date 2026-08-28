@@ -503,6 +503,28 @@ def quote_tco_total(
     return round(custo_total + (custo_operacional_mensal * tco_meses) - valor_revenda_estimado, 2)
 
 
+def compute_costs(
+    preco_efetivo: float,
+    frete: float,
+    custo_extra: float,
+    custo_total_override: float | None,
+    custo_operacional_mensal: float,
+    tco_meses: int,
+    valor_revenda_estimado: float,
+) -> tuple[float, float]:
+    total = custo_total_override
+    if total is None:
+        total = preco_efetivo + frete + custo_extra
+    total_rounded = round(float(total), 2)
+    tco_total = quote_tco_total(
+        total_rounded,
+        custo_operacional_mensal,
+        tco_meses,
+        valor_revenda_estimado,
+    )
+    return total_rounded, tco_total
+
+
 def leading_int(value: Any, default: int = 0) -> int:
     """`3 + 1 presencial` -> 3. Aceita config escrita em linguagem humana."""
     match = re.search(r"\d+", str(value or ""))
@@ -822,12 +844,12 @@ def add_quote(args: argparse.Namespace) -> None:
     preco = quote_float(args.preco)
     promocional = quote_float(args.preco_promocional, 0)
     preco_efetivo = promocional or preco
-    total = args.custo_total
-    if total is None:
-        total = preco_efetivo + quote_float(args.frete) + quote_float(args.custo_extra)
     tco_meses = args.tco_meses if args.tco_meses is not None else category_tco_months(categoria)
-    tco_total = quote_tco_total(
-        float(total),
+    custo_total, tco_total = compute_costs(
+        preco_efetivo,
+        quote_float(args.frete),
+        quote_float(args.custo_extra),
+        args.custo_total,
         quote_float(args.custo_operacional_mensal),
         quote_int(tco_meses),
         quote_float(args.valor_revenda_estimado),
@@ -847,7 +869,7 @@ def add_quote(args: argparse.Namespace) -> None:
         "frete_valor": quote_float(args.frete),
         "frete_prazo_dias": args.frete_prazo_dias if args.frete_prazo_dias is not None else "",
         "custo_extra": quote_float(args.custo_extra),
-        "custo_total": round(float(total), 2),
+        "custo_total": custo_total,
         "custo_operacional_mensal": quote_float(args.custo_operacional_mensal),
         "tco_meses": tco_meses or "",
         "valor_revenda_estimado": quote_float(args.valor_revenda_estimado),
@@ -1888,17 +1910,25 @@ def promote_quote(args: argparse.Namespace) -> None:
     preco = quote_float(row.get("preco"))
     promocional = quote_float(row.get("preco_promocional"), 0)
     preco_efetivo = promocional or preco
-    if args.custo_total is None:
-        row["custo_total"] = round(preco_efetivo + quote_float(row.get("frete_valor")) + quote_float(row.get("custo_extra")), 2)
-    if not row.get("tco_meses"):
-        row["tco_meses"] = category_tco_months(categoria) or ""
-    if args.tco_total is None:
-        row["tco_total"] = quote_tco_total(
-            quote_float(row.get("custo_total")),
-            quote_float(row.get("custo_operacional_mensal")),
-            quote_int(row.get("tco_meses")),
-            quote_float(row.get("valor_revenda_estimado")),
-        )
+    tco_meses = row.get("tco_meses")
+    if not tco_meses:
+        tco_meses = category_tco_months(categoria) or 0
+
+    custo_total, tco_total = compute_costs(
+        preco_efetivo,
+        quote_float(row.get("frete_valor")),
+        quote_float(row.get("custo_extra")),
+        args.custo_total,
+        quote_float(row.get("custo_operacional_mensal")),
+        quote_int(tco_meses),
+        quote_float(row.get("valor_revenda_estimado")),
+    )
+    row["custo_total"] = custo_total
+    row["tco_meses"] = tco_meses or ""
+    if args.tco_total is not None:
+        row["tco_total"] = args.tco_total
+    else:
+        row["tco_total"] = tco_total
     row["nota_ajustada"] = adjusted_rating(quote_float(row.get("nota")), quote_int(row.get("n_avaliacoes"))) if quote_float(row.get("nota")) else ""
     row["score"] = ""
 

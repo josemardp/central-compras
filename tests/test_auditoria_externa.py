@@ -120,6 +120,21 @@ class PromotionLaunderingTest(BaseCli):
         linhas = (self.tmpdir / projeto / "cotacoes.csv").read_text(encoding="utf-8").splitlines()
         self.assertEqual(sum(1 for l in linhas if ",manual," in l), 1)
 
+    def test_promotion_and_add_quote_have_identical_tco_calculation(self):
+        projeto = self.projeto("fone tco", teto=600)
+        self.candidato(projeto, "fone-web", "Fone Web", fonte="web")
+        self.cli("cotar", projeto, "--produto-id", "fone-web", "--loja", "Amazon",
+                 "--preco", "289.456", "--frete", "10.123", "--custo-extra", "5.789",
+                 "--custo-operacional-mensal", "2.345", "--tco-meses", "12",
+                 "--valor-revenda-estimado", "50.123", "--fonte", "web")
+        self.cli("promover-cotacao", projeto, "--produto-id", "fone-web", "--sem-alteracao")
+        quotes = cc.read_quotes(self.tmpdir / projeto)
+        self.assertEqual(len(quotes), 3)
+        q_web = quotes[1]
+        q_manual = quotes[2]
+        self.assertEqual(q_web["custo_total"], q_manual["custo_total"])
+        self.assertEqual(q_web["tco_total"], q_manual["tco_total"])
+
 
 class NotANumberTest(unittest.TestCase):
     """Achado 5: `NaN` e infinito passavam porque toda comparacao com NaN e falsa."""
