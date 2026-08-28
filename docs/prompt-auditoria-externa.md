@@ -1,20 +1,35 @@
-# Prompt para auditoria externa (Codex) — terceira rodada
+# Prompt para auditoria externa (Kimi) — terceira rodada
 
-Copie tudo daqui para baixo e cole no Codex, com o repositório aberto.
+Copie tudo daqui para baixo e cole no Kimi, com o repositório aberto.
 (As rodadas 1 e 2 estão no histórico do Git: `git log -- docs/prompt-auditoria-externa.md`.)
 
 ---
 
-Você já auditou este repositório duas vezes. Nas duas, seus achados eram reais,
-foram reproduzidos, corrigidos e viraram teste de regressão. Obrigado — e é
-justamente por isso que esta rodada não é mais do mesmo.
+Você nunca viu este repositório. **Isso é uma vantagem, e eu escolhi você por
+causa dela.**
 
-A rodada 1 auditou o **motor de decisão** e a integridade dos dados.
-A rodada 2 auditou as **regressões** dessas correções, mais a skill, os
-templates, o ciclo de veredito, o dashboard e a experiência de erro.
+As duas auditorias anteriores foram feitas pelo mesmo auditor. Ele achou coisas
+reais, tudo foi reproduzido, corrigido e virou teste de regressão. Mas a essa
+altura ele está defendendo as próprias conclusões: metade do `preferencias.yaml`
+saiu de sugestão dele, e ele já não consegue olhar este código sem passado.
+Você consegue.
 
-**Não repita esse território.** Aquilo está julgado. Esta rodada tem dois alvos
-que nunca foram olhados por ninguém, e o segundo é o mais importante.
+O que já está julgado, e que eu **não** quero que você refaça:
+
+- **Rodada 1** — o motor de decisão e a integridade dos dados. Seis achados,
+  todos corrigidos: `decidir` fechava produto cortado no gate; `promover-cotacao`
+  lavava preço web antigo como manual; `NaN`/infinito passavam como preço; data
+  futura passava; `auditar` e `ranking` usavam campos de valor diferentes; o
+  varredor de segredos tinha falsos-negativos.
+- **Rodada 2** — as regressões dessas correções, mais a skill, os templates, o
+  ciclo de veredito, o dashboard e a experiência de erro. Dali saiu a mudança
+  estrutural do score: eixo sem dado sai da conta, os pesos restantes são
+  renormalizados, e nasceu o índice `confianca`.
+
+Esse território está coberto. **Se você discordar de alguma dessas decisões, diga
+— mas com argumento novo, não com a mesma crítica outra vez.**
+
+Esta rodada tem dois alvos que ninguém olhou, e o segundo é o mais importante.
 
 ## O repositório
 
@@ -156,9 +171,9 @@ a possibilidade de "não faça nada disso, a decisão original está certa e o q
 falta é explicar melhor". E se você recomendar algo, diga o que **não** construir
 junto.
 
-**c) Onde ele trabalha por ela.** Você já fez o teste dirigido pelo produto na
-rodada 2, com uma compra fictícia. Agora faça diferente: **use o projeto de
-carro elétrico que já está no repositório** (`projetos/2026-comprar-carro-eletrico`).
+**c) Onde ele trabalha por ela.** A rodada 2 fez esse teste com uma compra
+fictícia, inventada do zero. Faça diferente: **use o projeto de carro elétrico
+que já está no repositório** (`projetos/2026-comprar-carro-eletrico`).
 Ele tem 10 candidatos mapeados, nenhuma cotação, e uma regra de parada que só
 permite 4 candidatos. Tente levá-lo do estado atual até ter uma shortlist de 4.
 Onde a ferramenta ajuda? Onde ela só cobra? A categoria `carro` e o caminho de
@@ -176,8 +191,9 @@ Um arquivo de 4.190 linhas com 30 subcomandos, escrito ao longo de 14 sprints
 por agentes diferentes.
 
 - Existe **regra duplicada em dois lugares** que já divergiu, ou vai divergir na
-  próxima mudança? (Na rodada 1 você achou uma: `custo_total` vs `tco_total`,
-  resolvida com `value_field_for()`. Existem outras?)
+  próxima mudança? (A rodada 1 achou uma: `custo_total` vs `tco_total` usados por
+  comandos diferentes, resolvida extraindo `value_field_for()`. O padrão existe;
+  procure os irmãos dele.)
 - Existe subcomando **morto, quebrado ou que ninguém usaria**? 30 é muito.
 - Os 200 testes: eles cobrem o que quebra, ou cresceram cobrindo o que é fácil
   de testar? Aponte a área com mais risco e menos teste.
@@ -192,31 +208,43 @@ skill também não está em `C:\Users\josem\.codex\skills\`. Ou seja: a skill es
 documentada como instalada e não está.
 
 Isso levanta a pergunta maior, que é a que me interessa: **como a skill chega às
-várias máquinas dele?** Não há script de instalação. Ele usa Codex *e* Claude
-Code; `skills/central-compras/agents/openai.yaml` só atende o Codex. Qual é o
-desenho certo aqui?
+várias máquinas dele?** Não há script de instalação. E ele não usa um agente só:
+usa Codex, Claude Code e agora você. O único arquivo de integração que existe,
+`skills/central-compras/agents/openai.yaml`, atende apenas o Codex — e o
+`SKILL.md` está escrito em inglês, com caminho do Windows cravado dentro.
 
-### 5. Julgamento, de novo
+Qual é o desenho certo aqui? Um único `SKILL.md` neutro que qualquer agente lê?
+Um instalador? Nada disso, e o conhecimento deveria viver no README? Você é o
+terceiro agente a encostar neste repositório: diga o que **você** precisou saber
+para operar e não estava escrito em lugar nenhum.
 
-Você já opinou sobre escalas e pesos, e várias sugestões suas viraram
-`preferencias.yaml`. Agora, com dois projetos reais no repositório:
+### 5. Julgamento
 
-- `confianca_minima_para_decidir` subiu para 0,90 (padrão) e 0,95 (acima de
-  R$ 20 mil). Na rodada 2 o número era 0,75 e você achou frouxo. **Passou do
-  ponto?** Com 0,95, um carro fecha algum dia?
-- `peso_ancora: 250` na nota bayesiana veio da sua crítica ao `m=50`. Ficou bom
-  para marketplace grande, mas e para categoria de poucas avaliações — material
-  de construção, por exemplo, onde 30 avaliações já é muito? O número único
-  serve para as duas pontas?
+Aqui eu quero opinião, não bug. Vários números abaixo saíram de sugestão do
+auditor anterior, e é exatamente por isso que eu quero um segundo olho. Com dois
+projetos reais no repositório:
+
+- `confianca_minima_para_decidir` é 0,90 (padrão) e 0,95 (acima de R$ 20 mil).
+  Na rodada 2 era 0,75, considerado frouxo, e subiu. **Passou do ponto?** Com
+  0,95, um carro fecha algum dia, ou o dono vai acabar usando
+  `--permitir-incompleto` toda vez — que é como uma trava morre?
+- `peso_ancora: 250` na nota bayesiana substituiu um `m=50` julgado fraco para
+  marketplace grande. Ficou bom para a Amazon, mas e para categoria de poucas
+  avaliações — material de construção, onde 30 avaliações já é muito? Um número
+  único serve para as duas pontas, ou isso devia ser por categoria?
 - O eixo `valor` é razão contra o mais barato do conjunto, e o README avisa que
   o score total não é comparável entre projetos. Isso é limitação aceitável ou
   defeito de desenho que ainda vai morder?
-
-Se você mantiver uma crítica que eu não implementei, **insista com argumento**.
+- **A pergunta aberta:** olhando o `preferencias.yaml` inteiro, tem número ali
+  que não deveria ser número? Alguma coisa que virou constante configurável
+  quando na verdade era uma decisão que precisava de contexto?
 
 ## Regras
 
-- **Reproduza antes de reportar.** Comando e saída real. Sem reprodução eu descarto.
+- **Reproduza antes de reportar.** Comando e saída real. Sem reprodução eu
+  descarto. Se você não tiver como executar comando neste ambiente, **diga isso
+  logo na primeira linha** e marque todo achado como análise estática — eu sei
+  ler os dois, mas preciso saber qual é qual.
 - **Não conserte.** Diagnóstico primeiro. Se propuser correção, em diff separado,
   no fim, e claramente marcada como proposta.
 - **Não invente.** `[NÃO VERIFICADO: motivo]` em vez de completar com
@@ -241,8 +269,12 @@ Se você mantiver uma crítica que eu não implementei, **insista com argumento*
 - Nenhuma compra foi fechada ainda em nenhum projeto. O ciclo de veredito nunca
   rodou com dado real — se isso atrapalhar sua análise, diga.
 - Falta a tag `v1.0` e a rotina semanal.
-- Derivados versionados: já discutimos duas vezes, mantive com `regenerar`.
-  Só volte ao assunto se tiver argumento novo.
+- **Derivados versionados** (`ranking.md`, `validacao.md`, `dashboard/` estão no
+  Git de propósito). O auditor anterior disse duas vezes que era errado; eu
+  mantive, porque o `ranking.md` ao lado do `decisao.md` é a evidência de por que
+  decidi naquele dia, e criei `regenerar` para resolver conflito de merge. Você
+  tem o direito de discordar, mas só volte ao assunto com argumento que essas
+  duas trocas não cobriram.
 
 ## Formato
 
@@ -260,9 +292,10 @@ Se você mantiver uma crítica que eu não implementei, **insista com argumento*
 
 ## Skill e várias máquinas
 
-## Julgamento revisado
+## Julgamento
 
-## Onde eu continuo discordando de você
+## Onde eu discordo das decisões já tomadas
+[só com argumento novo; se não tiver, escreva "nada a acrescentar"]
 
 ## O que não consegui verificar
 ```
