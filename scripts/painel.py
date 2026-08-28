@@ -510,7 +510,17 @@ class _Handler(BaseHTTPRequestHandler):
         if not parts or parts[0].lower() != "application/json":
             self._json({"ok": False, "erro": "Content-Type precisa ser application/json."}, 415)
             return
-        tamanho = int(self.headers.get("Content-Length") or 0)
+        raw_length = self.headers.get("Content-Length")
+        if raw_length is not None:
+            try:
+                tamanho = int(raw_length)
+                if tamanho < 0:
+                    raise ValueError()
+            except ValueError:
+                self._json({"ok": False, "erro": "Content-Length invalido."}, 400)
+                return
+        else:
+            tamanho = 0
         if tamanho > 1_000_000:
             self._json({"ok": False, "erro": "Pedido grande demais."}, 413)
             return

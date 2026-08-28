@@ -240,6 +240,34 @@ class ServidorTest(Base):
         self.assertFalse(dados["ok"])
         self.assertEqual(dados["erro"], "Content-Type precisa ser application/json.")
 
+    def test_post_refuses_invalid_content_length(self):
+        pedido = urllib.request.Request(
+            self.url("/api/acao"),
+            data=json.dumps({"projeto": self.projeto.name, "acao": "ranking"}).encode(),
+            headers={"Content-Type": "application/json", "Content-Length": "abc"}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(pedido, timeout=15)
+        self.assertEqual(ctx.exception.code, 400)
+        corpo = ctx.exception.read().decode("utf-8")
+        dados = json.loads(corpo)
+        self.assertFalse(dados["ok"])
+        self.assertEqual(dados["erro"], "Content-Length invalido.")
+
+    def test_post_refuses_negative_content_length(self):
+        pedido = urllib.request.Request(
+            self.url("/api/acao"),
+            data=json.dumps({"projeto": self.projeto.name, "acao": "ranking"}).encode(),
+            headers={"Content-Type": "application/json", "Content-Length": "-5"}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(pedido, timeout=15)
+        self.assertEqual(ctx.exception.code, 400)
+        corpo = ctx.exception.read().decode("utf-8")
+        dados = json.loads(corpo)
+        self.assertFalse(dados["ok"])
+        self.assertEqual(dados["erro"], "Content-Length invalido.")
+
     def test_unknown_route_is_404(self):
         for rota in ["/api/qualquer", "/etc/passwd", "/../config/preferencias.yaml"]:
             with self.assertRaises(urllib.error.HTTPError, msg=rota):
