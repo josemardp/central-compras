@@ -90,6 +90,15 @@ class CategoryBayesianAnchorTest(unittest.TestCase):
         # Ancora menor deixa a nota bruta pesar mais, aproximando do valor original.
         self.assertGreater(local_ancora, global_ancora)
 
+    def test_material_construcao_uses_lower_anchor_than_global(self):
+        # material_construcao tem peso_ancora proprio, menor que o global 250.
+        # Com 30 avaliacoes e nota 4.8, o global esmaga perto de 4.35; o local
+        # deve ficar bem acima disso, sem chegar a 4.8.
+        global_anchor = central_compras.adjusted_rating(4.8, 30, "generico")
+        material_anchor = central_compras.adjusted_rating(4.8, 30, "material_construcao")
+        self.assertLess(material_anchor, 4.8)
+        self.assertGreater(material_anchor, global_anchor)
+
 
 class AuditScoreBayesianMergeTest(unittest.TestCase):
     """audit_score deve usar a mesma configuracao mesclada que adjusted_rating."""

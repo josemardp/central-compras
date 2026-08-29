@@ -71,6 +71,16 @@ material_construcao:
     - superficie
     - rendimento_m2
     - embalagem_kg
+  # Produtos de nicho (impermeabilizante, tinta, argamassa, cimento) raramente
+  # passam de algumas dezenas de avaliacoes em marketplaces brasileiros.
+  # Pesquisa pontual em 2026-08-29: listagens no Mercado Livre e Amazon .br
+  # mostraram impermeabilizantes com 5-13 avaliacoes, tintas com 1-58,
+  # massa corrida com 1-462 (concentrado em poucos SKUs), e cimentos frequentemente
+  # sem avaliacoes ou zero em sites especializados. Com peso_ancora=50, um produto
+  # de 50 avaliacoes ja pesa 50% da nota ajustada; com 150 avaliacoes sobe para 75%.
+  # Valor proposto; sujeito a confirmacao do Josemar.
+  nota_bayesiana:
+    peso_ancora: 50
   gate: {}
 
 generico:
