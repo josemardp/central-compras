@@ -225,6 +225,7 @@ class ServidorTest(Base):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             urllib.request.urlopen(self.url("/api/estado?projeto=nao-existe"), timeout=15)
         self.assertEqual(ctx.exception.code, 404)
+        ctx.exception.close()
 
     def test_guards_hold_through_http(self):
         self.assertFalse(self.post({"projeto": self.projeto.name, "acao": "apagar_tudo", "dados": {}})["ok"])
@@ -243,6 +244,7 @@ class ServidorTest(Base):
             urllib.request.urlopen(pedido, timeout=15)
         self.assertEqual(ctx.exception.code, 415)
         corpo = ctx.exception.read().decode("utf-8")
+        ctx.exception.close()
         dados = json.loads(corpo)
         self.assertFalse(dados["ok"])
         self.assertEqual(dados["erro"], "Content-Type precisa ser application/json.")
@@ -257,6 +259,7 @@ class ServidorTest(Base):
             urllib.request.urlopen(pedido, timeout=15)
         self.assertEqual(ctx.exception.code, 400)
         corpo = ctx.exception.read().decode("utf-8")
+        ctx.exception.close()
         dados = json.loads(corpo)
         self.assertFalse(dados["ok"])
         self.assertEqual(dados["erro"], "Content-Length invalido.")
@@ -271,14 +274,16 @@ class ServidorTest(Base):
             urllib.request.urlopen(pedido, timeout=15)
         self.assertEqual(ctx.exception.code, 400)
         corpo = ctx.exception.read().decode("utf-8")
+        ctx.exception.close()
         dados = json.loads(corpo)
         self.assertFalse(dados["ok"])
         self.assertEqual(dados["erro"], "Content-Length invalido.")
 
     def test_unknown_route_is_404(self):
         for rota in ["/api/qualquer", "/etc/passwd", "/../config/preferencias.yaml"]:
-            with self.assertRaises(urllib.error.HTTPError, msg=rota):
+            with self.assertRaises(urllib.error.HTTPError, msg=rota) as ctx:
                 urllib.request.urlopen(self.url(rota), timeout=15)
+            ctx.exception.close()
 
 
 class ArtifactTest(Base):

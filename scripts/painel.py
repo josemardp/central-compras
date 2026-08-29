@@ -509,31 +509,59 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self.send_error(404)
 
+    def _consume_body(self) -> None:
+        """Descarta o corpo da requisicao antes de responder com erro.
+
+        Se o servidor enviar a resposta sem ler o corpo, o cliente (urllib no
+        Windows) pode receber RST e levantar ConnectionAbortedError em vez do
+        status HTTP esperado. Le o que ja chegou com timeout curto, sem
+        bloquear ate o fim da conexao.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length > 0:
+                self.rfile.read(min(length, 1_000_000))
+                return
+        except ValueError:
+            pass
+        original_timeout = self.connection.gettimeout()
+        self.connection.settimeout(0.1)
+        try:
+            while True:
+                try:
+                    chunk = self.connection.recv(4096)
+                    if not chunk:
+                        break
+                except TimeoutError:
+                    break
+        finally:
+            self.connection.settimeout(original_timeout)
+
     def do_POST(self) -> None:
         if self.path != "/api/acao":
             self.send_error(404)
             return
+        raw_length = self.headers.get("Content-Length")
+        try:
+            tamanho = int(raw_length) if raw_length is not None else 0
+            if tamanho < 0:
+                raise ValueError()
+        except ValueError:
+            self._consume_body()
+            self._json({"ok": False, "erro": "Content-Length invalido."}, 400)
+            return
+        if tamanho > 1_000_000:
+            self._consume_body()
+            self._json({"ok": False, "erro": "Pedido grande demais."}, 413)
+            return
+        corpo = self.rfile.read(tamanho)
         content_type = self.headers.get("Content-Type") or ""
         parts = [p.strip() for p in content_type.split(";")]
         if not parts or parts[0].lower() != "application/json":
             self._json({"ok": False, "erro": "Content-Type precisa ser application/json."}, 415)
             return
-        raw_length = self.headers.get("Content-Length")
-        if raw_length is not None:
-            try:
-                tamanho = int(raw_length)
-                if tamanho < 0:
-                    raise ValueError()
-            except ValueError:
-                self._json({"ok": False, "erro": "Content-Length invalido."}, 400)
-                return
-        else:
-            tamanho = 0
-        if tamanho > 1_000_000:
-            self._json({"ok": False, "erro": "Pedido grande demais."}, 413)
-            return
         try:
-            pedido = json.loads(self.rfile.read(tamanho) or b"{}")
+            pedido = json.loads(corpo or b"{}")
         except json.JSONDecodeError:
             self._json({"ok": False, "erro": "JSON invalido."}, 400)
             return
