@@ -412,3 +412,72 @@ class LostUpdateTest(BaseCli):
         with self.assertRaises(SystemExit) as ctx:
             cc.append_quote(caminho, {"data_coleta": "2026-01-01", "produto_id": "a", "custo_total": "1"})
         self.assertIn("migrar-cotacoes", str(ctx.exception))
+
+
+class NoShippingCategoryConfidenceTest(BaseCli):
+    """3a auditoria externa (Antigravity): carro nao tem frete no sentido que
+
+    o eixo `conveniencia` mede (dias ate a entrega). Faltar esse dado deixava
+    o eixo permanentemente "sem dado", travando a confianca em 0,90 - abaixo
+    do piso de 0,95 exigido acima de R$ 20 mil. Decisao do Josemar: categoria
+    marcada `sem_frete` tira o eixo inteiro da conta, em vez de puni-la para
+    sempre por um dado que nunca vai existir.
+
+    Roda tudo via CLI (subprocesso), como o resto deste arquivo: `compute_ranking`
+    e `stop_rule_status` dependem de `cc.PRODUTOS`/`cc.CONFIG` do processo que
+    os chama, e esse processo de teste aponta para o repositorio real, nao
+    para o `tmpdir` isolado que o subprocesso usa.
+    """
+
+    def test_missing_delivery_deadline_does_not_cap_confidence_for_carro(self):
+        projeto = self.projeto("carro sem frete", categoria="carro", valor=25000)
+        self.cli("novo-produto", projeto, "Carro Teste", "--marca", "M",
+                 "--categoria", "carro", "--produto-id", "carro-teste",
+                 "--requisito", "uso=true", "--requisito", "rede_assistencia=true")
+        self.cli("cotar", projeto, "--produto-id", "carro-teste",
+                 "--loja", "Concessionaria", "--vendedor", "V",
+                 "--vendedor-tipo", "oficial", "--preco", "120000",
+                 "--nota", "4.6", "--avaliacoes", "900",
+                 "--garantia-meses", "36", "--garantia-tipo", "nacional",
+                 "--fonte", "manual", "--link", "https://exemplo.com/carro-teste")
+        self.cli("auditar", projeto)
+
+        memoria = (self.tmpdir / projeto / "memoria-calculo.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "categoria sem frete real: o eixo nao entra na conta desta categoria", memoria,
+        )
+        self.assertIn("Confianca: **100%**", memoria,
+                       "faltar frete nao pode travar a confianca de uma categoria sem frete")
+
+
+class MappedCandidatesCountTowardStopRuleTest(BaseCli):
+    """3a auditoria externa (Antigravity): a regra de parada so contava
+
+    candidato com cotacao registrada. Com 10 candidatos mapeados e zero
+    cotacoes (caso real do projeto do carro eletrico), o teto da faixa nunca
+    disparava aviso porque `candidatos_atuais` dava zero.
+    """
+
+    def test_candidate_without_a_quote_still_counts_toward_the_limit(self):
+        projeto = self.projeto("carro sem cotacao", categoria="carro", valor=25000)
+        for indice in range(5):
+            self.cli("novo-produto", projeto, f"Carro {indice}", "--marca", "M",
+                     "--categoria", "carro", "--produto-id", f"carro-{indice}")
+        self.cli("validar", projeto, check=False)
+
+        validacao = (self.tmpdir / projeto / "validacao.md").read_text(encoding="utf-8")
+        self.assertIn("5 candidatos para um teto de 4", validacao,
+                       "candidato mapeado sem cotacao precisa contar pra regra de parada")
+
+    def test_a_quoted_candidate_without_produto_yaml_still_counts(self):
+        """Cotacao sem produto.yaml correspondente (dado legado) nao pode sumir da conta."""
+        projeto = self.projeto("carro legado", categoria="carro", valor=25000)
+        caminho = self.tmpdir / projeto
+        cc.append_quote(caminho, {
+            "data_coleta": cc.now_iso(), "produto_id": "carro-legado",
+            "custo_total": "100000", "fonte": "manual",
+        })
+        self.cli("validar", projeto, check=False)
+
+        validacao = (caminho / "validacao.md").read_text(encoding="utf-8")
+        self.assertIn("carro-legado", validacao)

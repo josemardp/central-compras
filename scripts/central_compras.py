@@ -569,23 +569,27 @@ def stop_rule_status(project: Path) -> dict[str, Any]:
     if not regra:
         return {}
     rows = read_quotes(project)
-    por_produto: dict[str, int] = {}
+    cotacoes_por_produto: dict[str, int] = {}
     for row in rows:
         produto_id = row.get("produto_id")
         if produto_id:
-            por_produto[produto_id] = por_produto.get(produto_id, 0) + 1
+            cotacoes_por_produto[produto_id] = cotacoes_por_produto.get(produto_id, 0) + 1
+    # Candidato mapeado (`novo-produto`) conta mesmo sem cotacao ainda: sem
+    # isso, 10 candidatos mapeados e zero cotacoes davam zero candidatos, e o
+    # teto da faixa nunca disparava aviso.
+    candidatos = project_candidate_ids(project) | set(cotacoes_por_produto)
     aberto_em = parse_dashboard_date(briefing.get("criado_em"))
     dias = (dt.date.today() - aberto_em).days if aberto_em else None
     faltando = sorted(
         produto_id
-        for produto_id, total in por_produto.items()
-        if total < regra["cotacoes_minimas_por_candidato"]
+        for produto_id in candidatos
+        if cotacoes_por_produto.get(produto_id, 0) < regra["cotacoes_minimas_por_candidato"]
     )
     return {
         **regra,
-        "candidatos_atuais": len(por_produto),
+        "candidatos_atuais": len(candidatos),
         "dias_em_pesquisa": dias,
-        "candidatos_excedidos": bool(regra["candidatos"] and len(por_produto) > regra["candidatos"]),
+        "candidatos_excedidos": bool(regra["candidatos"] and len(candidatos) > regra["candidatos"]),
         "produtos_sem_cotacoes_suficientes": faltando,
     }
 
@@ -801,6 +805,21 @@ def product_id_conflicts() -> list[str]:
         for produto_id, categorias in sorted(seen.items())
         if len(set(categorias)) > 1
     ]
+
+
+def project_candidate_ids(project: Path) -> set[str]:
+    """Todo produto_id mapeado para este projeto, com ou sem cotacao ainda.
+
+    `novo-produto` grava `projeto` no `produto.yaml`. Antes disso, a regra de
+    parada so via candidato quando a primeira cotacao chegava: com 10
+    candidatos mapeados e zero cotacoes, ela contava zero.
+    """
+    ids: set[str] = set()
+    for path in PRODUTOS.glob("*/*/produto.yaml"):
+        dados = read_yaml(path, {})
+        if dados.get("projeto") == project.name:
+            ids.add(path.parent.name)
+    return ids
 
 
 def set_process_state(project: Path, *, estado: str | None = None, proxima_acao: str | None = None, decisao_aberta: str | None = None) -> None:
@@ -1510,6 +1529,8 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     candidates: list[Ranked] = []
     for produto_id, row, product, eliminations, alerts in pre_candidates:
         sem_dado: list[str] = []
+        categoria_produto = product.get("categoria") or briefing.get("categoria") or "generico"
+        sem_frete = bool(category_definition(categoria_produto).get("sem_frete"))
 
         nota_ajustada = current_adjusted_rating(row)
         if not nota_ajustada:
@@ -1518,7 +1539,9 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
         prazo_raw = row.get("frete_prazo_dias")
         prazo = quote_float(prazo_raw) if prazo_raw not in {"", None} else None
         conveniencia, tem_prazo = convenience_score(prazo)
-        if not tem_prazo:
+        # Categoria sem frete real (ex.: carro): o eixo nao entra na conta,
+        # nunca "sem dado" temporario que travaria a confianca para sempre.
+        if sem_frete or not tem_prazo:
             sem_dado.append("conveniencia")
 
         if not (product.get("requisitos_atendidos") or {}):
@@ -1532,8 +1555,9 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
             "valor": value_score(cost_of(row), menor_custo),
             "risco": risk_score(row, alerts),
             "aderencia": adherence_score(product),
-            "conveniencia": conveniencia,
         }
+        if not sem_frete:
+            axes["conveniencia"] = conveniencia
 
         # Eixo sem dado sai da conta em vez de entrar como 0,50 neutro, e os
         # pesos restantes sao renormalizados. Com o 0,50, "nao informei o prazo"
@@ -3645,16 +3669,19 @@ def audit_score(args: argparse.Namespace) -> None:
             linhas.append("- nenhum requisito registrado: o eixo fica **fora da conta** (nao vale 0,50)")
 
         linhas.extend(["", "### Conveniencia", ""])
-        prazo = row.get("frete_prazo_dias")
-        if prazo in {"", None}:
-            linhas.append("- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)")
+        if "conveniencia" not in item.axes:
+            linhas.append("- categoria sem frete real: o eixo nao entra na conta desta categoria")
         else:
-            cfg_conv = (preferences().get("escala") or {}).get("conveniencia") or {}
-            otimo = quote_float(cfg_conv.get("prazo_otimo_dias"), 2)
-            ruim = quote_float(cfg_conv.get("prazo_ruim_dias"), 30)
-            linhas.append(
-                f"- conveniencia = ({ruim} - {prazo}) / ({ruim} - {otimo}) = **{item.axes['conveniencia']:.3f}**"
-            )
+            prazo = row.get("frete_prazo_dias")
+            if prazo in {"", None}:
+                linhas.append("- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)")
+            else:
+                cfg_conv = (preferences().get("escala") or {}).get("conveniencia") or {}
+                otimo = quote_float(cfg_conv.get("prazo_otimo_dias"), 2)
+                ruim = quote_float(cfg_conv.get("prazo_ruim_dias"), 30)
+                linhas.append(
+                    f"- conveniencia = ({ruim} - {prazo}) / ({ruim} - {otimo}) = **{item.axes['conveniencia']:.3f}**"
+                )
 
         linhas.extend(["", "### Score final", "", "| Eixo | Nota | Peso | Entra na conta? | Contribui |", "|---|---:|---:|:--:|---:|"])
         breakdown = item.breakdown

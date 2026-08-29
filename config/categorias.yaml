@@ -10,6 +10,11 @@ carro:
     - seguro_ano_1
     - carregador_wallbox
   tco_meses: 60
+  # Carro nao tem frete no sentido que o eixo conveniencia mede (dias ate a
+  # entrega). O eixo sai inteiro da conta de score e confianca nesta
+  # categoria, em vez de ficar permanentemente "sem dado" e travar a
+  # confianca minima. Decisao do Josemar na 3a auditoria externa.
+  sem_frete: true
   gate:
     garantia_minima_meses: 36
     exige_rede_assistencia: true
