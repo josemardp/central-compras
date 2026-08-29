@@ -3623,7 +3623,11 @@ def audit_score(args: argparse.Namespace) -> None:
         linhas.append(
             f"- nota bruta {row.get('nota') or 0} com {row.get('n_avaliacoes') or 0} avaliacoes"
         )
-        cfg_bayes = category_definition(categoria_produto or "generico").get("nota_bayesiana") or preferences().get("nota_bayesiana", {})
+        global_cfg = preferences().get("nota_bayesiana", {})
+        cfg_bayes = global_cfg
+        if categoria_produto:
+            cat_cfg = category_definition(categoria_produto).get("nota_bayesiana") or {}
+            cfg_bayes = {**global_cfg, **cat_cfg}
         media = quote_float(cfg_bayes.get("media_categoria_padrao"), 4.3)
         ancora = quote_float(cfg_bayes.get("peso_ancora"), 50)
         n = quote_int(row.get("n_avaliacoes"))
