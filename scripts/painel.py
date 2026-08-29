@@ -696,3 +696,7 @@ def gerar_artifact(args: argparse.Namespace) -> None:
         cc.atomic_write_text(alvo, artifact_fragmento())
         print(alvo)
     print("Pagina unica, so leitura. Pronta para publicar como artifact.")
+    print(
+        "Lembrete: nao escreva CEP, endereco ou nome de terceiros em texto livre "
+        "(campo porque, notas). O scanner de segredos nao detecta isso."
+    )

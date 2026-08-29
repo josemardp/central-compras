@@ -283,6 +283,23 @@ class ArtifactTest(Base):
         self.assertIn("viewport", pagina)
         self.assertIn("prefers-color-scheme", pagina, "sem tema escuro")
 
+    def test_artifact_command_warns_about_private_data(self):
+        import argparse
+        import io
+        import sys
+
+        args = argparse.Namespace(fragmento=None)
+        saida = io.StringIO()
+        stdout_original = sys.stdout
+        sys.stdout = saida
+        try:
+            painel.gerar_artifact(args)
+        finally:
+            sys.stdout = stdout_original
+        texto = saida.getvalue()
+        self.assertIn("Lembrete: nao escreva CEP", texto)
+        self.assertIn("scanner de segredos nao detecta", texto)
+
     def test_it_shows_the_engine_numbers(self):
         pagina = painel.artifact_html()
         self.assertIn("Fone A", pagina)

@@ -3820,6 +3820,7 @@ def private_data_dir(_: argparse.Namespace) -> None:
 
 SENSITIVE_PATTERNS: list[tuple[str, str, str]] = [
     ("CPF", r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", "CPF formatado"),
+    ("CEP", r"\b\d{5}-\d{3}\b", "CEP"),
     # CPF sem pontuacao so conta quando esta rotulado: 11 digitos soltos sao
     # rastreio, EAN e telefone o tempo todo num repositorio de compras.
     ("CPF", r"(?i)\bcpf\b[^0-9]{0,12}\d{11}\b", "CPF sem pontuacao, rotulado"),
