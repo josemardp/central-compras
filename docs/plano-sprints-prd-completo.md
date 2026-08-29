@@ -153,9 +153,9 @@ Entregas:
 - [x] Pasta de dados pessoais fora da arvore do repositorio (`dados-privados`).
 - [x] Testes ampliados: 58 testes, cobrindo integridade de CSV, escala do score,
       frescor, regra de parada, gates, travas de decisao e varredura de segredo.
-- [ ] Documentacao de rotina semanal.
-- [ ] Guia de nova categoria.
-- [ ] Tag `v1.0`.
+- [x] Documentacao de rotina semanal.
+- [x] Guia de nova categoria.
+- [x] Tag `v1.0`.
 
 Gate de saida:
 - [x] Comando equivalente ao pre-commit bloqueia padroes sensiveis.
