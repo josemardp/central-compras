@@ -1,6 +1,6 @@
 # Validacao
 
-Gerado em 2026-08-28T11:11:51.
+Gerado em 2026-08-29T16:23:27.
 
 ## Erros
 
@@ -10,7 +10,7 @@ Gerado em 2026-08-28T11:11:51.
 
 - cotacoes.csv linha 3 (edifier-w820nb-plus): alertas AVAL_SUSPEITA
 - Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.
-- Regra de parada (de_200_a_2000): minimo de 2 cotacao(oes) por candidato. Abaixo disso: edifier-w820nb-plus, jbl-tune-770nc, qcy-h3-anc, soundcore-anker-life-q30.
+- Regra de parada (de_200_a_2000): minimo de 2 cotacao(oes) por candidato. Abaixo disso: edifier-w820nb-plus, qcy-h3-anc, soundcore-anker-life-q30.
 
 ## Criterio
 

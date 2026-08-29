@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-08-29 | cotacao | Cotacao registrada para jbl-tune-770nc | Amazon / fonte=web / custo_total=489.0 |
 | 2026-08-26 | aguardando_preco | qcy-h3-anc aguardando preco | Produto lidera a pesquisa web, mas a compra deve esperar confirmacao manual e preco melhor. |
 | 2026-08-26 | cotacao | Cotacao registrada para soundcore-anker-life-q30 | Amazon / fonte=web / custo_total=466.0 |
 | 2026-08-26 | cotacao | Cotacao registrada para jbl-tune-770nc | MercadoLivre / fonte=web / custo_total=429.0 |
