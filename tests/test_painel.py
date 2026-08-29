@@ -208,6 +208,13 @@ class ServidorTest(Base):
         self.assertIn("prefers-color-scheme", corpo, "sem tema escuro")
         self.assertIn("viewport", corpo, "sem meta viewport, quebra no celular")
 
+    def test_page_polls_state_and_protects_the_form(self):
+        corpo = urllib.request.urlopen(self.url("/"), timeout=15).read().decode("utf-8")
+        self.assertIn("setInterval(carrega", corpo, "sem auto refresh")
+        self.assertIn("active.closest(\".form\")", corpo, "sem protecao de foco")
+        self.assertIn("[id^='f_']", corpo, "sem protecao de campos preenchidos")
+        self.assertIn("carrega(true)", corpo, "acao manual nao forca o refresh")
+
     def test_state_endpoint_returns_the_engine_numbers(self):
         dados = json.loads(urllib.request.urlopen(
             self.url(f"/api/estado?projeto={self.projeto.name}"), timeout=15).read())

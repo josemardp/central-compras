@@ -431,19 +431,27 @@ async function executa(nome, dados, botao){
     const r = await fetch("/api/acao", {method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({projeto:PROJ, acao:nome, dados})});
     const j = await r.json();
-    await carrega();
+    await carrega(true);
     aviso(j.ok ? j.mensagem : j.erro, j.ok);
   }catch(err){ aviso(String(err), false); }
   finally{ if(botao) botao.disabled=false; }
 }
 
-async function carrega(){
+async function carrega(forcar=false){
+  if(!forcar){
+    const active = document.activeElement;
+    if(active && active.closest && active.closest(".form")) return;
+    for(const el of document.querySelectorAll("[id^='f_']")){
+      if(el.value && el.value.trim() !== "") return;
+    }
+  }
   const r = await fetch("/api/estado?projeto="+encodeURIComponent(PROJ));
   const j = await r.json();
   if(j.erro){ $("#app").textContent = j.erro; return; }
   E = j; PROJ = j.projeto; desenha();
 }
 carrega();
+setInterval(carrega, 3000);
 </script></body></html>
 """
 
