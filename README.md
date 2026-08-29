@@ -341,10 +341,10 @@ A IA ajuda principalmente em tres momentos:
 
 Os prompts gerados por `prompt-ia` incluem automaticamente licoes da categoria, marcas e lojas ja registradas na base de conhecimento.
 
-Tambem ha uma skill local instalada em:
+Tambem ha uma skill local. Apos cada `git pull`, instale-a nas maquinas de agente que voce usa:
 
-```text
-C:\Users\pc\.codex\skills\central-compras
+```powershell
+python scripts/instalar_skill.py
 ```
 
 Use no Codex:

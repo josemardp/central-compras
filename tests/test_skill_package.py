@@ -1,3 +1,7 @@
+import os
+import shutil
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -25,6 +29,33 @@ class SkillPackageTest(unittest.TestCase):
 
         self.assertIn("promover-cotacao", text)
         self.assertIn("registrar-licao", text)
+
+    def test_installer_copies_to_existing_agent_dirs_and_skips_missing_ones(self):
+        tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-skill-install-"))
+        try:
+            (tmpdir / ".codex" / "skills").mkdir(parents=True)
+            (tmpdir / ".claude" / "skills").mkdir(parents=True)
+            # .antigravity nao existe -> deve ser pulado
+
+            env = os.environ.copy()
+            env["USERPROFILE"] = str(tmpdir)
+            resultado = subprocess.run(
+                ["python", str(ROOT / "scripts" / "instalar_skill.py")],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            saida = resultado.stdout
+
+            self.assertIn("instalou Codex", saida)
+            self.assertIn("instalou Claude Code", saida)
+            self.assertIn("pulou Antigravity", saida)
+            self.assertTrue((tmpdir / ".codex" / "skills" / "central-compras" / "SKILL.md").exists())
+            self.assertTrue((tmpdir / ".claude" / "skills" / "central-compras" / "SKILL.md").exists())
+            self.assertFalse((tmpdir / ".antigravity").exists())
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":
