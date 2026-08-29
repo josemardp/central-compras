@@ -1,4 +1,4 @@
-# STATUS — Central de Compras
+# STATUS: Central de Compras
 
 > Doc de handoff. Qualquer máquina ou agente retoma a partir daqui.
 > Estado do **repositório**. O estado de cada compra fica em
@@ -14,6 +14,12 @@
   tem cotação (`project_candidate_ids()`). 208 testes passando. `validar` no
   carro elétrico já mostra os dois avisos reais: 10 candidatos contra teto de
   4, e os 10 sem cotação suficiente. Commit `1023200`, já em `origin/main`.
+- Josemar mandou a conta de energia e a rotina de rotas. Preenchido no
+  `briefing.md` do carro: km/mês (~1.141, estimado por rotina declarada, não
+  odômetro), 71% rodovia / 29% urbano, tensão residencial 127V bifásico,
+  tarifa B1 convencional (~R$ 0,944/kWh bruto). Nenhum dado pessoal da conta
+  entrou no repo. Confirmado que data-limite e distância até concessionária
+  ainda não existem. Commit `c020649`.
 
 ## Sessão anterior: 28/08/2026
 
@@ -26,7 +32,7 @@
   `projetos/2026-comprar-carro-eletrico/referencia/`, com aviso do que já foi
   substituído pela Central.
 - Reescrito `docs/prompt-auditoria-externa.md` para a **3ª rodada de auditoria**.
-  Quem rodou não foi o Kimi, foi o **Antigravity** (agente Gemini) — protocolo
+  Quem rodou não foi o Kimi, foi o **Antigravity** (agente Gemini). O protocolo
   de triagem vale igual, independe de qual LLM auditou.
 - **3ª auditoria triada e os 4 bugs confirmados corrigidos**, implementados em
   outra sessão a partir de um prompt fechado, conferidos aqui (diff + teste +
@@ -47,27 +53,32 @@
   corrigidos, e as duas calibragens específicas do carro já decididas e
   implementadas. Seguem pendentes, como julgamento (não bug): `peso_ancora`
   global, escala de prazo por categoria pras demais (não-carro), reatividade
-  do painel — ver "Do repositório" abaixo.
+  do painel. Ver "Do repositório" abaixo.
 
 ## Próximo passo
 
-**As duas decisões de calibragem que travavam o carro já foram feitas.** O
-que falta agora pra cotar de verdade são os passos manuais do Josemar (ver
-"Pendências" abaixo: km/mês, rotas, quadro elétrico, data-limite, distância
-máxima) — sem eles não dá pra registrar cotação de verdade nem simular TCO.
-Nenhum passo de código bloqueia o carro neste momento.
+**O maior bloqueio do carro agora é ficha técnica, não calibragem nem uso.**
+Nenhum dos 10 candidatos tem autonomia/consumo/bateria preenchido (de
+propósito, herdado do ev-decisao: nenhum tinha fonte primária conferida). Sem
+isso não dá pra estimar custo de energia por carro, nem aplicar o simulador
+de viagem da `pesquisa-herdada.md`, nem cortar pra 4. Perguntei ao Josemar se
+quer que eu pesquise agora (fonte oficial por carro), ainda sem resposta.
 
 ## Pendências
 
 ### Passos manuais do Josemar (bloqueiam o projeto do carro)
 
-- Medir **km/mês por 2 semanas** e o percentual de rodovia. Não chutar.
-- Listar as **rotas recorrentes** (origem, destino, km, vezes por mês).
-- Levantar em casa: tensão (127/220 V), capacidade do quadro, distância do
-  quadro até a vaga, tarifa de kWh da fatura e se há tarifa branca.
-- Definir a **data-limite de decisão**. Sem ela, a única trava contra pesquisar
-  para sempre é a regra de 30 dias da Central.
-- Definir a distância máxima aceitável até concessionária.
+- Levantar em casa: **capacidade do quadro elétrico e distância do quadro até
+  a vaga** (define custo de wallbox). Exige inspeção física, ninguém consegue
+  fazer por ele.
+- Definir a **data-limite de decisão**. Confirmado em 28/08 que ainda não
+  existe. Sem ela, a única trava contra pesquisar para sempre é a regra de 30
+  dias da Central.
+- Definir a **distância máxima aceitável até concessionária**. Confirmado em
+  28/08 que ainda não existe.
+
+~~Medir km/mês, rotas, tensão residencial~~: feito em 28/08/2026 a partir da
+conta de energia e da rotina declarada, ver `briefing.md` do projeto.
 
 ### Do repositório
 
@@ -79,14 +90,14 @@ Nenhum passo de código bloqueia o carro neste momento.
 - Falta a tag `v1.0` e a rotina semanal.
 - Carro elétrico: 10 candidatos mapeados, regra de parada permite 4 (agora com
   aviso de verdade em `validar`). O corte final pra 4 depende de levantar
-  preço público com fonte e data — ainda não feito.
+  preço público com fonte e data, ainda não feito.
 - `nota 4.8` com `n_avaliacoes 0` na linha do JBL é dado de entrada errado. A
   validação acusa, aguarda decisão.
 - `peso_ancora: 250` (nota bayesiana) é global; a 3ª auditoria mostrou que
   esmaga categoria de poucas avaliações (ex.: material de construção). Migrar
   pra `categorias.yaml` é julgamento do Josemar, não feito ainda.
 - `artifact.html` é varrido por `checar-segredos`, mas os padrões só pegam
-  CPF/cartão/senha/token — não pegam CEP, endereço ou nome solto em texto
+  CPF/cartão/senha/token, não pegam CEP, endereço ou nome solto em texto
   livre (campo `porque`, notas). Risco condicional ao que for digitado ali.
 
 ## Decisões que valem lembrar
