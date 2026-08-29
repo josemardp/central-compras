@@ -5,7 +5,13 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## Última sessão: 28/08/2026 (continuação)
+## Última sessão: 28/08/2026 (fechamento)
+
+- Escrito `docs/prompt-ajustes-repositorio.md`: prompt autocontido pro Codex
+  atacar as 6 pendências gerais do repositório (não bloqueiam nada, mas
+  estavam em aberto desde a 3ª auditoria). Ver "Próximo passo" abaixo.
+
+## Sessão de 28/08/2026, rodada 2
 
 - **As duas decisões de calibragem abaixo foram tomadas e implementadas**:
   categoria `carro` marcada `sem_frete` no `categorias.yaml` (eixo
@@ -21,7 +27,7 @@
   entrou no repo. Confirmado que data-limite e distância até concessionária
   ainda não existem. Commit `c020649`.
 
-## Sessão anterior: 28/08/2026
+## Sessão de 28/08/2026, rodada 1
 
 - Absorvido o projeto `ev-decisao` (repo local que nunca foi publicado, encerrado
   e apagado). Virou `projetos/2026-comprar-carro-eletrico`: briefing, 10
@@ -57,12 +63,23 @@
 
 ## Próximo passo
 
-**O maior bloqueio do carro agora é ficha técnica, não calibragem nem uso.**
-Nenhum dos 10 candidatos tem autonomia/consumo/bateria preenchido (de
-propósito, herdado do ev-decisao: nenhum tinha fonte primária conferida). Sem
-isso não dá pra estimar custo de energia por carro, nem aplicar o simulador
-de viagem da `pesquisa-herdada.md`, nem cortar pra 4. Perguntei ao Josemar se
-quer que eu pesquise agora (fonte oficial por carro), ainda sem resposta.
+**Josemar decidiu atacar as pendências gerais do repositório antes de voltar
+pro carro.** Enviar `docs/prompt-ajustes-repositorio.md` ao Codex (6 itens:
+dado errado do JBL, `peso_ancora` por categoria, gap de PII no
+`artifact.html`, reatividade do painel, instalador da skill, tag `v1.0` +
+docs de rotina semanal/nova categoria).
+
+**Quando o Josemar colar o retorno do Codex aqui, leia
+`docs/como-conferir-auditoria.md` ANTES de agir**: o mesmo protocolo de
+triagem de auditoria vale pra retorno de implementação: conferir diff, rodar
+teste, só então aceitar. Já foi feito assim com o Antigravity nesta mesma
+sessão e funcionou.
+
+Separado disso, ainda pendente no projeto do carro (não é o foco agora, mas
+não sumiu): nenhum dos 10 candidatos tem autonomia/consumo/bateria
+preenchido, então não dá pra estimar custo de energia por carro nem cortar
+pra 4. Perguntei ao Josemar se quer que eu pesquise isso com fonte oficial;
+ainda sem resposta.
 
 ## Pendências
 
