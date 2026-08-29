@@ -69,6 +69,12 @@ dado errado do JBL, `peso_ancora` por categoria, gap de PII no
 `artifact.html`, reatividade do painel, instalador da skill, tag `v1.0` +
 docs de rotina semanal/nova categoria).
 
+**Quando ele disser "retoma" nesta sessão, a ação não é só apontar o
+arquivo.** Ele quer o conteúdo pronto pra colar no Codex. Ler
+`docs/prompt-ajustes-repositorio.md` e reproduzir o texto inteiro na resposta
+(ou o essencial dele, se tiver mudado desde então), pra ele copiar direto.
+Não responder só "está em docs/prompt-ajustes-repositorio.md, dá uma olhada".
+
 **Quando o Josemar colar o retorno do Codex aqui, leia
 `docs/como-conferir-auditoria.md` ANTES de agir**: o mesmo protocolo de
 triagem de auditoria vale pra retorno de implementação: conferir diff, rodar
