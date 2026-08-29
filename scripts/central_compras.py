@@ -476,8 +476,12 @@ def convenience_score(prazo_dias: float | None) -> tuple[float, bool]:
     return clamp01((ruim - prazo_dias) / (ruim - otimo)), True
 
 
-def adjusted_rating(nota: float, n: int) -> float:
-    cfg = preferences().get("nota_bayesiana", {})
+def adjusted_rating(nota: float, n: int, categoria: str | None = None) -> float:
+    global_cfg = preferences().get("nota_bayesiana", {})
+    cfg = global_cfg
+    if categoria:
+        cat_cfg = category_definition(categoria).get("nota_bayesiana") or {}
+        cfg = {**global_cfg, **cat_cfg}
     media = quote_float(cfg.get("media_categoria_padrao"), 4.3)
     anchor = quote_float(cfg.get("peso_ancora"), 50)
     if n < 0:
@@ -1408,7 +1412,7 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
     if nota_minima is not None:
         # Recalcula em vez de usar o valor congelado no CSV: se os pesos da nota
         # bayesiana mudarem em preferencias.yaml, o gate acompanha.
-        atual = current_adjusted_rating(row)
+        atual = current_adjusted_rating(row, categoria)
         if atual < quote_float(nota_minima):
             eliminations.append(f"nota_ajustada abaixo do gate ({atual} < {nota_minima})")
 
@@ -1468,12 +1472,12 @@ def waiting_gap(product: dict[str, Any], quote: dict[str, str]) -> str:
     return f"aguardando preco desde {desde} (sem preco_alvo definido)."
 
 
-def current_adjusted_rating(row: dict[str, str]) -> float:
+def current_adjusted_rating(row: dict[str, str], categoria: str | None = None) -> float:
     """Nota ajustada recalculada agora, a partir de nota + n_avaliacoes."""
     nota = quote_float(row.get("nota"))
     if not nota:
         return 0.0
-    return adjusted_rating(nota, quote_int(row.get("n_avaliacoes")))
+    return adjusted_rating(nota, quote_int(row.get("n_avaliacoes")), categoria)
 
 
 def minimum_confidence(briefing: dict[str, Any]) -> float:
@@ -1532,7 +1536,7 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
         categoria_produto = product.get("categoria") or briefing.get("categoria") or "generico"
         sem_frete = bool(category_definition(categoria_produto).get("sem_frete"))
 
-        nota_ajustada = current_adjusted_rating(row)
+        nota_ajustada = current_adjusted_rating(row, categoria_produto)
         if not nota_ajustada:
             sem_dado.append("qualidade")
 
@@ -3602,7 +3606,8 @@ def audit_score(args: argparse.Namespace) -> None:
     linhas: list[str] = ["# Memoria de calculo", "", f"Gerado em {now_iso()}.", ""]
     for item in todos:
         row = item.quote
-        nota_ajustada = current_adjusted_rating(row)
+        categoria_produto = item.product.get("categoria")
+        nota_ajustada = current_adjusted_rating(row, categoria_produto)
         linhas.extend([f"## {item.product.get('nome') or item.produto_id}", ""])
         if item.eliminations:
             linhas.extend([
@@ -3618,7 +3623,7 @@ def audit_score(args: argparse.Namespace) -> None:
         linhas.append(
             f"- nota bruta {row.get('nota') or 0} com {row.get('n_avaliacoes') or 0} avaliacoes"
         )
-        cfg_bayes = preferences().get("nota_bayesiana", {})
+        cfg_bayes = category_definition(categoria_produto or "generico").get("nota_bayesiana") or preferences().get("nota_bayesiana", {})
         media = quote_float(cfg_bayes.get("media_categoria_padrao"), 4.3)
         ancora = quote_float(cfg_bayes.get("peso_ancora"), 50)
         n = quote_int(row.get("n_avaliacoes"))

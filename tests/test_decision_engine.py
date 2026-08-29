@@ -1,3 +1,8 @@
+import shutil
+import tempfile
+from pathlib import Path
+
+import ambiente
 import unittest
 
 from scripts import central_compras
@@ -48,6 +53,41 @@ class DecisionEngineTest(unittest.TestCase):
             valor_revenda_estimado=50000,
         )
         self.assertEqual(total, 110000)
+
+
+class CategoryBayesianAnchorTest(unittest.TestCase):
+    """`nota_bayesiana` pode ser sobrescrito por categoria."""
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-bayes-"))
+        ambiente.montar(self.tmpdir)
+        self._orig_config = central_compras.CONFIG
+        central_compras.CONFIG = self.tmpdir / "config"
+        central_compras._PREFS_CACHE.clear()
+
+    def tearDown(self):
+        central_compras.CONFIG = self._orig_config
+        central_compras._PREFS_CACHE.clear()
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_category_without_block_uses_global(self):
+        sem_categoria = central_compras.adjusted_rating(4.8, 30)
+        com_categoria = central_compras.adjusted_rating(4.8, 30, "generico")
+        self.assertEqual(sem_categoria, com_categoria)
+
+    def test_category_with_custom_anchor_uses_local_value(self):
+        categorias = central_compras.read_yaml(self.tmpdir / "config" / "categorias.yaml", {})
+        categorias["teste_bayes"] = {
+            "atributos_obrigatorios": [],
+            "nota_bayesiana": {"peso_ancora": 30},
+            "gate": {},
+        }
+        central_compras.write_yaml(self.tmpdir / "config" / "categorias.yaml", categorias)
+
+        global_ancora = central_compras.adjusted_rating(4.8, 30, "generico")
+        local_ancora = central_compras.adjusted_rating(4.8, 30, "teste_bayes")
+        # Ancora menor deixa a nota bruta pesar mais, aproximando do valor original.
+        self.assertGreater(local_ancora, global_ancora)
 
 
 if __name__ == "__main__":
