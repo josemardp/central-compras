@@ -160,7 +160,7 @@ Entregas:
 Gate de saida:
 - [x] Comando equivalente ao pre-commit bloqueia padroes sensiveis.
 - [x] README cobre o uso diario.
-- [ ] Release `v1.0` publicada no GitHub privado.
+- [x] Release `v1.0` publicada no GitHub privado.
 
 ## Sprint 8 - Correcao do motor de decisao
 
