@@ -78,7 +78,7 @@ material_construcao:
   # massa corrida com 1-462 (concentrado em poucos SKUs), e cimentos frequentemente
   # sem avaliacoes ou zero em sites especializados. Com peso_ancora=50, um produto
   # de 50 avaliacoes ja pesa 50% da nota ajustada; com 150 avaliacoes sobe para 75%.
-  # Valor proposto; sujeito a confirmacao do Josemar.
+  # Confirmado pelo Josemar em 2026-08-29.
   nota_bayesiana:
     peso_ancora: 50
   gate: {}
