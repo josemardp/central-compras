@@ -9,5 +9,17 @@ preco_teto: 150000.0
 atributos:
   motorizacao: eletrico_bev
   origem: importado
+  # Fonte: JAC Motors Brasil - Especificação Técnica E-JS1 25/26 (PDF)
+  # URL: https://www.jacmotors.com.br/wp-content/uploads/2026/07/E-JS1-FICHA-1.pdf
+  # Fonte garantia/SoH: Manual do Proprietário E-JS1 (PDF)
+  # URL: https://www.jacmotors.com.br/wp-content/uploads/2025/12/E-JS1-MANUAL-1.pdf
+  # Consulta: 2026-08-30
+  autonomia_km: 181
+  autonomia_protocolo: INMETRO
+  potencia_cv: 62
+  potencia_fonte: 45 kW
+  porta_malas_l: 121
+  garantia_bateria: 5 anos/100.000 km com SoH mínimo de 75%
+  consumo_kwh_100km: null
 requisitos_atendidos: {}
 descartado_porque: null
