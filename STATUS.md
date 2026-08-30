@@ -5,7 +5,37 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## Última sessão: 28/08/2026 (fechamento)
+## Última sessão: 30/08/2026 (fechamento)
+
+- **Ficha técnica dos 10 candidatos do carro preenchida com fonte oficial BR**
+  (autonomia, protocolo, potência, porta-malas, garantia de bateria, consumo),
+  um commit por candidato, fonte e data em comentário no próprio `produto.yaml`.
+  Nenhum preço entrou. SoH só a JAC publica (75%); as demais não publicam.
+- **Dois bugs do mesmo tipo achados e corrigidos**, ambos de relatório que
+  afirmava o que os dados não sustentavam:
+  1. `build_ranking` marcava as etapas 5 e 6 do `processo.md` como concluídas
+     mesmo com zero cotações. Agora a 5 exige cotação e a 6 exige pelo menos
+     2 candidatos elegíveis. Commit `9159c72`.
+  2. A regra de parada contava candidato descartado, tanto na contagem quanto
+     na cobrança de cotações. Corrigido nos dois lados da união em
+     `stop_rule_status` (descartado com cotação voltava por `cotacoes_por_produto`).
+     Commit `301162d`.
+  As duas correções vieram de prompt fechado enviado ao Codex e foram
+  conferidas aqui: diff, suíte completa e, na segunda, teste de mutação
+  (desfiz a subtração de propósito e confirmei que só o teste da armadilha
+  falhou). **221 testes passando.**
+- **Carro cortado de 10 para 6 candidatos.** Descartados com motivo gravado:
+  `byd-seagull` (entrada duplicada, a BYD Brasil vende como Dolphin Mini),
+  `jac-e-js1` (181 km), `renault-kwid-etech` (180 km) e `caoa-chery-icar`
+  (197 km) por autonomia insuficiente na rota de Araçatuba (120 km ida e
+  volta, 2x/mês, uso 71% rodovia).
+- **Critério de SoH relaxado no `briefing.md` do carro**, decisão do Josemar
+  em 30/08: exigir percentual de SoH garantido eliminava 9 dos 10 candidatos
+  e deixava de pé justamente o de menor autonomia. Passou a exigir garantia
+  em anos e km por fonte oficial; SoH virou desejável, com registro de que
+  era obrigatório até 30/08.
+
+## Sessão de 28/08/2026 (fechamento)
 
 - Escrito `docs/prompt-ajustes-repositorio.md`: prompt autocontido pro Codex
   atacar as 6 pendências gerais do repositório (não bloqueiam nada, mas
@@ -51,7 +81,8 @@
 
 ## Estado atual
 
-- v1 estabilizada. **208 testes passando** (`python -m unittest discover -s tests`).
+- v1 estabilizada, tag `v1.0` publicada. **221 testes passando**
+  (`python -m unittest discover -s tests`).
 - Três projetos: fone bluetooth, Decor Bloqueador, carro elétrico.
 - **Nenhuma compra fechada ainda.** O ciclo de veredito (D+30 / D+180) nunca
   rodou com dado real.
@@ -63,29 +94,22 @@
 
 ## Próximo passo
 
-**Josemar decidiu atacar as pendências gerais do repositório antes de voltar
-pro carro.** Enviar `docs/prompt-ajustes-repositorio.md` ao Codex (6 itens:
-dado errado do JBL, `peso_ancora` por categoria, gap de PII no
-`artifact.html`, reatividade do painel, instalador da skill, tag `v1.0` +
-docs de rotina semanal/nova categoria).
+**Coletar cotação dos 6 candidatos vivos do carro elétrico** (etapa 4 do
+`processo.md`). São eles: `byd-dolphin`, `byd-dolphin-mini`,
+`chevrolet-spark-euv`, `gac-aion-ut`, `geely-ex2`, `gwm-ora-03-bev58`. A
+regra de parada pede 3 cotações + 1 presencial por candidato, e o teto da
+faixa é 4 candidatos: **os 2 cortes que faltam dependem de preço**, por isso
+não foram feitos ainda. Prazo de decisão: **28/09/2026**.
 
-**Quando ele disser "retoma" nesta sessão, a ação não é só apontar o
-arquivo.** Ele quer o conteúdo pronto pra colar no Codex. Ler
-`docs/prompt-ajustes-repositorio.md` e reproduzir o texto inteiro na resposta
-(ou o essencial dele, se tiver mudado desde então), pra ele copiar direto.
-Não responder só "está em docs/prompt-ajustes-repositorio.md, dá uma olhada".
+Ordem sugerida: preço público com fonte e data primeiro (para cortar de 6
+para 4), depois cotação presencial na concessionária só dos 4 finalistas.
 
-**Quando o Josemar colar o retorno do Codex aqui, leia
-`docs/como-conferir-auditoria.md` ANTES de agir**: o mesmo protocolo de
-triagem de auditoria vale pra retorno de implementação: conferir diff, rodar
-teste, só então aceitar. Já foi feito assim com o Antigravity nesta mesma
-sessão e funcionou.
-
-Separado disso, ainda pendente no projeto do carro (não é o foco agora, mas
-não sumiu): nenhum dos 10 candidatos tem autonomia/consumo/bateria
-preenchido, então não dá pra estimar custo de energia por carro nem cortar
-pra 4. Perguntei ao Josemar se quer que eu pesquise isso com fonte oficial;
-ainda sem resposta.
+**Quando o Josemar colar retorno de IA externa aqui, leia
+`docs/como-conferir-auditoria.md` ANTES de agir**: conferir diff, rodar
+teste, só então aceitar. Funcionou com o Antigravity e funcionou de novo com
+o Codex em 30/08. Vale ir além quando a correção é sutil: no bug da regra de
+parada, aplicar uma mutação de propósito foi o que provou que o teste novo
+tinha poder de detecção real.
 
 ## Pendências
 
@@ -94,11 +118,12 @@ ainda sem resposta.
 - Levantar em casa: **capacidade do quadro elétrico e distância do quadro até
   a vaga** (define custo de wallbox). Exige inspeção física, ninguém consegue
   fazer por ele.
-- Definir a **data-limite de decisão**. Confirmado em 28/08 que ainda não
-  existe. Sem ela, a única trava contra pesquisar para sempre é a regra de 30
-  dias da Central.
-- Definir a **distância máxima aceitável até concessionária**. Confirmado em
-  28/08 que ainda não existe.
+- **Falar com a esposa.** O briefing exige, como critério de sucesso, que ela
+  concorde "por motivos dela, não meus". Ninguém faz por ele, e isso não pode
+  aparecer só no fim.
+
+~~Definir data-limite de decisão e distância máxima até concessionária~~:
+feito em 29/08/2026 (prazo 28/09/2026, raio de 700 km), commit `30123cb`.
 
 ~~Medir km/mês, rotas, tensão residencial~~: feito em 28/08/2026 a partir da
 conta de energia e da rotina declarada, ver `briefing.md` do projeto.
@@ -110,15 +135,20 @@ conta de energia e da rotina declarada, ver `briefing.md` do projeto.
   é `josem`). Não há script de instalação, e o repo é usado de várias máquinas
   por agentes diferentes (Codex, Claude Code, Antigravity). A 3ª auditoria
   confirmou de novo, ainda sem dono.
-- Falta a tag `v1.0` e a rotina semanal.
-- Carro elétrico: 10 candidatos mapeados, regra de parada permite 4 (agora com
-  aviso de verdade em `validar`). O corte final pra 4 depende de levantar
-  preço público com fonte e data, ainda não feito.
-- `nota 4.8` com `n_avaliacoes 0` na linha do JBL é dado de entrada errado. A
-  validação acusa, aguarda decisão.
-- `peso_ancora: 250` (nota bayesiana) é global; a 3ª auditoria mostrou que
-  esmaga categoria de poucas avaliações (ex.: material de construção). Migrar
-  pra `categorias.yaml` é julgamento do Josemar, não feito ainda.
+- **Escrita de `produto.yaml` apaga comentário.** `write_yaml`
+  (`scripts/central_compras.py:280`) usa `yaml.safe_dump`, que reserializa o
+  arquivo do zero. Em 30/08 o comando `descartar` apagou os comentários de
+  proveniência (`# Fonte:`, `# URL:`, `# Consulta:`) dos 4 candidatos
+  descartados do carro. Está tudo no histórico do git, mas saiu do arquivo, e
+  vale para qualquer comando que reescreva um produto. Conserto provável:
+  guardar proveniência em campo do YAML, não em comentário.
+- **`descartar` sobrescreve a "Próxima ação" do `processo.md`** com texto
+  genérico ("seguir com finalistas restantes ou registrar nova cotacao"),
+  perdendo o que estava escrito. Aconteceu em 30/08 no carro.
+- Falta a rotina semanal (a tag `v1.0` já foi publicada).
+- `peso_ancora` global segue 250 em `preferencias.yaml`; já existe override
+  por categoria (`material_construcao: 50`). Avaliar se outras categorias
+  precisam.
 - `artifact.html` é varrido por `checar-segredos`, mas os padrões só pegam
   CPF/cartão/senha/token, não pegam CEP, endereço ou nome solto em texto
   livre (campo `porque`, notas). Risco condicional ao que for digitado ali.
