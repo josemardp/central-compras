@@ -581,7 +581,11 @@ def stop_rule_status(project: Path) -> dict[str, Any]:
     # Candidato mapeado (`novo-produto`) conta mesmo sem cotacao ainda: sem
     # isso, 10 candidatos mapeados e zero cotacoes davam zero candidatos, e o
     # teto da faixa nunca disparava aviso.
-    candidatos = project_candidate_ids(project) | set(cotacoes_por_produto)
+    # Cotacao legada sem produto continua contando; descartado conhecido sai
+    # mesmo quando ainda tem linhas no historico de cotacoes.
+    candidatos = (
+        project_candidate_ids(project) | set(cotacoes_por_produto)
+    ) - project_discarded_candidate_ids(project)
     aberto_em = parse_dashboard_date(briefing.get("criado_em"))
     dias = (dt.date.today() - aberto_em).days if aberto_em else None
     faltando = sorted(
@@ -812,7 +816,7 @@ def product_id_conflicts() -> list[str]:
 
 
 def project_candidate_ids(project: Path) -> set[str]:
-    """Todo produto_id mapeado para este projeto, com ou sem cotacao ainda.
+    """Todo produto_id ativo mapeado para este projeto, com ou sem cotacao.
 
     `novo-produto` grava `projeto` no `produto.yaml`. Antes disso, a regra de
     parada so via candidato quando a primeira cotacao chegava: com 10
@@ -821,7 +825,17 @@ def project_candidate_ids(project: Path) -> set[str]:
     ids: set[str] = set()
     for path in PRODUTOS.glob("*/*/produto.yaml"):
         dados = read_yaml(path, {})
-        if dados.get("projeto") == project.name:
+        if dados.get("projeto") == project.name and dados.get("estado") != "descartado":
+            ids.add(path.parent.name)
+    return ids
+
+
+def project_discarded_candidate_ids(project: Path) -> set[str]:
+    """Descartados conhecidos, inclusive os que ainda aparecem em cotacoes."""
+    ids: set[str] = set()
+    for path in PRODUTOS.glob("*/*/produto.yaml"):
+        dados = read_yaml(path, {})
+        if dados.get("projeto") == project.name and dados.get("estado") == "descartado":
             ids.add(path.parent.name)
     return ids
 

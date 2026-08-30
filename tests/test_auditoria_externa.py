@@ -469,6 +469,39 @@ class MappedCandidatesCountTowardStopRuleTest(BaseCli):
         self.assertIn("5 candidatos para um teto de 4", validacao,
                        "candidato mapeado sem cotacao precisa contar pra regra de parada")
 
+    def test_discarded_candidate_without_quote_leaves_the_stop_rule(self):
+        projeto = self.projeto("descarte sem cotacao", valor=25000)
+        for indice in range(6):
+            self.cli("novo-produto", projeto, f"Fone {indice}", "--marca", "M",
+                     "--categoria", "fone", "--produto-id", f"fone-{indice}")
+        self.cli("descartar", "--produto-id", "fone-5", "--projeto", projeto,
+                 "--porque", "nao atende ao uso")
+        self.cli("validar", projeto, check=False)
+
+        validacao = (self.tmpdir / projeto / "validacao.md").read_text(encoding="utf-8")
+        avisos_regra = "\n".join(
+            linha for linha in validacao.splitlines() if "Regra de parada" in linha
+        )
+        self.assertIn("5 candidatos para um teto de 4", avisos_regra)
+        self.assertNotIn("fone-5", avisos_regra)
+
+    def test_discarded_candidate_with_quote_leaves_the_stop_rule(self):
+        projeto = self.projeto("descarte com cotacao", valor=25000)
+        for indice in range(5):
+            self.cli("novo-produto", projeto, f"Fone {indice}", "--marca", "M",
+                     "--categoria", "fone", "--produto-id", f"fone-{indice}")
+        self.candidato(projeto, "fone-cotado", "Fone Cotado")
+        self.cli("descartar", "--produto-id", "fone-cotado", "--projeto", projeto,
+                 "--porque", "nao atende ao uso")
+        self.cli("validar", projeto, check=False)
+
+        validacao = (self.tmpdir / projeto / "validacao.md").read_text(encoding="utf-8")
+        avisos_regra = "\n".join(
+            linha for linha in validacao.splitlines() if "Regra de parada" in linha
+        )
+        self.assertIn("5 candidatos para um teto de 4", avisos_regra)
+        self.assertNotIn("fone-cotado", avisos_regra)
+
     def test_a_quoted_candidate_without_produto_yaml_still_counts(self):
         """Cotacao sem produto.yaml correspondente (dado legado) nao pode sumir da conta."""
         projeto = self.projeto("carro legado", categoria="carro", valor=25000)
