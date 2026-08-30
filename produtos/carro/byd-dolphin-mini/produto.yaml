@@ -10,5 +10,17 @@ atributos:
   motorizacao: eletrico_bev
   origem: nacional
   planta: Camacari/BA
+  # Fonte: BYD Dolphin Mini V2 - Ficha Técnica Oficial BYD Brasil (PDF)
+  # URL: https://www.byd.com/material/__CN/byd-site/br/fichas-tecnicas-2026/update-13-07-2026/07-13-2026---ficha-txiunica/BYD_DolphinMini_V2.pdf
+  # Consulta: 2026-08-30
+  autonomia_km: 280
+  autonomia_protocolo: PBEV
+  autonomia_obs: GL 224 km PBEV; GS 280 km PBEV; valor principal registra GS
+  potencia_cv: 75
+  potencia_fonte: publicado pela BYD Brasil em cv
+  porta_malas_l: 230
+  garantia_bateria: 8 anos/200.000 km (SoH não publicado)
+  consumo_kwh_100km: 11.4
+  consumo_fonte: 0,41 MJ/km do GS convertido para kWh/100 km
 requisitos_atendidos: {}
 descartado_porque: null
