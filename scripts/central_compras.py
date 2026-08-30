@@ -1737,7 +1737,10 @@ def build_ranking(args: argparse.Namespace) -> None:
 
     atomic_write_text((project / "ranking.md"), "\n".join(lines) + "\n")
     write_ranking_csv(project, elegiveis, cortados)
-    mark_steps(project, [5, 6])
+    if rows:
+        mark_steps(project, [5])
+    if len(elegiveis) >= 2:
+        mark_steps(project, [6])
     if elegiveis:
         lider = elegiveis[0]
         product_name = lider.product.get("nome") or lider.produto_id

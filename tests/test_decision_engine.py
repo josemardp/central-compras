@@ -56,6 +56,85 @@ class DecisionEngineTest(unittest.TestCase):
         self.assertEqual(total, 110000)
 
 
+class RankingProcessStepsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-ranking-steps-"))
+        ambiente.montar(self.tmpdir)
+        self._orig = {
+            key: getattr(central_compras, key)
+            for key in ["ROOT", "CONFIG", "PROJETOS", "PRODUTOS", "TEMPLATES", "BASE", "VEREDITOS", "DASHBOARD"]
+        }
+        central_compras.ROOT = self.tmpdir
+        central_compras.CONFIG = self.tmpdir / "config"
+        central_compras.PROJETOS = self.tmpdir / "projetos"
+        central_compras.PRODUTOS = self.tmpdir / "produtos"
+        central_compras.TEMPLATES = self.tmpdir / "templates"
+        central_compras.BASE = self.tmpdir / "base-conhecimento"
+        central_compras.VEREDITOS = self.tmpdir / "vereditos"
+        central_compras.DASHBOARD = self.tmpdir / "dashboard"
+        central_compras._PREFS_CACHE.clear()
+
+        import argparse
+        central_compras.new_project(argparse.Namespace(
+            nome="ranking etapas", categoria="generico", valor_estimado=400,
+            preco_teto=600, necessidade="teste", force=False))
+        self.projeto = central_compras.PROJETOS / f"{dt.date.today().year}-ranking-etapas"
+        for produto_id, nome in [("prod-a", "Produto A"), ("prod-b", "Produto B")]:
+            central_compras.new_product(argparse.Namespace(
+                projeto=str(self.projeto), nome=nome, marca="M", categoria="generico",
+                produto_id=produto_id, preco_alvo=None, preco_teto=None,
+                atributo=[], requisito=["uso=true"], force=False))
+
+    def tearDown(self):
+        for key, value in self._orig.items():
+            setattr(central_compras, key, value)
+        central_compras._PREFS_CACHE.clear()
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def add_quote(self, produto_id, preco):
+        import argparse
+        central_compras.add_quote(argparse.Namespace(
+            projeto=str(self.projeto), produto_id=produto_id, loja="Loja", vendedor="V",
+            vendedor_tipo="oficial", anuncio_id=None, variacao=None, preco=preco,
+            preco_promocional=None, frete=0.0, frete_prazo_dias=3, custo_extra=0.0,
+            custo_total=None, custo_operacional_mensal=0.0, tco_meses=None,
+            valor_revenda_estimado=0.0, nota=4.8, avaliacoes=1000, garantia_meses=12,
+            garantia_tipo="nacional", link=f"https://example.com/{produto_id}",
+            flag_suspeita="", fonte="web", data=None))
+
+    def test_ranking_without_quotes_keeps_gate_and_comparison_unchecked(self):
+        import argparse
+        args = argparse.Namespace(projeto=str(self.projeto))
+
+        central_compras.build_ranking(args)
+        central_compras.build_ranking(args)
+
+        processo = (self.projeto / "processo.md").read_text(encoding="utf-8")
+        self.assertIn("- [ ] 5. Aplicar gates eliminatorios", processo)
+        self.assertIn("- [ ] 6. Comparar finalistas", processo)
+
+    def test_ranking_with_two_eligible_quotes_marks_gate_and_comparison(self):
+        import argparse
+        self.add_quote("prod-a", 299.0)
+        self.add_quote("prod-b", 349.0)
+
+        central_compras.build_ranking(argparse.Namespace(projeto=str(self.projeto)))
+
+        processo = (self.projeto / "processo.md").read_text(encoding="utf-8")
+        self.assertIn("- [x] 5. Aplicar gates eliminatorios", processo)
+        self.assertIn("- [x] 6. Comparar finalistas", processo)
+
+    def test_ranking_with_one_quote_marks_gate_but_not_comparison(self):
+        import argparse
+        self.add_quote("prod-a", 299.0)
+
+        central_compras.build_ranking(argparse.Namespace(projeto=str(self.projeto)))
+
+        processo = (self.projeto / "processo.md").read_text(encoding="utf-8")
+        self.assertIn("- [x] 5. Aplicar gates eliminatorios", processo)
+        self.assertIn("- [ ] 6. Comparar finalistas", processo)
+
+
 class CategoryBayesianAnchorTest(unittest.TestCase):
     """`nota_bayesiana` pode ser sobrescrito por categoria."""
 
