@@ -9,5 +9,19 @@ preco_teto: 150000.0
 atributos:
   motorizacao: eletrico_bev
   origem: importado
+  # Fonte: Geely Brasil - Ficha Técnica Geely EX2 (PDF) e página oficial do EX2
+  # URL: https://www.geelybrasil.com.br/ex2
+  # Fonte consumo: Geely Brasil - Lançamento EX2
+  # URL: https://www.geelybrasil.com.br/geely-ex2-chega-ao-brasil
+  # Consulta: 2026-08-30
+  autonomia_km: 289
+  autonomia_protocolo: INMETRO
+  potencia_cv: 116
+  potencia_fonte: publicado pela Geely Brasil em cv
+  porta_malas_l: 375
+  porta_malas_obs: mais 70 L no compartimento dianteiro (fronta-malas)
+  garantia_bateria: 8 anos/150.000 km (SoH não publicado)
+  consumo_kwh_100km: 10.8
+  consumo_fonte: 0,39 MJ/km convertido para kWh/100 km
 requisitos_atendidos: {}
 descartado_porque: null
