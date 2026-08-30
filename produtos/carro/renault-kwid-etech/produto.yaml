@@ -2,18 +2,13 @@ id: renault-kwid-etech
 categoria: carro
 nome: Renault Kwid E-Tech
 marca: Renault
-estado: pesquisando
+estado: descartado
 projeto: 2026-comprar-carro-eletrico
 preco_alvo: null
 preco_teto: 150000.0
 atributos:
   motorizacao: eletrico_bev
   origem: nacional
-  # Fonte: Renault Brasil - Catálogo Kwid 2026 (PDF)
-  # URL: https://cdn.group.renault.com/ren/br/renault-new-cars/editorial/2025/catalogo/outubro/AF_RMA004925A_Catalogo_Kwid_26_Completovf.pdf
-  # Fonte complementar: Renault Brasil - FAQ
-  # URL: https://www.renault.com.br/faq.html
-  # Consulta: 2026-08-30
   autonomia_km: 180
   autonomia_protocolo: PBEV/INMETRO
   potencia_cv: 65
@@ -22,4 +17,5 @@ atributos:
   garantia_bateria: 8 anos/120.000 km (SoH não publicado)
   consumo_kwh_100km: null
 requisitos_atendidos: {}
-descartado_porque: null
+descartado_porque: autonomia 180 km PBEV nao fecha a rota mais longa (120 km ida e
+  volta, 2x/mes) com margem em uso 71 por cento rodovia

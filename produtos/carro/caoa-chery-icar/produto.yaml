@@ -2,15 +2,12 @@ id: caoa-chery-icar
 categoria: carro
 nome: Caoa Chery iCar
 marca: Caoa Chery
-estado: pesquisando
+estado: descartado
 projeto: 2026-comprar-carro-eletrico
 preco_alvo: null
 preco_teto: 150000.0
 atributos:
   motorizacao: eletrico_bev
-  # Fonte: Nova CAOA Chery - Página oficial do iCar
-  # URL: https://novacaoachery.com.br/carros/icar.html
-  # Consulta: 2026-08-30
   autonomia_km: 197
   autonomia_protocolo: PBEV 2023
   potencia_cv: 61
@@ -18,7 +15,9 @@ atributos:
   porta_malas_l: 100
   porta_malas_obs: 380 L com bancos traseiros rebatidos
   garantia_bateria: null
-  garantia_bateria_obs: garantia da bateria e SoH não localizados em fonte oficial brasileira; página oficial consultada não publica esses dados
+  garantia_bateria_obs: garantia da bateria e SoH não localizados em fonte oficial
+    brasileira; página oficial consultada não publica esses dados
   consumo_kwh_100km: null
 requisitos_atendidos: {}
-descartado_porque: null
+descartado_porque: autonomia 197 km PBEV fecha a rota mais longa (120 km ida e volta)
+  apenas raspando em uso 71 por cento rodovia
