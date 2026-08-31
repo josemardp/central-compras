@@ -93,9 +93,17 @@ camera:
   gate:
     nota_minima_ajustada: 4.2
     minimo_avaliacoes: 150
+    # Inclui "nenhuma" por decisao do Josemar em 31/08/2026 (caso Tapo TC40:
+    # nenhuma loja expunha garantia de fabrica no anuncio, so devolucao de 30
+    # dias). ATENCAO: "nenhuma" tambem e o valor padrao do CLI `cotar` quando
+    # ninguem informa --garantia-tipo (scripts/central_compras.py, argparse
+    # default), entao esse valor nao distingue "confirmei que nao tem
+    # garantia" de "nao perguntei". Aceitar "nenhuma" aqui significa aceitar
+    # os dois casos pra qualquer camera futura, nao so a TC40.
     garantia_tipo_aceita:
       - nacional
       - vendedor
+      - nenhuma
 
 generico:
   atributos_obrigatorios: []
