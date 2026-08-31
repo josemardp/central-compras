@@ -17,6 +17,8 @@ import sys
 import textwrap
 import time
 import unicodedata
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -3468,6 +3470,87 @@ def spec_comparison_rows(project: Path) -> tuple[str, list[str], list[Ranked]]:
     return categoria, obrigatorios + sorted(extras), itens
 
 
+LINHAS_COMERCIAIS = ["preco", "loja", "vendedor", "nota", "garantia", "fonte"]
+
+
+def comercial_valor(item: Ranked, chave: str) -> tuple[str, int | None]:
+    """(texto, estrelas) de uma linha comercial do comparativo.
+
+    Fonte unica pro HTML (spec_comparison_section) e pro export de dados
+    (sheets_export_payload) - os dois so formatam o que esta funcao decide,
+    nunca recalculam por conta propria. Estrela e None quando o candidato
+    foi cortado pelo gate, o dado falta, ou o eixo correspondente nao
+    entrou na conta do ranking - nunca fabricada.
+    """
+    quote = item.quote
+    if chave == "preco":
+        # De proposito sem estrela: `valor` e o unico eixo relativo ao mais
+        # barato do projeto, nao absoluto - documentado em preferencias.yaml.
+        return brl(quote.get("custo_total")), None
+    if chave == "loja":
+        return quote.get("loja") or "-", None
+    if chave == "vendedor":
+        vendedor = quote.get("vendedor") or ""
+        tipo = quote.get("vendedor_tipo") or ""
+        if not vendedor:
+            return "-", None
+        return (f"{vendedor} ({tipo})" if tipo else vendedor), None
+    if chave == "nota":
+        nota = quote.get("nota")
+        avaliacoes = quote.get("n_avaliacoes")
+        # quote_float (nao `not nota` puro): "0.0" e string nao-vazia, mas o
+        # valor numerico e zero - mesmo criterio de current_adjusted_rating,
+        # senao o texto mostra "0.0 (0 aval.)" como se fosse nota de verdade
+        # em vez de "nota nunca informada". Achado numa conferencia real na
+        # planilha (candidato do decor-bloqueador, cotacao web sem nota).
+        if not quote_float(nota):
+            return "-", None
+        # Estrela e etapa final da cotacao: so pros elegiveis, que chegam
+        # na mesa de decisao. Cortado pelo gate nao ganha estrela - nao
+        # vale gastar essa classificacao em quem ja saiu da disputa.
+        # Nota ausente (eixo qualidade sem dado) tambem nunca vira 1
+        # estrela por tabela: so estrela quando o eixo realmente entrou
+        # na conta do ranking pra este candidato.
+        if item.eliminations or "qualidade" in item.eixos_sem_dado:
+            estrelas = None
+        else:
+            estrelas = stars_from_score(item.axes.get("qualidade"))
+        return f"{nota} ({avaliacoes or 0} aval.)", estrelas
+    if chave == "garantia":
+        tipo = quote.get("garantia_tipo")
+        meses = quote.get("garantia_meses")
+        if not tipo:
+            return "-", None
+        texto = f"{tipo}, {meses} meses" if meses else tipo
+        estrelas = None
+        if not item.eliminations:
+            # So a parcela "garantia (tipo)" do risco, buscada por rotulo
+            # (nunca por indice) - reflete a mesma regua do score, sem
+            # inventar uma segunda conta.
+            parcela = next((p for p in risk_parts(quote) if p[0] == "garantia (tipo)"), None)
+            estrelas = stars_from_score(parcela[2] if parcela else None)
+        return texto, estrelas
+    if chave == "fonte":
+        return quote.get("fonte") or "-", None
+    return "-", None
+
+
+def atributo_valor(categoria: str, item: Ranked, chave: str) -> tuple[str, int | None]:
+    """(texto, estrelas) de um atributo tecnico do comparativo.
+
+    Mesmo principio de `comercial_valor`: fonte unica pro HTML e pro export.
+    """
+    texto = str((item.product.get("atributos") or {}).get(chave) or "-")
+    if texto == "-" or item.eliminations:
+        # Estrela e a etapa final da cotacao, so pra quem chega elegivel na
+        # mesa de decisao - cortado pelo gate mostra o valor bruto, nunca a
+        # classificacao (nao vale gastar essa conta em quem ja saiu da
+        # disputa).
+        return texto, None
+    classificacao = (item.product.get("atributos_classificacao") or {}).get(chave)
+    return texto, stars_for_attribute(categoria, chave, classificacao)
+
+
 def _celula_com_estrelas(texto: str, estrelas: int | None) -> str:
     if estrelas is None:
         return safe_html(texto)
@@ -3479,54 +3562,6 @@ def spec_comparison_section(project: Path) -> str:
     if not itens:
         return ""
 
-    def celula_comercial(item: Ranked, chave: str) -> str:
-        quote = item.quote
-        if chave == "preco":
-            return safe_html(brl(quote.get("custo_total")))
-        if chave == "loja":
-            return safe_html(quote.get("loja") or "-")
-        if chave == "vendedor":
-            vendedor = quote.get("vendedor") or ""
-            tipo = quote.get("vendedor_tipo") or ""
-            if not vendedor:
-                return "-"
-            return safe_html(f"{vendedor} ({tipo})" if tipo else vendedor)
-        if chave == "nota":
-            nota = quote.get("nota")
-            avaliacoes = quote.get("n_avaliacoes")
-            if not nota:
-                return "-"
-            # Estrela e etapa final da cotacao: so pros elegiveis, que chegam
-            # na mesa de decisao. Cortado pelo gate nao ganha estrela - nao
-            # vale gastar essa classificacao em quem ja saiu da disputa.
-            # Nota ausente (eixo qualidade sem dado) tambem nunca vira 1
-            # estrela por tabela: so estrela quando o eixo realmente entrou
-            # na conta do ranking pra este candidato.
-            if item.eliminations or "qualidade" in item.eixos_sem_dado:
-                estrelas = None
-            else:
-                estrelas = stars_from_score(item.axes.get("qualidade"))
-            return _celula_com_estrelas(f"{nota} ({avaliacoes or 0} aval.)", estrelas)
-        if chave == "garantia":
-            tipo = quote.get("garantia_tipo")
-            meses = quote.get("garantia_meses")
-            if not tipo:
-                return "-"
-            texto = f"{tipo}, {meses} meses" if meses else tipo
-            estrelas = None
-            if not item.eliminations:
-                # So a parcela "garantia (tipo)" do risco, buscada por rotulo
-                # (nunca por indice) - reflete a mesma regua do score, sem
-                # inventar uma segunda conta.
-                parcela = next((p for p in risk_parts(quote) if p[0] == "garantia (tipo)"), None)
-                estrelas = stars_from_score(parcela[2] if parcela else None)
-            return _celula_com_estrelas(texto, estrelas)
-        if chave == "fonte":
-            return safe_html(quote.get("fonte") or "-")
-        return "-"
-
-    linhas_comerciais = ["preco", "loja", "vendedor", "nota", "garantia", "fonte"]
-
     header_cols = "".join(
         f"<th>{safe_html(item.product.get('nome') or item.produto_id)}"
         + (' <span class="pill bad">cortado</span>' if item.eliminations else "")
@@ -3535,22 +3570,16 @@ def spec_comparison_section(project: Path) -> str:
     )
     comercial_rows = "".join(
         f"<tr><td>{safe_html(spec_comparison_label(chave))}</td>"
-        + "".join(f"<td>{celula_comercial(item, chave)}</td>" for item in itens)
+        + "".join(
+            f"<td>{_celula_com_estrelas(*comercial_valor(item, chave))}</td>"
+            for item in itens
+        )
         + "</tr>"
-        for chave in linhas_comerciais
+        for chave in LINHAS_COMERCIAIS
     )
+
     def celula_atributo(item: Ranked, chave: str) -> str:
-        texto = str((item.product.get("atributos") or {}).get(chave) or "-")
-        if texto == "-":
-            return safe_html(texto)
-        if item.eliminations:
-            # Estrela e a etapa final da cotacao, so pra quem chega elegivel
-            # na mesa de decisao - cortado pelo gate mostra o valor bruto,
-            # nunca a classificacao (nao vale gastar essa conta em quem ja
-            # saiu da disputa).
-            return safe_html(texto)
-        classificacao = (item.product.get("atributos_classificacao") or {}).get(chave)
-        return _celula_com_estrelas(texto, stars_for_attribute(categoria, chave, classificacao))
+        return _celula_com_estrelas(*atributo_valor(categoria, item, chave))
 
     spec_rows = "".join(
         f"<tr><td>{safe_html(spec_comparison_label(chave))}</td>"
@@ -3573,6 +3602,119 @@ def spec_comparison_section(project: Path) -> str:
   </div>
 </section>
 """
+
+
+SHEETS_OVERVIEW_FIELDS = [
+    "categoria", "estado", "lider", "score", "confianca", "cotacoes",
+    "manual", "dias_ate_decisao", "escolhido", "aguardando_preco",
+]
+
+
+def _linha_export(chave: str, tipo: str, valores: list[tuple[str, int | None]]) -> dict[str, Any]:
+    rotulo = spec_comparison_label(chave)
+    if tipo == "estrela":
+        return {
+            "rotulo": rotulo,
+            "tipo": "estrela",
+            "valores": [{"texto": texto, "estrelas": estrelas} for texto, estrelas in valores],
+        }
+    return {"rotulo": rotulo, "tipo": "texto", "valores": [texto for texto, _ in valores]}
+
+
+def sheets_export_payload() -> dict[str, Any]:
+    """JSON pronto pro Web App do Apps Script. So monta, nunca envia.
+
+    Reaproveita project_counts() e spec_comparison_rows() (as mesmas contas
+    do dashboard) e comercial_valor()/atributo_valor() (a mesma decisao de
+    texto+estrela do HTML) - HTML e planilha nunca podem mostrar numero
+    diferente pro mesmo candidato.
+    """
+    visao_geral: list[dict[str, Any]] = []
+    comparativos: list[dict[str, Any]] = []
+    for project in project_dirs():
+        counts = project_counts(project)
+        linha = {"projeto": counts["id"]}
+        linha.update({campo: counts[campo] for campo in SHEETS_OVERVIEW_FIELDS})
+        visao_geral.append(linha)
+
+        categoria, atributos, itens = spec_comparison_rows(project)
+        if not itens:
+            continue
+        colunas = [item.product.get("nome") or item.produto_id for item in itens]
+        situacao = ["cortado" if item.eliminations else "elegivel" for item in itens]
+        linhas: list[dict[str, Any]] = []
+        for chave in LINHAS_COMERCIAIS:
+            tipo = "estrela" if chave in {"nota", "garantia"} else "texto"
+            valores = [comercial_valor(item, chave) for item in itens]
+            linhas.append(_linha_export(chave, tipo, valores))
+        for chave in atributos:
+            valores = [atributo_valor(categoria, item, chave) for item in itens]
+            linhas.append(_linha_export(chave, "estrela", valores))
+        comparativos.append({
+            "projeto": project.name,
+            "colunas": colunas,
+            "situacao": situacao,
+            "linhas": linhas,
+        })
+
+    return {"gerado_em": now_iso(), "visao_geral": visao_geral, "comparativos": comparativos}
+
+
+def sheets_config_path() -> Path:
+    return Path.home() / ".central-compras" / "dados-privados" / "integracao_sheets.json"
+
+
+def sincronizar_planilha(args: argparse.Namespace) -> None:
+    """Monta o payload e faz o POST pro Web App do Apps Script.
+
+    So roda quando chamado - nunca dentro de `dashboard` (que e local e sem
+    rede). Mandar dado pra fora e decisao explicita, nao efeito colateral.
+    """
+    caminho = Path(args.config) if getattr(args, "config", None) else sheets_config_path()
+    if not caminho.exists():
+        raise SystemExit(
+            f"Configuracao nao encontrada: {caminho}\n"
+            'Crie esse arquivo com {"url": "...", "token": "..."} '
+            "(a URL do Web App do Apps Script e o token definido no Code.gs)."
+        )
+    try:
+        config = json.loads(caminho.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as erro:
+        raise SystemExit(f"{caminho} nao e um JSON valido: {erro}") from erro
+    url = config.get("url")
+    token = config.get("token")
+    if not url or not token:
+        raise SystemExit(f"{caminho} precisa ter os campos 'url' e 'token'.")
+
+    payload = sheets_export_payload()
+    payload["token"] = token
+    corpo = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    requisicao = urllib.request.Request(
+        url, data=corpo, headers={"Content-Type": "application/json"}, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(requisicao, timeout=30) as resposta:
+            corpo_resposta = resposta.read().decode("utf-8")
+    except urllib.error.URLError as erro:
+        raise SystemExit(f"Falha ao conectar na planilha: {erro}") from erro
+
+    try:
+        resultado = json.loads(corpo_resposta)
+    except json.JSONDecodeError as erro:
+        # A Web App pode devolver uma pagina de erro/login em vez do JSON
+        # esperado (por exemplo, se o redirecionamento do Apps Script nao
+        # preservou o POST). Erro claro em vez de traceback cru.
+        raise SystemExit(
+            "A planilha nao devolveu JSON valido - a implantacao pode ter "
+            f"mudado ou o link expirou. Resposta recebida: {corpo_resposta[:300]!r}"
+        ) from erro
+
+    if not resultado.get("ok"):
+        raise SystemExit(f"A planilha recusou os dados: {resultado.get('error') or resultado}")
+    print(
+        f"Planilha sincronizada: {len(payload['visao_geral'])} projeto(s), "
+        f"{len(payload['comparativos'])} comparativo(s)."
+    )
 
 
 def generate_project_page(project: Path) -> Path:
@@ -4333,6 +4475,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("dados-privados", help="cria a pasta de dados pessoais fora do repositorio")
     p.set_defaults(func=private_data_dir)
+
+    p = sub.add_parser("sincronizar-planilha", help="manda visao geral e comparativos pra uma Google Sheets via Apps Script")
+    p.add_argument("--config", help="caminho alternativo do integracao_sheets.json (default: ~/.central-compras/dados-privados/)")
+    p.set_defaults(func=sincronizar_planilha)
 
     p = sub.add_parser("checar-segredos", help="procura CPF, cartao, senha e token na arvore versionada")
     p.add_argument("--strict", action="store_true", help="retorna erro se encontrar algo (use no pre-commit)")

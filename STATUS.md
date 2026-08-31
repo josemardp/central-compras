@@ -5,6 +5,31 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Última sessão: 31/08/2026 (continuação 3)
+
+- **Sincronização com Google Sheets** (`sincronizar-planilha`, comando novo).
+  Josemar pediu pro Gemini construir a planilha + um Apps Script (Web App)
+  que recebe JSON via POST e escreve as abas "Visão Geral" + uma por
+  projeto; testado por ele de ponta a ponta antes de eu escrever qualquer
+  Python. `sheets_export_payload()` reaproveita `project_counts()` e
+  `spec_comparison_rows()` (o mesmo motor do dashboard) - extraí
+  `comercial_valor`/`atributo_valor` de dentro de `spec_comparison_section`
+  como funções puras (texto, estrelas) pra que HTML e planilha nunca
+  divirjam no mesmo número. `urllib.request` (stdlib, sem dependência
+  nova). Config (URL + token) fica em
+  `~/.central-compras/dados-privados/integracao_sheets.json`, fora do repo.
+  Planejado com `EnterPlanMode` de novo (mesmo processo da feature de
+  estrelas). **Rodou de verdade contra o link publicado** - sem precisar
+  ajustar nada pro risco de redirecionamento que eu tinha sinalizado no
+  plano. Conferido por outra IA (Codex) direto na planilha real, não só
+  pelo "ok" do terminal.
+  **Achado na conferência real**: candidato do decor-bloqueador (cotação
+  web sem nota) mostrava "0.0 (0 aval.)" em vez de "-" na linha Nota -
+  bug de exibição (a nota="0.0" é string não-vazia, então `not nota`
+  não pegava; a régua de estrela em si já estava correta, só o texto
+  enganava). Corrigido com `quote_float(nota)`, mesmo critério de
+  `current_adjusted_rating`. **259 testes passando.**
+
 ## Última sessão: 31/08/2026 (continuação 2)
 
 - **Estrelas absolutas no comparativo de características**, pedido do
