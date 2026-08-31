@@ -12,5 +12,9 @@ atributos:
   ip_rating: IP65
   conexao: wifi_2.4ghz
   armazenamento_tipo: sd_ate_512gb_ou_nuvem_tapo_care
+  angulo_visao: 85.5_diag_73.5h_41v_graus
+  zoom_digital: nenhum
+  deteccao_ia: movimento_pessoa_sabotagem
+  audio_bidirecional: sim_com_cancelamento_ruido
 requisitos_atendidos: {}
 descartado_porque: null

@@ -12,5 +12,9 @@ atributos:
   ip_rating: IP67
   conexao: wifi
   armazenamento_tipo: sd_ate_256gb_dvr_nvr_onvif_ou_mibo_cloud
+  angulo_visao: 115_diag_98h_52v_graus
+  zoom_digital: 16x
+  deteccao_ia: movimento_ajustavel_sem_confirmacao_pessoa
+  audio_bidirecional: nao_confirmado
 requisitos_atendidos: {}
 descartado_porque: null

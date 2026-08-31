@@ -12,5 +12,9 @@ atributos:
   ip_rating: IP66
   conexao: wifi_ou_ethernet
   armazenamento_tipo: sd_ou_nuvem_tapo_care
+  angulo_visao: 113_diag_97h_54v_graus
+  zoom_digital: 12x
+  deteccao_ia: movimento_pessoa_veiculo_cruzamento_linha_intrusao_area_sabotagem
+  audio_bidirecional: sim_com_cancelamento_ruido
 requisitos_atendidos: {}
 descartado_porque: null

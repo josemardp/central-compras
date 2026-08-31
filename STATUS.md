@@ -5,6 +5,25 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Última sessão: 31/08/2026 (continuação)
+
+- **Comparativo de características no dashboard** (pedido do Josemar: "quadro
+  comparativo estilo compara celular"). `spec_comparison_section()` em
+  `scripts/central_compras.py`, genérico por categoria (lê
+  `atributos_obrigatorios` do `categorias.yaml`), um candidato por coluna,
+  linhas comerciais (preço/loja/vendedor/nota/garantia/fonte) + atributos
+  técnicos. Atributo ausente vira "-", nunca inventado.
+- **Enriquecidos os 5 candidatos da câmera** com 4 atributos técnicos novos
+  (ângulo de visão, zoom digital, detecção por IA, áudio bidirecional), todos
+  de datasheet oficial do fabricante (TP-Link `static.tp-link.com`, Intelbras
+  espelhado por revendedor autorizado), fonte e data em
+  `produtos/camera/<id>/pesquisa.md` (não em comentário no YAML - esse já
+  é apagado pela escrita, pendência conhecida do repositório).
+- Achado no processo: o datasheet oficial da Intelbras iM5 SC só confirma
+  "áudio: sim", sem detalhar alto-falante/bidirecional, embora uma busca
+  agregada tivesse afirmado "bidirecional" - **não registrado** por falta de
+  confirmação primária.
+
 ## Última sessão: 31/08/2026
 
 - **Novo projeto: câmera de monitoramento externa**
