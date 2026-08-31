@@ -28,11 +28,18 @@
   mutação: desfiz a correção e confirmei que só o teste-armadilha falhou).
   **224 testes passando.** Commits `7d6efd8` (fix) e `5e470e2` (projeto),
   já em `origin/main`.
+- **Categoria `camera` passou a aceitar `garantia_tipo=nenhuma`** no gate,
+  decisão do Josemar em 31/08 (a Tapo TC40 não tinha garantia de fábrica
+  confirmada em nenhuma loja, só devolução de 30 dias, e ele não quis cortar
+  só por isso). Achado no processo: `nenhuma` também é o valor padrão do CLI
+  `cotar` quando ninguém informa `--garantia-tipo`, então essa mudança vale
+  tanto pra "não confirmei" quanto pra "confirmei que não tem garantia" -
+  daqui pra frente qualquer câmera sem dado de garantia passa o gate. Commit
+  `83cc2cd`.
 - **Ranking atual da câmera** (tudo `fonte=web`, ninguém confirmou manual
-  ainda): 1º Intelbras iM5 SC (96,9, R$ 247,22 ML) e 2º Tapo C500 (95,7,
-  R$ 269,91 ML) em empate técnico (diferença ≤3); depois Tapo C320WS (91,8) e
-  Tapo C510W (79,7). Tapo TC40 cortado de verdade: ninguém confirmou a
-  garantia de fábrica em nenhuma das duas lojas checadas.
+  ainda): 1º Intelbras iM5 SC (95,8, R$ 247,22 ML) e 2º Tapo C500 (94,8,
+  R$ 269,91 ML) em empate técnico (diferença ≤3); depois Tapo C320WS (91,0),
+  Tapo C510W (78,9) e Tapo TC40 (75,1, a mais barata: R$ 238,41).
 
 ## Sessão de 30/08/2026 (fechamento)
 
