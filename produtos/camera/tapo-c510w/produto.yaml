@@ -18,3 +18,11 @@ atributos:
   audio_bidirecional: sim_com_cancelamento_ruido
 requisitos_atendidos: {}
 descartado_porque: null
+atributos_classificacao:
+  resolucao: 3
+  ip_rating: IP65
+  zoom_digital: 0
+  angulo_visao: 73.5
+  visao_noturna: colorida
+  deteccao_ia: padrao
+  audio_bidirecional: confirmado

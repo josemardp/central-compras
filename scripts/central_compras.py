@@ -3285,6 +3285,7 @@ td.num, th.num { text-align: right; }
   position: sticky; left: 0; background: var(--surface); font-weight: 700;
   white-space: normal; min-width: 140px;
 }
+.stars { color: var(--amber); letter-spacing: 1px; }
 pre {
   white-space: pre-wrap;
   background: var(--code-bg);
@@ -3375,8 +3376,76 @@ def spec_comparison_label(chave: str) -> str:
     return " ".join(parte.capitalize() for parte in chave.split("_"))
 
 
-def spec_comparison_rows(project: Path) -> tuple[list[str], list[Ranked]]:
-    """Atributos + resumo comercial lado a lado, um candidato por coluna.
+def _stars_from_faixas(faixas: list[dict[str, Any]], valor: Any) -> int | None:
+    """Primeira faixa (por `min` decrescente) que o valor numerico atinge.
+
+    Ordena por `min` aqui dentro de proposito: nunca confia na ordem em que
+    a lista foi escrita no YAML. Uma faixa colada fora de ordem por engano
+    nao pode classificar errado em silencio.
+    """
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return None
+    ordenadas = sorted(faixas, key=lambda f: quote_float(f.get("min")), reverse=True)
+    for faixa in ordenadas:
+        if numero >= quote_float(faixa.get("min")):
+            return int(faixa["estrelas"])
+    return None
+
+
+def _stars_from_valores(valores: dict[str, Any], valor: Any) -> int | None:
+    """Correspondencia exata categoria -> estrelas. Sem entrada = None, nunca um chute."""
+    estrelas = valores.get(valor)
+    return int(estrelas) if estrelas is not None else None
+
+
+def stars_for_attribute(categoria: str, campo: str, valor: Any) -> int | None:
+    """1-5, absoluto: nunca recebe lista de candidatos, so um valor por vez.
+
+    Isso torna estruturalmente impossivel comparar um candidato contra o
+    outro aqui dentro - empate e o padrao quando o valor normalizado e igual.
+    Le a regua em `categorias.yaml` (`estrelas.<campo>`); campo sem regua ou
+    valor sem correspondencia devolve None (sem dado, nunca 1 estrela).
+    """
+    if valor in {None, ""}:
+        return None
+    regua = (category_definition(categoria).get("estrelas") or {}).get(campo)
+    if not regua:
+        return None
+    if "valores" in regua:
+        return _stars_from_valores(regua.get("valores") or {}, valor)
+    faixas = regua.get("faixas")
+    if not faixas:
+        return None
+    return _stars_from_faixas(faixas, valor)
+
+
+def stars_from_score(score01: float | None) -> int | None:
+    """Mapeia um score 0-1 ja absoluto (qualidade, risco/garantia) em 1-5 estrelas."""
+    if score01 is None:
+        return None
+    if score01 >= 0.8:
+        return 5
+    if score01 >= 0.6:
+        return 4
+    if score01 >= 0.4:
+        return 3
+    if score01 >= 0.2:
+        return 2
+    return 1
+
+
+def stars_glyphs(estrelas: int | None) -> str:
+    """'★★★☆☆' (Unicode simples). None -> string vazia, nunca estrela fabricada."""
+    if estrelas is None:
+        return ""
+    cheias = max(0, min(5, estrelas))
+    return "★" * cheias + "☆" * (5 - cheias)
+
+
+def spec_comparison_rows(project: Path) -> tuple[str, list[str], list[Ranked]]:
+    """Categoria + atributos + resumo comercial lado a lado, um candidato por coluna.
 
     Ordem das linhas: primeiro os `atributos_obrigatorios` da categoria (na
     ordem do `categorias.yaml`), depois qualquer atributo extra que apareca em
@@ -3388,7 +3457,7 @@ def spec_comparison_rows(project: Path) -> tuple[list[str], list[Ranked]]:
     elegiveis, cortados = compute_ranking(project)
     itens = [*elegiveis, *cortados]
     if not itens:
-        return [], []
+        return categoria, [], []
 
     obrigatorios = list(category_definition(categoria).get("atributos_obrigatorios") or [])
     extras: list[str] = []
@@ -3396,11 +3465,17 @@ def spec_comparison_rows(project: Path) -> tuple[list[str], list[Ranked]]:
         for chave in (item.product.get("atributos") or {}):
             if chave not in obrigatorios and chave not in extras:
                 extras.append(chave)
-    return obrigatorios + sorted(extras), itens
+    return categoria, obrigatorios + sorted(extras), itens
+
+
+def _celula_com_estrelas(texto: str, estrelas: int | None) -> str:
+    if estrelas is None:
+        return safe_html(texto)
+    return f'{safe_html(texto)} <span class="stars" title="{estrelas}/5">{stars_glyphs(estrelas)}</span>'
 
 
 def spec_comparison_section(project: Path) -> str:
-    atributos, itens = spec_comparison_rows(project)
+    categoria, atributos, itens = spec_comparison_rows(project)
     if not itens:
         return ""
 
@@ -3421,13 +3496,23 @@ def spec_comparison_section(project: Path) -> str:
             avaliacoes = quote.get("n_avaliacoes")
             if not nota:
                 return "-"
-            return safe_html(f"{nota} ({avaliacoes or 0} aval.)")
+            # Nota ausente (eixo qualidade sem dado) nunca vira 1 estrela por
+            # tabela: so estrela quando o eixo qualidade realmente entrou na
+            # conta do ranking pra este candidato.
+            estrelas = None if "qualidade" in item.eixos_sem_dado else stars_from_score(item.axes.get("qualidade"))
+            return _celula_com_estrelas(f"{nota} ({avaliacoes or 0} aval.)", estrelas)
         if chave == "garantia":
             tipo = quote.get("garantia_tipo")
             meses = quote.get("garantia_meses")
             if not tipo:
                 return "-"
-            return safe_html(f"{tipo}, {meses} meses" if meses else tipo)
+            texto = f"{tipo}, {meses} meses" if meses else tipo
+            # So a parcela "garantia (tipo)" do risco, buscada por rotulo (nunca
+            # por indice) - reflete a mesma regua do score, sem inventar uma
+            # segunda conta.
+            parcela = next((p for p in risk_parts(quote) if p[0] == "garantia (tipo)"), None)
+            estrelas = stars_from_score(parcela[2] if parcela else None)
+            return _celula_com_estrelas(texto, estrelas)
         if chave == "fonte":
             return safe_html(quote.get("fonte") or "-")
         return "-"
@@ -3446,12 +3531,16 @@ def spec_comparison_section(project: Path) -> str:
         + "</tr>"
         for chave in linhas_comerciais
     )
+    def celula_atributo(item: Ranked, chave: str) -> str:
+        texto = str((item.product.get("atributos") or {}).get(chave) or "-")
+        if texto == "-":
+            return safe_html(texto)
+        classificacao = (item.product.get("atributos_classificacao") or {}).get(chave)
+        return _celula_com_estrelas(texto, stars_for_attribute(categoria, chave, classificacao))
+
     spec_rows = "".join(
         f"<tr><td>{safe_html(spec_comparison_label(chave))}</td>"
-        + "".join(
-            f"<td>{safe_html((item.product.get('atributos') or {}).get(chave) or '-')}</td>"
-            for item in itens
-        )
+        + "".join(f"<td>{celula_atributo(item, chave)}</td>" for item in itens)
         + "</tr>"
         for chave in atributos
     )

@@ -5,6 +5,27 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Última sessão: 31/08/2026 (continuação 2)
+
+- **Estrelas absolutas no comparativo de características**, pedido do
+  Josemar com uma condição inegociável: a nota tem que valer contra o
+  mercado, nunca "o melhor destes 5 leva 5 estrelas". Desenho em duas
+  etapas — normalizar (`atributos_classificacao`, dicionário irmão de
+  `atributos` com valor limpo, nunca dentro do texto livre de exibição) e
+  classificar (`estrelas` em `categorias.yaml`, faixas numéricas ou mapa
+  categórico, sempre absoluto). Funções novas: `stars_for_attribute`,
+  `stars_from_score`, `stars_glyphs`. Linhas Nota e Garantia reaproveitam a
+  escala que já existe no motor de score (`quality_score`, `risk_parts`),
+  não inventam régua nova. Preço fica sem estrela de propósito (é o único
+  eixo relativo ao mais barato do projeto). 21 testes novos, incluindo um
+  cenário isolado provando o empate pedido e uma guarda pra nota ausente
+  nunca virar 1 estrela por tabela. **245 testes passando.**
+  Planejado com `EnterPlanMode` + agente de plano antes de codar (achou 2
+  bugs reais no meu rascunho: colisão de linha nova no quadro, e a guarda da
+  Nota). Um erro de conta meu na conferência manual (ângulo de visão de
+  73,5° deveria valer 2 estrelas, não 3) foi pego pelo proprio teste antes
+  de ir pro ar.
+
 ## Última sessão: 31/08/2026 (continuação)
 
 - **Comparativo de características no dashboard** (pedido do Josemar: "quadro

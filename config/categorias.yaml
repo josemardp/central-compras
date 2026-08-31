@@ -104,6 +104,59 @@ camera:
       - nacional
       - vendedor
       - nenhuma
+  # Estrela e absoluta: 1-5 contra o que existe no mercado de cameras
+  # residenciais externas hoje (31/08/2026), nunca contra os outros
+  # candidatos do mesmo projeto. Le o valor de `atributos_classificacao` do
+  # produto.yaml (numero limpo ou categoria fixa), nunca o texto livre de
+  # `atributos`. Ausencia de chave em `atributos_classificacao` = sem
+  # estrela (None), nunca 1 estrela - "nao sei" nao e "e ruim".
+  #
+  # resolucao: megapixel real do sensor. 1080p/2MP e a linha de entrada do
+  # mercado hoje, por isso 3 estrelas (nao 5): reservar o topo pra 4K de
+  # verdade evita empurrar tudo pra "otimo" so porque e Full HD.
+  # ip_rating: por codigo IP inteiro (como e vendido), nao por digito
+  # separado - simples de auditar de cabeca.
+  # zoom_digital: fator numerico (16 = "16x"); "nenhum" vira 0.
+  # angulo_visao: usa SO o angulo horizontal do campo de visao (o numero que
+  # importa pra cobertura), nao o diagonal nem o vertical.
+  # visao_noturna: colorida com holofote dedicado (Starlight/floodlight) e o
+  # topo hoje; colorida via sensor IR sem holofote fica um degrau abaixo;
+  # preto-e-branco (nao confirmada colorida) fica no meio, nao no fundo.
+  # deteccao_ia: "avancado" = pessoa + veiculo + zona/linha de intrusao;
+  # "padrao" = pessoa + sabotagem; "basico" = so movimento ajustavel, sem
+  # confirmar deteccao de pessoa.
+  # audio_bidirecional: so mapeia o "sim" - se nao foi confirmado no
+  # datasheet, fica de fora do mapa de proposito (None, nunca 1 estrela).
+  estrelas:
+    resolucao:
+      faixas:
+        - {min: 8, estrelas: 5}
+        - {min: 3, estrelas: 4}
+        - {min: 1.9, estrelas: 3}
+        - {min: 1, estrelas: 2}
+        - {min: 0, estrelas: 1}
+    ip_rating:
+      valores: {IP68: 5, IP67: 5, IP66: 4, IP65: 3, IP64: 2}
+    zoom_digital:
+      faixas:
+        - {min: 16, estrelas: 5}
+        - {min: 8, estrelas: 4}
+        - {min: 2, estrelas: 3}
+        - {min: 0.1, estrelas: 2}
+        - {min: 0, estrelas: 1}
+    angulo_visao:
+      faixas:
+        - {min: 110, estrelas: 5}
+        - {min: 95, estrelas: 4}
+        - {min: 80, estrelas: 3}
+        - {min: 65, estrelas: 2}
+        - {min: 0, estrelas: 1}
+    visao_noturna:
+      valores: {colorida_holofote: 5, colorida: 4, monocromatica: 3, monocromatica_curta: 2}
+    deteccao_ia:
+      valores: {avancado: 5, padrao: 4, basico: 3}
+    audio_bidirecional:
+      valores: {confirmado: 5}
 
 generico:
   atributos_obrigatorios: []

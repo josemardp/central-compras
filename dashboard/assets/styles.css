@@ -100,6 +100,7 @@ td.num, th.num { text-align: right; }
   position: sticky; left: 0; background: var(--surface); font-weight: 700;
   white-space: normal; min-width: 140px;
 }
+.stars { color: var(--amber); letter-spacing: 1px; }
 pre {
   white-space: pre-wrap;
   background: var(--code-bg);

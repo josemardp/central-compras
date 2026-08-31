@@ -18,3 +18,10 @@ atributos:
   audio_bidirecional: nao_confirmado
 requisitos_atendidos: {}
 descartado_porque: null
+atributos_classificacao:
+  resolucao: 2
+  ip_rating: IP67
+  zoom_digital: 16
+  angulo_visao: 98
+  visao_noturna: monocromatica
+  deteccao_ia: basico
