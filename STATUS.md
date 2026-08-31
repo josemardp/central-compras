@@ -5,7 +5,36 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## Última sessão: 30/08/2026 (fechamento)
+## Última sessão: 31/08/2026
+
+- **Novo projeto: câmera de monitoramento externa**
+  (`projetos/2026-camera-de-monitoramento-externa`), categoria `camera` nova
+  em `config/categorias.yaml`. Orçamento R$ 200 (unidade) a R$ 800
+  (2-3 câmeras), uso externo, sem prazo. Deal-breaker: app de visualização
+  tem que ser de qualidade real (padrão Tapo/TP-Link), nada de marca obscura.
+- **5 candidatos pesquisados via prompt fechado pro Codex** (fichas técnicas
+  oficiais + anúncios reais Amazon/Mercado Livre, 11 cotações web):
+  Tapo C500, Tapo TC40, Tapo C320WS, Tapo C510W, Intelbras iM5 SC.
+- **Bug real achado e corrigido**, mesmo padrão dos dois do carro:
+  `latest_quotes()` escolhia a cotação representante de cada produto só pela
+  data mais recente, nunca considerando se ela passava no gate. Registrar uma
+  2ª cotação (loja diferente, sem dado de garantia) depois da 1ª (com garantia
+  confirmada) fazia o produto ser cortado por "garantia não aceita", mesmo
+  havendo cotação válida e não vencida que passava no gate. Corrigido com
+  parâmetro `prefer` em `latest_quotes()`: dentro do mesmo nível de
+  prioridade (manual não vencida > web não vencida > vencida), cotação que
+  passa no gate vence a que não passa; empate desfaz por menor custo.
+  Prompt fechado pro Codex, conferido aqui (diff + suíte completa + teste de
+  mutação: desfiz a correção e confirmei que só o teste-armadilha falhou).
+  **224 testes passando.** Commits `7d6efd8` (fix) e `5e470e2` (projeto),
+  já em `origin/main`.
+- **Ranking atual da câmera** (tudo `fonte=web`, ninguém confirmou manual
+  ainda): 1º Intelbras iM5 SC (96,9, R$ 247,22 ML) e 2º Tapo C500 (95,7,
+  R$ 269,91 ML) em empate técnico (diferença ≤3); depois Tapo C320WS (91,8) e
+  Tapo C510W (79,7). Tapo TC40 cortado de verdade: ninguém confirmou a
+  garantia de fábrica em nenhuma das duas lojas checadas.
+
+## Sessão de 30/08/2026 (fechamento)
 
 - **Ficha técnica dos 10 candidatos do carro preenchida com fonte oficial BR**
   (autonomia, protocolo, potência, porta-malas, garantia de bateria, consumo),
@@ -81,9 +110,10 @@
 
 ## Estado atual
 
-- v1 estabilizada, tag `v1.0` publicada. **221 testes passando**
+- v1 estabilizada, tag `v1.0` publicada. **224 testes passando**
   (`python -m unittest discover -s tests`).
-- Três projetos: fone bluetooth, Decor Bloqueador, carro elétrico.
+- Quatro projetos: fone bluetooth, Decor Bloqueador, carro elétrico, câmera de
+  monitoramento externa.
 - **Nenhuma compra fechada ainda.** O ciclo de veredito (D+30 / D+180) nunca
   rodou com dado real.
 - `scripts/painel.py` e o `artifact` já foram auditados (3ª rodada), bugs
@@ -94,7 +124,12 @@
 
 ## Próximo passo
 
-**Coletar cotação dos 6 candidatos vivos do carro elétrico** (etapa 4 do
+**Câmera de monitoramento:** confirmar manualmente (abrir o checkout de
+verdade) o preço/frete/estoque/garantia de pelo menos o Intelbras iM5 SC e o
+Tapo C500 (empatados tecnicamente), com `promover-cotacao`, antes de decidir.
+Prazo: nenhum.
+
+**Carro elétrico:** coletar cotação dos 6 candidatos vivos (etapa 4 do
 `processo.md`). São eles: `byd-dolphin`, `byd-dolphin-mini`,
 `chevrolet-spark-euv`, `gac-aion-ut`, `geely-ex2`, `gwm-ora-03-bev58`. A
 regra de parada pede 3 cotações + 1 presencial por candidato, e o teto da
