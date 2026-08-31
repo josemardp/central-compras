@@ -3278,6 +3278,13 @@ td.num, th.num { text-align: right; }
 .bar-fill { height: 100%; background: var(--teal); }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .actions a { font-size: 13px; }
+.compare-wrap { overflow-x: auto; }
+.compare { table-layout: auto; min-width: 100%; }
+.compare th, .compare td { white-space: nowrap; }
+.compare td:first-child, .compare th:first-child {
+  position: sticky; left: 0; background: var(--surface); font-weight: 700;
+  white-space: normal; min-width: 140px;
+}
 pre {
   white-space: pre-wrap;
   background: var(--code-bg);
@@ -3359,6 +3366,112 @@ def decision_date(project: Path) -> dt.date | None:
     return parse_dashboard_date(extract_bullet(text, "Data"))
 
 
+def spec_comparison_label(chave: str) -> str:
+    """Rotulo legivel para uma chave de atributo, sem depender de tabela por categoria.
+
+    So troca `_` por espaco e capitaliza cada palavra: funciona pra qualquer
+    categoria (carro, fone, camera...) sem manter uma lista de traducoes.
+    """
+    return " ".join(parte.capitalize() for parte in chave.split("_"))
+
+
+def spec_comparison_rows(project: Path) -> tuple[list[str], list[Ranked]]:
+    """Atributos + resumo comercial lado a lado, um candidato por coluna.
+
+    Ordem das linhas: primeiro os `atributos_obrigatorios` da categoria (na
+    ordem do `categorias.yaml`), depois qualquer atributo extra que apareca em
+    algum candidato, em ordem alfabetica. Atributo ausente num candidato vira
+    "-", nunca um valor inventado - o mesmo principio do ranking.
+    """
+    briefing_meta, _ = load_frontmatter(project / "briefing.md")
+    categoria = briefing_meta.get("categoria") or "generico"
+    elegiveis, cortados = compute_ranking(project)
+    itens = [*elegiveis, *cortados]
+    if not itens:
+        return [], []
+
+    obrigatorios = list(category_definition(categoria).get("atributos_obrigatorios") or [])
+    extras: list[str] = []
+    for item in itens:
+        for chave in (item.product.get("atributos") or {}):
+            if chave not in obrigatorios and chave not in extras:
+                extras.append(chave)
+    return obrigatorios + sorted(extras), itens
+
+
+def spec_comparison_section(project: Path) -> str:
+    atributos, itens = spec_comparison_rows(project)
+    if not itens:
+        return ""
+
+    def celula_comercial(item: Ranked, chave: str) -> str:
+        quote = item.quote
+        if chave == "preco":
+            return safe_html(brl(quote.get("custo_total")))
+        if chave == "loja":
+            return safe_html(quote.get("loja") or "-")
+        if chave == "vendedor":
+            vendedor = quote.get("vendedor") or ""
+            tipo = quote.get("vendedor_tipo") or ""
+            if not vendedor:
+                return "-"
+            return safe_html(f"{vendedor} ({tipo})" if tipo else vendedor)
+        if chave == "nota":
+            nota = quote.get("nota")
+            avaliacoes = quote.get("n_avaliacoes")
+            if not nota:
+                return "-"
+            return safe_html(f"{nota} ({avaliacoes or 0} aval.)")
+        if chave == "garantia":
+            tipo = quote.get("garantia_tipo")
+            meses = quote.get("garantia_meses")
+            if not tipo:
+                return "-"
+            return safe_html(f"{tipo}, {meses} meses" if meses else tipo)
+        if chave == "fonte":
+            return safe_html(quote.get("fonte") or "-")
+        return "-"
+
+    linhas_comerciais = ["preco", "loja", "vendedor", "nota", "garantia", "fonte"]
+
+    header_cols = "".join(
+        f"<th>{safe_html(item.product.get('nome') or item.produto_id)}"
+        + (' <span class="pill bad">cortado</span>' if item.eliminations else "")
+        + "</th>"
+        for item in itens
+    )
+    comercial_rows = "".join(
+        f"<tr><td>{safe_html(spec_comparison_label(chave))}</td>"
+        + "".join(f"<td>{celula_comercial(item, chave)}</td>" for item in itens)
+        + "</tr>"
+        for chave in linhas_comerciais
+    )
+    spec_rows = "".join(
+        f"<tr><td>{safe_html(spec_comparison_label(chave))}</td>"
+        + "".join(
+            f"<td>{safe_html((item.product.get('atributos') or {}).get(chave) or '-')}</td>"
+            for item in itens
+        )
+        + "</tr>"
+        for chave in atributos
+    )
+    return f"""
+<section class="section panel">
+  <h2>Comparativo de caracteristicas</h2>
+  <p class="muted">Um candidato por coluna, igual comparador de celular. "-" e atributo sem dado, nunca valor inventado.</p>
+  <div class="compare-wrap">
+  <table class="compare">
+    <thead><tr><th>Candidato</th>{header_cols}</tr></thead>
+    <tbody>
+      {comercial_rows}
+      {spec_rows}
+    </tbody>
+  </table>
+  </div>
+</section>
+"""
+
+
 def generate_project_page(project: Path) -> Path:
     page_dir = DASHBOARD / "projetos"
     page_dir.mkdir(parents=True, exist_ok=True)
@@ -3419,6 +3532,7 @@ def generate_project_page(project: Path) -> Path:
             f"<td>{safe_html(row.get('fonte'))}</td>"
             "</tr>"
         )
+    comparativo = spec_comparison_section(project)
     body = f"""
 <div class="topbar">
   <div>
@@ -3452,6 +3566,7 @@ def generate_project_page(project: Path) -> Path:
     <tbody>{''.join(ranking_rows) or '<tr><td colspan="6">Sem ranking gerado.</td></tr>'}</tbody>
   </table>
 </section>
+{comparativo}
 <section class="section panel">
   <h2>Historico de preco</h2>
   <p class="muted">Desconto so e desconto contra a sua propria serie. Com uma unica observacao, nao da para saber.</p>
