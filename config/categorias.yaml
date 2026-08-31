@@ -83,6 +83,20 @@ material_construcao:
     peso_ancora: 50
   gate: {}
 
+camera:
+  atributos_obrigatorios:
+    - resolucao
+    - visao_noturna
+    - ip_rating
+    - conexao
+    - armazenamento_tipo
+  gate:
+    nota_minima_ajustada: 4.2
+    minimo_avaliacoes: 150
+    garantia_tipo_aceita:
+      - nacional
+      - vendedor
+
 generico:
   atributos_obrigatorios: []
   gate:

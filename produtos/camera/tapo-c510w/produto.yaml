@@ -1,0 +1,16 @@
+id: tapo-c510w
+categoria: camera
+nome: Tapo C510W
+marca: TP-Link
+estado: pesquisando
+projeto: 2026-camera-de-monitoramento-externa
+preco_alvo: null
+preco_teto: 800.0
+atributos:
+  resolucao: 2K_3MP
+  visao_noturna: colorida_ate_30m
+  ip_rating: IP65
+  conexao: wifi
+  armazenamento_tipo: sd_ate_512gb_ou_nuvem_tapo_care
+requisitos_atendidos: {}
+descartado_porque: null

@@ -1,0 +1,16 @@
+id: intelbras-im5-sc
+categoria: camera
+nome: Intelbras iM5 SC
+marca: Intelbras
+estado: pesquisando
+projeto: 2026-camera-de-monitoramento-externa
+preco_alvo: null
+preco_teto: 800.0
+atributos:
+  resolucao: 1080p
+  visao_noturna: ate_30m
+  ip_rating: IP67
+  conexao: wifi
+  armazenamento_tipo: sd_ate_256gb_dvr_nvr_onvif_ou_mibo_cloud
+requisitos_atendidos: {}
+descartado_porque: null
