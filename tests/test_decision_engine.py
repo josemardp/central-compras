@@ -1,4 +1,5 @@
 import datetime as dt
+import argparse
 import shutil
 import tempfile
 from pathlib import Path
@@ -133,6 +134,82 @@ class RankingProcessStepsTest(unittest.TestCase):
         processo = (self.projeto / "processo.md").read_text(encoding="utf-8")
         self.assertIn("- [x] 5. Aplicar gates eliminatorios", processo)
         self.assertIn("- [ ] 6. Comparar finalistas", processo)
+
+
+class RankingGateAwareQuoteSelectionTest(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-camera-gate-"))
+        ambiente.montar(self.tmpdir, extras=["dashboard", "vereditos"])
+        self._orig = {
+            key: getattr(central_compras, key)
+            for key in ["ROOT", "CONFIG", "PROJETOS", "PRODUTOS", "TEMPLATES", "BASE", "VEREDITOS", "DASHBOARD"]
+        }
+        central_compras.ROOT = self.tmpdir
+        central_compras.CONFIG = self.tmpdir / "config"
+        central_compras.PROJETOS = self.tmpdir / "projetos"
+        central_compras.PRODUTOS = self.tmpdir / "produtos"
+        central_compras.TEMPLATES = self.tmpdir / "templates"
+        central_compras.BASE = self.tmpdir / "base-conhecimento"
+        central_compras.VEREDITOS = self.tmpdir / "vereditos"
+        central_compras.DASHBOARD = self.tmpdir / "dashboard"
+        central_compras._PREFS_CACHE.clear()
+
+        categorias = central_compras.read_yaml(central_compras.CONFIG / "categorias.yaml", {})
+        categorias["camera"] = {
+            "atributos_obrigatorios": ["resolucao", "visao_noturna", "ip_rating", "conexao", "armazenamento_tipo"],
+            "gate": {
+                "nota_minima_ajustada": 4.2,
+                "minimo_avaliacoes": 150,
+                "garantia_tipo_aceita": ["nacional", "vendedor"],
+            },
+        }
+        central_compras.write_yaml(central_compras.CONFIG / "categorias.yaml", categorias)
+
+    def tearDown(self):
+        for key, value in self._orig.items():
+            setattr(central_compras, key, value)
+        central_compras._PREFS_CACHE.clear()
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def add_quote(self, *, loja: str, preco: float, nota: float, avaliacoes: int, garantia_tipo: str) -> None:
+        central_compras.add_quote(argparse.Namespace(
+            projeto=str(self.projeto), produto_id="intelbras-im5-sc", loja=loja, vendedor=loja,
+            vendedor_tipo="oficial", anuncio_id=None, variacao=None, preco=preco,
+            preco_promocional=None, frete=0.0, frete_prazo_dias=2, custo_extra=0.0,
+            custo_total=None, custo_operacional_mensal=0.0, tco_meses=None,
+            valor_revenda_estimado=0.0, nota=nota, avaliacoes=avaliacoes, garantia_meses=12,
+            garantia_tipo=garantia_tipo, link=f"https://example.com/{loja}", flag_suspeita="",
+            fonte="manual", data="2026-08-31",
+        ))
+
+    def test_same_day_quote_without_accepted_warranty_does_not_hide_valid_quote(self):
+        central_compras.new_project(argparse.Namespace(
+            nome="camera de monitoramento externa", categoria="camera", valor_estimado=800,
+            preco_teto=800, necessidade="camera externa", force=False,
+        ))
+        self.projeto = central_compras.PROJETOS / f"{dt.date.today().year}-camera-de-monitoramento-externa"
+        central_compras.new_product(argparse.Namespace(
+            projeto=str(self.projeto), nome="Intelbras iM5 SC", marca="Intelbras",
+            categoria="camera", produto_id="intelbras-im5-sc", preco_alvo=None, preco_teto=None,
+            atributo=[
+                "resolucao=1080p",
+                "visao_noturna=true",
+                "ip_rating=IP67",
+                "conexao=wifi",
+                "armazenamento_tipo=microSD",
+            ],
+            requisito=["app_qualidade=true"], force=False,
+        ))
+
+        self.add_quote(loja="Mercado Livre", preco=329.63, nota=4.9, avaliacoes=9112, garantia_tipo="nacional")
+        self.add_quote(loja="Amazon", preco=253.71, nota=4.8, avaliacoes=1608, garantia_tipo="nenhuma")
+
+        elegiveis, cortados = central_compras.compute_ranking(self.projeto)
+
+        self.assertEqual([item.produto_id for item in elegiveis], ["intelbras-im5-sc"])
+        self.assertEqual(cortados, [])
+        self.assertEqual(elegiveis[0].quote["loja"], "Mercado Livre")
+        self.assertEqual(elegiveis[0].quote["garantia_tipo"], "nacional")
 
 
 class CategoryBayesianAnchorTest(unittest.TestCase):

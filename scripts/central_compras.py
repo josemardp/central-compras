@@ -19,7 +19,7 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 
@@ -964,14 +964,36 @@ def find_product(produto_id: str) -> dict[str, Any] | None:
     return read_yaml(path, {})
 
 
-def latest_quotes(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+def latest_quotes(
+    rows: list[dict[str, str]],
+    prefer: Callable[[dict[str, str]], bool] | None = None,
+) -> dict[str, dict[str, str]]:
     """Cotacao que representa cada produto no ranking.
 
     Manual vale mais que web porque foi conferida. Mas manual VENCIDA nao vale
     mais que uma observacao recente: preferir cegamente a manual fazia um preco
     de dois anos atras rankear no lugar do de hoje. Quando a manual venceu,
     usa a observacao mais recente e o ranking avisa que ela e estimativa.
+
+    Quando quem chama informa `prefer`, a escolha dentro do mesmo nivel de
+    prioridade privilegia a cotacao que passa no gate; so depois desempata por
+    data e custo. Isso evita que uma observacao recente, mas inutil para a
+    decisao, esconda outra cotacao igualmente fresca e elegivel.
     """
+
+    def choose(values: list[dict[str, str]], *, prefer_cost_tiebreak: bool = True) -> dict[str, str]:
+        preferred = [row for row in values if prefer and prefer(row)]
+        pool = preferred or values
+        chosen = pool[-1]
+        if prefer_cost_tiebreak and preferred:
+            same_date = [row for row in pool if str(row.get("data_coleta") or "") == str(chosen.get("data_coleta") or "")]
+            positive_costs = [quote_float(row.get("custo_total")) for row in same_date if quote_float(row.get("custo_total")) > 0]
+            if positive_costs:
+                cheapest = min(positive_costs)
+                cheapest_rows = [row for row in same_date if quote_float(row.get("custo_total")) == cheapest]
+                chosen = cheapest_rows[-1]
+        return chosen
+
     grouped: dict[str, list[dict[str, str]]] = {}
     for row in rows:
         grouped.setdefault(row.get("produto_id", ""), []).append(row)
@@ -983,11 +1005,11 @@ def latest_quotes(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
             row for row in por_data if row.get("fonte") == "manual" and not quote_is_stale(row)
         ]
         if manual_no_prazo:
-            latest[produto_id] = manual_no_prazo[-1]
+            latest[produto_id] = choose(manual_no_prazo)
             continue
         recentes = [row for row in por_data if not quote_is_stale(row)]
         if recentes:
-            latest[produto_id] = recentes[-1]
+            latest[produto_id] = choose(recentes)
             continue
         # Tudo vencido: fica a manual mais nova, ou a observacao mais nova.
         manual = [row for row in por_data if row.get("fonte") == "manual"]
@@ -1524,7 +1546,13 @@ def value_field_for(briefing: dict[str, Any]) -> tuple[str, str]:
 def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     rows = read_quotes(project)
-    latest = latest_quotes(rows)
+
+    def passes_gate(row: dict[str, str]) -> bool:
+        produto_id = row.get("produto_id", "")
+        product = find_product(produto_id) or {"id": produto_id, "categoria": briefing.get("categoria"), "marca": ""}
+        return not gate_eliminations(row, product, briefing)
+
+    latest = latest_quotes(rows, prefer=passes_gate)
     weights = preferences().get("score", {})
     pre_candidates: list[tuple[str, dict[str, str], dict[str, Any], list[str], list[str]]] = []
     for produto_id, row in latest.items():
