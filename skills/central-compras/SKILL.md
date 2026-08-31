@@ -33,6 +33,7 @@ C:\projetos\central-compras
 - `promover-cotacao` requires the fields confirmed now, or explicit `--sem-alteracao`; never refresh an old price implicitly.
 - A final decision freezes its current evidence under `projeto/snapshots/`. Current derived files may be regenerated; snapshots must not be edited or regenerated.
 - D+30 and D+180 are separate observations. Fill and export each phase independently so early experience does not block long-term learning.
+- Star classification (`atributos_classificacao` in `produto.yaml`, rendered in the dashboard's comparison table) is a LATE, on-demand step, not something to fill in when a candidate is first registered. Only research and fill it for candidates that already passed the gate (elegible, heading to the decision table), and only when Josemar explicitly asks for it. Never spend that research effort on a candidate likely to be cut soon by price or gate. The dashboard code itself already refuses to show a star for any gate-cut candidate even if the data exists (`spec_comparison_section` in `scripts/central_compras.py`), but the discipline of not doing the research early is on the agent, not the code.
 
 ## Workflow
 

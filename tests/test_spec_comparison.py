@@ -137,6 +137,26 @@ class SpecComparisonTest(unittest.TestCase):
         html = cc.spec_comparison_section(self.projeto)
         self.assertIn("720p", html)
 
+    def test_gate_cut_candidate_never_shows_a_star_even_with_good_data(self):
+        # Estrela e etapa final da cotacao: so pra quem chega elegivel na mesa
+        # de decisao. Um candidato cortado pelo gate (aqui, preco acima do
+        # teto do projeto) nao pode mostrar estrela nenhuma, mesmo tendo
+        # atributos_classificacao de topo de mercado - nao vale classificar
+        # quem ja saiu da disputa.
+        self._novo_produto("cam-caro", resolucao_display="4K", resolucao_classificacao=8)
+        self._cotar("cam-caro", preco=999999, nota=4.9, avaliacoes=9000)
+
+        elegiveis, cortados = cc.compute_ranking(self.projeto)
+        self.assertEqual(elegiveis, [])
+        self.assertEqual(len(cortados), 1)
+
+        html = cc.spec_comparison_section(self.projeto)
+        linha_resolucao = _linha_da_tabela(html, "Resolucao")
+        self.assertIn("4K", linha_resolucao)
+        self.assertNotIn("★", linha_resolucao)
+        self.assertNotIn("★", _linha_da_tabela(html, "Nota"))
+        self.assertNotIn("★", _linha_da_tabela(html, "Garantia"))
+
     def test_tied_absolute_values_render_the_same_stars(self):
         self._novo_produto("cam-a", resolucao_display="1080p", resolucao_classificacao=2)
         self._novo_produto("cam-b", resolucao_display="1080p (outra marca)", resolucao_classificacao=2)

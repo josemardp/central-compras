@@ -3496,10 +3496,16 @@ def spec_comparison_section(project: Path) -> str:
             avaliacoes = quote.get("n_avaliacoes")
             if not nota:
                 return "-"
-            # Nota ausente (eixo qualidade sem dado) nunca vira 1 estrela por
-            # tabela: so estrela quando o eixo qualidade realmente entrou na
-            # conta do ranking pra este candidato.
-            estrelas = None if "qualidade" in item.eixos_sem_dado else stars_from_score(item.axes.get("qualidade"))
+            # Estrela e etapa final da cotacao: so pros elegiveis, que chegam
+            # na mesa de decisao. Cortado pelo gate nao ganha estrela - nao
+            # vale gastar essa classificacao em quem ja saiu da disputa.
+            # Nota ausente (eixo qualidade sem dado) tambem nunca vira 1
+            # estrela por tabela: so estrela quando o eixo realmente entrou
+            # na conta do ranking pra este candidato.
+            if item.eliminations or "qualidade" in item.eixos_sem_dado:
+                estrelas = None
+            else:
+                estrelas = stars_from_score(item.axes.get("qualidade"))
             return _celula_com_estrelas(f"{nota} ({avaliacoes or 0} aval.)", estrelas)
         if chave == "garantia":
             tipo = quote.get("garantia_tipo")
@@ -3507,11 +3513,13 @@ def spec_comparison_section(project: Path) -> str:
             if not tipo:
                 return "-"
             texto = f"{tipo}, {meses} meses" if meses else tipo
-            # So a parcela "garantia (tipo)" do risco, buscada por rotulo (nunca
-            # por indice) - reflete a mesma regua do score, sem inventar uma
-            # segunda conta.
-            parcela = next((p for p in risk_parts(quote) if p[0] == "garantia (tipo)"), None)
-            estrelas = stars_from_score(parcela[2] if parcela else None)
+            estrelas = None
+            if not item.eliminations:
+                # So a parcela "garantia (tipo)" do risco, buscada por rotulo
+                # (nunca por indice) - reflete a mesma regua do score, sem
+                # inventar uma segunda conta.
+                parcela = next((p for p in risk_parts(quote) if p[0] == "garantia (tipo)"), None)
+                estrelas = stars_from_score(parcela[2] if parcela else None)
             return _celula_com_estrelas(texto, estrelas)
         if chave == "fonte":
             return safe_html(quote.get("fonte") or "-")
@@ -3535,6 +3543,12 @@ def spec_comparison_section(project: Path) -> str:
         texto = str((item.product.get("atributos") or {}).get(chave) or "-")
         if texto == "-":
             return safe_html(texto)
+        if item.eliminations:
+            # Estrela e a etapa final da cotacao, so pra quem chega elegivel
+            # na mesa de decisao - cortado pelo gate mostra o valor bruto,
+            # nunca a classificacao (nao vale gastar essa conta em quem ja
+            # saiu da disputa).
+            return safe_html(texto)
         classificacao = (item.product.get("atributos_classificacao") or {}).get(chave)
         return _celula_com_estrelas(texto, stars_for_attribute(categoria, chave, classificacao))
 
@@ -3547,7 +3561,7 @@ def spec_comparison_section(project: Path) -> str:
     return f"""
 <section class="section panel">
   <h2>Comparativo de caracteristicas</h2>
-  <p class="muted">Um candidato por coluna, igual comparador de celular. "-" e atributo sem dado, nunca valor inventado.</p>
+  <p class="muted">Um candidato por coluna, igual comparador de celular. "-" e atributo sem dado, nunca valor inventado. Estrela e a classificacao final: so pros elegiveis (quem chega na mesa de decisao), nunca pros cortados pelo gate.</p>
   <div class="compare-wrap">
   <table class="compare">
     <thead><tr><th>Candidato</th>{header_cols}</tr></thead>
