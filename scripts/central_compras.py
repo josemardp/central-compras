@@ -687,6 +687,7 @@ def new_product(args: argparse.Namespace) -> None:
         "preco_teto": args.preco_teto if args.preco_teto is not None else meta.get("preco_teto"),
         "atributos": parse_pairs(args.atributo or []),
         "requisitos_atendidos": parse_pairs(args.requisito or []),
+        "proveniencia": None,
         "descartado_porque": None,
     }
     write_yaml(path / "produto.yaml", data)

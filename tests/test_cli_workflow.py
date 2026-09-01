@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 import ambiente
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -187,6 +188,40 @@ class CliWorkflowTest(unittest.TestCase):
         self.assertIn("Escolhido: QCY H3", resumo.stdout)
         self.assertIn("Estado: comprado", status.stdout)
         self.assertTrue(vereditos)
+
+    def test_product_provenance_survives_discard_rewrite(self):
+        self.run_cli(
+            "novo-projeto",
+            "fone com fonte preservada",
+            "--categoria",
+            "fone",
+            "--valor-estimado",
+            "400",
+            "--preco-teto",
+            "600",
+        )
+        project = f"projetos/{ANO}-fone-com-fonte-preservada"
+        self.run_cli(
+            "novo-produto",
+            project,
+            "QCY H3",
+            "--marca",
+            "QCY",
+            "--categoria",
+            "fone",
+        )
+        product_path = self.tmpdir / "produtos" / "fone" / "qcy-h3" / "produto.yaml"
+        product = yaml.safe_load(product_path.read_text(encoding="utf-8"))
+        product["proveniencia"] = "Fonte: ficha tecnica oficial. URL: https://example.com/qcy-h3. Consulta: 2026-09-01."
+        product_path.write_text(yaml.safe_dump(product, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+        self.run_cli("descartar", "--produto-id", "qcy-h3", "--projeto", project, "--porque", "Fora do foco do teste.")
+
+        product = yaml.safe_load(product_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            product["proveniencia"],
+            "Fonte: ficha tecnica oficial. URL: https://example.com/qcy-h3. Consulta: 2026-09-01.",
+        )
 
     def test_tco_changes_value_axis_for_car_project(self):
         self.run_cli(

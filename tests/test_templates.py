@@ -29,6 +29,7 @@ class ProductTemplateTest(unittest.TestCase):
             "preco_teto",
             "atributos",
             "requisitos_atendidos",
+            "proveniencia",
             "descartado_porque",
             "aguardando_preco_desde",
             "aguardando_preco_porque",
