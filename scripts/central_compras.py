@@ -2032,7 +2032,10 @@ def discard_product(args: argparse.Namespace) -> None:
     write_yaml(path, product)
     project = project_path(args.projeto or product.get("projeto"))
     append_timeline(project, "descarte", f"Descartado {args.produto_id}", args.porque)
-    set_process_state(project, proxima_acao="seguir com finalistas restantes ou registrar nova cotacao")
+    build_ranking(argparse.Namespace(projeto=args.projeto or str(project)))
+    elegiveis, _ = compute_ranking(project)
+    if not elegiveis:
+        print("Proxima acao mantida: nenhum candidato elegivel apos descarte.")
     print(f"Descartado: {args.produto_id}")
 
 

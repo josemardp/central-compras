@@ -223,6 +223,117 @@ class CliWorkflowTest(unittest.TestCase):
             "Fonte: ficha tecnica oficial. URL: https://example.com/qcy-h3. Consulta: 2026-09-01.",
         )
 
+    def test_discard_recomputes_next_action_when_candidate_remains(self):
+        self.run_cli(
+            "novo-projeto",
+            "fone descarte recalcula",
+            "--categoria",
+            "fone",
+            "--valor-estimado",
+            "400",
+            "--preco-teto",
+            "600",
+        )
+        project = f"projetos/{ANO}-fone-descarte-recalcula"
+        for product_id, name in [("qcy-h3", "QCY H3"), ("qcy-x", "QCY X")]:
+            self.run_cli(
+                "novo-produto",
+                project,
+                name,
+                "--marca",
+                "QCY",
+                "--categoria",
+                "fone",
+                "--produto-id",
+                product_id,
+            )
+            self.run_cli(
+                "cotar",
+                project,
+                "--produto-id",
+                product_id,
+                "--loja",
+                "Loja",
+                "--vendedor",
+                "Vendedor",
+                "--vendedor-tipo",
+                "oficial",
+                "--preco",
+                "299",
+                "--frete",
+                "0",
+                "--frete-prazo-dias",
+                "3",
+                "--nota",
+                "4.8",
+                "--avaliacoes",
+                "1000",
+                "--garantia-meses",
+                "12",
+                "--garantia-tipo",
+                "nacional",
+                "--fonte",
+                "web",
+                "--link",
+                f"https://example.com/{product_id}",
+            )
+        processo_path = self.tmpdir / project / "processo.md"
+        processo = processo_path.read_text(encoding="utf-8")
+        processo_path.write_text(
+            processo.replace(
+                "- Proxima acao: gerar ranking com a cotacao manual e registrar decisao",
+                "- Proxima acao: coletar cotacao dos candidatos vivos",
+            ),
+            encoding="utf-8",
+        )
+
+        self.run_cli("descartar", "--produto-id", "qcy-x", "--projeto", project, "--porque", "Candidato perdeu prioridade.")
+
+        processo = processo_path.read_text(encoding="utf-8")
+        self.assertNotIn("seguir com finalistas restantes ou registrar nova cotacao", processo)
+        self.assertIn(
+            "- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas",
+            processo,
+        )
+
+    def test_discard_keeps_specific_next_action_when_no_candidate_remains(self):
+        self.run_cli(
+            "novo-projeto",
+            "fone descarte sem elegiveis",
+            "--categoria",
+            "fone",
+            "--valor-estimado",
+            "400",
+            "--preco-teto",
+            "600",
+        )
+        project = f"projetos/{ANO}-fone-descarte-sem-elegiveis"
+        self.run_cli(
+            "novo-produto",
+            project,
+            "QCY H3",
+            "--marca",
+            "QCY",
+            "--categoria",
+            "fone",
+        )
+        processo_path = self.tmpdir / project / "processo.md"
+        processo = processo_path.read_text(encoding="utf-8")
+        processo_path.write_text(
+            processo.replace(
+                "- Proxima acao: definir modelo/requisitos com ajuda da IA",
+                "- Proxima acao: coletar cotacao dos candidatos vivos",
+            ),
+            encoding="utf-8",
+        )
+
+        result = self.run_cli("descartar", "--produto-id", "qcy-h3", "--projeto", project, "--porque", "Sem cotacao util.")
+
+        processo = processo_path.read_text(encoding="utf-8")
+        self.assertIn("- Proxima acao: coletar cotacao dos candidatos vivos", processo)
+        self.assertIn("Proxima acao mantida: nenhum candidato elegivel apos descarte.", result.stdout)
+        self.assertNotIn("seguir com finalistas restantes ou registrar nova cotacao", processo)
+
     def test_tco_changes_value_axis_for_car_project(self):
         self.run_cli(
             "novo-projeto",
