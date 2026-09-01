@@ -237,28 +237,29 @@ conta de energia e da rotina declarada, ver `briefing.md` do projeto.
 
 ### Do repositório
 
-- **A skill não está instalada nesta máquina.** O README manda instalar em
-  `C:\Users\pc\.codex\skills\central-compras`, caminho que não existe (o usuário
-  é `josem`). Não há script de instalação, e o repo é usado de várias máquinas
-  por agentes diferentes (Codex, Claude Code, Antigravity). A 3ª auditoria
-  confirmou de novo, ainda sem dono.
+**Resolvidas desde a última revisão desta lista** (confirmado no código em
+01/09/2026, esta seção estava desatualizada): skill installer
+(`scripts/instalar_skill.py` já existe e o README já aponta pra ele),
+rotina semanal (`docs/rotina-semanal.md` já existe), `peso_ancora` por
+categoria (`nota_bayesiana` já em `categorias.yaml`, com fallback pro
+global) e filtro de CEP em `checar-segredos` (`SENSITIVE_PATTERNS` já tem o
+padrão). Seguem só as duas reais:
+
 - **Escrita de `produto.yaml` apaga comentário.** `write_yaml`
-  (`scripts/central_compras.py:280`) usa `yaml.safe_dump`, que reserializa o
-  arquivo do zero. Em 30/08 o comando `descartar` apagou os comentários de
-  proveniência (`# Fonte:`, `# URL:`, `# Consulta:`) dos 4 candidatos
-  descartados do carro. Está tudo no histórico do git, mas saiu do arquivo, e
-  vale para qualquer comando que reescreva um produto. Conserto provável:
-  guardar proveniência em campo do YAML, não em comentário.
+  (`scripts/central_compras.py:281-282`) usa `yaml.safe_dump`, que
+  reserializa o arquivo do zero. Em 30/08 o comando `descartar` apagou os
+  comentários de proveniência (`# Fonte:`, `# URL:`, `# Consulta:`) dos 4
+  candidatos descartados do carro. Está tudo no histórico do git, mas saiu
+  do arquivo, e vale para qualquer comando que reescreva um produto.
+  Conserto provável: guardar proveniência em campo do YAML, não em
+  comentário. **Prompt fechado enviado ao Codex em 01/09/2026**, retorno
+  ainda não conferido.
 - **`descartar` sobrescreve a "Próxima ação" do `processo.md`** com texto
   genérico ("seguir com finalistas restantes ou registrar nova cotacao"),
-  perdendo o que estava escrito. Aconteceu em 30/08 no carro.
-- Falta a rotina semanal (a tag `v1.0` já foi publicada).
-- `peso_ancora` global segue 250 em `preferencias.yaml`; já existe override
-  por categoria (`material_construcao: 50`). Avaliar se outras categorias
-  precisam.
-- `artifact.html` é varrido por `checar-segredos`, mas os padrões só pegam
-  CPF/cartão/senha/token, não pegam CEP, endereço ou nome solto em texto
-  livre (campo `porque`, notas). Risco condicional ao que for digitado ali.
+  perdendo o que estava escrito. Aconteceu em 30/08 no carro. Conserto
+  provável: reusar `build_ranking` (já faz isso em `decide`) em vez de
+  escrever a linha à mão. **Mesmo prompt ao Codex em 01/09/2026**, retorno
+  ainda não conferido.
 
 ## Decisões que valem lembrar
 
