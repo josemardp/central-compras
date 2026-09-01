@@ -252,14 +252,13 @@ padrão). Seguem só as duas reais:
   candidatos descartados do carro. Está tudo no histórico do git, mas saiu
   do arquivo, e vale para qualquer comando que reescreva um produto.
   Conserto provável: guardar proveniência em campo do YAML, não em
-  comentário. **Prompt fechado enviado ao Codex em 01/09/2026**, retorno
-  ainda não conferido.
+  comentário. Prompt fechado já escrito em 01/09/2026, ainda não enviado
+  ao Codex.
 - **`descartar` sobrescreve a "Próxima ação" do `processo.md`** com texto
   genérico ("seguir com finalistas restantes ou registrar nova cotacao"),
   perdendo o que estava escrito. Aconteceu em 30/08 no carro. Conserto
   provável: reusar `build_ranking` (já faz isso em `decide`) em vez de
-  escrever a linha à mão. **Mesmo prompt ao Codex em 01/09/2026**, retorno
-  ainda não conferido.
+  escrever a linha à mão. Mesmo prompt de 01/09/2026, ainda não enviado.
 
 ## Decisões que valem lembrar
 
