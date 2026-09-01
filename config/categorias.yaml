@@ -158,6 +158,23 @@ camera:
     audio_bidirecional:
       valores: {confirmado: 5}
 
+servico:
+  atributos_obrigatorios:
+    - tipo_exame
+    - modalidade
+    - cidade
+  # Servico, nao produto de prateleira: nao existe nota agregada
+  # numerica confiavel e publica (busca web devolve contagem de avaliacoes
+  # e comentarios, nunca a nota exata do Google Maps), nem conceito de
+  # frete ou garantia de fabrica. Gate fica vazio de proposito - exclusao
+  # por modalidade errada (remoto quando o pedido exige
+  # presencial) ou por sinal de risco (endereco/telefone incompativel) e
+  # sempre manual via `descartar`, nunca corte automatico de nota/
+  # avaliacoes. Aberta em 01/09/2026 para a cotacao de servico do
+  # Josemar (praca: consultar `dados-privados`, referencia SP/Aracatuba).
+  sem_frete: true
+  gate: {}
+
 generico:
   atributos_obrigatorios: []
   gate:
