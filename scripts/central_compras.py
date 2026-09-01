@@ -1304,6 +1304,7 @@ class Ranked:
     vencida: bool
     confianca: float
     breakdown: ScoreBreakdown
+    sem_cotacao: bool = False
 
 
 def quote_age_days(row: dict[str, str], reference: dt.date | None = None) -> int | None:
@@ -1637,6 +1638,39 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     elegiveis = sorted([c for c in candidates if not c.eliminations], key=lambda c: c.score, reverse=True)
     cortados = sorted([c for c in candidates if c.eliminations], key=lambda c: c.produto_id)
     return elegiveis, cortados
+
+
+def sem_cotacao_candidates(project: Path, categoria: str, known: list[Ranked]) -> list[Ranked]:
+    """Candidatos mapeados (`novo-produto`) que ainda nao tem nenhuma cotacao.
+
+    Aparecem no comparativo com os atributos ja conhecidos e "-" nos campos
+    comerciais (preco, nota, garantia...), nunca um valor inventado - assim
+    a pesquisa em andamento fica visivel na tabela em vez de sumir ate a
+    primeira cotacao chegar.
+    """
+    conhecidos = {item.produto_id for item in known}
+    faltando = sorted(project_candidate_ids(project) - conhecidos)
+    itens: list[Ranked] = []
+    for produto_id in faltando:
+        product = find_product(produto_id) or {"id": produto_id, "categoria": categoria, "marca": ""}
+        itens.append(
+            Ranked(
+                produto_id,
+                {},
+                product,
+                {},
+                0.0,
+                [],
+                [],
+                [],
+                None,
+                False,
+                0.0,
+                score_breakdown({}, [], {}),
+                sem_cotacao=True,
+            )
+        )
+    return itens
 
 
 def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ranked]) -> None:
@@ -3461,7 +3495,7 @@ def spec_comparison_rows(project: Path) -> tuple[str, list[str], list[Ranked]]:
     briefing_meta, _ = load_frontmatter(project / "briefing.md")
     categoria = briefing_meta.get("categoria") or "generico"
     elegiveis, cortados = compute_ranking(project)
-    itens = [*elegiveis, *cortados]
+    itens = [*elegiveis, *cortados, *sem_cotacao_candidates(project, categoria, [*elegiveis, *cortados])]
     if not itens:
         return categoria, [], []
 
@@ -3568,7 +3602,11 @@ def spec_comparison_section(project: Path) -> str:
 
     header_cols = "".join(
         f"<th>{safe_html(item.product.get('nome') or item.produto_id)}"
-        + (' <span class="pill bad">cortado</span>' if item.eliminations else "")
+        + (
+            ' <span class="pill bad">cortado</span>' if item.eliminations
+            else ' <span class="pill">sem cotacao</span>' if item.sem_cotacao
+            else ""
+        )
         + "</th>"
         for item in itens
     )
@@ -3645,7 +3683,12 @@ def sheets_export_payload() -> dict[str, Any]:
         if not itens:
             continue
         colunas = [item.product.get("nome") or item.produto_id for item in itens]
-        situacao = ["cortado" if item.eliminations else "elegivel" for item in itens]
+        situacao = [
+            "sem_cotacao" if item.sem_cotacao
+            else "cortado" if item.eliminations
+            else "elegivel"
+            for item in itens
+        ]
         linhas: list[dict[str, Any]] = []
         for chave in LINHAS_COMERCIAIS:
             tipo = "estrela" if chave in {"nota", "garantia"} else "texto"
