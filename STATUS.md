@@ -237,28 +237,17 @@ conta de energia e da rotina declarada, ver `briefing.md` do projeto.
 
 ### Do repositório
 
-**Resolvidas desde a última revisão desta lista** (confirmado no código em
-01/09/2026, esta seção estava desatualizada): skill installer
-(`scripts/instalar_skill.py` já existe e o README já aponta pra ele),
-rotina semanal (`docs/rotina-semanal.md` já existe), `peso_ancora` por
-categoria (`nota_bayesiana` já em `categorias.yaml`, com fallback pro
-global) e filtro de CEP em `checar-segredos` (`SENSITIVE_PATTERNS` já tem o
-padrão). Seguem só as duas reais:
-
-- **Escrita de `produto.yaml` apaga comentário.** `write_yaml`
-  (`scripts/central_compras.py:281-282`) usa `yaml.safe_dump`, que
-  reserializa o arquivo do zero. Em 30/08 o comando `descartar` apagou os
-  comentários de proveniência (`# Fonte:`, `# URL:`, `# Consulta:`) dos 4
-  candidatos descartados do carro. Está tudo no histórico do git, mas saiu
-  do arquivo, e vale para qualquer comando que reescreva um produto.
-  Conserto provável: guardar proveniência em campo do YAML, não em
-  comentário. Prompt fechado já escrito em 01/09/2026, ainda não enviado
-  ao Codex.
-- **`descartar` sobrescreve a "Próxima ação" do `processo.md`** com texto
-  genérico ("seguir com finalistas restantes ou registrar nova cotacao"),
-  perdendo o que estava escrito. Aconteceu em 30/08 no carro. Conserto
-  provável: reusar `build_ranking` (já faz isso em `decide`) em vez de
-  escrever a linha à mão. Mesmo prompt de 01/09/2026, ainda não enviado.
+Nenhuma pendência aberta no momento. As 6 que existiam foram todas
+resolvidas: skill installer, rotina semanal, `peso_ancora` por categoria e
+filtro de CEP (já estavam feitas, a lista é que estava desatualizada); e as
+duas últimas — **`write_yaml` apagava comentário de proveniência** e
+**`descartar` sobrescrevia a "Próxima ação" com texto genérico** — corrigidas
+por prompt fechado ao Codex em 01/09/2026 (commits `3b808c4` e `89baf02`),
+conferidas aqui: diff, suíte completa (262 testes) e teste de mutação no
+item da "Próxima ação" (desfiz a correção, só os 2 testes-armadilha
+falharam, restaurada em seguida). `produto.yaml` ganhou o campo opcional
+`proveniencia`; `descartar` agora chama `build_ranking` para recalcular a
+próxima ação de verdade, em vez de escrever texto fixo.
 
 ## Decisões que valem lembrar
 
