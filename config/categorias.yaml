@@ -10,6 +10,11 @@ carro:
     - seguro_ano_1
     - carregador_wallbox
   tco_meses: 60
+  # Carro nao tem frete no sentido que o eixo conveniencia mede (dias ate a
+  # entrega). O eixo sai inteiro da conta de score e confianca nesta
+  # categoria, em vez de ficar permanentemente "sem dado" e travar a
+  # confianca minima. Decisao do Josemar na 3a auditoria externa.
+  sem_frete: true
   gate:
     garantia_minima_meses: 36
     exige_rede_assistencia: true
@@ -66,6 +71,108 @@ material_construcao:
     - superficie
     - rendimento_m2
     - embalagem_kg
+  # Produtos de nicho (impermeabilizante, tinta, argamassa, cimento) raramente
+  # passam de algumas dezenas de avaliacoes em marketplaces brasileiros.
+  # Pesquisa pontual em 2026-08-29: listagens no Mercado Livre e Amazon .br
+  # mostraram impermeabilizantes com 5-13 avaliacoes, tintas com 1-58,
+  # massa corrida com 1-462 (concentrado em poucos SKUs), e cimentos frequentemente
+  # sem avaliacoes ou zero em sites especializados. Com peso_ancora=50, um produto
+  # de 50 avaliacoes ja pesa 50% da nota ajustada; com 150 avaliacoes sobe para 75%.
+  # Confirmado pelo Josemar em 2026-08-29.
+  nota_bayesiana:
+    peso_ancora: 50
+  gate: {}
+
+camera:
+  atributos_obrigatorios:
+    - resolucao
+    - visao_noturna
+    - ip_rating
+    - conexao
+    - armazenamento_tipo
+  gate:
+    nota_minima_ajustada: 4.2
+    minimo_avaliacoes: 150
+    # Inclui "nenhuma" por decisao do Josemar em 31/08/2026 (caso Tapo TC40:
+    # nenhuma loja expunha garantia de fabrica no anuncio, so devolucao de 30
+    # dias). ATENCAO: "nenhuma" tambem e o valor padrao do CLI `cotar` quando
+    # ninguem informa --garantia-tipo (scripts/central_compras.py, argparse
+    # default), entao esse valor nao distingue "confirmei que nao tem
+    # garantia" de "nao perguntei". Aceitar "nenhuma" aqui significa aceitar
+    # os dois casos pra qualquer camera futura, nao so a TC40.
+    garantia_tipo_aceita:
+      - nacional
+      - vendedor
+      - nenhuma
+  # Estrela e absoluta: 1-5 contra o que existe no mercado de cameras
+  # residenciais externas hoje (31/08/2026), nunca contra os outros
+  # candidatos do mesmo projeto. Le o valor de `atributos_classificacao` do
+  # produto.yaml (numero limpo ou categoria fixa), nunca o texto livre de
+  # `atributos`. Ausencia de chave em `atributos_classificacao` = sem
+  # estrela (None), nunca 1 estrela - "nao sei" nao e "e ruim".
+  #
+  # resolucao: megapixel real do sensor. 1080p/2MP e a linha de entrada do
+  # mercado hoje, por isso 3 estrelas (nao 5): reservar o topo pra 4K de
+  # verdade evita empurrar tudo pra "otimo" so porque e Full HD.
+  # ip_rating: por codigo IP inteiro (como e vendido), nao por digito
+  # separado - simples de auditar de cabeca.
+  # zoom_digital: fator numerico (16 = "16x"); "nenhum" vira 0.
+  # angulo_visao: usa SO o angulo horizontal do campo de visao (o numero que
+  # importa pra cobertura), nao o diagonal nem o vertical.
+  # visao_noturna: colorida com holofote dedicado (Starlight/floodlight) e o
+  # topo hoje; colorida via sensor IR sem holofote fica um degrau abaixo;
+  # preto-e-branco (nao confirmada colorida) fica no meio, nao no fundo.
+  # deteccao_ia: "avancado" = pessoa + veiculo + zona/linha de intrusao;
+  # "padrao" = pessoa + sabotagem; "basico" = so movimento ajustavel, sem
+  # confirmar deteccao de pessoa.
+  # audio_bidirecional: so mapeia o "sim" - se nao foi confirmado no
+  # datasheet, fica de fora do mapa de proposito (None, nunca 1 estrela).
+  estrelas:
+    resolucao:
+      faixas:
+        - {min: 8, estrelas: 5}
+        - {min: 3, estrelas: 4}
+        - {min: 1.9, estrelas: 3}
+        - {min: 1, estrelas: 2}
+        - {min: 0, estrelas: 1}
+    ip_rating:
+      valores: {IP68: 5, IP67: 5, IP66: 4, IP65: 3, IP64: 2}
+    zoom_digital:
+      faixas:
+        - {min: 16, estrelas: 5}
+        - {min: 8, estrelas: 4}
+        - {min: 2, estrelas: 3}
+        - {min: 0.1, estrelas: 2}
+        - {min: 0, estrelas: 1}
+    angulo_visao:
+      faixas:
+        - {min: 110, estrelas: 5}
+        - {min: 95, estrelas: 4}
+        - {min: 80, estrelas: 3}
+        - {min: 65, estrelas: 2}
+        - {min: 0, estrelas: 1}
+    visao_noturna:
+      valores: {colorida_holofote: 5, colorida: 4, monocromatica: 3, monocromatica_curta: 2}
+    deteccao_ia:
+      valores: {avancado: 5, padrao: 4, basico: 3}
+    audio_bidirecional:
+      valores: {confirmado: 5}
+
+servico:
+  atributos_obrigatorios:
+    - tipo_exame
+    - modalidade
+    - cidade
+  # Servico, nao produto de prateleira: nao existe nota agregada
+  # numerica confiavel e publica (busca web devolve contagem de avaliacoes
+  # e comentarios, nunca a nota exata do Google Maps), nem conceito de
+  # frete ou garantia de fabrica. Gate fica vazio de proposito - exclusao
+  # por modalidade errada (remoto quando o pedido exige
+  # presencial) ou por sinal de risco (endereco/telefone incompativel) e
+  # sempre manual via `descartar`, nunca corte automatico de nota/
+  # avaliacoes. Aberta em 01/09/2026 para a cotacao de servico do
+  # Josemar (praca: consultar `dados-privados`, referencia SP/Aracatuba).
+  sem_frete: true
   gate: {}
 
 generico:

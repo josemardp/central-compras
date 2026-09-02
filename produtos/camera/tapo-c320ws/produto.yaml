@@ -1,0 +1,28 @@
+id: tapo-c320ws
+categoria: camera
+nome: Tapo C320WS
+marca: TP-Link
+estado: pesquisando
+projeto: 2026-camera-de-monitoramento-externa
+preco_alvo: null
+preco_teto: 800.0
+atributos:
+  resolucao: 2K_4MP
+  visao_noturna: colorida_ate_30m_starlight
+  ip_rating: IP66
+  conexao: wifi_ou_ethernet
+  armazenamento_tipo: sd_ou_nuvem_tapo_care
+  angulo_visao: 113_diag_97h_54v_graus
+  zoom_digital: 12x
+  deteccao_ia: movimento_pessoa_veiculo_cruzamento_linha_intrusao_area_sabotagem
+  audio_bidirecional: sim_com_cancelamento_ruido
+requisitos_atendidos: {}
+descartado_porque: null
+atributos_classificacao:
+  resolucao: 4
+  ip_rating: IP66
+  zoom_digital: 12
+  angulo_visao: 97
+  visao_noturna: colorida_holofote
+  deteccao_ia: avancado
+  audio_bidirecional: confirmado

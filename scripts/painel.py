@@ -431,19 +431,27 @@ async function executa(nome, dados, botao){
     const r = await fetch("/api/acao", {method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({projeto:PROJ, acao:nome, dados})});
     const j = await r.json();
-    await carrega();
+    await carrega(true);
     aviso(j.ok ? j.mensagem : j.erro, j.ok);
   }catch(err){ aviso(String(err), false); }
   finally{ if(botao) botao.disabled=false; }
 }
 
-async function carrega(){
+async function carrega(forcar=false){
+  if(!forcar){
+    const active = document.activeElement;
+    if(active && active.closest && active.closest(".form")) return;
+    for(const el of document.querySelectorAll("[id^='f_']")){
+      if(el.value && el.value.trim() !== "") return;
+    }
+  }
   const r = await fetch("/api/estado?projeto="+encodeURIComponent(PROJ));
   const j = await r.json();
   if(j.erro){ $("#app").textContent = j.erro; return; }
   E = j; PROJ = j.projeto; desenha();
 }
 carrega();
+setInterval(carrega, 3000);
 </script></body></html>
 """
 
@@ -501,16 +509,59 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self.send_error(404)
 
+    def _consume_body(self) -> None:
+        """Descarta o corpo da requisicao antes de responder com erro.
+
+        Se o servidor enviar a resposta sem ler o corpo, o cliente (urllib no
+        Windows) pode receber RST e levantar ConnectionAbortedError em vez do
+        status HTTP esperado. Le o que ja chegou com timeout curto, sem
+        bloquear ate o fim da conexao.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length > 0:
+                self.rfile.read(min(length, 1_000_000))
+                return
+        except ValueError:
+            pass
+        original_timeout = self.connection.gettimeout()
+        self.connection.settimeout(0.1)
+        try:
+            while True:
+                try:
+                    chunk = self.connection.recv(4096)
+                    if not chunk:
+                        break
+                except TimeoutError:
+                    break
+        finally:
+            self.connection.settimeout(original_timeout)
+
     def do_POST(self) -> None:
         if self.path != "/api/acao":
             self.send_error(404)
             return
-        tamanho = int(self.headers.get("Content-Length") or 0)
+        raw_length = self.headers.get("Content-Length")
+        try:
+            tamanho = int(raw_length) if raw_length is not None else 0
+            if tamanho < 0:
+                raise ValueError()
+        except ValueError:
+            self._consume_body()
+            self._json({"ok": False, "erro": "Content-Length invalido."}, 400)
+            return
         if tamanho > 1_000_000:
+            self._consume_body()
             self._json({"ok": False, "erro": "Pedido grande demais."}, 413)
             return
+        corpo = self.rfile.read(tamanho)
+        content_type = self.headers.get("Content-Type") or ""
+        parts = [p.strip() for p in content_type.split(";")]
+        if not parts or parts[0].lower() != "application/json":
+            self._json({"ok": False, "erro": "Content-Type precisa ser application/json."}, 415)
+            return
         try:
-            pedido = json.loads(self.rfile.read(tamanho) or b"{}")
+            pedido = json.loads(corpo or b"{}")
         except json.JSONDecodeError:
             self._json({"ok": False, "erro": "JSON invalido."}, 400)
             return
@@ -682,3 +733,7 @@ def gerar_artifact(args: argparse.Namespace) -> None:
         cc.atomic_write_text(alvo, artifact_fragmento())
         print(alvo)
     print("Pagina unica, so leitura. Pronta para publicar como artifact.")
+    print(
+        "Lembrete: nao escreva CEP, endereco ou nome de terceiros em texto livre "
+        "(campo porque, notas). O scanner de segredos nao detecta isso."
+    )

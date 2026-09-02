@@ -17,9 +17,11 @@ import sys
 import textwrap
 import time
 import unicodedata
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 
@@ -365,11 +367,18 @@ def project_path(value: str) -> Path:
     if not path.exists():
         candidates = sorted(p for p in PROJETOS.glob(f"*{value}*") if p.is_dir())
         if len(candidates) == 1:
-            return candidates[0]
-        if len(candidates) > 1:
+            path = candidates[0]
+        elif len(candidates) > 1:
             nomes = ", ".join(p.name for p in candidates)
             raise SystemExit(f"`{value}` casa com mais de um projeto: {nomes}. Seja especifico.")
-    if not path.exists() or not path.is_dir():
+    
+    try:
+        resolved_path = path.resolve()
+        dentro = resolved_path.is_relative_to(PROJETOS.resolve())
+    except Exception:
+        dentro = False
+
+    if not dentro or not path.exists() or not path.is_dir():
         disponiveis = ", ".join(p.name for p in project_dirs()) or "nenhum"
         raise SystemExit(f"Projeto nao encontrado: {value}. Existentes: {disponiveis}")
     return path
@@ -469,8 +478,12 @@ def convenience_score(prazo_dias: float | None) -> tuple[float, bool]:
     return clamp01((ruim - prazo_dias) / (ruim - otimo)), True
 
 
-def adjusted_rating(nota: float, n: int) -> float:
-    cfg = preferences().get("nota_bayesiana", {})
+def adjusted_rating(nota: float, n: int, categoria: str | None = None) -> float:
+    global_cfg = preferences().get("nota_bayesiana", {})
+    cfg = global_cfg
+    if categoria:
+        cat_cfg = category_definition(categoria).get("nota_bayesiana") or {}
+        cfg = {**global_cfg, **cat_cfg}
     media = quote_float(cfg.get("media_categoria_padrao"), 4.3)
     anchor = quote_float(cfg.get("peso_ancora"), 50)
     if n < 0:
@@ -494,6 +507,28 @@ def quote_tco_total(
     if not tco_meses:
         return round(custo_total, 2)
     return round(custo_total + (custo_operacional_mensal * tco_meses) - valor_revenda_estimado, 2)
+
+
+def compute_costs(
+    preco_efetivo: float,
+    frete: float,
+    custo_extra: float,
+    custo_total_override: float | None,
+    custo_operacional_mensal: float,
+    tco_meses: int,
+    valor_revenda_estimado: float,
+) -> tuple[float, float]:
+    total = custo_total_override
+    if total is None:
+        total = preco_efetivo + frete + custo_extra
+    total_rounded = round(float(total), 2)
+    tco_total = quote_tco_total(
+        total_rounded,
+        custo_operacional_mensal,
+        tco_meses,
+        valor_revenda_estimado,
+    )
+    return total_rounded, tco_total
 
 
 def leading_int(value: Any, default: int = 0) -> int:
@@ -540,23 +575,31 @@ def stop_rule_status(project: Path) -> dict[str, Any]:
     if not regra:
         return {}
     rows = read_quotes(project)
-    por_produto: dict[str, int] = {}
+    cotacoes_por_produto: dict[str, int] = {}
     for row in rows:
         produto_id = row.get("produto_id")
         if produto_id:
-            por_produto[produto_id] = por_produto.get(produto_id, 0) + 1
+            cotacoes_por_produto[produto_id] = cotacoes_por_produto.get(produto_id, 0) + 1
+    # Candidato mapeado (`novo-produto`) conta mesmo sem cotacao ainda: sem
+    # isso, 10 candidatos mapeados e zero cotacoes davam zero candidatos, e o
+    # teto da faixa nunca disparava aviso.
+    # Cotacao legada sem produto continua contando; descartado conhecido sai
+    # mesmo quando ainda tem linhas no historico de cotacoes.
+    candidatos = (
+        project_candidate_ids(project) | set(cotacoes_por_produto)
+    ) - project_discarded_candidate_ids(project)
     aberto_em = parse_dashboard_date(briefing.get("criado_em"))
     dias = (dt.date.today() - aberto_em).days if aberto_em else None
     faltando = sorted(
         produto_id
-        for produto_id, total in por_produto.items()
-        if total < regra["cotacoes_minimas_por_candidato"]
+        for produto_id in candidatos
+        if cotacoes_por_produto.get(produto_id, 0) < regra["cotacoes_minimas_por_candidato"]
     )
     return {
         **regra,
-        "candidatos_atuais": len(por_produto),
+        "candidatos_atuais": len(candidatos),
         "dias_em_pesquisa": dias,
-        "candidatos_excedidos": bool(regra["candidatos"] and len(por_produto) > regra["candidatos"]),
+        "candidatos_excedidos": bool(regra["candidatos"] and len(candidatos) > regra["candidatos"]),
         "produtos_sem_cotacoes_suficientes": faltando,
     }
 
@@ -644,6 +687,7 @@ def new_product(args: argparse.Namespace) -> None:
         "preco_teto": args.preco_teto if args.preco_teto is not None else meta.get("preco_teto"),
         "atributos": parse_pairs(args.atributo or []),
         "requisitos_atendidos": parse_pairs(args.requisito or []),
+        "proveniencia": None,
         "descartado_porque": None,
     }
     write_yaml(path / "produto.yaml", data)
@@ -774,6 +818,31 @@ def product_id_conflicts() -> list[str]:
     ]
 
 
+def project_candidate_ids(project: Path) -> set[str]:
+    """Todo produto_id ativo mapeado para este projeto, com ou sem cotacao.
+
+    `novo-produto` grava `projeto` no `produto.yaml`. Antes disso, a regra de
+    parada so via candidato quando a primeira cotacao chegava: com 10
+    candidatos mapeados e zero cotacoes, ela contava zero.
+    """
+    ids: set[str] = set()
+    for path in PRODUTOS.glob("*/*/produto.yaml"):
+        dados = read_yaml(path, {})
+        if dados.get("projeto") == project.name and dados.get("estado") != "descartado":
+            ids.add(path.parent.name)
+    return ids
+
+
+def project_discarded_candidate_ids(project: Path) -> set[str]:
+    """Descartados conhecidos, inclusive os que ainda aparecem em cotacoes."""
+    ids: set[str] = set()
+    for path in PRODUTOS.glob("*/*/produto.yaml"):
+        dados = read_yaml(path, {})
+        if dados.get("projeto") == project.name and dados.get("estado") == "descartado":
+            ids.add(path.parent.name)
+    return ids
+
+
 def set_process_state(project: Path, *, estado: str | None = None, proxima_acao: str | None = None, decisao_aberta: str | None = None) -> None:
     path = project / "processo.md"
     if not path.exists():
@@ -815,12 +884,12 @@ def add_quote(args: argparse.Namespace) -> None:
     preco = quote_float(args.preco)
     promocional = quote_float(args.preco_promocional, 0)
     preco_efetivo = promocional or preco
-    total = args.custo_total
-    if total is None:
-        total = preco_efetivo + quote_float(args.frete) + quote_float(args.custo_extra)
     tco_meses = args.tco_meses if args.tco_meses is not None else category_tco_months(categoria)
-    tco_total = quote_tco_total(
-        float(total),
+    custo_total, tco_total = compute_costs(
+        preco_efetivo,
+        quote_float(args.frete),
+        quote_float(args.custo_extra),
+        args.custo_total,
         quote_float(args.custo_operacional_mensal),
         quote_int(tco_meses),
         quote_float(args.valor_revenda_estimado),
@@ -840,7 +909,7 @@ def add_quote(args: argparse.Namespace) -> None:
         "frete_valor": quote_float(args.frete),
         "frete_prazo_dias": args.frete_prazo_dias if args.frete_prazo_dias is not None else "",
         "custo_extra": quote_float(args.custo_extra),
-        "custo_total": round(float(total), 2),
+        "custo_total": custo_total,
         "custo_operacional_mensal": quote_float(args.custo_operacional_mensal),
         "tco_meses": tco_meses or "",
         "valor_revenda_estimado": quote_float(args.valor_revenda_estimado),
@@ -898,14 +967,36 @@ def find_product(produto_id: str) -> dict[str, Any] | None:
     return read_yaml(path, {})
 
 
-def latest_quotes(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+def latest_quotes(
+    rows: list[dict[str, str]],
+    prefer: Callable[[dict[str, str]], bool] | None = None,
+) -> dict[str, dict[str, str]]:
     """Cotacao que representa cada produto no ranking.
 
     Manual vale mais que web porque foi conferida. Mas manual VENCIDA nao vale
     mais que uma observacao recente: preferir cegamente a manual fazia um preco
     de dois anos atras rankear no lugar do de hoje. Quando a manual venceu,
     usa a observacao mais recente e o ranking avisa que ela e estimativa.
+
+    Quando quem chama informa `prefer`, a escolha dentro do mesmo nivel de
+    prioridade privilegia a cotacao que passa no gate; so depois desempata por
+    data e custo. Isso evita que uma observacao recente, mas inutil para a
+    decisao, esconda outra cotacao igualmente fresca e elegivel.
     """
+
+    def choose(values: list[dict[str, str]], *, prefer_cost_tiebreak: bool = True) -> dict[str, str]:
+        preferred = [row for row in values if prefer and prefer(row)]
+        pool = preferred or values
+        chosen = pool[-1]
+        if prefer_cost_tiebreak and preferred:
+            same_date = [row for row in pool if str(row.get("data_coleta") or "") == str(chosen.get("data_coleta") or "")]
+            positive_costs = [quote_float(row.get("custo_total")) for row in same_date if quote_float(row.get("custo_total")) > 0]
+            if positive_costs:
+                cheapest = min(positive_costs)
+                cheapest_rows = [row for row in same_date if quote_float(row.get("custo_total")) == cheapest]
+                chosen = cheapest_rows[-1]
+        return chosen
+
     grouped: dict[str, list[dict[str, str]]] = {}
     for row in rows:
         grouped.setdefault(row.get("produto_id", ""), []).append(row)
@@ -917,11 +1008,11 @@ def latest_quotes(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
             row for row in por_data if row.get("fonte") == "manual" and not quote_is_stale(row)
         ]
         if manual_no_prazo:
-            latest[produto_id] = manual_no_prazo[-1]
+            latest[produto_id] = choose(manual_no_prazo)
             continue
         recentes = [row for row in por_data if not quote_is_stale(row)]
         if recentes:
-            latest[produto_id] = recentes[-1]
+            latest[produto_id] = choose(recentes)
             continue
         # Tudo vencido: fica a manual mais nova, ou a observacao mais nova.
         manual = [row for row in por_data if row.get("fonte") == "manual"]
@@ -1213,6 +1304,7 @@ class Ranked:
     vencida: bool
     confianca: float
     breakdown: ScoreBreakdown
+    sem_cotacao: bool = False
 
 
 def quote_age_days(row: dict[str, str], reference: dt.date | None = None) -> int | None:
@@ -1360,7 +1452,7 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
     if nota_minima is not None:
         # Recalcula em vez de usar o valor congelado no CSV: se os pesos da nota
         # bayesiana mudarem em preferencias.yaml, o gate acompanha.
-        atual = current_adjusted_rating(row)
+        atual = current_adjusted_rating(row, categoria)
         if atual < quote_float(nota_minima):
             eliminations.append(f"nota_ajustada abaixo do gate ({atual} < {nota_minima})")
 
@@ -1420,12 +1512,12 @@ def waiting_gap(product: dict[str, Any], quote: dict[str, str]) -> str:
     return f"aguardando preco desde {desde} (sem preco_alvo definido)."
 
 
-def current_adjusted_rating(row: dict[str, str]) -> float:
+def current_adjusted_rating(row: dict[str, str], categoria: str | None = None) -> float:
     """Nota ajustada recalculada agora, a partir de nota + n_avaliacoes."""
     nota = quote_float(row.get("nota"))
     if not nota:
         return 0.0
-    return adjusted_rating(nota, quote_int(row.get("n_avaliacoes")))
+    return adjusted_rating(nota, quote_int(row.get("n_avaliacoes")), categoria)
 
 
 def minimum_confidence(briefing: dict[str, Any]) -> float:
@@ -1458,7 +1550,13 @@ def value_field_for(briefing: dict[str, Any]) -> tuple[str, str]:
 def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     rows = read_quotes(project)
-    latest = latest_quotes(rows)
+
+    def passes_gate(row: dict[str, str]) -> bool:
+        produto_id = row.get("produto_id", "")
+        product = find_product(produto_id) or {"id": produto_id, "categoria": briefing.get("categoria"), "marca": ""}
+        return not gate_eliminations(row, product, briefing)
+
+    latest = latest_quotes(rows, prefer=passes_gate)
     weights = preferences().get("score", {})
     pre_candidates: list[tuple[str, dict[str, str], dict[str, Any], list[str], list[str]]] = []
     for produto_id, row in latest.items():
@@ -1481,15 +1579,19 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     candidates: list[Ranked] = []
     for produto_id, row, product, eliminations, alerts in pre_candidates:
         sem_dado: list[str] = []
+        categoria_produto = product.get("categoria") or briefing.get("categoria") or "generico"
+        sem_frete = bool(category_definition(categoria_produto).get("sem_frete"))
 
-        nota_ajustada = current_adjusted_rating(row)
+        nota_ajustada = current_adjusted_rating(row, categoria_produto)
         if not nota_ajustada:
             sem_dado.append("qualidade")
 
         prazo_raw = row.get("frete_prazo_dias")
         prazo = quote_float(prazo_raw) if prazo_raw not in {"", None} else None
         conveniencia, tem_prazo = convenience_score(prazo)
-        if not tem_prazo:
+        # Categoria sem frete real (ex.: carro): o eixo nao entra na conta,
+        # nunca "sem dado" temporario que travaria a confianca para sempre.
+        if sem_frete or not tem_prazo:
             sem_dado.append("conveniencia")
 
         if not (product.get("requisitos_atendidos") or {}):
@@ -1503,8 +1605,9 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
             "valor": value_score(cost_of(row), menor_custo),
             "risco": risk_score(row, alerts),
             "aderencia": adherence_score(product),
-            "conveniencia": conveniencia,
         }
+        if not sem_frete:
+            axes["conveniencia"] = conveniencia
 
         # Eixo sem dado sai da conta em vez de entrar como 0,50 neutro, e os
         # pesos restantes sao renormalizados. Com o 0,50, "nao informei o prazo"
@@ -1535,6 +1638,39 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     elegiveis = sorted([c for c in candidates if not c.eliminations], key=lambda c: c.score, reverse=True)
     cortados = sorted([c for c in candidates if c.eliminations], key=lambda c: c.produto_id)
     return elegiveis, cortados
+
+
+def sem_cotacao_candidates(project: Path, categoria: str, known: list[Ranked]) -> list[Ranked]:
+    """Candidatos mapeados (`novo-produto`) que ainda nao tem nenhuma cotacao.
+
+    Aparecem no comparativo com os atributos ja conhecidos e "-" nos campos
+    comerciais (preco, nota, garantia...), nunca um valor inventado - assim
+    a pesquisa em andamento fica visivel na tabela em vez de sumir ate a
+    primeira cotacao chegar.
+    """
+    conhecidos = {item.produto_id for item in known}
+    faltando = sorted(project_candidate_ids(project) - conhecidos)
+    itens: list[Ranked] = []
+    for produto_id in faltando:
+        product = find_product(produto_id) or {"id": produto_id, "categoria": categoria, "marca": ""}
+        itens.append(
+            Ranked(
+                produto_id,
+                {},
+                product,
+                {},
+                0.0,
+                [],
+                [],
+                [],
+                None,
+                False,
+                0.0,
+                score_breakdown({}, [], {}),
+                sem_cotacao=True,
+            )
+        )
+    return itens
 
 
 def write_ranking_csv(project: Path, elegiveis: list[Ranked], cortados: list[Ranked]) -> None:
@@ -1680,7 +1816,10 @@ def build_ranking(args: argparse.Namespace) -> None:
 
     atomic_write_text((project / "ranking.md"), "\n".join(lines) + "\n")
     write_ranking_csv(project, elegiveis, cortados)
-    mark_steps(project, [5, 6])
+    if rows:
+        mark_steps(project, [5])
+    if len(elegiveis) >= 2:
+        mark_steps(project, [6])
     if elegiveis:
         lider = elegiveis[0]
         product_name = lider.product.get("nome") or lider.produto_id
@@ -1881,17 +2020,25 @@ def promote_quote(args: argparse.Namespace) -> None:
     preco = quote_float(row.get("preco"))
     promocional = quote_float(row.get("preco_promocional"), 0)
     preco_efetivo = promocional or preco
-    if args.custo_total is None:
-        row["custo_total"] = round(preco_efetivo + quote_float(row.get("frete_valor")) + quote_float(row.get("custo_extra")), 2)
-    if not row.get("tco_meses"):
-        row["tco_meses"] = category_tco_months(categoria) or ""
-    if args.tco_total is None:
-        row["tco_total"] = quote_tco_total(
-            quote_float(row.get("custo_total")),
-            quote_float(row.get("custo_operacional_mensal")),
-            quote_int(row.get("tco_meses")),
-            quote_float(row.get("valor_revenda_estimado")),
-        )
+    tco_meses = row.get("tco_meses")
+    if not tco_meses:
+        tco_meses = category_tco_months(categoria) or 0
+
+    custo_total, tco_total = compute_costs(
+        preco_efetivo,
+        quote_float(row.get("frete_valor")),
+        quote_float(row.get("custo_extra")),
+        args.custo_total,
+        quote_float(row.get("custo_operacional_mensal")),
+        quote_int(tco_meses),
+        quote_float(row.get("valor_revenda_estimado")),
+    )
+    row["custo_total"] = custo_total
+    row["tco_meses"] = tco_meses or ""
+    if args.tco_total is not None:
+        row["tco_total"] = args.tco_total
+    else:
+        row["tco_total"] = tco_total
     row["nota_ajustada"] = adjusted_rating(quote_float(row.get("nota")), quote_int(row.get("n_avaliacoes"))) if quote_float(row.get("nota")) else ""
     row["score"] = ""
 
@@ -1919,7 +2066,10 @@ def discard_product(args: argparse.Namespace) -> None:
     write_yaml(path, product)
     project = project_path(args.projeto or product.get("projeto"))
     append_timeline(project, "descarte", f"Descartado {args.produto_id}", args.porque)
-    set_process_state(project, proxima_acao="seguir com finalistas restantes ou registrar nova cotacao")
+    build_ranking(argparse.Namespace(projeto=args.projeto or str(project)))
+    elegiveis, _ = compute_ranking(project)
+    if not elegiveis:
+        print("Proxima acao mantida: nenhum candidato elegivel apos descarte.")
     print(f"Descartado: {args.produto_id}")
 
 
@@ -3168,6 +3318,14 @@ td.num, th.num { text-align: right; }
 .bar-fill { height: 100%; background: var(--teal); }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .actions a { font-size: 13px; }
+.compare-wrap { overflow-x: auto; }
+.compare { table-layout: auto; min-width: 100%; }
+.compare th, .compare td { white-space: nowrap; }
+.compare td:first-child, .compare th:first-child {
+  position: sticky; left: 0; background: var(--surface); font-weight: 700;
+  white-space: normal; min-width: 140px;
+}
+.stars { color: var(--amber); letter-spacing: 1px; }
 pre {
   white-space: pre-wrap;
   background: var(--code-bg);
@@ -3249,6 +3407,363 @@ def decision_date(project: Path) -> dt.date | None:
     return parse_dashboard_date(extract_bullet(text, "Data"))
 
 
+def spec_comparison_label(chave: str) -> str:
+    """Rotulo legivel para uma chave de atributo, sem depender de tabela por categoria.
+
+    So troca `_` por espaco e capitaliza cada palavra: funciona pra qualquer
+    categoria (carro, fone, camera...) sem manter uma lista de traducoes.
+    """
+    return " ".join(parte.capitalize() for parte in chave.split("_"))
+
+
+def _stars_from_faixas(faixas: list[dict[str, Any]], valor: Any) -> int | None:
+    """Primeira faixa (por `min` decrescente) que o valor numerico atinge.
+
+    Ordena por `min` aqui dentro de proposito: nunca confia na ordem em que
+    a lista foi escrita no YAML. Uma faixa colada fora de ordem por engano
+    nao pode classificar errado em silencio.
+    """
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return None
+    ordenadas = sorted(faixas, key=lambda f: quote_float(f.get("min")), reverse=True)
+    for faixa in ordenadas:
+        if numero >= quote_float(faixa.get("min")):
+            return int(faixa["estrelas"])
+    return None
+
+
+def _stars_from_valores(valores: dict[str, Any], valor: Any) -> int | None:
+    """Correspondencia exata categoria -> estrelas. Sem entrada = None, nunca um chute."""
+    estrelas = valores.get(valor)
+    return int(estrelas) if estrelas is not None else None
+
+
+def stars_for_attribute(categoria: str, campo: str, valor: Any) -> int | None:
+    """1-5, absoluto: nunca recebe lista de candidatos, so um valor por vez.
+
+    Isso torna estruturalmente impossivel comparar um candidato contra o
+    outro aqui dentro - empate e o padrao quando o valor normalizado e igual.
+    Le a regua em `categorias.yaml` (`estrelas.<campo>`); campo sem regua ou
+    valor sem correspondencia devolve None (sem dado, nunca 1 estrela).
+    """
+    if valor in {None, ""}:
+        return None
+    regua = (category_definition(categoria).get("estrelas") or {}).get(campo)
+    if not regua:
+        return None
+    if "valores" in regua:
+        return _stars_from_valores(regua.get("valores") or {}, valor)
+    faixas = regua.get("faixas")
+    if not faixas:
+        return None
+    return _stars_from_faixas(faixas, valor)
+
+
+def stars_from_score(score01: float | None) -> int | None:
+    """Mapeia um score 0-1 ja absoluto (qualidade, risco/garantia) em 1-5 estrelas."""
+    if score01 is None:
+        return None
+    if score01 >= 0.8:
+        return 5
+    if score01 >= 0.6:
+        return 4
+    if score01 >= 0.4:
+        return 3
+    if score01 >= 0.2:
+        return 2
+    return 1
+
+
+def stars_glyphs(estrelas: int | None) -> str:
+    """'★★★☆☆' (Unicode simples). None -> string vazia, nunca estrela fabricada."""
+    if estrelas is None:
+        return ""
+    cheias = max(0, min(5, estrelas))
+    return "★" * cheias + "☆" * (5 - cheias)
+
+
+def spec_comparison_rows(project: Path) -> tuple[str, list[str], list[Ranked]]:
+    """Categoria + atributos + resumo comercial lado a lado, um candidato por coluna.
+
+    Ordem das linhas: primeiro os `atributos_obrigatorios` da categoria (na
+    ordem do `categorias.yaml`), depois qualquer atributo extra que apareca em
+    algum candidato, em ordem alfabetica. Atributo ausente num candidato vira
+    "-", nunca um valor inventado - o mesmo principio do ranking.
+    """
+    briefing_meta, _ = load_frontmatter(project / "briefing.md")
+    categoria = briefing_meta.get("categoria") or "generico"
+    elegiveis, cortados = compute_ranking(project)
+    itens = [*elegiveis, *cortados, *sem_cotacao_candidates(project, categoria, [*elegiveis, *cortados])]
+    if not itens:
+        return categoria, [], []
+
+    obrigatorios = list(category_definition(categoria).get("atributos_obrigatorios") or [])
+    extras: list[str] = []
+    for item in itens:
+        for chave in (item.product.get("atributos") or {}):
+            if chave not in obrigatorios and chave not in extras:
+                extras.append(chave)
+    return categoria, obrigatorios + sorted(extras), itens
+
+
+LINHAS_COMERCIAIS = ["preco", "loja", "vendedor", "nota", "garantia", "fonte"]
+
+
+def comercial_valor(item: Ranked, chave: str) -> tuple[str, int | None]:
+    """(texto, estrelas) de uma linha comercial do comparativo.
+
+    Fonte unica pro HTML (spec_comparison_section) e pro export de dados
+    (sheets_export_payload) - os dois so formatam o que esta funcao decide,
+    nunca recalculam por conta propria. Estrela e None quando o candidato
+    foi cortado pelo gate, o dado falta, ou o eixo correspondente nao
+    entrou na conta do ranking - nunca fabricada.
+    """
+    quote = item.quote
+    if chave == "preco":
+        # De proposito sem estrela: `valor` e o unico eixo relativo ao mais
+        # barato do projeto, nao absoluto - documentado em preferencias.yaml.
+        return brl(quote.get("custo_total")), None
+    if chave == "loja":
+        return quote.get("loja") or "-", None
+    if chave == "vendedor":
+        vendedor = quote.get("vendedor") or ""
+        tipo = quote.get("vendedor_tipo") or ""
+        if not vendedor:
+            return "-", None
+        return (f"{vendedor} ({tipo})" if tipo else vendedor), None
+    if chave == "nota":
+        nota = quote.get("nota")
+        avaliacoes = quote.get("n_avaliacoes")
+        # quote_float (nao `not nota` puro): "0.0" e string nao-vazia, mas o
+        # valor numerico e zero - mesmo criterio de current_adjusted_rating,
+        # senao o texto mostra "0.0 (0 aval.)" como se fosse nota de verdade
+        # em vez de "nota nunca informada". Achado numa conferencia real na
+        # planilha (candidato do decor-bloqueador, cotacao web sem nota).
+        if not quote_float(nota):
+            return "-", None
+        # Estrela e etapa final da cotacao: so pros elegiveis, que chegam
+        # na mesa de decisao. Cortado pelo gate nao ganha estrela - nao
+        # vale gastar essa classificacao em quem ja saiu da disputa.
+        # Nota ausente (eixo qualidade sem dado) tambem nunca vira 1
+        # estrela por tabela: so estrela quando o eixo realmente entrou
+        # na conta do ranking pra este candidato.
+        if item.eliminations or "qualidade" in item.eixos_sem_dado:
+            estrelas = None
+        else:
+            estrelas = stars_from_score(item.axes.get("qualidade"))
+        return f"{nota} ({avaliacoes or 0} aval.)", estrelas
+    if chave == "garantia":
+        tipo = quote.get("garantia_tipo")
+        meses = quote.get("garantia_meses")
+        if not tipo:
+            return "-", None
+        texto = f"{tipo}, {meses} meses" if meses else tipo
+        estrelas = None
+        if not item.eliminations:
+            # So a parcela "garantia (tipo)" do risco, buscada por rotulo
+            # (nunca por indice) - reflete a mesma regua do score, sem
+            # inventar uma segunda conta.
+            parcela = next((p for p in risk_parts(quote) if p[0] == "garantia (tipo)"), None)
+            estrelas = stars_from_score(parcela[2] if parcela else None)
+        return texto, estrelas
+    if chave == "fonte":
+        return quote.get("fonte") or "-", None
+    return "-", None
+
+
+def atributo_valor(categoria: str, item: Ranked, chave: str) -> tuple[str, int | None]:
+    """(texto, estrelas) de um atributo tecnico do comparativo.
+
+    Mesmo principio de `comercial_valor`: fonte unica pro HTML e pro export.
+    """
+    texto = str((item.product.get("atributos") or {}).get(chave) or "-")
+    if texto == "-" or item.eliminations:
+        # Estrela e a etapa final da cotacao, so pra quem chega elegivel na
+        # mesa de decisao - cortado pelo gate mostra o valor bruto, nunca a
+        # classificacao (nao vale gastar essa conta em quem ja saiu da
+        # disputa).
+        return texto, None
+    classificacao = (item.product.get("atributos_classificacao") or {}).get(chave)
+    return texto, stars_for_attribute(categoria, chave, classificacao)
+
+
+def _celula_com_estrelas(texto: str, estrelas: int | None) -> str:
+    if estrelas is None:
+        return safe_html(texto)
+    return f'{safe_html(texto)} <span class="stars" title="{estrelas}/5">{stars_glyphs(estrelas)}</span>'
+
+
+def spec_comparison_section(project: Path) -> str:
+    categoria, atributos, itens = spec_comparison_rows(project)
+    if not itens:
+        return ""
+
+    header_cols = "".join(
+        f"<th>{safe_html(item.product.get('nome') or item.produto_id)}"
+        + (
+            ' <span class="pill bad">cortado</span>' if item.eliminations
+            else ' <span class="pill">sem cotacao</span>' if item.sem_cotacao
+            else ""
+        )
+        + "</th>"
+        for item in itens
+    )
+    comercial_rows = "".join(
+        f"<tr><td>{safe_html(spec_comparison_label(chave))}</td>"
+        + "".join(
+            f"<td>{_celula_com_estrelas(*comercial_valor(item, chave))}</td>"
+            for item in itens
+        )
+        + "</tr>"
+        for chave in LINHAS_COMERCIAIS
+    )
+
+    def celula_atributo(item: Ranked, chave: str) -> str:
+        return _celula_com_estrelas(*atributo_valor(categoria, item, chave))
+
+    spec_rows = "".join(
+        f"<tr><td>{safe_html(spec_comparison_label(chave))}</td>"
+        + "".join(f"<td>{celula_atributo(item, chave)}</td>" for item in itens)
+        + "</tr>"
+        for chave in atributos
+    )
+    return f"""
+<section class="section panel">
+  <h2>Comparativo de caracteristicas</h2>
+  <p class="muted">Um candidato por coluna, igual comparador de celular. "-" e atributo sem dado, nunca valor inventado. Estrela e a classificacao final: so pros elegiveis (quem chega na mesa de decisao), nunca pros cortados pelo gate.</p>
+  <div class="compare-wrap">
+  <table class="compare">
+    <thead><tr><th>Candidato</th>{header_cols}</tr></thead>
+    <tbody>
+      {comercial_rows}
+      {spec_rows}
+    </tbody>
+  </table>
+  </div>
+</section>
+"""
+
+
+SHEETS_OVERVIEW_FIELDS = [
+    "categoria", "estado", "lider", "score", "confianca", "cotacoes",
+    "manual", "dias_ate_decisao", "escolhido", "aguardando_preco",
+]
+
+
+def _linha_export(chave: str, tipo: str, valores: list[tuple[str, int | None]]) -> dict[str, Any]:
+    rotulo = spec_comparison_label(chave)
+    if tipo == "estrela":
+        return {
+            "rotulo": rotulo,
+            "tipo": "estrela",
+            "valores": [{"texto": texto, "estrelas": estrelas} for texto, estrelas in valores],
+        }
+    return {"rotulo": rotulo, "tipo": "texto", "valores": [texto for texto, _ in valores]}
+
+
+def sheets_export_payload() -> dict[str, Any]:
+    """JSON pronto pro Web App do Apps Script. So monta, nunca envia.
+
+    Reaproveita project_counts() e spec_comparison_rows() (as mesmas contas
+    do dashboard) e comercial_valor()/atributo_valor() (a mesma decisao de
+    texto+estrela do HTML) - HTML e planilha nunca podem mostrar numero
+    diferente pro mesmo candidato.
+    """
+    visao_geral: list[dict[str, Any]] = []
+    comparativos: list[dict[str, Any]] = []
+    for project in project_dirs():
+        counts = project_counts(project)
+        linha = {"projeto": counts["id"]}
+        linha.update({campo: counts[campo] for campo in SHEETS_OVERVIEW_FIELDS})
+        visao_geral.append(linha)
+
+        categoria, atributos, itens = spec_comparison_rows(project)
+        if not itens:
+            continue
+        colunas = [item.product.get("nome") or item.produto_id for item in itens]
+        situacao = [
+            "sem_cotacao" if item.sem_cotacao
+            else "cortado" if item.eliminations
+            else "elegivel"
+            for item in itens
+        ]
+        linhas: list[dict[str, Any]] = []
+        for chave in LINHAS_COMERCIAIS:
+            tipo = "estrela" if chave in {"nota", "garantia"} else "texto"
+            valores = [comercial_valor(item, chave) for item in itens]
+            linhas.append(_linha_export(chave, tipo, valores))
+        for chave in atributos:
+            valores = [atributo_valor(categoria, item, chave) for item in itens]
+            linhas.append(_linha_export(chave, "estrela", valores))
+        comparativos.append({
+            "projeto": project.name,
+            "colunas": colunas,
+            "situacao": situacao,
+            "linhas": linhas,
+        })
+
+    return {"gerado_em": now_iso(), "visao_geral": visao_geral, "comparativos": comparativos}
+
+
+def sheets_config_path() -> Path:
+    return Path.home() / ".central-compras" / "dados-privados" / "integracao_sheets.json"
+
+
+def sincronizar_planilha(args: argparse.Namespace) -> None:
+    """Monta o payload e faz o POST pro Web App do Apps Script.
+
+    So roda quando chamado - nunca dentro de `dashboard` (que e local e sem
+    rede). Mandar dado pra fora e decisao explicita, nao efeito colateral.
+    """
+    caminho = Path(args.config) if getattr(args, "config", None) else sheets_config_path()
+    if not caminho.exists():
+        raise SystemExit(
+            f"Configuracao nao encontrada: {caminho}\n"
+            'Crie esse arquivo com {"url": "...", "token": "..."} '
+            "(a URL do Web App do Apps Script e o token definido no Code.gs)."
+        )
+    try:
+        config = json.loads(caminho.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as erro:
+        raise SystemExit(f"{caminho} nao e um JSON valido: {erro}") from erro
+    url = config.get("url")
+    token = config.get("token")
+    if not url or not token:
+        raise SystemExit(f"{caminho} precisa ter os campos 'url' e 'token'.")
+
+    payload = sheets_export_payload()
+    payload["token"] = token
+    corpo = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    requisicao = urllib.request.Request(
+        url, data=corpo, headers={"Content-Type": "application/json"}, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(requisicao, timeout=30) as resposta:
+            corpo_resposta = resposta.read().decode("utf-8")
+    except urllib.error.URLError as erro:
+        raise SystemExit(f"Falha ao conectar na planilha: {erro}") from erro
+
+    try:
+        resultado = json.loads(corpo_resposta)
+    except json.JSONDecodeError as erro:
+        # A Web App pode devolver uma pagina de erro/login em vez do JSON
+        # esperado (por exemplo, se o redirecionamento do Apps Script nao
+        # preservou o POST). Erro claro em vez de traceback cru.
+        raise SystemExit(
+            "A planilha nao devolveu JSON valido - a implantacao pode ter "
+            f"mudado ou o link expirou. Resposta recebida: {corpo_resposta[:300]!r}"
+        ) from erro
+
+    if not resultado.get("ok"):
+        raise SystemExit(f"A planilha recusou os dados: {resultado.get('error') or resultado}")
+    print(
+        f"Planilha sincronizada: {len(payload['visao_geral'])} projeto(s), "
+        f"{len(payload['comparativos'])} comparativo(s)."
+    )
+
+
 def generate_project_page(project: Path) -> Path:
     page_dir = DASHBOARD / "projetos"
     page_dir.mkdir(parents=True, exist_ok=True)
@@ -3309,6 +3824,7 @@ def generate_project_page(project: Path) -> Path:
             f"<td>{safe_html(row.get('fonte'))}</td>"
             "</tr>"
         )
+    comparativo = spec_comparison_section(project)
     body = f"""
 <div class="topbar">
   <div>
@@ -3342,6 +3858,7 @@ def generate_project_page(project: Path) -> Path:
     <tbody>{''.join(ranking_rows) or '<tr><td colspan="6">Sem ranking gerado.</td></tr>'}</tbody>
   </table>
 </section>
+{comparativo}
 <section class="section panel">
   <h2>Historico de preco</h2>
   <p class="muted">Desconto so e desconto contra a sua propria serie. Com uma unica observacao, nao da para saber.</p>
@@ -3541,7 +4058,8 @@ def audit_score(args: argparse.Namespace) -> None:
     linhas: list[str] = ["# Memoria de calculo", "", f"Gerado em {now_iso()}.", ""]
     for item in todos:
         row = item.quote
-        nota_ajustada = current_adjusted_rating(row)
+        categoria_produto = item.product.get("categoria")
+        nota_ajustada = current_adjusted_rating(row, categoria_produto)
         linhas.extend([f"## {item.product.get('nome') or item.produto_id}", ""])
         if item.eliminations:
             linhas.extend([
@@ -3557,7 +4075,11 @@ def audit_score(args: argparse.Namespace) -> None:
         linhas.append(
             f"- nota bruta {row.get('nota') or 0} com {row.get('n_avaliacoes') or 0} avaliacoes"
         )
-        cfg_bayes = preferences().get("nota_bayesiana", {})
+        global_cfg = preferences().get("nota_bayesiana", {})
+        cfg_bayes = global_cfg
+        if categoria_produto:
+            cat_cfg = category_definition(categoria_produto).get("nota_bayesiana") or {}
+            cfg_bayes = {**global_cfg, **cat_cfg}
         media = quote_float(cfg_bayes.get("media_categoria_padrao"), 4.3)
         ancora = quote_float(cfg_bayes.get("peso_ancora"), 50)
         n = quote_int(row.get("n_avaliacoes"))
@@ -3608,16 +4130,19 @@ def audit_score(args: argparse.Namespace) -> None:
             linhas.append("- nenhum requisito registrado: o eixo fica **fora da conta** (nao vale 0,50)")
 
         linhas.extend(["", "### Conveniencia", ""])
-        prazo = row.get("frete_prazo_dias")
-        if prazo in {"", None}:
-            linhas.append("- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)")
+        if "conveniencia" not in item.axes:
+            linhas.append("- categoria sem frete real: o eixo nao entra na conta desta categoria")
         else:
-            cfg_conv = (preferences().get("escala") or {}).get("conveniencia") or {}
-            otimo = quote_float(cfg_conv.get("prazo_otimo_dias"), 2)
-            ruim = quote_float(cfg_conv.get("prazo_ruim_dias"), 30)
-            linhas.append(
-                f"- conveniencia = ({ruim} - {prazo}) / ({ruim} - {otimo}) = **{item.axes['conveniencia']:.3f}**"
-            )
+            prazo = row.get("frete_prazo_dias")
+            if prazo in {"", None}:
+                linhas.append("- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)")
+            else:
+                cfg_conv = (preferences().get("escala") or {}).get("conveniencia") or {}
+                otimo = quote_float(cfg_conv.get("prazo_otimo_dias"), 2)
+                ruim = quote_float(cfg_conv.get("prazo_ruim_dias"), 30)
+                linhas.append(
+                    f"- conveniencia = ({ruim} - {prazo}) / ({ruim} - {otimo}) = **{item.axes['conveniencia']:.3f}**"
+                )
 
         linhas.extend(["", "### Score final", "", "| Eixo | Nota | Peso | Entra na conta? | Contribui |", "|---|---:|---:|:--:|---:|"])
         breakdown = item.breakdown
@@ -3751,6 +4276,7 @@ def private_data_dir(_: argparse.Namespace) -> None:
 
 SENSITIVE_PATTERNS: list[tuple[str, str, str]] = [
     ("CPF", r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", "CPF formatado"),
+    ("CEP", r"\b\d{5}-\d{3}\b", "CEP"),
     # CPF sem pontuacao so conta quando esta rotulado: 11 digitos soltos sao
     # rastreio, EAN e telefone o tempo todo num repositorio de compras.
     ("CPF", r"(?i)\bcpf\b[^0-9]{0,12}\d{11}\b", "CPF sem pontuacao, rotulado"),
@@ -3996,6 +4522,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("dados-privados", help="cria a pasta de dados pessoais fora do repositorio")
     p.set_defaults(func=private_data_dir)
+
+    p = sub.add_parser("sincronizar-planilha", help="manda visao geral e comparativos pra uma Google Sheets via Apps Script")
+    p.add_argument("--config", help="caminho alternativo do integracao_sheets.json (default: ~/.central-compras/dados-privados/)")
+    p.set_defaults(func=sincronizar_planilha)
 
     p = sub.add_parser("checar-segredos", help="procura CPF, cartao, senha e token na arvore versionada")
     p.add_argument("--strict", action="store_true", help="retorna erro se encontrar algo (use no pre-commit)")

@@ -1,21 +1,35 @@
-# Prompt para auditoria externa (Codex) — segunda rodada
+# Prompt para auditoria externa (Kimi) — terceira rodada
 
-Copie tudo daqui para baixo e cole no Codex, com o repositório aberto.
+Copie tudo daqui para baixo e cole no Kimi, com o repositório aberto.
+(As rodadas 1 e 2 estão no histórico do Git: `git log -- docs/prompt-auditoria-externa.md`.)
 
 ---
 
-Você já auditou este repositório uma vez. **Todos os seus seis achados eram
-reais**, foram reproduzidos e corrigidos, e viraram teste de regressão. Esta é a
-segunda rodada, e ela tem um objetivo diferente da primeira.
+Você nunca viu este repositório. **Isso é uma vantagem, e eu escolhi você por
+causa dela.**
 
-Na primeira, você procurou defeito num código que ninguém de fora tinha olhado.
-Agora você procura duas coisas mais difíceis:
+As duas auditorias anteriores foram feitas pelo mesmo auditor. Ele achou coisas
+reais, tudo foi reproduzido, corrigido e virou teste de regressão. Mas a essa
+altura ele está defendendo as próprias conclusões: metade do `preferencias.yaml`
+saiu de sugestão dele, e ele já não consegue olhar este código sem passado.
+Você consegue.
 
-1. **Correção que criou problema novo.** Toda correção mexe em algo. Seis
-   correções suas mais três minhas foram aplicadas de uma vez.
-2. **O que nenhuma das duas auditorias tocou.** A primeira olhou o motor de
-   decisão e a integridade. Ninguém olhou a skill, os templates, o ciclo de
-   veredito, o dashboard como produto, nem o sistema como *ferramenta de compra*.
+O que já está julgado, e que eu **não** quero que você refaça:
+
+- **Rodada 1** — o motor de decisão e a integridade dos dados. Seis achados,
+  todos corrigidos: `decidir` fechava produto cortado no gate; `promover-cotacao`
+  lavava preço web antigo como manual; `NaN`/infinito passavam como preço; data
+  futura passava; `auditar` e `ranking` usavam campos de valor diferentes; o
+  varredor de segredos tinha falsos-negativos.
+- **Rodada 2** — as regressões dessas correções, mais a skill, os templates, o
+  ciclo de veredito, o dashboard e a experiência de erro. Dali saiu a mudança
+  estrutural do score: eixo sem dado sai da conta, os pesos restantes são
+  renormalizados, e nasceu o índice `confianca`.
+
+Esse território está coberto. **Se você discordar de alguma dessas decisões, diga
+— mas com argumento novo, não com a mesma crítica outra vez.**
+
+Esta rodada tem dois alvos que ninguém olhou, e o segundo é o mais importante.
 
 ## O repositório
 
@@ -26,16 +40,18 @@ Memória permanente de decisão de compra de uma pessoa física. Preço envelhec
 "deu certo?") vale para sempre. Serve para um perfume de R$ 70 e para um carro
 elétrico de R$ 150.000 — muda a profundidade da pesquisa, nunca a estrutura.
 
-- Python 3, dependência única `PyYAML`. Arquivo único, 29 subcomandos.
-- 143 testes: `python -m unittest discover -s tests`.
-- Usado de **várias máquinas Windows**, PowerShell e Git Bash.
+- Python 3, dependência única `PyYAML`.
+- `scripts/central_compras.py` — 4.190 linhas, arquivo único, ~30 subcomandos.
+- `scripts/painel.py` — 683 linhas, servidor HTTP local que **escreve no repositório**.
+- **200 testes**: `python -m unittest discover -s tests`. Passam aqui.
+- Usado de **várias máquinas Windows**, PowerShell e Git Bash, por uma pessoa que
+  **não é desenvolvedor profissional**.
 - Fontes: `cotacoes.csv` (append-only, o livro-razão), `produto.yaml`,
   `briefing.md`, `config/*.yaml`, `base-conhecimento/`, `vereditos/`.
-- Derivados: `ranking.md`, `ranking.csv`, `validacao.md`, `historico.md`,
-  `memoria-calculo.md`, `dashboard/`. Versionados de propósito; `regenerar`
-  refaz todos.
+- Derivados versionados de propósito; `regenerar` refaz todos; `snapshots/` é
+  congelado e nunca regenerado.
 
-Os cinco princípios do PRD, que continuam sendo o critério:
+Os cinco princípios do PRD continuam sendo o critério:
 
 1. Fato datado nunca é sobrescrito.
 2. Gate antes de score.
@@ -43,155 +59,247 @@ Os cinco princípios do PRD, que continuam sendo o critério:
 4. O "não escolhi" vale mais que o "escolhi".
 5. Dado pessoal não mora em repositório versionado.
 
-## O que mudou desde a sua auditoria
+## O que existe hoje que você nunca viu
 
-`git log 447aa0d..HEAD` mostra tudo. Dois commits: `e28af86` (seus achados) e
-`c321550` (concorrência).
+`git log 02807b0..HEAD` mostra tudo. Depois do pacote de estabilização v1:
 
-**Seus seis achados, corrigidos assim:**
-
-| Achado | Correção |
+| Commit | O que entrou |
 |---|---|
-| `decidir` fechava produto cortado no gate | `decide()` agora chama `gate_eliminations`; recusa sem `--permitir-cortado` |
-| `promover-cotacao` lavava web antiga como manual | exige informar ao menos um campo conferido, ou `--sem-alteracao` explícito |
-| `NaN`/infinito passavam como preço | barrados em `quote_float` via `math.isnan`/`isinf`; reportados em `validar` |
-| Data futura passava | `reject_future()` no `iso_datetime`; `validar` também acusa |
-| `auditar` usava `custo_total` com ranking em `tco_total` | regra extraída para `value_field_for()`, única, usada pelos dois |
-| Varredor com falsos-negativos | CPF rotulado sem pontuação, `_` como separador de cartão, `.env` varrido, `\b` removido antes de `api_key` |
+| `6857093`, `a7bea15` | guia prático visual (`docs/guia-pratico-visual.html`) |
+| `789d305` | processo real: Decor Bloqueador (material de construção) |
+| `73b10cd` | **`painel` local editável + `artifact` de consulta** |
+| `6ed32e3` | artifact também no formato de publicação |
+| `10466b5`, `9d2a958` | **projeto de carro elétrico**, absorvido de um projeto morto |
 
-**Seu achado de julgamento (o 0,50 neutro premiando o silêncio)** virou uma
-mudança estrutural: o eixo sem dado agora **sai da conta** e os pesos restantes
-são renormalizados. O score mede só o que se sabe. Nasceu um índice `confianca`
-(fração do peso apoiada em dado real), publicado no `ranking.md`, no
-`ranking.csv` e na memória de cálculo, e `decidir` recusa fechar abaixo de 75%.
+O `painel` e o `artifact` são ~700 linhas que nenhuma auditoria tocou. O projeto
+de carro é o primeiro uso real da categoria `carro` e do caminho de TCO.
 
-**Sobre derivados versionados eu discordei de você** e quero que reavalie: não
-tirei do Git, porque o `ranking.md` ao lado do `decisao.md` é a evidência de por
-que a decisão foi tomada naquele dia. Em vez disso criei `regenerar`. Diga se
-continua achando errado.
+---
 
-**Três achados que eu mesmo encontrei ao preparar esta rodada**, seguindo a sua
-pista de concorrência (você tinha testado 30 `cotar` paralelos e não visto perda;
-a corrida existia mas seu teste não a expôs):
+# A IDEIA ORIGINAL (o critério de aceite que você nunca viu)
 
-- `cotar` relia e reescrevia o CSV inteiro para acrescentar uma linha. Dois
-  comandos simultâneos liam a mesma base e um sobrescrevia o outro. Agora anexa
-  de verdade, sem reler.
-- `atomic_write_text` usava nome de temporário **fixo**: dois processos
-  escreviam no mesmo `.processo.md.tmp` e um apagava o do outro.
-- No Windows, `os.replace` falha se outro processo tiver o destino aberto, mesmo
-  só para leitura. Adicionei repetição com espera e uma trava por projeto.
+Isto é o que o dono pediu, com as palavras dele, antes de existir qualquer linha
+de código. É o padrão contra o qual eu quero que você julgue o produto:
 
-Medido: 25 `cotar` em paralelo saíram de 6 linhas gravadas / 20 processos com
-erro para **25 linhas e zero erros**.
+> "Eu faço muitas compras na internet e dependo de cotações tops. Quero
+> construir uma central de compras, repositório local e GitHub. Vai ter
+> habilidades de navegação e pesquisa em tempo real atual eficaz, preferências
+> minhas, dados, endereços etc. Um ou mais arquivos de controle, tipo produto
+> pretendido, daí vai criando as colunas com variações de tipo, marca, preço.
+> A princípio prefiro compras no ML e Amazon, mas nada impede cotar em outras
+> frentes. Foco em produtos bem validados, bem avaliados. Tipo, eu quero
+> comprar um carro X, a central vai me construindo e me guiando na melhor
+> escolha. Ou até algo mais simples: comprar um celular, um tênis."
+>
+> "Tipo, eu abro uma aba, pode ser no VS Code mesmo, vou conversando com a
+> central e do lado vai sendo editado tudo. A IA me mostra as opções, vai
+> salvando os dados cabíveis e tal. Seria como eu conversar com a tela de
+> pesquisa ao mesmo tempo que vejo ela. E ir montando um dossiê, um controle de
+> todos os dados pra guiar minha decisão, tudo isso lado a lado: conversa e tela
+> de dados para decisão. Eu peço pra IA pesquisar, ela pesquisa e já lança o
+> dado na tela ao lado que está aberta na central."
+
+Leia isso duas vezes. O sistema de hoje é um CLI de 30 subcomandos, uma skill e
+um painel que precisa ser recarregado. **A pergunta é honesta e eu quero a
+resposta honesta:** isso virou a coisa que ele pediu, ou virou uma coisa boa e
+diferente?
+
+---
 
 ## O que eu quero desta rodada
 
-### 1. As correções criaram problema novo?
+### 1. O painel e o artifact (código novo, risco novo)
 
-Esta é a pergunta principal. Especificamente:
+`scripts/painel.py` sobe um `ThreadingHTTPServer` em `127.0.0.1:8800` que grava
+no repositório. O README promete: *"o painel não é porta dos fundos: toda
+gravação passa pelos mesmos caminhos do CLI, com a mesma trava por projeto, a
+mesma validação de entrada e o mesmo append-only."*
 
-- **A trava por projeto** (`project_lock` em `central_compras.py`). Ela pode
-  emperrar? Deadlock, trava órfã que não expira, comando que morre segurando,
-  Ctrl+C no meio, dois comandos em projetos diferentes se bloqueando à toa?
-  O `MUTATING_COMMANDS` cobre os comandos certos, ou sobrou um que escreve sem
-  travar, ou trava um que só lê?
-- **O `append_quote`** substituiu o ciclo ler-modificar-reescrever. Ele preserva
-  colunas extras escritas à mão? Lida com arquivo sem newline final? E se o
-  cabeçalho tiver coluna a mais que o schema, em vez de a menos?
-- **A renormalização do score.** Ela pode produzir divisão por zero, score fora
-  de 0-100, ou um caso em que *todos* os eixos faltam? A `confianca` bate com o
-  que realmente entrou na conta? Compare `ranking.csv` com `memoria-calculo.md`.
-- **As quatro travas do `decidir`** (`--permitir-cortado`, `--permitir-vencida`,
-  `--permitir-aguardando`, `--permitir-incompleto`). Elas se contradizem? Existe
-  ordem em que uma esconde a outra? Existe caminho que passa por todas?
-- **Os padrões novos do varredor.** `(?i)(token|api[_-]?key|...)` sem `\b` à
-  esquerda: isso gera falso-positivo em texto comum? E o CPF rotulado?
+**Verifique se essa frase é verdadeira ou apenas quase verdadeira.** Onde o
+caminho do painel diverge do caminho do CLI, ainda que um pouco, é achado.
 
-### 2. O território que ninguém auditou
+Superfícies que eu quero que você olhe com nome e sobrenome (não estou afirmando
+que há bug em nenhuma delas — estou dizendo onde procurar):
 
-Nenhuma das duas rodadas olhou isto:
+- **`_resolver()`** recebe nome de projeto vindo da query string (`/api/estado`)
+  e do corpo JSON (`/api/acao`). Ele aceita `../`, caminho absoluto, nome com
+  separador, nome vazio, nome com unicode? Dá para fazer o painel ler ou
+  escrever fora de `projetos/`?
+- **`POST /api/acao` não tem verificação de origem visível.** O servidor escuta
+  em 127.0.0.1 e não pede autenticação, por desenho. Mas enquanto o painel está
+  no ar, uma página qualquer que o dono abra no navegador pode disparar `fetch`
+  para `http://127.0.0.1:8800/api/acao`? O `Content-Type: application/json`
+  segura sozinho, ou passa com `text/plain`? E rebind de DNS? Se der para
+  escrever no repositório a partir de uma aba aleatória, isso é o achado mais
+  grave desta rodada. Se não der, diga por que não dá — quero o argumento, não a
+  suposição.
+- **`ThreadingHTTPServer` + `project_lock`.** Duas abas abertas no mesmo projeto,
+  dois POSTs simultâneos: perde linha? Emperra? A trava por projeto foi desenhada
+  para processos separados; ela se comporta igual entre *threads* do mesmo
+  processo?
+- **Ctrl+C com requisição em voo**, e o `finally: server_close()`: deixa trava
+  órfã? Deixa `.tmp` para trás?
+- **O limite de 1 MB no corpo** e o `int(Content-Length or 0)`: `Content-Length`
+  negativo, ausente, ou não numérico derruba o servidor?
+- **`artifact.html`** é gerado para ser lido no celular e é "página única e
+  autossuficiente". **Ele pode conter dado pessoal?** Endereço, CEP, nome de
+  vendedor, link com parâmetro identificável, qualquer coisa que viole o
+  princípio 5 se a página for compartilhada ou parar num serviço de publicação.
+  O `checar-segredos` varre a árvore versionada — ele varre o `artifact.html`?
 
-- **A skill** (`skills/central-compras/`). Ela descreve o sistema como ele é
-  hoje, ou ficou defasada depois de 12 sprints? Um agente seguindo só ela
-  conseguiria conduzir uma compra do início ao fim? Ela ensina algum comando
-  que não existe mais, ou omite trava que faria o agente travar sem entender?
-- **Os templates** (`templates/`). As perguntas do `briefing.md` e do
-  `veredito.md` extraem o que precisa ser extraído? O que falta perguntar para
-  uma compra dar errado menos vezes?
-- **O ciclo de veredito de ponta a ponta.** Rode: compra → `decidir` →
-  `preencher-veredito` D+30 → `aprender-veredito` → veja se a lição vira gate →
-  abra uma compra nova da mesma categoria e veja se o `prompt-ia` aproveita.
-  Esse loop é o produto inteiro. Ele fecha de verdade ou tem elo solto?
-- **O dashboard como produto**, não como código. Abra
-  `dashboard/index.html`. Ele responde as perguntas que alguém realmente faz
-  ("o que estou esperando baixar de preço?", "me arrependi de quê?"), ou é
-  tabela bonita de dado que não decide nada?
-- **A experiência de erro.** Erre de propósito em dez lugares. As mensagens
-  dizem o que fazer, ou só o que aconteceu?
+### 2. A distância entre a ideia original e o que existe
 
-### 3. O teste dirigido pelo produto
+Esta é a parte principal, e é julgamento de produto, não caça a bug.
 
-Faça uma compra fictícia inteira, de ponta a ponta, como se você fosse o dono,
-**sem ler o README antes**. Só `--help`. Anote onde travou, onde teve que
-adivinhar, onde a ferramenta te fez trabalhar por ela.
+Releia a ideia original acima. Depois faça, de verdade, o exercício abaixo, e
+me diga onde a ferramenta ficou devendo:
 
-Depois faça a mesma compra lendo o README. O que o README não conta e deveria?
+**a) A promessa da "tela ao lado".** O painel foi a primeira tentativa. Abra-o
+(`python scripts/central_compras.py painel`), coloque-o lado a lado com um chat,
+e simule: o dono pede uma pesquisa, o agente responde, o dado precisa aparecer
+na grade. Quantos passos manuais existem entre "a IA achou o preço" e "o preço
+está na tela"? A grade atualiza sozinha ou ele tem que recarregar? Isso é
+"conversar com a tela de pesquisa ao mesmo tempo que vejo ela", ou é um CRUD com
+navegador?
 
-### 4. Julgamento, de novo
+**b) A "pesquisa em tempo real".** O sistema não tem navegação nem scraping, por
+decisão explícita e bem argumentada (site de loja quebra toda semana). Mas a
+ideia original pedia exatamente isso. Hoje o caminho é: o agente pesquisa por
+fora, o humano digita. **Qual é o menor caminho honesto que aproxima o sistema
+do pedido sem construir um scraper frágil?** Quero a sua recomendação, incluindo
+a possibilidade de "não faça nada disso, a decisão original está certa e o que
+falta é explicar melhor". E se você recomendar algo, diga o que **não** construir
+junto.
 
-Você já opinou sobre escalas e pesos. Agora que o 0,50 virou renormalização mais
-confiança, reavalie:
+**c) Onde ele trabalha por ela.** A rodada 2 fez esse teste com uma compra
+fictícia, inventada do zero. Faça diferente: **use o projeto de carro elétrico
+que já está no repositório** (`projetos/2026-comprar-carro-eletrico`).
+Ele tem 10 candidatos mapeados, nenhuma cotação, e uma regra de parada que só
+permite 4 candidatos. Tente levá-lo do estado atual até ter uma shortlist de 4.
+Onde a ferramenta ajuda? Onde ela só cobra? A categoria `carro` e o caminho de
+TCO nunca rodaram de verdade — eles se sustentam?
 
-- O limite de **75% de confiança** para decidir é bem calibrado? Com que
-  frequência ele vai atrapalhar sem motivo?
-- A **renormalização** resolveu o incentivo perverso, ou só mudou de lugar?
-  Continua valendo a pena omitir dado?
-- `μ=4,3` e `m=50` na nota bayesiana: você disse que `m=50` é fraco para
-  marketplace grande. Que valor você usaria, e por quê?
-- Qualidade de **3,8 a 5,0**: você disse que é otimista. Qual faixa?
+**d) O ML e a Amazon.** A ideia original nomeia as duas lojas como principais.
+`lojas_preferidas` é uma lista em YAML que entra no eixo risco, e é isso. Existe
+algo específico dessas duas que o sistema deveria saber e não sabe (padrão de
+anúncio, vendedor oficial vs. terceiro, reputação, histórico de preço)? Ou
+generalizar foi a escolha certa?
 
-Se você mantiver uma crítica que eu não implementei, **insista com argumento**.
-Eu discordei da sua sugestão sobre derivados versionados; se você continuar
-achando que estou errado, diga por quê de novo.
+### 3. Erosão de escala
+
+Um arquivo de 4.190 linhas com 30 subcomandos, escrito ao longo de 14 sprints
+por agentes diferentes.
+
+- Existe **regra duplicada em dois lugares** que já divergiu, ou vai divergir na
+  próxima mudança? (A rodada 1 achou uma: `custo_total` vs `tco_total` usados por
+  comandos diferentes, resolvida extraindo `value_field_for()`. O padrão existe;
+  procure os irmãos dele.)
+- Existe subcomando **morto, quebrado ou que ninguém usaria**? 30 é muito.
+- Os 200 testes: eles cobrem o que quebra, ou cresceram cobrindo o que é fácil
+  de testar? Aponte a área com mais risco e menos teste.
+- `config/categorias.yaml` tem 7 categorias. Abrir a oitava exige o quê? Um
+  não-desenvolvedor consegue?
+
+### 4. Um achado que eu já confirmei — comece por ele
+
+O README manda instalar a skill em `C:\Users\pc\.codex\skills\central-compras`.
+**Esse caminho não existe nesta máquina** (o usuário é `josem`, não `pc`), e a
+skill também não está em `C:\Users\josem\.codex\skills\`. Ou seja: a skill está
+documentada como instalada e não está.
+
+Isso levanta a pergunta maior, que é a que me interessa: **como a skill chega às
+várias máquinas dele?** Não há script de instalação. E ele não usa um agente só:
+usa Codex, Claude Code e agora você. O único arquivo de integração que existe,
+`skills/central-compras/agents/openai.yaml`, atende apenas o Codex — e o
+`SKILL.md` está escrito em inglês, com caminho do Windows cravado dentro.
+
+Qual é o desenho certo aqui? Um único `SKILL.md` neutro que qualquer agente lê?
+Um instalador? Nada disso, e o conhecimento deveria viver no README? Você é o
+terceiro agente a encostar neste repositório: diga o que **você** precisou saber
+para operar e não estava escrito em lugar nenhum.
+
+### 5. Julgamento
+
+Aqui eu quero opinião, não bug. Vários números abaixo saíram de sugestão do
+auditor anterior, e é exatamente por isso que eu quero um segundo olho. Com dois
+projetos reais no repositório:
+
+- `confianca_minima_para_decidir` é 0,90 (padrão) e 0,95 (acima de R$ 20 mil).
+  Na rodada 2 era 0,75, considerado frouxo, e subiu. **Passou do ponto?** Com
+  0,95, um carro fecha algum dia, ou o dono vai acabar usando
+  `--permitir-incompleto` toda vez — que é como uma trava morre?
+- `peso_ancora: 250` na nota bayesiana substituiu um `m=50` julgado fraco para
+  marketplace grande. Ficou bom para a Amazon, mas e para categoria de poucas
+  avaliações — material de construção, onde 30 avaliações já é muito? Um número
+  único serve para as duas pontas, ou isso devia ser por categoria?
+- O eixo `valor` é razão contra o mais barato do conjunto, e o README avisa que
+  o score total não é comparável entre projetos. Isso é limitação aceitável ou
+  defeito de desenho que ainda vai morder?
+- **A pergunta aberta:** olhando o `preferencias.yaml` inteiro, tem número ali
+  que não deveria ser número? Alguma coisa que virou constante configurável
+  quando na verdade era uma decisão que precisava de contexto?
 
 ## Regras
 
-- **Reproduza antes de reportar.** Comando e saída real. Sem reprodução eu descarto.
-- **Não conserte.** Diagnóstico primeiro; correção, se propuser, em diff separado.
-- **Não invente.** `[NÃO VERIFICADO: motivo]` em vez de completar com plausibilidade.
-- Os 143 testes passam aqui. Se falhar aí, isso já é achado — reporte o ambiente.
-- **Se não achar nada crítico, diga isso.** Não invente achado para justificar a
-  auditoria. "Procurei em X, Y e Z e está sólido" é resultado válido e útil.
+- **Reproduza antes de reportar.** Comando e saída real. Sem reprodução eu
+  descarto. Se você não tiver como executar comando neste ambiente, **diga isso
+  logo na primeira linha** e marque todo achado como análise estática — eu sei
+  ler os dois, mas preciso saber qual é qual.
+- **Não conserte.** Diagnóstico primeiro. Se propuser correção, em diff separado,
+  no fim, e claramente marcada como proposta.
+- **Não invente.** `[NÃO VERIFICADO: motivo]` em vez de completar com
+  plausibilidade. Isso vale em dobro para as perguntas de segurança do painel:
+  se você não conseguiu montar o ataque, diga que não conseguiu, não diga que é
+  seguro.
+- Os 200 testes passam aqui. Se falharem aí, isso já é achado — reporte o ambiente.
+- **Se não achar nada crítico, diga isso.** "Procurei em X, Y e Z e está sólido"
+  é resultado válido e útil. Não invente achado para justificar a auditoria.
+- Ordene por **impacto na decisão de compra**, não por severidade técnica. Um bug
+  que faz o dono comprar o carro errado vale mais que dez avisos de lint.
+- Lembre quem usa: uma pessoa que não é desenvolvedora, em várias máquinas
+  Windows. "Bastaria rodar um `git filter-repo`" não é solução para ele.
 
 ## Já sei, não gaste tempo
 
-- `nota 4.8` com `n_avaliacoes 0` na linha do JBL: dado de entrada errado, a
-  validação acusa, aguarda decisão do dono.
-- As 4 cotações daquele projeto são `fonte=web`; nenhuma compra fechada ainda.
-- O carro elétrico (Dolphin Mini GL, Geely EX2 Pro, King GL, Atto 2 DM-i) ainda
-  não foi registrado. É o próximo passo.
-- Falta a tag `v1.0`, o guia de nova categoria e a rotina semanal.
+- O projeto de carro elétrico tem 10 candidatos e nenhuma cotação. É de
+  propósito: nenhum preço da pesquisa de origem foi verificado em fonte
+  primária, então nenhum foi transferido. A shortlist é o próximo passo.
+- `nota 4.8` com `n_avaliacoes 0` na linha do JBL é dado de entrada errado; a
+  validação já acusa.
+- Nenhuma compra foi fechada ainda em nenhum projeto. O ciclo de veredito nunca
+  rodou com dado real — se isso atrapalhar sua análise, diga.
+- Falta a tag `v1.0` e a rotina semanal.
+- **Derivados versionados** (`ranking.md`, `validacao.md`, `dashboard/` estão no
+  Git de propósito). O auditor anterior disse duas vezes que era errado; eu
+  mantive, porque o `ranking.md` ao lado do `decisao.md` é a evidência de por que
+  decidi naquele dia, e criei `regenerar` para resolver conflito de merge. Você
+  tem o direito de discordar, mas só volte ao assunto com argumento que essas
+  duas trocas não cobriram.
 
 ## Formato
 
 ```
 ## Veredito em uma linha
 
-## As correções criaram problema novo?
-[o principal; com reprodução, ou "não encontrei, procurei em X e Y"]
+## O painel e o artifact
+[o mais grave primeiro; com reprodução, ou "tentei X e Y e não consegui"]
 
-## Território não auditado (skill, templates, ciclo de veredito, dashboard, erros)
+## A distância entre a ideia original e o que existe
+[a) tela ao lado  b) pesquisa em tempo real  c) onde ele trabalha por ela
+ d) ML e Amazon — e a sua recomendação, incluindo o que NÃO construir]
 
-## O teste dirigido pelo produto
-[onde a ferramenta te fez trabalhar por ela]
+## Erosão de escala
 
-## Julgamento revisado
+## Skill e várias máquinas
 
-## Onde eu continuo discordando de você
-[se for o caso]
+## Julgamento
+
+## Onde eu discordo das decisões já tomadas
+[só com argumento novo; se não tiver, escreva "nada a acrescentar"]
 
 ## O que não consegui verificar
 ```
 
-Ordene por **impacto na decisão de compra**, não por severidade técnica.
+Se, ao fim de tudo, a sua conclusão for "o sistema é bom, mas não é o que foi
+pedido", eu quero ler isso em letras grandes. É a resposta mais valiosa que esta
+auditoria pode produzir.

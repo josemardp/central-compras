@@ -208,6 +208,13 @@ class ServidorTest(Base):
         self.assertIn("prefers-color-scheme", corpo, "sem tema escuro")
         self.assertIn("viewport", corpo, "sem meta viewport, quebra no celular")
 
+    def test_page_polls_state_and_protects_the_form(self):
+        corpo = urllib.request.urlopen(self.url("/"), timeout=15).read().decode("utf-8")
+        self.assertIn("setInterval(carrega", corpo, "sem auto refresh")
+        self.assertIn("active.closest(\".form\")", corpo, "sem protecao de foco")
+        self.assertIn("[id^='f_']", corpo, "sem protecao de campos preenchidos")
+        self.assertIn("carrega(true)", corpo, "acao manual nao forca o refresh")
+
     def test_state_endpoint_returns_the_engine_numbers(self):
         dados = json.loads(urllib.request.urlopen(
             self.url(f"/api/estado?projeto={self.projeto.name}"), timeout=15).read())
@@ -218,6 +225,7 @@ class ServidorTest(Base):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             urllib.request.urlopen(self.url("/api/estado?projeto=nao-existe"), timeout=15)
         self.assertEqual(ctx.exception.code, 404)
+        ctx.exception.close()
 
     def test_guards_hold_through_http(self):
         self.assertFalse(self.post({"projeto": self.projeto.name, "acao": "apagar_tudo", "dados": {}})["ok"])
@@ -226,10 +234,56 @@ class ServidorTest(Base):
         self.assertFalse(r["ok"])
         self.assertIn("nao e numero", r["erro"])
 
+    def test_post_refuses_invalid_content_type(self):
+        pedido = urllib.request.Request(
+            self.url("/api/acao"),
+            data=json.dumps({"projeto": self.projeto.name, "acao": "ranking"}).encode(),
+            headers={"Content-Type": "text/plain"}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(pedido, timeout=15)
+        self.assertEqual(ctx.exception.code, 415)
+        corpo = ctx.exception.read().decode("utf-8")
+        ctx.exception.close()
+        dados = json.loads(corpo)
+        self.assertFalse(dados["ok"])
+        self.assertEqual(dados["erro"], "Content-Type precisa ser application/json.")
+
+    def test_post_refuses_invalid_content_length(self):
+        pedido = urllib.request.Request(
+            self.url("/api/acao"),
+            data=json.dumps({"projeto": self.projeto.name, "acao": "ranking"}).encode(),
+            headers={"Content-Type": "application/json", "Content-Length": "abc"}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(pedido, timeout=15)
+        self.assertEqual(ctx.exception.code, 400)
+        corpo = ctx.exception.read().decode("utf-8")
+        ctx.exception.close()
+        dados = json.loads(corpo)
+        self.assertFalse(dados["ok"])
+        self.assertEqual(dados["erro"], "Content-Length invalido.")
+
+    def test_post_refuses_negative_content_length(self):
+        pedido = urllib.request.Request(
+            self.url("/api/acao"),
+            data=json.dumps({"projeto": self.projeto.name, "acao": "ranking"}).encode(),
+            headers={"Content-Type": "application/json", "Content-Length": "-5"}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(pedido, timeout=15)
+        self.assertEqual(ctx.exception.code, 400)
+        corpo = ctx.exception.read().decode("utf-8")
+        ctx.exception.close()
+        dados = json.loads(corpo)
+        self.assertFalse(dados["ok"])
+        self.assertEqual(dados["erro"], "Content-Length invalido.")
+
     def test_unknown_route_is_404(self):
         for rota in ["/api/qualquer", "/etc/passwd", "/../config/preferencias.yaml"]:
-            with self.assertRaises(urllib.error.HTTPError, msg=rota):
+            with self.assertRaises(urllib.error.HTTPError, msg=rota) as ctx:
                 urllib.request.urlopen(self.url(rota), timeout=15)
+            ctx.exception.close()
 
 
 class ArtifactTest(Base):
@@ -240,6 +294,23 @@ class ArtifactTest(Base):
         self.assertNotIn("<script", pagina, "artifact nao precisa de script")
         self.assertIn("viewport", pagina)
         self.assertIn("prefers-color-scheme", pagina, "sem tema escuro")
+
+    def test_artifact_command_warns_about_private_data(self):
+        import argparse
+        import io
+        import sys
+
+        args = argparse.Namespace(fragmento=None)
+        saida = io.StringIO()
+        stdout_original = sys.stdout
+        sys.stdout = saida
+        try:
+            painel.gerar_artifact(args)
+        finally:
+            sys.stdout = stdout_original
+        texto = saida.getvalue()
+        self.assertIn("Lembrete: nao escreva CEP", texto)
+        self.assertIn("scanner de segredos nao detecta", texto)
 
     def test_it_shows_the_engine_numbers(self):
         pagina = painel.artifact_html()

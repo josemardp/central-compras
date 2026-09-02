@@ -31,6 +31,10 @@ class SecretScanTest(unittest.TestCase):
         self.escrever("nota.md", "Dados para nota: 000.000.001-91\n")  # central-compras:exemplo-nao-e-segredo
         self.assertIn("CPF", self.codigos())
 
+    def test_finds_a_cep(self):
+        self.escrever("endereco.html", "Entrega em 01310-100\n")  # central-compras:exemplo-nao-e-segredo
+        self.assertIn("CEP", self.codigos())
+
     def test_finds_a_card_number(self):
         # Numero de teste publico (Visa), valido no Luhn.
         self.escrever("pagamento.md", "cartao usado: 4111 1111 1111 1111\n")  # central-compras:exemplo-nao-e-segredo

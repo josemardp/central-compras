@@ -120,6 +120,21 @@ class PromotionLaunderingTest(BaseCli):
         linhas = (self.tmpdir / projeto / "cotacoes.csv").read_text(encoding="utf-8").splitlines()
         self.assertEqual(sum(1 for l in linhas if ",manual," in l), 1)
 
+    def test_promotion_and_add_quote_have_identical_tco_calculation(self):
+        projeto = self.projeto("fone tco", teto=600)
+        self.candidato(projeto, "fone-web", "Fone Web", fonte="web")
+        self.cli("cotar", projeto, "--produto-id", "fone-web", "--loja", "Amazon",
+                 "--preco", "289.456", "--frete", "10.123", "--custo-extra", "5.789",
+                 "--custo-operacional-mensal", "2.345", "--tco-meses", "12",
+                 "--valor-revenda-estimado", "50.123", "--fonte", "web")
+        self.cli("promover-cotacao", projeto, "--produto-id", "fone-web", "--sem-alteracao")
+        quotes = cc.read_quotes(self.tmpdir / projeto)
+        self.assertEqual(len(quotes), 3)
+        q_web = quotes[1]
+        q_manual = quotes[2]
+        self.assertEqual(q_web["custo_total"], q_manual["custo_total"])
+        self.assertEqual(q_web["tco_total"], q_manual["tco_total"])
+
 
 class NotANumberTest(unittest.TestCase):
     """Achado 5: `NaN` e infinito passavam porque toda comparacao com NaN e falsa."""
@@ -397,3 +412,105 @@ class LostUpdateTest(BaseCli):
         with self.assertRaises(SystemExit) as ctx:
             cc.append_quote(caminho, {"data_coleta": "2026-01-01", "produto_id": "a", "custo_total": "1"})
         self.assertIn("migrar-cotacoes", str(ctx.exception))
+
+
+class NoShippingCategoryConfidenceTest(BaseCli):
+    """3a auditoria externa (Antigravity): carro nao tem frete no sentido que
+
+    o eixo `conveniencia` mede (dias ate a entrega). Faltar esse dado deixava
+    o eixo permanentemente "sem dado", travando a confianca em 0,90 - abaixo
+    do piso de 0,95 exigido acima de R$ 20 mil. Decisao do Josemar: categoria
+    marcada `sem_frete` tira o eixo inteiro da conta, em vez de puni-la para
+    sempre por um dado que nunca vai existir.
+
+    Roda tudo via CLI (subprocesso), como o resto deste arquivo: `compute_ranking`
+    e `stop_rule_status` dependem de `cc.PRODUTOS`/`cc.CONFIG` do processo que
+    os chama, e esse processo de teste aponta para o repositorio real, nao
+    para o `tmpdir` isolado que o subprocesso usa.
+    """
+
+    def test_missing_delivery_deadline_does_not_cap_confidence_for_carro(self):
+        projeto = self.projeto("carro sem frete", categoria="carro", valor=25000)
+        self.cli("novo-produto", projeto, "Carro Teste", "--marca", "M",
+                 "--categoria", "carro", "--produto-id", "carro-teste",
+                 "--requisito", "uso=true", "--requisito", "rede_assistencia=true")
+        self.cli("cotar", projeto, "--produto-id", "carro-teste",
+                 "--loja", "Concessionaria", "--vendedor", "V",
+                 "--vendedor-tipo", "oficial", "--preco", "120000",
+                 "--nota", "4.6", "--avaliacoes", "900",
+                 "--garantia-meses", "36", "--garantia-tipo", "nacional",
+                 "--fonte", "manual", "--link", "https://exemplo.com/carro-teste")
+        self.cli("auditar", projeto)
+
+        memoria = (self.tmpdir / projeto / "memoria-calculo.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "categoria sem frete real: o eixo nao entra na conta desta categoria", memoria,
+        )
+        self.assertIn("Confianca: **100%**", memoria,
+                       "faltar frete nao pode travar a confianca de uma categoria sem frete")
+
+
+class MappedCandidatesCountTowardStopRuleTest(BaseCli):
+    """3a auditoria externa (Antigravity): a regra de parada so contava
+
+    candidato com cotacao registrada. Com 10 candidatos mapeados e zero
+    cotacoes (caso real do projeto do carro eletrico), o teto da faixa nunca
+    disparava aviso porque `candidatos_atuais` dava zero.
+    """
+
+    def test_candidate_without_a_quote_still_counts_toward_the_limit(self):
+        projeto = self.projeto("carro sem cotacao", categoria="carro", valor=25000)
+        for indice in range(5):
+            self.cli("novo-produto", projeto, f"Carro {indice}", "--marca", "M",
+                     "--categoria", "carro", "--produto-id", f"carro-{indice}")
+        self.cli("validar", projeto, check=False)
+
+        validacao = (self.tmpdir / projeto / "validacao.md").read_text(encoding="utf-8")
+        self.assertIn("5 candidatos para um teto de 4", validacao,
+                       "candidato mapeado sem cotacao precisa contar pra regra de parada")
+
+    def test_discarded_candidate_without_quote_leaves_the_stop_rule(self):
+        projeto = self.projeto("descarte sem cotacao", valor=25000)
+        for indice in range(6):
+            self.cli("novo-produto", projeto, f"Fone {indice}", "--marca", "M",
+                     "--categoria", "fone", "--produto-id", f"fone-{indice}")
+        self.cli("descartar", "--produto-id", "fone-5", "--projeto", projeto,
+                 "--porque", "nao atende ao uso")
+        self.cli("validar", projeto, check=False)
+
+        validacao = (self.tmpdir / projeto / "validacao.md").read_text(encoding="utf-8")
+        avisos_regra = "\n".join(
+            linha for linha in validacao.splitlines() if "Regra de parada" in linha
+        )
+        self.assertIn("5 candidatos para um teto de 4", avisos_regra)
+        self.assertNotIn("fone-5", avisos_regra)
+
+    def test_discarded_candidate_with_quote_leaves_the_stop_rule(self):
+        projeto = self.projeto("descarte com cotacao", valor=25000)
+        for indice in range(5):
+            self.cli("novo-produto", projeto, f"Fone {indice}", "--marca", "M",
+                     "--categoria", "fone", "--produto-id", f"fone-{indice}")
+        self.candidato(projeto, "fone-cotado", "Fone Cotado")
+        self.cli("descartar", "--produto-id", "fone-cotado", "--projeto", projeto,
+                 "--porque", "nao atende ao uso")
+        self.cli("validar", projeto, check=False)
+
+        validacao = (self.tmpdir / projeto / "validacao.md").read_text(encoding="utf-8")
+        avisos_regra = "\n".join(
+            linha for linha in validacao.splitlines() if "Regra de parada" in linha
+        )
+        self.assertIn("5 candidatos para um teto de 4", avisos_regra)
+        self.assertNotIn("fone-cotado", avisos_regra)
+
+    def test_a_quoted_candidate_without_produto_yaml_still_counts(self):
+        """Cotacao sem produto.yaml correspondente (dado legado) nao pode sumir da conta."""
+        projeto = self.projeto("carro legado", categoria="carro", valor=25000)
+        caminho = self.tmpdir / projeto
+        cc.append_quote(caminho, {
+            "data_coleta": cc.now_iso(), "produto_id": "carro-legado",
+            "custo_total": "100000", "fonte": "manual",
+        })
+        self.cli("validar", projeto, check=False)
+
+        validacao = (caminho / "validacao.md").read_text(encoding="utf-8")
+        self.assertIn("carro-legado", validacao)

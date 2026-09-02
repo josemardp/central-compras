@@ -1,0 +1,19 @@
+id: byd-seagull
+categoria: carro
+nome: BYD Seagull
+marca: BYD
+estado: descartado
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  autonomia_km: null
+  autonomia_protocolo: null
+  potencia_cv: null
+  porta_malas_l: null
+  garantia_bateria: null
+  consumo_kwh_100km: null
+requisitos_atendidos: {}
+descartado_porque: nao existe como modelo proprio no Brasil; a BYD Brasil vende este
+  carro como Dolphin Mini, entrada duplicada

@@ -1,0 +1,21 @@
+id: jac-e-js1
+categoria: carro
+nome: JAC e-JS1
+marca: JAC
+estado: descartado
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  origem: importado
+  autonomia_km: 181
+  autonomia_protocolo: INMETRO
+  potencia_cv: 62
+  potencia_fonte: 45 kW
+  porta_malas_l: 121
+  garantia_bateria: 5 anos/100.000 km com SoH mínimo de 75%
+  consumo_kwh_100km: null
+requisitos_atendidos: {}
+descartado_porque: autonomia 181 km INMETRO nao fecha a rota mais longa (120 km ida
+  e volta, 2x/mes) com margem em uso 71 por cento rodovia

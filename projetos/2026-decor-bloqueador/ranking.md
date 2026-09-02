@@ -1,23 +1,27 @@
 # Ranking
 
-Gerado em 2026-08-27T23:05:11.
+Gerado em 2026-09-02T01:29:08.
 
 ## Elegiveis
 
-1. Viapol Viaplus 1000 18 kg - 62.4
-   qualidade 0.53 · valor 1.00 · risco 0.29 · aderencia -- · conveniencia --
-   custo total R$ 359,97 / LPK Home Center / estimativa web
+1. Viapol Viaplus 1000 18 kg - 73.3
+   qualidade 0.81 · valor 1.00 · risco 0.29 · aderencia -- · conveniencia --
+   custo total R$ 192,90 / Elos Cimento / estimativa web
    confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
    alertas: AVAL_SUSPEITA
 
-2. Sika SikaTop 107 Cinza 18 kg - 45.2
-   qualidade -- · valor 0.46 · risco 0.44 · aderencia -- · conveniencia --
+2. Impermeabilizante Block Total Decor Colors - 47.8
+   qualidade -- · valor 0.51 · risco 0.44 · aderencia -- · conveniencia --
+   custo total R$ 379,99 / Loja Decor Colors / estimativa web
+   confianca 45% - sem dado em: qualidade, conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+
+3. Sika SikaTop 107 Cinza 18 kg - 33.3
+   qualidade -- · valor 0.25 · risco 0.44 · aderencia -- · conveniencia --
    custo total R$ 779,70 / Superpro Atacado / estimativa web
    confianca 45% - sem dado em: qualidade, conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
 ## Cortados pelos gates
 
-- Impermeabilizante Block Total Decor Colors: custo_total acima do preco_teto do briefing (1139.97 > 800.0)
 - Sika Igolflex Fachada Branco 3,6 L: produto descartado (Mesma limitacao do Vedapren: pintura acrilica para fachada, pressao positiva. A propria Sika separa a linha Igolflex Fachada da linha SikaTop, que e a indicada para negativa.)
 - Vedacit Vedapren Parede Branco 3,6 kg: produto descartado (Membrana acrilica de face positiva. Nao resiste a contrapressao: descola sob umidade negativa. A ficha do fabricante posiciona o produto contra batida de chuva na fachada, nao contra agua empurrando por tras.)
 

@@ -84,6 +84,21 @@ of the calculation and reduce `confianca`; they never count as neutral 0.50.
 Every decision stores immutable `ranking.md`, `ranking.csv`, and quote metadata
 under the project's `snapshots/` directory.
 
+## Star Classification (on demand, after the gate has run)
+
+The dashboard's side-by-side comparison table can show a 1-5 star rating per
+attribute row, absolute against the market (never "best of these N
+candidates"). Filling `atributos_classificacao` in a candidate's
+`produto.yaml` is real research work (official datasheets, not guesses), so
+only do it for candidates that are already `elegiveis` after `ranking` has
+run, and only when Josemar explicitly asks for the star classification.
+Never front-load this research when a candidate is first registered - most
+candidates get cut by price or gate before reaching the decision table, and
+that research would be wasted. The code itself will never render a star for
+a gate-cut candidate even if `atributos_classificacao` happens to have data
+(`spec_comparison_section` in `scripts/central_compras.py`), but skipping the
+research early is on the agent's judgment, not something the code enforces.
+
 ## Verdict Learning
 
 ```powershell

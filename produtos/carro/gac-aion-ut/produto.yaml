@@ -1,0 +1,28 @@
+id: gac-aion-ut
+categoria: carro
+nome: GAC Aion UT
+marca: GAC
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  origem: importado
+  # Fonte: GAC Group - Especificação Aion UT (página oficial do grupo, configuração brasileira)
+  # URL: https://www.gacgroup.com/pt-br/configuration/aion-ut/2024
+  # Fonte garantia: GAC Brasil - Condições de Hipervalorização e Financiamento, agosto/2026 (PDF)
+  # URL: https://br-www-resouce-cdn.gacgroup.com/static/BR/tenant/cms/material/202608/1786041998018-Texto-legal---agosto-2026.pdf
+  # Consulta: 2026-08-30
+  autonomia_km: 253
+  autonomia_protocolo: INMETRO
+  autonomia_obs: versão Premium de entrada; versão Elite 310 km INMETRO
+  potencia_cv: 204
+  potencia_fonte: 150 kW
+  bateria_kwh: 44.12
+  bateria_obs: versão Elite com 60 kWh
+  porta_malas_l: 340
+  garantia_bateria: 8 anos/200.000 km (SoH não publicado)
+  consumo_kwh_100km: null
+requisitos_atendidos: {}
+descartado_porque: null

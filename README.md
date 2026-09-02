@@ -23,6 +23,11 @@ Cada compra vira um projeto em `projetos/`.
 8. `decisao.md` - escolhido, motivo, segundo colocado e por que perdeu.
 9. `vereditos/` - D+30 e D+180 para fechar o aprendizado.
 
+Cada candidato tambem tem um `produto.yaml` em `produtos/<categoria>/<id>/`.
+Use o campo opcional `proveniencia` para guardar fonte, URL e data de consulta
+de especificacoes pesquisadas. Evite comentarios YAML para esse dado: comandos
+como `descartar` regravam o arquivo e preservam campos, nao comentarios.
+
 ## Comandos
 
 ```powershell
@@ -341,10 +346,10 @@ A IA ajuda principalmente em tres momentos:
 
 Os prompts gerados por `prompt-ia` incluem automaticamente licoes da categoria, marcas e lojas ja registradas na base de conhecimento.
 
-Tambem ha uma skill local instalada em:
+Tambem ha uma skill local. Apos cada `git pull`, instale-a nas maquinas de agente que voce usa:
 
-```text
-C:\Users\pc\.codex\skills\central-compras
+```powershell
+python scripts/instalar_skill.py
 ```
 
 Use no Codex:

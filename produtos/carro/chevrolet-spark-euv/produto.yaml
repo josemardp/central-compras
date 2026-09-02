@@ -1,0 +1,22 @@
+id: chevrolet-spark-euv
+categoria: carro
+nome: Chevrolet Spark EUV
+marca: Chevrolet
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  # Fonte: Chevrolet Brasil - Notícia oficial de lançamento do Spark EUV e transferência "Ficha Tecnica Spark EV MY26"
+  # URL: https://news.chevrolet.com.br/newsroom.detail.html/Pages/news/br/pt/2025/sep/0908-Chevrolet-Spark-EUV-estreia-como-primeiro-SUV-eletrico-acessivel-inteligente-Brasil.html
+  # Consulta: 2026-08-30
+  autonomia_km: 258
+  autonomia_protocolo: INMETRO
+  potencia_cv: 101
+  porta_malas_l: 355
+  porta_malas_obs: mais 35 L no compartimento dianteiro
+  garantia_bateria: 8 anos/160.000 km (SoH não publicado)
+  consumo_kwh_100km: null
+requisitos_atendidos: {}
+descartado_porque: null

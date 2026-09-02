@@ -1,0 +1,27 @@
+id: gwm-ora-03-bev58
+categoria: carro
+nome: GWM ORA 03 BEV58
+marca: GWM
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  origem: importado
+  # Fonte: GWM Motors Brasil - Especificações ORA 03 BEV58 (site oficial)
+  # URL: https://www.gwmmotors.com.br/pt/modelos/ora-03-bev58/specification
+  # Fonte garantia: GWM Motors Brasil - Lançamento ORA 03
+  # URL: https://www.gwmmotors.com.br/pt/media-center/news/2023/gwm-lanca-o-modelo-eletrico-ora-03-em-duas-versoes
+  # Consulta: 2026-08-30
+  autonomia_km: 315
+  autonomia_protocolo: INMETRO
+  autonomia_obs: 420 km no ciclo WLTP
+  potencia_cv: 171
+  potencia_fonte: publicado pela GWM Brasil em cv
+  porta_malas_l: 228
+  porta_malas_obs: 858 L com bancos rebatidos
+  garantia_bateria: 8 anos/200.000 km (SoH não publicado)
+  consumo_kwh_100km: null
+requisitos_atendidos: {}
+descartado_porque: null

@@ -25,9 +25,9 @@ ANO = dt.date.today().year
 class QuoteSelectionTest(unittest.TestCase):
     """Qual cotacao representa o produto no ranking."""
 
-    def linha(self, fonte, dias_atras, custo):
+    def linha(self, fonte, dias_atras, custo, **extras):
         data = (dt.date.today() - dt.timedelta(days=dias_atras)).isoformat()
-        return {"produto_id": "p", "fonte": fonte, "data_coleta": data, "custo_total": str(custo)}
+        return {"produto_id": "p", "fonte": fonte, "data_coleta": data, "custo_total": str(custo), **extras}
 
     def test_fresh_manual_beats_fresh_web(self):
         escolhida = cc.latest_quotes([self.linha("web", 0, 400), self.linha("manual", 1, 420)])["p"]
@@ -48,6 +48,30 @@ class QuoteSelectionTest(unittest.TestCase):
     def test_the_most_recent_of_two_fresh_manuals_wins(self):
         escolhida = cc.latest_quotes([self.linha("manual", 5, 500), self.linha("manual", 1, 450)])["p"]
         self.assertEqual(escolhida["custo_total"], "450")
+
+    def test_gate_passing_quote_beats_later_same_day_quote_inside_same_priority(self):
+        boa = self.linha("manual", 0, 329.63, garantia_tipo="nacional", loja="Mercado Livre")
+        ruim = self.linha("manual", 0, 253.71, garantia_tipo="nenhuma", loja="Amazon")
+
+        escolhida = cc.latest_quotes(
+            [boa, ruim],
+            prefer=lambda row: row.get("garantia_tipo") in {"nacional", "vendedor"},
+        )["p"]
+
+        self.assertEqual(escolhida["loja"], "Mercado Livre")
+        self.assertEqual(escolhida["garantia_tipo"], "nacional")
+
+    def test_cheaper_quote_breaks_tie_when_multiple_preferred_quotes_have_same_date(self):
+        cara = self.linha("manual", 0, 340, garantia_tipo="nacional", loja="Loja A")
+        barata = self.linha("manual", 0, 310, garantia_tipo="vendedor", loja="Loja B")
+
+        escolhida = cc.latest_quotes(
+            [cara, barata],
+            prefer=lambda row: row.get("garantia_tipo") in {"nacional", "vendedor"},
+        )["p"]
+
+        self.assertEqual(escolhida["loja"], "Loja B")
+        self.assertEqual(escolhida["custo_total"], "310")
 
 
 class BrlFormatTest(unittest.TestCase):

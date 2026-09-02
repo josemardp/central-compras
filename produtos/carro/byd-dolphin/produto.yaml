@@ -1,0 +1,24 @@
+id: byd-dolphin
+categoria: carro
+nome: BYD Dolphin
+marca: BYD
+estado: pesquisando
+projeto: 2026-comprar-carro-eletrico
+preco_alvo: null
+preco_teto: 150000.0
+atributos:
+  motorizacao: eletrico_bev
+  origem: importado
+  # Fonte: BYD Dolphin GS V2 - Ficha Técnica Oficial BYD Brasil (PDF)
+  # URL: https://www.byd.com/material/__CN/byd-site/br/fichas-tecnicas-2026/update-13-07-2026/07-13-2026---ficha-txiunica/BYD_DolphinGS_V2.pdf
+  # Consulta: 2026-08-30
+  autonomia_km: 291
+  autonomia_protocolo: PBEV
+  potencia_cv: 95
+  potencia_fonte: publicado pela BYD Brasil em cv
+  porta_malas_l: 250
+  garantia_bateria: 8 anos/200.000 km (SoH não publicado)
+  consumo_kwh_100km: 11.7
+  consumo_fonte: 0,42 MJ/km convertido para kWh/100 km
+requisitos_atendidos: {}
+descartado_porque: null

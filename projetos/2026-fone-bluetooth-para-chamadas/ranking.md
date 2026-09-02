@@ -1,6 +1,6 @@
 # Ranking
 
-Gerado em 2026-08-27T11:16:40.
+Gerado em 2026-09-02T01:29:09.
 
 ## Elegiveis
 
@@ -10,7 +10,12 @@ Gerado em 2026-08-27T11:16:40.
    confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
    aguardando preco desde 2026-08-26: faltam R$ 36,64 para o alvo de R$ 260,00. Voce decidiu esperar, nao comprar.
 
-2. Soundcore Anker Life Q30 - 58.6
+2. JBL Tune 770NC - 75.0
+   qualidade 0.99 · valor 0.61 · risco 0.76 · aderencia 0.50 · conveniencia --
+   custo total R$ 489,00 / Amazon / estimativa web
+   confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+
+3. Soundcore Anker Life Q30 - 58.6
    qualidade 0.58 · valor 0.64 · risco 0.60 · aderencia 0.50 · conveniencia --
    custo total R$ 466,00 / Amazon / estimativa web
    confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
@@ -18,7 +23,6 @@ Gerado em 2026-08-27T11:16:40.
 ## Cortados pelos gates
 
 - Edifier W820NB Plus: avaliacoes insuficientes (128 < 150) alertas: AVAL_SUSPEITA
-- JBL Tune 770NC: avaliacoes insuficientes (0 < 150)
 
 ## Observacoes
 
