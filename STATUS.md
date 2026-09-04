@@ -17,15 +17,32 @@
   ativada. **Lição para o handoff: dado que mora só em `dados-privados`
   precisa estar registrado aqui como "existe, mas é local da máquina X",
   senão o próximo agente reconstrói tudo.**
-- **O que existia da rodada de 31/08** (achado vasculhando a conta conta-comercial):
-  planilha `Central de Compras - Comparativo de Produtos`, criada 31/08,
-  modificada 01/09, na raiz do Meu Drive — **hoje está na lixeira do Drive**
-  (não foi esta sessão que apagou). O Apps Script daquela rodada não aparece
-  em `script.google.com` provavelmente porque era *container-bound* à
-  planilha: com a planilha na lixeira, o script some da listagem.
-  **Pendência de segurança**: essa planilha está com
-  `Qualquer pessoa na Internet com o link pode editar`. Decidir se restaura
-  (e fecha o compartilhamento) ou deixa expirar na lixeira (30 dias).
+- **O que existia da rodada de 31/08, achado e neutralizado.** Vasculhando a
+  conta conta-comercial (Apps Script "Meus projetos" e "Todos os projetos" não
+  mostravam nada; a conta josemardp também não tinha nada), o rastro apareceu
+  **na lixeira do Drive**: planilha `Central de Compras - Comparativo de
+  Produtos`, criada 31/08, modificada 01/09, aberta 02/09, na raiz do Meu
+  Drive. Não foi esta sessão que a apagou. **O Apps Script daquela rodada era
+  *container-bound* a ela** (Extensões → Apps Script abre o projeto
+  `1dbv6oCJefa6WiAXijBN3XOuFBFolF-JxdzZsQHFLww5r_HlI4Rhycwec`, sem título,
+  com `doPost` usando `LockService`): por isso não aparecia em listagem
+  nenhuma — com a planilha na lixeira, o script vinculado some junto. **Fica
+  a lição de busca: script container-bound não aparece na lista de projetos
+  quando o arquivo dono está na lixeira; procure pelo arquivo, não pelo
+  script.**
+  - **Dois problemas reais de segurança, os dois resolvidos hoje:**
+    1. A planilha estava com `Qualquer pessoa na Internet com o link pode
+       editar`. Trocado para **Restrito**.
+    2. O Web App daquela rodada **continuava ativo e publicado** na internet
+       ("Integração Central de Compras", Versão 1 de 31/08 15:30). Ou seja,
+       havia **dois endpoints abertos** ao mesmo tempo. A implantação antiga
+       foi **arquivada**; conferido com `curl`: o endpoint antigo agora
+       responde **404** e o novo segue respondendo normalmente.
+  - Conferido antes de mexer: a planilha antiga era espelho dos mesmos dados
+    (Visão Geral + abas de carro, servico, decor, fone, câmera), tudo
+    já no repositório e já na planilha nova. Nada exclusivo a preservar. Foi
+    devolvida à lixeira, agora sem link público e sem endpoint — expira
+    sozinha em ~30 dias.
 - **Montagem nova (a que está no ar)**, tudo na conta **conta-comercial**:
   - Pasta `Central de Compras` em
     `Meu Drive/10_JOSEMAR_PESSOAL/03_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/`
