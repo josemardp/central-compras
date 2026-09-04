@@ -3711,27 +3711,110 @@ def sheets_config_path() -> Path:
     return Path.home() / ".central-compras" / "dados-privados" / "integracao_sheets.json"
 
 
+def sheets_endpoint_path() -> Path:
+    """Parte NAO secreta da integracao, versionada de proposito.
+
+    A URL do Web App sozinha nao da acesso: quem protege e o token, conferido
+    dentro do Apps Script. Versionar a URL e o que faz `git pull` deixar outra
+    maquina pronta - antes dela, so o token faltava e ninguem sabia disso.
+    """
+    return CONFIG / "integracao_sheets.yaml"
+
+
+def carregar_config_sheets(caminho_explicito: str | None = None) -> tuple[str, str]:
+    """Devolve (url, token) juntando a parte versionada com a parte local.
+
+    - `--config` explicito: o arquivo tem que bastar sozinho (e o que os testes
+      e uma maquina de teste usam para apontar para outro endpoint).
+    - Sem `--config`: URL vem de config/integracao_sheets.yaml (versionada) e
+      token de dados-privados. O arquivo local pode sobrepor a URL, para apontar
+      uma maquina para um endpoint de teste sem sujar o repositorio.
+    """
+    if caminho_explicito:
+        caminho = Path(caminho_explicito)
+        if not caminho.exists():
+            raise SystemExit(
+                f"Configuracao nao encontrada: {caminho}\n"
+                'Crie esse arquivo com {"url": "...", "token": "..."} '
+                "(a URL do Web App do Apps Script e o token definido no Code.gs)."
+            )
+        try:
+            local = json.loads(caminho.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as erro:
+            raise SystemExit(f"{caminho} nao e um JSON valido: {erro}") from erro
+        url, token = local.get("url"), local.get("token")
+        if not url or not token:
+            raise SystemExit(f"{caminho} precisa ter os campos 'url' e 'token'.")
+        return url, token
+
+    versionado = read_yaml(sheets_endpoint_path(), {}) or {}
+    url = versionado.get("url")
+
+    caminho = sheets_config_path()
+    local: dict[str, Any] = {}
+    if caminho.exists():
+        try:
+            local = json.loads(caminho.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as erro:
+            raise SystemExit(f"{caminho} nao e um JSON valido: {erro}") from erro
+        url = local.get("url") or url
+
+    token = local.get("token")
+
+    if not url:
+        raise SystemExit(
+            f"Falta a URL do Web App. Ela deveria estar versionada em "
+            f"{sheets_endpoint_path()} (campo 'url') e chegar aqui pelo git pull.\n"
+            "Se a implantacao mudou, atualize esse arquivo e commite - ver "
+            "docs/infraestrutura-externa.md."
+        )
+    if not token:
+        raise SystemExit(
+            "Falta o token desta maquina. A URL ja veio pelo git pull; o token "
+            "nao vai pelo Git de proposito.\n"
+            "Pegue o valor no Code.gs (const TOKEN) ou em outra maquina que ja "
+            "funciona, e rode:\n"
+            "  python scripts/central_compras.py configurar-sheets --token SEU_TOKEN\n"
+            f"Ele fica so em {sheets_config_path()}."
+        )
+    return url, token
+
+
+def configurar_sheets(args: argparse.Namespace) -> None:
+    """Grava o token desta maquina, sem obrigar ninguem a editar JSON na mao.
+
+    Isso e o unico passo manual que sobra depois de um `git pull` numa maquina
+    nova - a URL ja vem versionada.
+    """
+    caminho = sheets_config_path()
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    dados: dict[str, Any] = {}
+    if caminho.exists():
+        try:
+            dados = json.loads(caminho.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            dados = {}
+    dados["token"] = args.token
+    if getattr(args, "url", None):
+        dados["url"] = args.url
+    elif "url" in dados:
+        # URL antiga no arquivo local sobrepoe a versionada e ja causou 404
+        # depois de um redeploy. Sem --url explicito, manda a versionada valer.
+        dados.pop("url")
+    caminho.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
+    url_versionada = (read_yaml(sheets_endpoint_path(), {}) or {}).get("url")
+    print(f"Token gravado em {caminho}")
+    print(f"URL em uso: {dados.get('url') or url_versionada or '(nenhuma - confira config/integracao_sheets.yaml)'}")
+    print("Agora rode: python scripts/central_compras.py sincronizar-planilha")
+
+
 def sincronizar_planilha(args: argparse.Namespace) -> None:
     """Monta o payload e faz o POST pro Web App do Apps Script.
 
     So roda quando chamado - nunca dentro de `dashboard` (que e local e sem
     rede). Mandar dado pra fora e decisao explicita, nao efeito colateral.
     """
-    caminho = Path(args.config) if getattr(args, "config", None) else sheets_config_path()
-    if not caminho.exists():
-        raise SystemExit(
-            f"Configuracao nao encontrada: {caminho}\n"
-            'Crie esse arquivo com {"url": "...", "token": "..."} '
-            "(a URL do Web App do Apps Script e o token definido no Code.gs)."
-        )
-    try:
-        config = json.loads(caminho.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as erro:
-        raise SystemExit(f"{caminho} nao e um JSON valido: {erro}") from erro
-    url = config.get("url")
-    token = config.get("token")
-    if not url or not token:
-        raise SystemExit(f"{caminho} precisa ter os campos 'url' e 'token'.")
+    url, token = carregar_config_sheets(getattr(args, "config", None))
 
     payload = sheets_export_payload()
     payload["token"] = token
@@ -4352,6 +4435,12 @@ def scan_sensitive(root: Path) -> list[tuple[str, int, str, str]]:
                         # codigo de barras e MLB longo viraria alarme falso.
                         if not (13 <= len(digitos) <= 19 and luhn_ok(digitos)):
                             continue
+                    if codigo == "TOKEN" and linha[match.end():match.end() + 1] == "(":
+                        # `token = carregar_config_sheets(...)` e codigo lendo um
+                        # segredo, nao o segredo. Sem isso, qualquer funcao que
+                        # devolva token vira alarme eterno - e alarme que sempre
+                        # mente e alarme que se aprende a ignorar.
+                        continue
                     rel = path.relative_to(root).as_posix()
                     achados.append((rel, numero, codigo, descricao))
                     break
@@ -4526,6 +4615,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("sincronizar-planilha", help="manda visao geral e comparativos pra uma Google Sheets via Apps Script")
     p.add_argument("--config", help="caminho alternativo do integracao_sheets.json (default: ~/.central-compras/dados-privados/)")
     p.set_defaults(func=sincronizar_planilha)
+
+    p = sub.add_parser("configurar-sheets", help="grava o token desta maquina (a URL ja vem versionada pelo git pull)")
+    p.add_argument("--token", required=True, help="o mesmo valor de const TOKEN no Code.gs")
+    p.add_argument("--url", help="so para apontar esta maquina a um endpoint de teste; sem isso vale a URL versionada")
+    p.set_defaults(func=configurar_sheets)
 
     p = sub.add_parser("checar-segredos", help="procura CPF, cartao, senha e token na arvore versionada")
     p.add_argument("--strict", action="store_true", help="retorna erro se encontrar algo (use no pre-commit)")

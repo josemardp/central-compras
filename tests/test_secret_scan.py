@@ -65,6 +65,23 @@ class SecretScanTest(unittest.TestCase):
         self.escrever("dados-privados/endereco.md", "CPF: 000.000.001-91\n")  # central-compras:exemplo-nao-e-segredo
         self.assertEqual(self.codigos(), set())
 
+    def test_does_not_flag_code_that_merely_reads_a_token(self):
+        # `token = alguma_funcao(...)` e codigo lendo o segredo, nao o segredo.
+        # Sem esse filtro, qualquer funcao com nome longo que devolva token
+        # virava alarme permanente - e alarme que sempre mente e desligado.
+        self.escrever(
+            "app.py",
+            "url, token = carregar_config_sheets(getattr(args, 'config', None))\n"
+            "api_key = obter_credencial_do_ambiente()\n",
+        )
+        self.assertNotIn("TOKEN", self.codigos())
+
+    def test_still_flags_a_token_written_literally(self):
+        # A contraprova do teste acima: o filtro nao pode ter aberto buraco
+        # para o caso que importa.
+        self.escrever("vazou.py", 'token = "YB1fXWevD6W1JCRxqY1lQ0xIugCe"\n')  # central-compras:exemplo-nao-e-segredo
+        self.assertIn("TOKEN", self.codigos())
+
     def test_real_repository_is_clean(self):
         raiz = Path(__file__).resolve().parents[1]
         achados = cc.scan_sensitive(raiz)

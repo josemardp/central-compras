@@ -309,5 +309,74 @@ class SincronizarPlanilhaTest(unittest.TestCase):
         self.assertIn("nao devolveu JSON valido", str(ctx.exception))
 
 
+class ConfigDivididaTest(unittest.TestCase):
+    """A URL e versionada, o token nao.
+
+    O que motivou: em 04/09/2026 tres agentes concluiram que a integracao
+    nunca tinha sido ativada, porque a prova (URL + token) morava so em
+    dados-privados, que nao viaja no git pull. Com a URL versionada, `git
+    pull` deixa a maquina nova a um comando de distancia.
+    """
+
+    def setUp(self):
+        self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-cfg-"))
+        (self.tmpdir / "config").mkdir(parents=True, exist_ok=True)
+        self._orig_config = cc.CONFIG
+        cc.CONFIG = self.tmpdir / "config"
+        self.privado = self.tmpdir / "privado" / "integracao_sheets.json"
+        self._orig_path = cc.sheets_config_path
+        cc.sheets_config_path = lambda: self.privado
+
+    def tearDown(self):
+        cc.CONFIG = self._orig_config
+        cc.sheets_config_path = self._orig_path
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _versionado(self, url):
+        (cc.CONFIG / "integracao_sheets.yaml").write_text(f'url: "{url}"\n', encoding="utf-8")
+
+    def _local(self, dados):
+        self.privado.parent.mkdir(parents=True, exist_ok=True)
+        self.privado.write_text(json.dumps(dados), encoding="utf-8")
+
+    def test_url_versionada_mais_token_local_bastam(self):
+        self._versionado("https://exemplo/exec")
+        self._local({"token": "abc123"})
+        self.assertEqual(cc.carregar_config_sheets(), ("https://exemplo/exec", "abc123"))
+
+    def test_sem_token_o_erro_ensina_o_comando(self):
+        self._versionado("https://exemplo/exec")
+        with self.assertRaises(SystemExit) as ctx:
+            cc.carregar_config_sheets()
+        mensagem = str(ctx.exception)
+        self.assertIn("configurar-sheets", mensagem)
+        self.assertIn("nao vai pelo Git", mensagem)
+
+    def test_sem_url_versionada_o_erro_aponta_o_arquivo(self):
+        self._local({"token": "abc123"})
+        with self.assertRaises(SystemExit) as ctx:
+            cc.carregar_config_sheets()
+        self.assertIn("integracao_sheets.yaml", str(ctx.exception))
+
+    def test_url_local_sobrepoe_a_versionada(self):
+        self._versionado("https://producao/exec")
+        self._local({"url": "https://teste/exec", "token": "abc123"})
+        url, _ = cc.carregar_config_sheets()
+        self.assertEqual(url, "https://teste/exec")
+
+    def test_configurar_sheets_grava_token_e_descarta_url_velha(self):
+        # A armadilha real: apos um redeploy, URL velha no arquivo local
+        # continuava valendo sobre a versionada e a maquina tomava 404.
+        self._versionado("https://nova/exec")
+        self._local({"url": "https://velha/exec", "token": "antigo"})
+        cc.configurar_sheets(argparse.Namespace(token="novo", url=None))
+        self.assertEqual(cc.carregar_config_sheets(), ("https://nova/exec", "novo"))
+
+    def test_configurar_sheets_respeita_url_explicita(self):
+        self._versionado("https://nova/exec")
+        cc.configurar_sheets(argparse.Namespace(token="t", url="https://teste/exec"))
+        self.assertEqual(cc.carregar_config_sheets(), ("https://teste/exec", "t"))
+
+
 if __name__ == "__main__":
     unittest.main()

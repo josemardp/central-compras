@@ -9,12 +9,16 @@ retrabalho ou estrago real neste repositório.
 Planilha, pasta no Drive, Apps Script, Web App, integração, conta: **leia
 [`docs/infraestrutura-externa.md`](docs/infraestrutura-externa.md) primeiro.**
 
-**Ausência de configuração local NÃO prova que a coisa não existe.** A URL e o
-token da integração moram em `~/.central-compras/dados-privados/`, que fica
-fora do Git de propósito e **não sincroniza entre máquinas**. Em 04/09/2026,
-três agentes em sessões separadas concluíram "nunca foi ativado" e recriaram
-tudo — enquanto havia uma planilha, um script e um Web App **ativo** desde
-31/08. Havia dois endpoints abertos na internet ao mesmo tempo.
+**Ausência de configuração local NÃO prova que a coisa não existe.** Em
+04/09/2026, três agentes em sessões separadas concluíram "nunca foi ativado" e
+recriaram tudo — enquanto havia uma planilha, um script e um Web App **ativo**
+desde 31/08. Havia dois endpoints abertos na internet ao mesmo tempo.
+
+Desde então a configuração é dividida: a **URL** fica versionada em
+`config/integracao_sheets.yaml` (ela sozinha não dá acesso) e só o **token**
+mora em `~/.central-compras/dados-privados/`. Numa máquina nova, `git pull` +
+`configurar-sheets --token ...` basta. Se `sincronizar-planilha` reclamar de
+token faltando, é isso — **não é sinal de que a integração não existe**.
 
 Se algo parece não existir, procure nesta ordem antes de concluir: o
 inventário, a pasta no Drive, **a lixeira do Drive**, `script.google.com/home/all`,

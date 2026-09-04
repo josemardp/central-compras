@@ -45,6 +45,8 @@ python scripts/central_compras.py anotar projetos/2026-fone-bluetooth-para-chama
 python scripts/central_compras.py cotar projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --loja Amazon --vendedor "Loja oficial" --vendedor-tipo oficial --preco 299 --frete 0 --nota 4.6 --avaliacoes 1200 --garantia-meses 12 --garantia-tipo nacional --fonte manual --link "https://..."
 python scripts/central_compras.py promover-cotacao projetos/2026-fone-bluetooth-para-chamadas --produto-id qcy-h3 --preco 289 --frete 10 --garantia-meses 12 --garantia-tipo nacional
 python scripts/central_compras.py ranking projetos/2026-fone-bluetooth-para-chamadas
+python scripts/central_compras.py configurar-sheets --token SEU_TOKEN   # so na primeira vez em cada maquina
+python scripts/central_compras.py sincronizar-planilha
 python scripts/central_compras.py validar projetos/2026-fone-bluetooth-para-chamadas
 python scripts/central_compras.py registrar-marca QCY --categoria fone --projeto projetos/2026-fone-bluetooth-para-chamadas --nota 8 --compraria-de-novo talvez --resumo "Boa relacao custo-beneficio; falta veredito proprio."
 python scripts/central_compras.py registrar-loja Amazon --categoria fone --projeto projetos/2026-fone-bluetooth-para-chamadas --nota 9 --compraria-de-novo sim --resumo "Entrega e devolucao reduzem risco."

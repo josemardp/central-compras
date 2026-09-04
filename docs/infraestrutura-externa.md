@@ -81,16 +81,38 @@ de propósito: assim não desaparece se a planilha for para a lixeira).
   protegido por token no corpo do POST.
 - Código e procedimento de redeploy: [`integracao-google-sheets.md`](integracao-google-sheets.md).
 
-### Config local (por máquina, fora do Git)
+### Configuração: o que viaja no `git pull` e o que não viaja
 
-```
-~/.central-compras/dados-privados/integracao_sheets.json
-{"url": "<URL /exec do Web App>", "token": "<o mesmo token do Code.gs>"}
+A configuração é dividida de propósito, para que `git pull` deixe uma máquina
+nova a **um comando** de funcionar:
+
+| Onde | O quê | Viaja no Git? |
+|---|---|---|
+| `config/integracao_sheets.yaml` | a **URL** do Web App | **Sim** |
+| `~/.central-compras/dados-privados/integracao_sheets.json` | o **token** | Não, e nem deve |
+
+A URL pode ser versionada porque sozinha ela não dá acesso: quem protege o
+endpoint é o token, conferido dentro do Apps Script.
+
+**Máquina nova, do zero:**
+
+```powershell
+git pull
+python scripts/central_compras.py configurar-sheets --token SEU_TOKEN
+python scripts/central_compras.py sincronizar-planilha
 ```
 
-**Este arquivo não sincroniza entre máquinas.** Se `sincronizar-planilha`
-falhar numa máquina nova, quase sempre é só isso: o arquivo não existe ali
-ainda. Copie de uma máquina que funciona — não crie infraestrutura nova.
+O token está em `const TOKEN` no Code.gs (conta conta-comercial) ou no
+`integracao_sheets.json` de uma máquina que já funciona.
+
+Se faltar o token, o próprio comando diz isso e ensina a linha acima — não é
+sinal de que a integração não existe.
+
+**Depois de um redeploy que gere URL nova:** atualize
+`config/integracao_sheets.yaml` e **commite**. Senão as outras máquinas
+continuam batendo no endpoint velho e tomando 404 — foi o que aconteceu em
+04/09. O `configurar-sheets` remove URL antiga presa no arquivo local
+justamente para essa armadilha não sobreviver a um `git pull`.
 
 ## Desativado (não recriar, não reativar)
 

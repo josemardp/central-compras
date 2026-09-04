@@ -147,15 +147,20 @@ nome na raiz por um ID fixo de pasta, para nunca mais criar pasta duplicada.
 
 ## Configuração da máquina
 
-Arquivo fora do repositório (nunca commitar):
+A URL já vem versionada em `config/integracao_sheets.yaml`, pelo `git pull`.
+Falta só o token, que não vai pelo Git:
 
-```
-~/.central-compras/dados-privados/integracao_sheets.json
+```powershell
+python scripts/central_compras.py configurar-sheets --token SEU_TOKEN
 ```
 
-```json
-{"url": "https://script.google.com/macros/s/AKfycbzrKsNDNyCEK40qvHKn9L7rOVGp3pfkjNUR9iKFk6w5qLnJhdliHLYAbWPXuKep9GZT/exec", "token": "..."}
-```
+Isso grava `{"token": "..."}` em
+`~/.central-compras/dados-privados/integracao_sheets.json` — fora do
+repositório, nunca commitado.
+
+Para apontar uma máquina a um endpoint de teste sem sujar o repositório,
+acrescente `--url https://.../exec`. Sem esse argumento vale sempre a URL
+versionada (é o que evita máquina presa numa URL velha depois de redeploy).
 
 ## Sincronizar
 

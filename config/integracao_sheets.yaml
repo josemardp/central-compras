@@ -1,0 +1,13 @@
+# Parte NAO secreta da integracao com o Google Sheets.
+#
+# Fica versionada de proposito: e isso que faz `git pull` deixar outra maquina
+# pronta. A URL sozinha nao da acesso - quem protege o endpoint e o token,
+# conferido dentro do Apps Script. O token NUNCA entra aqui; ele mora em
+# ~/.central-compras/dados-privados/integracao_sheets.json, gravado com:
+#
+#   python scripts/central_compras.py configurar-sheets --token SEU_TOKEN
+#
+# Trocou a implantacao (redeploy que gera URL nova)? Atualize aqui e commite,
+# senao as outras maquinas continuam batendo no endpoint velho e tomando 404.
+# Inventario completo em docs/infraestrutura-externa.md.
+url: "https://script.google.com/macros/s/AKfycbzrKsNDNyCEK40qvHKn9L7rOVGp3pfkjNUR9iKFk6w5qLnJhdliHLYAbWPXuKep9GZT/exec"
