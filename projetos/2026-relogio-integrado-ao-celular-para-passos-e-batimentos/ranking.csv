@@ -1,0 +1,4 @@
+produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+huawei-band-9,Huawei Band 9,71.9,0.984,0.705,0.38,0.667,0.5,elegivel,,,web,0.9,0,nao,conveniencia,239.88,0.0,,0.0,239.88
+samsung-galaxy-fit3,Samsung Galaxy Fit3,69.7,1.0,0.606,0.38,0.667,0.5,elegivel,,,web,0.9,0,nao,conveniencia,279.0,0.0,,0.0,279.0
+xiaomi-smart-band-9-active,Xiaomi Smart Band 9 Active,67.3,0.493,1.0,0.59,0.667,0.571,elegivel,,,manual,1.0,0,nao,,169.0,0.0,,0.0,169.0

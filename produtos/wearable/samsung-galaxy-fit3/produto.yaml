@@ -1,0 +1,23 @@
+id: samsung-galaxy-fit3
+categoria: wearable
+nome: Samsung Galaxy Fit3
+marca: Samsung
+estado: pesquisando
+projeto: 2026-relogio-integrado-ao-celular-para-passos-e-batimentos
+preco_alvo: null
+preco_teto: 300.0
+atributos:
+  tipo: smartband
+  tela: amoled_1_6
+  resistencia: 5ATM_IP68
+  bateria_dias: 13
+  batimentos: true
+  passos: true
+  gps: via_celular
+  compatibilidade: Android_Galaxy_Android10_plus
+requisitos_atendidos:
+  passos: true
+  batimentos: true
+  resistencia_agua: 5ATM_IP68
+proveniencia: null
+descartado_porque: null

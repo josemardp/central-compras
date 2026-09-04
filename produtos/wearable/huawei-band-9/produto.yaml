@@ -1,0 +1,23 @@
+id: huawei-band-9
+categoria: wearable
+nome: Huawei Band 9
+marca: Huawei
+estado: pesquisando
+projeto: 2026-relogio-integrado-ao-celular-para-passos-e-batimentos
+preco_alvo: null
+preco_teto: 300.0
+atributos:
+  tipo: smartband
+  tela: amoled_1_47
+  resistencia: 5ATM
+  bateria_dias: 14
+  batimentos: true
+  passos: true
+  gps: via_celular
+  compatibilidade: Android_iOS
+requisitos_atendidos:
+  passos: true
+  batimentos: true
+  resistencia_agua: 5ATM
+proveniencia: null
+descartado_porque: null

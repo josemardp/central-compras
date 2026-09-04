@@ -1,0 +1,16 @@
+id: pulseira-silicone-travaclique
+categoria: pulseira-huawei-band9
+nome: Pulseira Silicone Trava-Clique (Generic)
+marca: Generic
+estado: pesquisando
+projeto: 2026-pulseira-para-huawei-band-9
+preco_alvo: null
+preco_teto: 60.0
+atributos:
+  material: silicone
+  cor: preto
+  fecho: trava_clique
+  compatibilidade: Band 9 padrao, nao serve na versao Pro/Honor
+requisitos_atendidos: {}
+proveniencia: null
+descartado_porque: null

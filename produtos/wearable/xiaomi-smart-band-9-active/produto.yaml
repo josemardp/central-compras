@@ -1,0 +1,23 @@
+id: xiaomi-smart-band-9-active
+categoria: wearable
+nome: Xiaomi Smart Band 9 Active
+marca: Xiaomi
+estado: pesquisando
+projeto: 2026-relogio-integrado-ao-celular-para-passos-e-batimentos
+preco_alvo: null
+preco_teto: 300.0
+atributos:
+  tipo: smartband
+  tela: tft_1_47
+  resistencia: 5ATM
+  bateria_dias: 18
+  batimentos: true
+  passos: true
+  gps: via_celular
+  compatibilidade: Android_iOS
+requisitos_atendidos:
+  passos: true
+  batimentos: true
+  resistencia_agua: 5ATM
+proveniencia: null
+descartado_porque: null
