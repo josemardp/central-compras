@@ -8,7 +8,8 @@ Nenhum erro.
 
 ## Avisos
 
-- Regra de parada (de_200_a_2000): minimo de 2 cotacao(oes) por candidato. Abaixo disso: samsung-galaxy-fit3.
+- Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.
+- Regra de parada (ate_200): 4 candidatos para um teto de 3. Pesquisar demais tambem custa caro.
 
 ## Criterio
 

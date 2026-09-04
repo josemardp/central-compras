@@ -3,13 +3,17 @@
 ## Estado atual
 
 - Estado: pesquisando
-- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
+- Proxima acao: gerar ranking com a cotacao manual e registrar decisao
 - Decisao aberta: Huawei Band 9 lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-04 | cotacao | Amazon descartada como origem do Band 9. | Busca por "Huawei Band 9" filtrada ate R$350 em 04/09 devolve so acessorios (pulseira, pelicula, cabo) e a Xiaomi. O unico Band 9 na Amazon e a rosa a R$399, com apenas 97 avaliacoes. Sobra o Mercado Livre, que bloqueia meu navegador (403) - depende de levantamento externo. |
+| 2026-09-04 | comparacao | Cor deixa de ser criterio: Josemar aceita qualquer cor da Band 9, vale o menor preco em estoque. | O modulo do Band 9 e destacavel da pulseira, entao a cor de fabrica nao determina o visual de uso - e ele ja vai trocar a pulseira (projeto 2026-pulseira-para-huawei-band-9). |
+| 2026-09-04 | cotacao | Xiaomi registrada com garantia_meses=3, tipo=importada. | Conferido no anuncio em 04/09: a pagina NAO declara prazo de garantia (so vende garantia estendida a parte). Os 3 meses sao o piso legal do CDC art. 26 II para bem duravel, que vale independente de declaracao do vendedor - NAO e promessa do vendedor. Tipo 'importada' porque e versao global sem assistencia nacional declarada. |
+| 2026-09-04 | cotacao-manual | Cotacao manual confirmada para xiaomi-smart-band-9-active | Amazon / custo_total=169.0 |
 | 2026-09-04 | comparacao | Huawei Band 9 preto (cotacao original R$239,88) esta fora de estoque no anuncio do Mercado Livre. Variantes em estoque: amarelo/bisel prateado R$312 (ML, relatado via Codex/Josemar, nao verificado diretamente por mim - Mercado Livre bloqueia meu navegador) e rosa R$399 (Amazon, verificado diretamente por mim, so 97 avaliacoes). | Bloqueio de acesso automatizado ao Mercado Livre (erro 403 persistente) me impede de confirmar diretamente; dados da amarela vieram do Codex a pedido do Josemar. |
 | 2026-09-04 | cotacao | Cotacao registrada para huawei-band-9 | Amazon / fonte=web / custo_total=399.0 |
 | 2026-09-04 | cotacao | Cotacao registrada para huawei-band-9 | Mercado Livre / fonte=web / custo_total=312.0 |
