@@ -3650,6 +3650,11 @@ SHEETS_OVERVIEW_FIELDS = [
     "categoria", "estado", "lider", "score", "confianca", "cotacoes",
     "manual", "dias_ate_decisao", "escolhido", "aguardando_preco",
 ]
+SHEETS_SCHEMA_VERSION = 2
+SHEETS_METRIC_FIELDS = [
+    "produto", "situacao", "score", "confianca", "custo_total", "nota",
+    "avaliacoes", "qualidade", "valor", "risco", "aderencia", "conveniencia",
+]
 
 
 def _linha_export(chave: str, tipo: str, valores: list[tuple[str, int | None]]) -> dict[str, Any]:
@@ -3661,6 +3666,57 @@ def _linha_export(chave: str, tipo: str, valores: list[tuple[str, int | None]]) 
             "valores": [{"texto": texto, "estrelas": estrelas} for texto, estrelas in valores],
         }
     return {"rotulo": rotulo, "tipo": "texto", "valores": [texto for texto, _ in valores]}
+
+
+def _valor_tipado(valor: Any, texto: str, estrelas: int | None = None) -> dict[str, Any]:
+    """Valor adicional pro Sheets v2; o campo legado continua intacto."""
+    if texto == "-" or valor is None or valor == "":
+        return {"tipo": "vazio", "valor": "", "texto": texto, "estrelas": estrelas}
+    if isinstance(valor, bool):
+        return {"tipo": "booleano", "valor": valor, "texto": texto, "estrelas": estrelas}
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        return {"tipo": "numero", "valor": valor, "texto": texto, "estrelas": estrelas}
+    return {"tipo": "texto", "valor": texto, "texto": texto, "estrelas": estrelas}
+
+
+def _valores_tipados_comerciais(chave: str, itens: list[Ranked]) -> list[dict[str, Any]]:
+    tipados: list[dict[str, Any]] = []
+    for item in itens:
+        texto, estrelas = comercial_valor(item, chave)
+        quote = item.quote
+        if chave == "preco":
+            custo = quote_float(quote.get("custo_total"))
+            valor = _valor_tipado(custo if custo > 0 else None, texto, estrelas)
+            valor["tipo"] = "moeda" if custo > 0 else "vazio"
+        elif chave == "nota":
+            nota = quote_float(quote.get("nota"))
+            valor = _valor_tipado(nota if nota > 0 else None, texto, estrelas)
+            valor["tipo"] = "nota" if nota > 0 else "vazio"
+            valor["detalhe"] = f"{quote_int(quote.get('n_avaliacoes'))} avaliacoes" if nota > 0 else ""
+        else:
+            valor = _valor_tipado(texto if texto != "-" else None, texto, estrelas)
+        tipados.append(valor)
+    return tipados
+
+
+def _metricas_sheets(item: Ranked, situacao: str) -> dict[str, Any]:
+    quote = item.quote
+    custo = quote_float(quote.get("custo_total"))
+    nota = quote_float(quote.get("nota"))
+    return {
+        "produto": item.product.get("nome") or item.produto_id,
+        "situacao": situacao,
+        "score": "" if item.sem_cotacao else item.score,
+        "confianca": "" if item.sem_cotacao else item.confianca,
+        "custo_total": custo if custo > 0 else "",
+        "nota": nota if nota > 0 else "",
+        "avaliacoes": quote_int(quote.get("n_avaliacoes")) if nota > 0 else "",
+        "qualidade": item.axes.get("qualidade", ""),
+        "valor": item.axes.get("valor", ""),
+        "risco": item.axes.get("risco", ""),
+        "aderencia": item.axes.get("aderencia", ""),
+        "conveniencia": item.axes.get("conveniencia", ""),
+    }
 
 
 def sheets_export_payload() -> dict[str, Any]:
@@ -3693,18 +3749,33 @@ def sheets_export_payload() -> dict[str, Any]:
         for chave in LINHAS_COMERCIAIS:
             tipo = "estrela" if chave in {"nota", "garantia"} else "texto"
             valores = [comercial_valor(item, chave) for item in itens]
-            linhas.append(_linha_export(chave, tipo, valores))
+            linha = _linha_export(chave, tipo, valores)
+            linha["valores_tipados"] = _valores_tipados_comerciais(chave, itens)
+            linhas.append(linha)
         for chave in atributos:
             valores = [atributo_valor(categoria, item, chave) for item in itens]
-            linhas.append(_linha_export(chave, "estrela", valores))
+            linha = _linha_export(chave, "estrela", valores)
+            linha["valores_tipados"] = [
+                _valor_tipado((item.product.get("atributos") or {}).get(chave), texto, estrelas)
+                for item, (texto, estrelas) in zip(itens, valores)
+            ]
+            linhas.append(linha)
         comparativos.append({
             "projeto": project.name,
             "colunas": colunas,
             "situacao": situacao,
             "linhas": linhas,
+            "metricas": [_metricas_sheets(item, status) for item, status in zip(itens, situacao)],
         })
 
-    return {"gerado_em": now_iso(), "visao_geral": visao_geral, "comparativos": comparativos}
+    return {
+        "schema_versao": SHEETS_SCHEMA_VERSION,
+        "gerado_em": now_iso(),
+        "visao_geral_colunas": ["projeto", *SHEETS_OVERVIEW_FIELDS],
+        "metricas_colunas": ["projeto", *SHEETS_METRIC_FIELDS],
+        "visao_geral": visao_geral,
+        "comparativos": comparativos,
+    }
 
 
 def sheets_config_path() -> Path:
