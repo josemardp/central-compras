@@ -104,6 +104,10 @@ function escreverVisaoGeral(planilha, linhas) {
 function escreverComparativo(planilha, comp) {
   let nomeAba = comp.projeto.replace(/[\[\]:*?\/\\]/g, '-').slice(0, 100);
   const aba = abaLimpa(planilha, nomeAba);
+  // Sem esta linha, a tabela mostrava numero sem dono: dava para ver preco e
+  // nota, mas nao qual coluna era qual produto. O payload sempre mandou
+  // comp.colunas; o script e que ignorava.
+  aba.appendRow(['Produto'].concat(comp.colunas || []));
   aba.appendRow(['Situacao'].concat(comp.situacao || []));
   comp.linhas.forEach(function (linha) {
     if (linha.tipo === 'estrela') {
@@ -115,12 +119,17 @@ function escreverComparativo(planilha, comp) {
       aba.appendRow([linha.rotulo].concat(linha.valores || []));
     }
   });
+  aba.getRange(1, 1, 1, aba.getLastColumn()).setFontWeight('bold');
+  aba.setFrozenRows(1);
 }
 
 function abaLimpa(planilha, nome) {
   let aba = planilha.getSheetByName(nome);
   if (!aba) aba = planilha.insertSheet(nome);
-  aba.clearContents();
+  // clear() e nao clearContents(): precisa levar junto negrito e linha
+  // congelada da execucao anterior, senao formatacao velha gruda na aba.
+  aba.clear();
+  aba.setFrozenRows(0);
   return aba;
 }
 
@@ -131,11 +140,18 @@ function resposta(obj) {
 }
 ```
 
-**Nota histórica:** a primeira versão implantada usava `DriveApp.getRoot()`,
-que não existe na API (o método certo é `DriveApp.getRootFolder()`). Isso
-quebrava toda sincronização com `TypeError: DriveApp.getRoot is not a
-function`. Corrigido na Versão 2 do deployment. A Versão 3 trocou a busca por
-nome na raiz por um ID fixo de pasta, para nunca mais criar pasta duplicada.
+**Nota histórica — três bugs, todos herdados do mesmo Code.gs de origem:**
+
+| Versão | Bug | Sintoma |
+|---|---|---|
+| 1 → 2 | `DriveApp.getRoot()` não existe (é `getRootFolder()`) | `TypeError`, sincronização quebrada por completo |
+| 2 → 3 | pasta buscada só na raiz do Drive | criou pasta duplicada na raiz, já que a certa é aninhada |
+| 3 → 4 | `comp.colunas` ignorado | tabela sem cabeçalho: dava para ver preço e nota, mas **não qual coluna era qual produto** |
+
+O terceiro só apareceu quando o Josemar olhou a planilha e perguntou "não
+estou vendo as marcas". Vale a lição: `sincronizar-planilha` responder
+`ok` prova que o POST chegou, não que a planilha ficou legível. **Confira
+abrindo a planilha.**
 
 ## Implantação (para redeploy futuro)
 
