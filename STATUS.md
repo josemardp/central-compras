@@ -5,6 +5,62 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Última sessão: 04/09/2026
+
+- **Integração Google Sheets reativada nesta máquina, do zero.** A sessão de
+  31/08 (abaixo) dizia que a sincronização já rodava contra "o link
+  publicado" — e rodava mesmo, mas **essa informação não bastava para
+  retomar**: a URL + token vivem em
+  `~/.central-compras/dados-privados/integracao_sheets.json`, que fica **fora
+  do Git de propósito** e portanto **não sincroniza entre máquinas**. Nesta
+  máquina o arquivo não existia, então a integração parecia nunca ter sido
+  ativada. **Lição para o handoff: dado que mora só em `dados-privados`
+  precisa estar registrado aqui como "existe, mas é local da máquina X",
+  senão o próximo agente reconstrói tudo.**
+- **O que existia da rodada de 31/08** (achado vasculhando a conta conta-comercial):
+  planilha `Central de Compras - Comparativo de Produtos`, criada 31/08,
+  modificada 01/09, na raiz do Meu Drive — **hoje está na lixeira do Drive**
+  (não foi esta sessão que apagou). O Apps Script daquela rodada não aparece
+  em `script.google.com` provavelmente porque era *container-bound* à
+  planilha: com a planilha na lixeira, o script some da listagem.
+  **Pendência de segurança**: essa planilha está com
+  `Qualquer pessoa na Internet com o link pode editar`. Decidir se restaura
+  (e fecha o compartilhamento) ou deixa expirar na lixeira (30 dias).
+- **Montagem nova (a que está no ar)**, tudo na conta **conta-comercial**:
+  - Pasta `Central de Compras` em
+    `Meu Drive/10_JOSEMAR_PESSOAL/03_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/`
+    (id `1MyR5NNhHz5Q2RtSHbgPZxXDV3kRM2ARU`), seguindo o padrão dos outros
+    projetos de código dessa conta (FisioAI, DISC).
+  - Apps Script `Central de Compras - Sync`, Web App implantado (Versão 3),
+    execução como conta-comercial, acesso "qualquer pessoa", protegido por token.
+  - Planilha `Central de Compras - Cotacoes e Comparacoes` dentro da pasta.
+  - Config local em `~/.central-compras/dados-privados/integracao_sheets.json`
+    (fora do repo). Detalhes em `docs/integracao-google-sheets.md`.
+- **Três bugs reais achados e corrigidos no caminho**:
+  1. O `Code.gs` que estava documentado usava `DriveApp.getRoot()`, que **não
+     existe** na API (o certo é `getRootFolder()`). Quebrava toda
+     sincronização com `TypeError`. A doc anterior propagava o bug.
+  2. `pastaCentral()` procurava a pasta **só na raiz** do Drive: como a pasta
+     certa está aninhada, o script criou uma pasta duplicada na raiz na
+     primeira execução. Trocado por ID fixo (`DriveApp.getFolderById`). A
+     duplicata foi movida para a lixeira com autorização do Josemar.
+  3. `sincronizar-planilha` usava `timeout=30` no `urllib`, mas com 8
+     projetos o Apps Script leva ~47s para responder (escreve linha a linha,
+     sem batch). Passava do timeout **sempre**, com traceback cru de
+     `TimeoutError`. Timeout subido para 120s. Se o número de projetos
+     crescer muito, o próximo passo é trocar `appendRow` por `setValues` em
+     lote no Apps Script.
+- Sincronização rodada de verdade no fim: `8 projeto(s), 8 comparativo(s)`,
+  conferida abrindo a planilha real (abas por projeto, incluindo relógio e
+  pulseira).
+- **Dois projetos novos de compra** abertos nesta sessão:
+  `2026-relogio-integrado-ao-celular-para-passos-e-batimentos` (Huawei Band 9
+  escolhido pelo critério de saúde: SpO2 contínuo e FC mais responsiva; **a
+  cor preta cotada a R$ 239,88 está esgotada**, as opções vivas são amarela
+  R$ 312 e rosa R$ 399, ambas acima do teto de R$ 300) e
+  `2026-pulseira-para-huawei-band-9` (o módulo do Band 9 é destacável, então
+  a cor da unidade não trava a decisão).
+
 ## Última sessão: 31/08/2026 (continuação 3)
 
 - **Sincronização com Google Sheets** (`sincronizar-planilha`, comando novo).

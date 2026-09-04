@@ -3740,7 +3740,7 @@ def sincronizar_planilha(args: argparse.Namespace) -> None:
         url, data=corpo, headers={"Content-Type": "application/json"}, method="POST"
     )
     try:
-        with urllib.request.urlopen(requisicao, timeout=30) as resposta:
+        with urllib.request.urlopen(requisicao, timeout=120) as resposta:
             corpo_resposta = resposta.read().decode("utf-8")
     except urllib.error.URLError as erro:
         raise SystemExit(f"Falha ao conectar na planilha: {erro}") from erro

@@ -29,3 +29,9 @@ htmlcov/
 
 # Trava de escrita concorrente
 .central-compras.lock
+
+# Snapshots do navegador automatizado (MCP). Guardam a pagina inteira: ja
+# capturaram token de Apps Script, CEP e numero com cara de cartao vindos das
+# lojas. Tambem esta no gitignore global desta maquina, mas nao da pra contar
+# com isso em outra maquina - por isso fica aqui tambem.
+.playwright-mcp/
