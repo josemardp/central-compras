@@ -9,6 +9,13 @@ Perdido sobre como usar na pratica? Comece pelo guia visual interativo:
 A versao simples em Markdown continua em
 [`docs/guia-pratico-visual.md`](docs/guia-pratico-visual.md).
 
+> **Agente de IA ou maquina nova?** Leia [`CLAUDE.md`](CLAUDE.md) antes de
+> mexer. E se for criar planilha, pasta no Drive, Apps Script ou integracao,
+> confira antes o inventario em
+> [`docs/infraestrutura-externa.md`](docs/infraestrutura-externa.md): a
+> configuracao local fica fora do Git e nao sincroniza entre maquinas, entao
+> "nao existe aqui" nao quer dizer "nao existe la fora".
+
 ## Fluxo de uma compra
 
 Cada compra vira um projeto em `projetos/`.
