@@ -51,6 +51,14 @@ erros já observados**.
 5. **Mantenha o timeout de 120 segundos.** Oito projetos já levaram cerca de
    47 segundos na versão linha a linha; escrita em lote melhora, mas criação e
    renderização de gráficos ainda podem ultrapassar 30 segundos.
+6. **Payload legado não pode fabricar `NaN`.** Se métricas novas estiverem
+   ausentes, o receptor deve usar `situacao` e os campos antigos para produzir
+   um texto honesto como “score indisponível neste payload”, sem calcular
+   diferenças inexistentes.
+7. **Decisão fechada tem precedência sobre envelhecimento.** Um projeto com
+   escolha registrada não volta para “vencido” só porque as cotações antigas
+   expiraram. KPIs, fila de atenção e gráficos devem excluir decisões fechadas
+   das pendências operacionais.
 
 ## Regras de layout e gráficos
 
@@ -70,6 +78,22 @@ erros já observados**.
    `EmbeddedChartBuilder` ou cubra fórmulas localizadas com teste explícito.
 5. **Sem dado não é zero.** Eixos ausentes ficam fora do gráfico ou são
    identificados como “sem dado”; zero mudaria o sentido da comparação.
+6. **Cabeçalho dinâmico não deve virar área congelada.** A fila de atenção
+   muda de tamanho. Congelar até o cabeçalho da tabela faria quase toda a tela
+   ficar imóvel em projetos numerosos; a `Visao Geral` congela apenas as três
+   linhas estáveis do topo.
+
+## Validação da Versão 9 em 05/09/2026
+
+- A implantação existente foi atualizada como `conta-comercial@exemplo.com`, sem criar
+  outro endpoint e sem alterar a URL `/exec`.
+- Duas sincronizações consecutivas devolveram 8 projetos e 8 comparativos.
+- A planilha real ficou com 9 abas. Não apareceram `#REF!`, `#ERROR!`, `NaN`
+  ou `undefined` nos blocos de dados inspecionados.
+- Foram conferidos a `Visao Geral`, o gráfico de pendências, o empate técnico
+  entre Huawei Band 9 e Galaxy Fit3, o ranking, os cinco eixos e um projeto com
+  muitos candidatos. A leitura estreita confirmou três linhas congeladas na
+  visão geral e seis nas abas de projeto, sem congelar a fila dinâmica.
 
 ## O que “sucesso” realmente prova
 

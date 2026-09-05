@@ -3142,6 +3142,11 @@ def project_decision_summary(project: Path) -> tuple[str, str]:
     return chosen, why
 
 
+def is_technical_tie(elegiveis: list[Ranked]) -> bool:
+    """Os dois primeiros elegiveis estao dentro da margem de 3 pontos."""
+    return len(elegiveis) > 1 and elegiveis[0].score - elegiveis[1].score <= 3
+
+
 def project_counts(project: Path) -> dict[str, Any]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     quotes = read_quotes(project)
@@ -3178,6 +3183,9 @@ def project_counts(project: Path) -> dict[str, Any]:
         "escolhido": chosen,
         "porque": why,
         "aguardando_preco": len(waiting),
+        # Mesma regua do Code.gs: fingir precisao alem disso seria mentir sobre
+        # o que o score mede.
+        "empate_tecnico": is_technical_tie(elegiveis),
         "criado_em": opened_at.isoformat() if opened_at else "",
         "data_decisao": decided_at.isoformat() if decided_at else "",
         "dias_ate_decisao": decision_days,
@@ -3655,10 +3663,13 @@ SHEETS_OVERVIEW_COLUMNS = [
     "projeto", "categoria", "estado", "lider", "score", "confianca",
     "cotacoes", "data_decisao",
 ]
-SHEETS_SCHEMA_VERSION = 2
+SHEETS_SCHEMA_VERSION = 3
 SHEETS_METRIC_FIELDS = [
     "produto", "situacao", "score", "confianca", "custo_total", "nota",
     "avaliacoes", "qualidade", "valor", "risco", "aderencia", "conveniencia",
+    # Schema 3 (aditivo): estado da cotacao e motivo do corte, para a aba do
+    # projeto explicar o que impede a decisao sem recomputar o gate.
+    "vencida", "fonte", "motivos_corte",
 ]
 
 
@@ -3721,6 +3732,11 @@ def _metricas_sheets(item: Ranked, situacao: str) -> dict[str, Any]:
         "risco": item.axes.get("risco", ""),
         "aderencia": item.axes.get("aderencia", ""),
         "conveniencia": item.axes.get("conveniencia", ""),
+        # Schema 3 (aditivo): a aba mostra "cotacao vencida", "so fonte web" e
+        # o motivo do corte sem reimplementar gate nem frescor no Apps Script.
+        "vencida": bool(item.vencida),
+        "fonte": quote.get("fonte") or "",
+        "motivos_corte": list(item.eliminations),
     }
 
 
@@ -3740,6 +3756,10 @@ def sheets_export_payload() -> dict[str, Any]:
         linha.update({campo: counts[campo] for campo in SHEETS_OVERVIEW_FIELDS})
         linha["data_decisao"] = counts["data_decisao"]
         linha["cotacoes_vencidas"] = counts["cotacoes_vencidas"]
+        # Schema 3 (aditivo): a fila de atencao da Visao Geral usa os dois sem
+        # refazer conta nenhuma no Apps Script.
+        linha["abaixo_confianca_minima"] = counts["confianca_minima"]
+        linha["empate_tecnico"] = counts["empate_tecnico"]
         visao_geral.append(linha)
 
         categoria, atributos, itens = spec_comparison_rows(project)
@@ -3771,6 +3791,10 @@ def sheets_export_payload() -> dict[str, Any]:
             linhas.append(linha)
         comparativos.append({
             "projeto": project.name,
+            # Schema 3 (aditivo): cabecalho e faixa de veredito da aba.
+            "categoria": categoria,
+            "escolhido": counts["escolhido"],
+            "data_decisao": counts["data_decisao"],
             "colunas": colunas,
             "situacao": situacao,
             "linhas": linhas,

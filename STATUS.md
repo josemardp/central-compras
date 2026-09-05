@@ -7,12 +7,12 @@
 
 ## AO RETOMAR — comece por aqui (deixado em 05/09/2026)
 
-Repositório sincronizado com `origin/main`, **284 testes passando**. A
-planilha premium está no ar na **Versão 8** do Apps Script, executada como
-**conta-comercial**, usando o mesmo endpoint. A sincronização real devolveu 8
+Repositório sincronizado com `origin/main`, **287 testes passando**. A
+planilha premium está no ar na **Versão 9** do Apps Script, executada como
+**conta-comercial**, usando o mesmo endpoint. Duas sincronizações reais devolveram 8
 projetos e 8 comparativos. A planilha foi aberta e conferida: 9 abas sem
-órfãs, KPIs, filtros, links, tipografia Inter/Roboto Mono, destaques, números
-tipados e gráficos em todos os projetos. Detalhes e endereços em
+órfãs, fila de atenção, KPIs, vereditos, filtros, links, números tipados e
+gráficos renderizados. Detalhes e endereços em
 `docs/infraestrutura-externa.md`.
 
 ### Também parado, esperando decisão do Josemar
@@ -28,7 +28,29 @@ do teto.
 
 ---
 
-## Última sessão: 05/09/2026
+## Última sessão: 05/09/2026 — Versão 9
+
+- **Versão 9 implantada e verificada.** O `Code.gs` foi atualizado preservando
+  o token já existente e publicado como nova versão da implantação atual pela
+  conta `conta-comercial@exemplo.com`; ID e URL `/exec` permaneceram iguais.
+- O payload passou ao schema 3 de forma aditiva. O receptor continua aceitando
+  o formato anterior, avisa sobre campos desconhecidos e não produz `NaN`
+  quando métricas novas não existem.
+- A `Visao Geral` ganhou fila de atenção e gráfico de pendências comparáveis.
+  Scores relativos de compras diferentes deixaram de ser comparados. Projetos
+  fechados têm precedência sobre cotação vencida e não entram nas pendências.
+- As abas de projeto ganharam contexto, alertas e vereditos de líder, empate,
+  bloqueio ou ausência de cotação. O relógio mostra Huawei Band 9 e Galaxy Fit3
+  em empate técnico por diferença de 2,2 pontos.
+- Duas sincronizações consecutivas retornaram 8 projetos e 8 comparativos. A
+  inspeção da planilha confirmou 9 abas, gráfico geral, rankings e gráficos de
+  eixos, sem `#REF!`, `#ERROR!`, `NaN` ou `undefined`. Desktop e largura de
+  celular foram conferidos; a fila dinâmica não ficou congelada.
+- Verificações locais: 287 testes passaram em 143,477 segundos, o scanner
+  estrito de segredos passou e o JavaScript documentado passou na checagem de
+  sintaxe.
+
+## Sessão anterior: 05/09/2026 — Versão 8
 
 - **Redesign premium implantado e verificado na planilha real.** A implantação
   existente foi atualizada até a Versão 8 sem trocar a URL. O Web App executa

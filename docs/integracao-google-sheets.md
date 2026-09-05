@@ -3,8 +3,10 @@
 O comando `python scripts/central_compras.py sincronizar-planilha` exporta a
 visão geral dos projetos e os comparativos de cotações para uma planilha Google.
 
-**Status: ativo.** Implantado na conta conta-comercial, testado de ponta a ponta em
-2026-09-04.
+**Status externo e versionado: Versão 9 ativa e verificada.** A implantação
+existente foi atualizada pela conta `conta-comercial@exemplo.com`, sem trocar o ID nem
+a URL do Web App. Depois do deploy, a sincronização foi executada duas vezes e
+a planilha real foi conferida no desktop e em largura de celular.
 
 ## Como funciona
 
@@ -35,12 +37,11 @@ Projeto "Central de Compras - Sync" em https://script.google.com, conta
 conta-comercial. Editor:
 `https://script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 
-## Code.gs (versão 8 implantada)
+## Code.gs (versão 9 ativa)
 
-> O código abaixo corresponde à Versão 8, implantada em 05/09/2026 pela conta
-> **conta-comercial** na implantação existente. O ID e a URL do Web App foram
-> preservados. A sincronização e a renderização real foram verificadas com 8
-> projetos e 8 comparativos.
+> O código abaixo corresponde à Versão 9 implantada, executada como
+> **conta-comercial**, no mesmo ID e URL do Web App. O estado foi confirmado com duas
+> sincronizações e inspeção da planilha real em 05/09/2026.
 
 ```javascript
 const TOKEN = '...'; // cole aqui uma senha longa aleatoria. O valor real vive
@@ -48,7 +49,7 @@ const TOKEN = '...'; // cole aqui uma senha longa aleatoria. O valor real vive
                      // integracao_sheets.json local. Nunca neste arquivo.
 const PASTA_ID = '1MyR5NNhHz5Q2RtSHbgPZxXDV3kRM2ARU';
 const PLANILHA_NOME = 'Central de Compras - Cotacoes e Comparacoes';
-const SCHEMA_SUPORTADO = 2;
+const SCHEMA_SUPORTADO = 3;
 const CAMPOS_VISAO_FALLBACK = [
   'projeto', 'categoria', 'estado', 'lider', 'score', 'confianca', 'cotacoes',
   'manual', 'dias_ate_decisao', 'escolhido', 'aguardando_preco',
@@ -162,45 +163,132 @@ function planilhaCentral(pasta) {
   return nova;
 }
 
+// ---------------------------------------------------------------- Visao Geral
+
+function decidido(linha) {
+  return Boolean(linha.data_decisao || linha.escolhido || linha.estado === 'comprado');
+}
+
+function pesoAtencao(linha) {
+  // Cockpit: quem precisa de acao primeiro, decididos por ultimo. Nunca por
+  // score: o eixo valor e relativo ao mais barato de cada projeto, entao o
+  // score total nao e comparavel entre projetos (README, "Como o score
+  // funciona").
+  if (decidido(linha)) return -1;
+  return (Number(linha.cotacoes_vencidas) || 0) * 100
+    + (Number(linha.aguardando_preco) || 0) * 10
+    + (linha.lider ? 0 : 5)
+    + (linha.empate_tecnico ? 2 : 0);
+}
+
+function pendenciasProjeto(linha) {
+  // So fatos presentes no payload. Ausencia nao vira zero nem recomendacao.
+  const pendencias = [];
+  if (decidido(linha)) return pendencias;
+  const vencidas = Number(linha.cotacoes_vencidas) || 0;
+  const aguardando = Number(linha.aguardando_preco) || 0;
+  const cotacoes = Number(linha.cotacoes) || 0;
+  const manual = Number(linha.manual) || 0;
+  const baixaConfianca = Number(linha.abaixo_confianca_minima) || 0;
+  if (vencidas) pendencias.push('▲ ' + vencidas + ' cotacao(oes) vencida(s)');
+  if (aguardando) pendencias.push('◔ ' + aguardando + ' produto(s) aguardando confirmacao de preco');
+  if (!linha.lider) pendencias.push('◔ nenhum candidato elegivel ainda');
+  if (cotacoes && !manual) pendencias.push('◔ so fonte web; nenhuma cotacao manual');
+  if (baixaConfianca) pendencias.push('◐ ' + baixaConfianca + ' candidato(s) abaixo da confianca minima');
+  if (linha.empate_tecnico) pendencias.push('◐ empate tecnico no topo do ranking');
+  return pendencias;
+}
+
 function escreverVisaoGeral(planilha, linhas, campos, geradoEm, avisos, comparativos, destinos) {
   const aba = abaLimpa(planilha, 'Visao Geral');
   const largura = Math.max(1, campos.length);
+  const larguraFaixa = Math.max(10, largura);
   const ordenadas = linhas.slice().sort(function (a, b) {
-    return (Number(b.score) || -1) - (Number(a.score) || -1);
+    const peso = pesoAtencao(b) - pesoAtencao(a);
+    if (peso) return peso;
+    return String(a.projeto).localeCompare(String(b.projeto));
   });
-  const tabela = [campos.map(tituloCampo)].concat(ordenadas.map(function (linha) {
-    return campos.map(function (c) {
-      if (c === 'estado') return estadoVisao(linha);
-      return linha[c] !== undefined && linha[c] !== null ? linha[c] : '';
-    });
-  }));
 
-  const ativos = linhas.filter(function (linha) {
-    return !linha.data_decisao && linha.estado !== 'comprado';
-  }).length;
-  const decididos = linhas.filter(function (linha) {
-    return Boolean(linha.data_decisao || linha.escolhido || linha.estado === 'comprado');
-  }).length;
+  // Faixa de indicadores: o numero e o protagonista; cor forte so quando ha
+  // algo a resolver.
+  const ativos = linhas.filter(function (linha) { return !decidido(linha); }).length;
+  const decididos = linhas.length - ativos;
   const aguardando = linhas.reduce(function (total, linha) {
-    return total + (Number(linha.aguardando_preco) || 0);
+    return total + (decidido(linha) ? 0 : (Number(linha.aguardando_preco) || 0));
   }, 0);
   const vencidas = linhas.reduce(function (total, linha) {
-    return total + (Number(linha.cotacoes_vencidas) || 0);
+    return total + (decidido(linha) ? 0 : (Number(linha.cotacoes_vencidas) || 0));
   }, 0);
+  const bloqueados = linhas.filter(function (linha) {
+    return !decidido(linha) && !linha.lider;
+  }).length;
   const indicadores = [
-    ['PROJETOS ATIVOS', ativos],
-    ['DECISOES FECHADAS', decididos],
-    ['AGUARDANDO PRECO', aguardando],
-    ['COTACOES VENCIDAS', vencidas ? '▲ ' + vencidas : 0],
+    ['PROJETOS ATIVOS', ativos, ''],
+    ['DECISOES FECHADAS', decididos, ''],
+    ['AGUARDANDO PRECO', aguardando, aguardando ? TEMA.pesquisando : ''],
+    ['COTACOES VENCIDAS', vencidas, vencidas ? TEMA.vencida : ''],
+    ['PROJETOS BLOQUEADOS', bloqueados, bloqueados ? TEMA.vencida : ''],
   ];
   indicadores.forEach(function (indicador, indice) {
     const coluna = indice * 2 + 1;
     aba.getRange(1, coluna, 1, 2).merge().setValue(indicador[0]);
     aba.getRange(2, coluna, 1, 2).merge().setValue(indicador[1]);
   });
-  aba.getRange(3, 1, 1, 8).merge()
-    .setValue('Central de Compras · espelho de decisao')
+  aba.getRange(3, 1, 1, larguraFaixa).merge()
+    .setValue('Central de Compras · espelho de decisao · gerado em ' +
+      String(geradoEm || 'data nao informada'))
     .setNote(avisos.length ? avisos.join('\n') : 'Sem avisos de compatibilidade.');
+  aba.getRange(1, 1, 3, larguraFaixa).setFontFamily('Inter');
+  aba.getRange(1, 1, 1, larguraFaixa).setFontSize(10).setFontWeight('bold')
+    .setFontColor(TEMA.secundaria).setBackground(TEMA.faixa);
+  aba.getRange(2, 1, 1, larguraFaixa).setFontSize(24).setFontWeight('bold')
+    .setFontColor(TEMA.tinta).setBackground(TEMA.branco);
+  indicadores.forEach(function (indicador, indice) {
+    if (indicador[2]) aba.getRange(2, indice * 2 + 1, 1, 2).setFontColor(indicador[2]);
+  });
+  aba.getRange(3, 1, 1, larguraFaixa).setFontSize(9).setFontColor(TEMA.apagada)
+    .setHorizontalAlignment('left');
+
+  // Fila de atencao: quem precisa de acao e por que. So fatos do payload.
+  let proximaLinha = 5;
+  const fila = ordenadas.map(function (linha) {
+    return { linha: linha, pendencias: pendenciasProjeto(linha) };
+  }).filter(function (item) { return item.pendencias.length; });
+  if (fila.length) {
+    aba.getRange(proximaLinha, 1, 1, larguraFaixa).merge()
+      .setValue('FILA DE ATENCAO · ' + fila.length + ' projeto(s) precisam de acao')
+      .setFontFamily('Inter').setFontSize(10).setFontWeight('bold')
+      .setFontColor(TEMA.secundaria).setBackground(TEMA.faixa)
+      .setBorder(false, false, true, false, false, false, TEMA.linha, SpreadsheetApp.BorderStyle.SOLID);
+    proximaLinha += 1;
+    fila.forEach(function (item) {
+      aba.getRange(proximaLinha, 2, 1, larguraFaixa - 1).merge()
+        .setValue(item.pendencias.join('  ·  '))
+        .setFontFamily('Inter').setFontSize(10)
+        .setFontColor(item.pendencias[0].indexOf('▲') === 0 ? TEMA.vencida : TEMA.secundaria);
+      const destino = destinoPorProjeto(planilha, item.linha.projeto, comparativos, destinos);
+      const celula = aba.getRange(proximaLinha, 1);
+      if (destino) {
+        celula.setRichTextValue(SpreadsheetApp.newRichTextValue()
+          .setText(String(item.linha.projeto))
+          .setLinkUrl(planilha.getUrl() + '#gid=' + destino.getSheetId()).build());
+      } else {
+        celula.setValue(String(item.linha.projeto));
+      }
+      celula.setFontFamily('Inter').setFontSize(10).setFontColor(TEMA.tinta);
+      proximaLinha += 1;
+    });
+    proximaLinha += 1;
+  }
+
+  // Tabela principal.
+  const linhaCabecalho = proximaLinha;
+  const tabela = [campos.map(tituloCampo)].concat(ordenadas.map(function (linha) {
+    return campos.map(function (c) {
+      if (c === 'estado') return estadoVisao(linha);
+      return linha[c] !== undefined && linha[c] !== null ? linha[c] : '';
+    });
+  }));
   const formatosTabela = [linhaFormato(largura, '@')].concat(ordenadas.map(function () {
     return campos.map(function (campo) {
       if (campo === 'score') return '0.0';
@@ -209,321 +297,113 @@ function escreverVisaoGeral(planilha, linhas, campos, geradoEm, avisos, comparat
       return '@';
     });
   }));
-  const faixaTabela = aba.getRange(5, 1, tabela.length, largura);
+  const faixaTabela = aba.getRange(linhaCabecalho, 1, tabela.length, largura);
   faixaTabela.setNumberFormats(formatosTabela);
   faixaTabela.setValues(tabela);
-
-  aba.getRange(1, 1, 3, Math.max(8, largura)).setFontFamily('Inter');
-  aba.getRange(1, 1, 1, 8).setFontSize(10).setFontWeight('bold')
-    .setFontColor(TEMA.secundaria).setBackground(TEMA.faixa);
-  aba.getRange(2, 1, 1, 8).setFontSize(24).setFontWeight('bold')
-    .setFontColor(TEMA.tinta).setBackground(TEMA.branco);
-  if (vencidas) aba.getRange(2, 7, 1, 2).setFontColor(TEMA.vencida);
-  aba.getRange(3, 1, 1, 8).setFontSize(9).setFontColor(TEMA.apagada)
-    .setHorizontalAlignment('left');
-  const cabecalho = aba.getRange(5, 1, 1, largura);
+  const cabecalho = aba.getRange(linhaCabecalho, 1, 1, largura);
   cabecalho.setBackground(TEMA.faixa).setFontColor(TEMA.secundaria)
-    .setFontWeight('bold').setFontFamily('Inter').setHorizontalAlignment('left');
+    .setFontWeight('bold').setFontFamily('Inter').setHorizontalAlignment('left')
+    .setBorder(false, false, true, false, false, false, TEMA.base, SpreadsheetApp.BorderStyle.SOLID);
 
   if (ordenadas.length) {
-    const corpo = aba.getRange(6, 1, ordenadas.length, largura);
+    const corpo = aba.getRange(linhaCabecalho + 1, 1, ordenadas.length, largura);
     corpo.setFontFamily('Inter').setFontColor(TEMA.tinta).setFontSize(10)
       .setVerticalAlignment('middle').setWrap(true);
     aplicarFaixas(corpo);
-    aplicarLinksProjetos(planilha, aba, ordenadas, campos, comparativos, destinos);
-    colorirEstadosVisao(aba, ordenadas, campos);
-    formatarColunasVisao(aba, campos, ordenadas.length, 6);
-    aba.getRange(5, 1, ordenadas.length + 1, largura).createFilter();
-    inserirGraficoVisao(aba, campos, ordenadas.length, 6, largura + 2);
+    aplicarLinksProjetos(planilha, aba, ordenadas, campos, comparativos, destinos, linhaCabecalho + 1);
+    colorirEstadosVisao(aba, ordenadas, campos, linhaCabecalho + 1);
+    formatarColunasVisao(aba, campos, ordenadas.length, linhaCabecalho + 1);
+    aba.getRange(linhaCabecalho, 1, ordenadas.length + 1, largura).createFilter();
+    inserirGraficoPendencias(aba, ordenadas, linhaCabecalho, larguraFaixa + 16, largura + 2);
   }
   aplicarLargurasVisao(aba, campos);
-  const rodape = 7 + ordenadas.length;
-  aba.getRange(rodape, 1, 1, Math.max(1, largura)).merge()
+  const rodape = linhaCabecalho + tabela.length + 1;
+  aba.getRange(rodape, 1, 1, largura).merge()
     .setValue('Espelho gerado em ' + String(geradoEm || 'data nao informada') +
       ' · a fonte e o cotacoes.csv de cada projeto')
     .setFontFamily('Inter').setFontSize(9).setFontColor(TEMA.apagada);
-  aba.setFrozenRows(5);
   // Titulos e rodapes atravessam varias colunas mescladas; congelar uma
   // coluna cortaria essas mesclas e o Google Sheets rejeitaria a renderizacao.
+  // As mesclas ficam acima da linha de congelamento, que e horizontal.
+  // A fila e dinamica. Congelar ate o cabecalho prenderia muitas linhas no
+  // celular quando varios projetos exigissem atencao.
+  aba.setFrozenRows(3);
   aba.setFrozenColumns(0);
   aba.setTabColor(TEMA.lider);
   protegerEspelho(aba);
 }
 
-function escreverComparativo(planilha, comp, nomeAba, geradoEm, linkVisao) {
-  const aba = abaLimpa(planilha, nomeAba);
-  const colunas = Array.isArray(comp.colunas) ? comp.colunas : [];
-  const situacaoRecebida = Array.isArray(comp.situacao) ? comp.situacao : [];
-  const situacao = colunas.map(function (_, indice) {
-    return situacaoRecebida[indice] || '';
-  });
-  const metricasRecebidas = Array.isArray(comp.metricas) ? comp.metricas : [];
-  const metricas = metricasRecebidas.length ? colunas.map(function (_, indice) {
-    return metricasRecebidas[indice] || {};
-  }) : [];
-  const linhas = Array.isArray(comp.linhas) ? comp.linhas : [];
-  const largura = Math.max(1, colunas.length + 1);
-  const matriz = [];
-  const formatos = [];
-  const notas = [];
-  const fundos = [];
-
-  matriz.push(['← Visao Geral'].concat(colunas));
-  formatos.push(linhaFormato(largura, '@'));
-  notas.push(linhaFormato(largura, ''));
-  fundos.push(linhaFormato(largura, TEMA.branco));
-  matriz.push(['VEREDITO'].concat(vereditosProdutos(metricas, situacao)));
-  formatos.push(linhaFormato(largura, '@'));
-  notas.push(linhaFormato(largura, ''));
-  fundos.push(linhaFormato(largura, TEMA.faixa));
-
-  const linhasMetricas = [];
-  if (metricas.length) {
-    adicionarSecao(matriz, formatos, notas, fundos, largura, 'SCORE');
-    adicionarLinhaMetrica(matriz, formatos, notas, fundos, 'Score', metricas, 'score', '0.0');
-    linhasMetricas.push(matriz.length);
-    adicionarLinhaMetrica(matriz, formatos, notas, fundos, 'Confianca', metricas, 'confianca', '0%');
-    linhasMetricas.push(matriz.length);
-    ['qualidade', 'valor', 'risco', 'aderencia', 'conveniencia'].forEach(function (eixo) {
-      adicionarLinhaMetrica(
-        matriz, formatos, notas, fundos, tituloCampo(eixo), metricas, eixo, '0%'
-      );
-      linhasMetricas.push(matriz.length);
-    });
+function destinoPorProjeto(planilha, projeto, comparativos, destinos) {
+  for (let i = 0; i < comparativos.length; i += 1) {
+    if (comparativos[i].projeto === projeto) {
+      return planilha.getSheetByName(destinos[i]);
+    }
   }
+  return null;
+}
 
-  adicionarSecao(matriz, formatos, notas, fundos, largura, 'PRECOS');
-  let secaoAnterior = 'precos';
+function estadoVisao(linha) {
+  if (decidido(linha)) return '● Decidido';
+  if (linha.cotacoes_vencidas > 0) return '▲ Vencida';
+  if (linha.aguardando_preco > 0) return '◔ Aguardando preco';
+  return '◐ Pesquisando';
+}
+
+function colorirEstadosVisao(aba, linhas, campos, inicio) {
+  const indice = campos.indexOf('estado');
+  if (indice < 0) return;
+  linhas.forEach(function (linha, linhaIndice) {
+    let cor = TEMA.pesquisando;
+    if (decidido(linha)) cor = TEMA.decidido;
+    else if (linha.cotacoes_vencidas > 0) cor = TEMA.vencida;
+    else if (linha.aguardando_preco > 0) cor = TEMA.aguardando;
+    aba.getRange(linhaIndice + inicio, indice + 1).setFontColor(cor).setFontWeight('bold');
+  });
+}
+
+function aplicarLinksProjetos(planilha, aba, linhas, campos, comparativos, destinos, inicio) {
+  const indice = campos.indexOf('projeto');
+  if (indice < 0) return;
+  linhas.forEach(function (linha, i) {
+    const destino = destinoPorProjeto(planilha, linha.projeto, comparativos, destinos);
+    if (!destino) return;
+    const link = planilha.getUrl() + '#gid=' + destino.getSheetId();
+    aba.getRange(i + inicio, indice + 1).setRichTextValue(
+      SpreadsheetApp.newRichTextValue().setText(String(linha.projeto)).setLinkUrl(link).build()
+    );
+  });
+}
+
+// Grafico geral: pendencias por projeto (contagens, comparaveis entre
+// projetos). NUNCA score total: o eixo valor e relativo ao mais barato de
+// cada compra, entao scores de projetos diferentes nao dividem a mesma base.
+function inserirGraficoPendencias(aba, linhas, ancoraLinha, colunaFonte, colunaGrafico) {
+  const dados = [['Projeto', 'Cotacoes vencidas', 'Aguardando preco']];
   linhas.forEach(function (linha) {
-    if (linha.secao === 'atributos' && secaoAnterior !== 'atributos') {
-      adicionarSecao(matriz, formatos, notas, fundos, largura, 'ATRIBUTOS');
-      secaoAnterior = 'atributos';
-    }
-    const renderizada = renderizarLinha(linha, colunas.length);
-    matriz.push([linha.rotulo || 'Sem rotulo'].concat(renderizada.valores));
-    formatos.push(['@'].concat(renderizada.formatos));
-    notas.push([''].concat(renderizada.notas));
-    fundos.push(linhaFormato(largura, TEMA.branco));
-  });
-
-  const inicioTabela = 1;
-  const faixa = aba.getRange(inicioTabela, 1, matriz.length, largura);
-  faixa.setNumberFormats(formatos);
-  faixa.setValues(matriz);
-  faixa.setNotes(notas);
-  faixa.setBackgrounds(fundos);
-  aba.getRange(1, 1).setRichTextValue(
-    SpreadsheetApp.newRichTextValue().setText('← Visao Geral').setLinkUrl(linkVisao).build()
-  );
-  faixa.setFontFamily('Inter').setFontColor(TEMA.tinta).setFontSize(10)
-    .setVerticalAlignment('middle').setWrap(true);
-  aba.getRange(1, 2, 1, Math.max(1, colunas.length)).setFontSize(13).setFontWeight('bold');
-  aba.getRange(2, 1, 1, largura).setFontWeight('bold');
-  colorirProdutos(aba, inicioTabela, metricas, situacao, matriz.length);
-  estilizarSecoes(aba, matriz, largura);
-  const corpo = aba.getRange(inicioTabela + 1, 1, matriz.length - 1, largura);
-  corpo.setFontFamily('Inter').setFontSize(10).setVerticalAlignment('middle').setWrap(true);
-  aba.getRange(inicioTabela, 1, matriz.length, 1)
-    .setFontWeight('bold').setFontColor(TEMA.secundaria);
-  if (linhasMetricas.length) {
-    aba.getRange(4, 2, linhasMetricas.length, Math.max(1, colunas.length))
-      .setFontFamily('Roboto Mono').setHorizontalAlignment('right');
-  }
-  aba.setColumnWidth(1, 220);
-  for (let c = 2; c <= largura; c += 1) aba.setColumnWidth(c, 220);
-  aba.autoResizeRows(1, inicioTabela + matriz.length - 1);
-  const rodape = matriz.length + 2;
-  aba.getRange(rodape, 1, 1, largura).merge()
-    .setValue('Espelho gerado em ' + String(geradoEm || 'data nao informada') +
-      ' · edite o repositorio, nao esta planilha')
-    .setFontFamily('Inter').setFontSize(9).setFontColor(TEMA.apagada);
-  aba.setFrozenRows(2);
-  aba.setFrozenColumns(0);
-  aba.setTabColor(TEMA.lider);
-  protegerEspelho(aba);
-
-  if (metricas.length) {
-    inserirGraficosComparativo(aba, 1, largura, 4, 6, matriz.length + 4, colunas.length);
-  }
-}
-
-function abaLimpa(planilha, nome) {
-  let aba = planilha.getSheetByName(nome);
-  if (!aba) aba = planilha.insertSheet(nome);
-  if (aba.isSheetHidden()) aba.showSheet();
-  aba.getCharts().forEach(function (grafico) { aba.removeChart(grafico); });
-  aba.getBandings().forEach(function (faixa) { faixa.remove(); });
-  if (aba.getFilter()) aba.getFilter().remove();
-  aba.setConditionalFormatRules([]);
-  aba.getRange(1, 1, aba.getMaxRows(), aba.getMaxColumns()).breakApart();
-  aba.clear();
-  aba.setFrozenRows(0);
-  aba.setFrozenColumns(0);
-  aba.setHiddenGridlines(true);
-  return aba;
-}
-
-function renderizarLinha(linha, quantidade) {
-  const tipados = Array.isArray(linha.valores_tipados) ? linha.valores_tipados : null;
-  const valores = [];
-  const formatos = [];
-  const notas = [];
-  for (let i = 0; i < quantidade; i += 1) {
-    if (tipados && tipados[i]) {
-      const item = tipados[i];
-      const tipo = item.tipo || 'texto';
-      valores.push(tipo === 'vazio' ? '' : item.valor);
-      formatos.push(formatoTipo(tipo));
-      const estrelas = item.estrelas ? item.estrelas + '/5 estrelas' : '';
-      notas.push([item.detalhe || '', estrelas].filter(String).join(' | '));
-    } else {
-      const legado = (linha.valores || [])[i];
-      if (linha.tipo === 'estrela' && legado && typeof legado === 'object') {
-        valores.push(legado.texto + (legado.estrelas ? '  ' + estrelas(legado.estrelas) : ''));
-      } else {
-        valores.push(legado === undefined || legado === null ? '' : legado);
-      }
-      formatos.push('@');
-      notas.push('Payload legado; valor preservado como texto.');
-    }
-  }
-  return { valores: valores, formatos: formatos, notas: notas };
-}
-
-function formatoTipo(tipo) {
-  if (tipo === 'moeda') return 'R$ #,##0.00';
-  if (tipo === 'nota') return '0.0 "estrela"';
-  if (tipo === 'numero') return '0.##';
-  if (tipo === 'booleano') return 'General';
-  return '@';
-}
-
-function adicionarLinhaMetrica(matriz, formatos, notas, fundos, rotulo, metricas, campo, formato) {
-  matriz.push([rotulo].concat(metricas.map(function (m) {
-    const valor = m[campo];
-    const eixo = ['qualidade', 'valor', 'risco', 'aderencia', 'conveniencia'].indexOf(campo) >= 0;
-    return valor !== undefined && valor !== null && valor !== '' ? valor : (eixo ? 'sem dado' : '');
-  })));
-  formatos.push(['@'].concat(metricas.map(function () { return formato; })));
-  notas.push([''].concat(metricas.map(function (m) {
-    if (m[campo] === undefined || m[campo] === null || m[campo] === '') return 'sem dado';
-    if (campo === 'score') return 'Score total de 0 a 100, calculado pelo motor de ranking do repositorio.';
-    return '';
-  })));
-  fundos.push(linhaFormato(metricas.length + 1, TEMA.branco));
-}
-
-function adicionarSecao(matriz, formatos, notas, fundos, largura, titulo) {
-  matriz.push([titulo].concat(linhaFormato(largura - 1, '')));
-  formatos.push(linhaFormato(largura, '@'));
-  notas.push(linhaFormato(largura, ''));
-  fundos.push(linhaFormato(largura, TEMA.faixa));
-}
-
-function vereditosProdutos(metricas, situacao) {
-  const scores = metricas.map(function (m, indice) {
-    return situacao[indice] === 'elegivel' && typeof m.score === 'number' ? m.score : null;
-  });
-  const validos = scores.filter(function (score) { return score !== null; }).sort(function (a, b) { return b - a; });
-  const melhor = validos.length ? validos[0] : null;
-  const empate = validos.length > 1 && melhor - validos[1] <= 3;
-  return situacao.map(function (estado, indice) {
-    const score = scores[indice];
-    if (estado === 'cortado') return '▲ Bloqueado pelo gate';
-    if (estado === 'sem_cotacao') return '◔ Sem cotacao';
-    if (score === null) return '◐ Pesquisando';
-    if (empate && melhor - score <= 3) return '◐ Empate tecnico · score ' + score.toFixed(1);
-    if (score === melhor) return '● Lider · score ' + score.toFixed(1);
-    return '◐ Atrás por ' + (melhor - score).toFixed(1) + ' pontos';
-  });
-}
-
-function estilizarSecoes(aba, matriz, largura) {
-  matriz.forEach(function (linha, indice) {
-    if (['SCORE', 'PRECOS', 'ATRIBUTOS'].indexOf(linha[0]) >= 0) {
-      aba.getRange(indice + 1, 1, 1, largura).setBackground(TEMA.faixa)
-        .setFontFamily('Inter').setFontSize(10).setFontWeight('bold')
-        .setFontColor(TEMA.secundaria)
-        .setBorder(false, false, true, false, false, false, TEMA.linha, SpreadsheetApp.BorderStyle.SOLID);
-    }
-    if (linha[0] === 'Preco') {
-      aba.getRange(indice + 1, 2, 1, Math.max(1, largura - 1)).setFontWeight('bold');
+    if (decidido(linha)) return;
+    const vencidas = Number(linha.cotacoes_vencidas) || 0;
+    const aguardando = Number(linha.aguardando_preco) || 0;
+    if (vencidas + aguardando > 0) {
+      dados.push([String(linha.projeto), vencidas, aguardando]);
     }
   });
-}
-
-function inserirGraficosComparativo(aba, linhaProdutos, largura, linhaScore, linhaEixos, ancora, quantidade) {
-  const produtos = aba.getRange(linhaProdutos, 2, 1, quantidade).getValues()[0];
-  const scores = aba.getRange(linhaScore, 2, 1, quantidade).getValues()[0];
-  const nomesEixos = aba.getRange(linhaEixos, 1, 5, 1).getValues().map(function (linha) {
-    return linha[0];
-  });
-  const valoresEixos = aba.getRange(linhaEixos, 2, 5, quantidade).getValues();
-  const colunaFonte = largura + 8;
-  const ultimaColunaFonte = colunaFonte + quantidade;
-  if (aba.getMaxColumns() < ultimaColunaFonte) {
-    aba.insertColumnsAfter(aba.getMaxColumns(), ultimaColunaFonte - aba.getMaxColumns());
+  if (dados.length < 2) return; // sem pendencias, nao ha o que comparar
+  if (aba.getMaxColumns() < colunaFonte + 2) {
+    aba.insertColumnsAfter(aba.getMaxColumns(), colunaFonte + 2 - aba.getMaxColumns());
   }
-
-  // Os graficos do Sheets sao mais previsiveis com tabelas contiguas. As
-  // fontes ficam estreitas e brancas, fora da area principal do comparativo.
-  const rankingDados = [['Produto', 'Score']].concat(produtos.map(function (produto, indice) {
-    return [produto, scores[indice]];
-  }));
-  const rankingFonte = aba.getRange(ancora, colunaFonte, rankingDados.length, 2);
-  rankingFonte.setValues(rankingDados);
-  const linhaFonteEixos = ancora + rankingDados.length + 1;
-  const eixosDados = [['Eixo'].concat(produtos)].concat(nomesEixos.map(function (eixo, indice) {
-    return [eixo].concat(valoresEixos[indice]);
-  }));
-  const eixosFonte = aba.getRange(
-    linhaFonteEixos, colunaFonte, eixosDados.length, quantidade + 1
-  );
-  eixosFonte.setValues(eixosDados);
-  aba.getRange(
-    ancora, colunaFonte, linhaFonteEixos + eixosDados.length - ancora,
-    Math.max(2, quantidade + 1)
-  ).setFontColor(TEMA.branco).setBackground(TEMA.branco).setFontSize(6);
-  aba.setColumnWidths(colunaFonte, Math.max(2, quantidade + 1), 24);
-
-  const ranking = aba.newChart().setChartType(Charts.ChartType.BAR)
-    .addRange(rankingFonte).setNumHeaders(1)
-    .setOption('title', 'Score total por candidato').setOption('fontName', 'Inter')
-    .setOption('legend', { position: 'none' }).setOption('colors', [TEMA.lider])
-    .setOption('hAxis', { viewWindow: { min: 0, max: 100 }, textStyle: { color: TEMA.apagada } })
-    .setPosition(ancora, 1, 0, 0).build();
-  aba.insertChart(ranking);
-
-  if (quantidade <= 3) {
-    const eixos = aba.newChart().setChartType(Charts.ChartType.COLUMN)
-      .addRange(eixosFonte).setNumHeaders(1)
-      .setOption('title', 'Cinco eixos da decisao').setOption('fontName', 'Inter')
-      .setOption('legend', { position: quantidade > 1 ? 'bottom' : 'none' })
-      .setOption('colors', [TEMA.lider, TEMA.slot2, TEMA.slot3].slice(0, quantidade))
-      .setOption('vAxis', { viewWindow: { min: 0, max: 1 }, textStyle: { color: TEMA.apagada } })
-      .setPosition(ancora + 16, 1, 0, 0).build();
-    aba.insertChart(eixos);
-  } else {
-    for (let indice = 0; indice < quantidade; indice += 1) {
-      const mini = aba.newChart().setChartType(Charts.ChartType.COLUMN)
-        .addRange(aba.getRange(linhaFonteEixos, colunaFonte, eixosDados.length, 1))
-        .addRange(aba.getRange(linhaFonteEixos, colunaFonte + indice + 1, eixosDados.length, 1))
-        .setNumHeaders(1).setOption('title', String(produtos[indice]))
-        .setOption('fontName', 'Inter').setOption('legend', { position: 'none' })
-        .setOption('colors', [TEMA.lider])
-        .setOption('vAxis', { viewWindow: { min: 0, max: 1 }, textStyle: { color: TEMA.apagada } })
-        .setPosition(ancora + 16 + Math.floor(indice / 2) * 15, 1 + (indice % 2) * 6, 0, 0).build();
-      aba.insertChart(mini);
-    }
-  }
-}
-
-function aplicarFaixas(faixa) {
-  const cores = [];
-  for (let r = 0; r < faixa.getNumRows(); r += 1) {
-    cores.push(linhaFormato(faixa.getNumColumns(), r % 2 ? TEMA.faixa : TEMA.branco));
-  }
-  faixa.setBackgrounds(cores);
+  const fonte = aba.getRange(1, colunaFonte, dados.length, 3);
+  fonte.setValues(dados);
+  fonte.setFontColor(TEMA.branco).setBackground(TEMA.branco).setFontSize(6);
+  aba.setColumnWidths(colunaFonte, 3, 24);
+  const grafico = aba.newChart().setChartType(Charts.ChartType.COLUMN)
+    .addRange(fonte).setNumHeaders(1)
+    .setOption('title', 'Pendencias por projeto (contagem)')
+    .setOption('fontName', 'Inter')
+    .setOption('legend', { position: 'bottom' })
+    .setOption('colors', [TEMA.vencida, TEMA.pesquisando])
+    .setOption('vAxis', { viewWindow: { min: 0 }, textStyle: { color: TEMA.apagada } })
+    .setPosition(ancoraLinha, colunaGrafico, 0, 0).build();
+  aba.insertChart(grafico);
 }
 
 function formatarColunasVisao(aba, campos, quantidade, inicio) {
@@ -564,9 +444,416 @@ function aplicarLargurasVisao(aba, campos) {
   });
 }
 
-function colorirProdutos(aba, linha, metricas, situacao, quantidadeLinhas) {
+// ------------------------------------------------------------- Comparativos
+
+function escreverComparativo(planilha, comp, nomeAba, geradoEm, linkVisao) {
+  const aba = abaLimpa(planilha, nomeAba);
+  const colunas = Array.isArray(comp.colunas) ? comp.colunas : [];
+  const situacaoRecebida = Array.isArray(comp.situacao) ? comp.situacao : [];
+  const situacao = colunas.map(function (_, indice) {
+    return situacaoRecebida[indice] || '';
+  });
+  const metricasRecebidas = Array.isArray(comp.metricas) ? comp.metricas : [];
+  const metricas = metricasRecebidas.length ? colunas.map(function (_, indice) {
+    return metricasRecebidas[indice] || {};
+  }) : [];
+  const linhas = Array.isArray(comp.linhas) ? comp.linhas : [];
+  const largura = Math.max(1, colunas.length + 1);
+  const matriz = [];
+  const formatos = [];
+  const notas = [];
+  const fundos = [];
+  const alinhamentos = [];
+
+  function empurrar(valoresLinha) {
+    matriz.push(valoresLinha);
+    formatos.push(linhaFormato(largura, '@'));
+    notas.push(linhaFormato(largura, ''));
+    fundos.push(linhaFormato(largura, TEMA.branco));
+    alinhamentos.push(linhaFormato(largura, 'left'));
+  }
+
+  // Cabecalho da aba: navegacao, titulo, contexto, veredito e alertas.
+  empurrar(['← Visao Geral'].concat(linhaFormato(largura - 1, '')));
+  empurrar([String(comp.projeto || nomeAba)].concat(linhaFormato(largura - 1, '')));
+  const contexto = [comp.categoria ? String(comp.categoria) : 'categoria nao informada',
+    'gerado em ' + String(geradoEm || 'data nao informada')].join(' · ');
+  empurrar([contexto].concat(linhaFormato(largura - 1, '')));
+  const veredito = vereditoProjeto(comp, metricas, situacao, colunas);
+  empurrar([veredito.texto].concat(linhaFormato(largura - 1, '')));
+  const alertas = alertasProjeto(metricas, situacao, colunas);
+  const linhaAlertas = alertas.length ? matriz.length + 1 : 0;
+  if (alertas.length) empurrar([alertas.join('  ·  ')].concat(linhaFormato(largura - 1, '')));
+
+  const linhaProdutos = matriz.length + 1;
+  empurrar(['Candidato'].concat(colunas));
+  const linhaVereditos = matriz.length + 1;
+  empurrar(['VEREDITO'].concat(vereditosProdutos(metricas, situacao)));
+  fundos[fundos.length - 1] = linhaFormato(largura, TEMA.faixa);
+
+  if (metricas.length) {
+    adicionarSecao(matriz, formatos, notas, fundos, alinhamentos, largura, 'SCORE');
+    adicionarLinhaMetrica(matriz, formatos, notas, fundos, alinhamentos, 'Score', metricas, 'score', '0.0');
+    adicionarLinhaMetrica(matriz, formatos, notas, fundos, alinhamentos, 'Confianca', metricas, 'confianca', '0%');
+    ['qualidade', 'valor', 'risco', 'aderencia', 'conveniencia'].forEach(function (eixo) {
+      adicionarLinhaMetrica(
+        matriz, formatos, notas, fundos, alinhamentos, tituloCampo(eixo), metricas, eixo, '0%'
+      );
+    });
+  }
+
+  adicionarSecao(matriz, formatos, notas, fundos, alinhamentos, largura, 'PRECOS');
+  let secaoAnterior = 'precos';
+  linhas.forEach(function (linha) {
+    if (linha.secao === 'atributos' && secaoAnterior !== 'atributos') {
+      adicionarSecao(matriz, formatos, notas, fundos, alinhamentos, largura, 'ATRIBUTOS');
+      secaoAnterior = 'atributos';
+    }
+    const renderizada = renderizarLinha(linha, colunas.length);
+    matriz.push([linha.rotulo || 'Sem rotulo'].concat(renderizada.valores));
+    formatos.push(['@'].concat(renderizada.formatos));
+    notas.push([''].concat(renderizada.notas));
+    fundos.push(linhaFormato(largura, TEMA.branco));
+    alinhamentos.push(['left'].concat(renderizada.alinhamentos));
+  });
+
+  const faixa = aba.getRange(1, 1, matriz.length, largura);
+  faixa.setNumberFormats(formatos);
+  faixa.setValues(matriz);
+  faixa.setNotes(notas);
+  faixa.setBackgrounds(fundos);
+  faixa.setHorizontalAlignments(alinhamentos);
+  aba.getRange(1, 1).setRichTextValue(
+    SpreadsheetApp.newRichTextValue().setText('← Visao Geral').setLinkUrl(linkVisao).build()
+  );
+  faixa.setFontFamily('Inter').setFontColor(TEMA.tinta).setFontSize(10)
+    .setVerticalAlignment('middle').setWrap(true);
+  // Numeros tabulares em Roboto Mono; texto em Inter (derivado do alinhamento
+  // que cada linha ja declarou na montagem).
+  const familias = alinhamentos.map(function (linhaAlinh) {
+    return linhaAlinh.map(function (alinh) {
+      return alinh === 'right' ? 'Roboto Mono' : 'Inter';
+    });
+  });
+  faixa.setFontFamilies(familias);
+
+  aba.getRange(1, 1).setFontColor(TEMA.apagada).setFontSize(9);
+  aba.getRange(2, 1, 1, largura).merge()
+    .setFontSize(14).setFontWeight('bold').setFontColor(TEMA.tinta);
+  aba.getRange(3, 1, 1, largura).merge().setFontSize(9).setFontColor(TEMA.apagada);
+  aba.getRange(4, 1, 1, largura).merge()
+    .setFontSize(11).setFontWeight('bold').setFontColor(veredito.cor).setBackground(TEMA.faixa);
+  if (linhaAlertas) {
+    aba.getRange(linhaAlertas, 1, 1, largura).merge()
+      .setFontSize(9).setFontColor(TEMA.secundaria);
+  }
+  aba.getRange(linhaProdutos, 2, 1, Math.max(1, colunas.length)).setFontSize(13).setFontWeight('bold');
+  aba.getRange(linhaProdutos, 1, 1, largura).setFontWeight('bold')
+    .setBorder(false, false, true, false, false, false, TEMA.base, SpreadsheetApp.BorderStyle.SOLID);
+  aba.getRange(linhaVereditos, 1, 1, largura).setFontWeight('bold');
+  colorirProdutos(aba, linhaProdutos, metricas, situacao, matriz.length);
+  estilizarSecoes(aba, matriz, largura);
+  aba.getRange(1, 1, matriz.length, 1)
+    .setFontWeight('bold').setFontColor(TEMA.secundaria);
+  aba.setColumnWidth(1, 220);
+  for (let c = 2; c <= largura; c += 1) aba.setColumnWidth(c, 220);
+  aba.autoResizeRows(1, matriz.length);
+  const rodape = matriz.length + 2;
+  aba.getRange(rodape, 1, 1, largura).merge()
+    .setValue('Espelho gerado em ' + String(geradoEm || 'data nao informada') +
+      ' · edite o repositorio, nao esta planilha')
+    .setFontFamily('Inter').setFontSize(9).setFontColor(TEMA.apagada);
+  // Congela ate a linha de produtos: o cabecalho mesclado fica inteiro acima
+  // da divisoria horizontal; coluna congelada cortaria as mesclas.
+  aba.setFrozenRows(linhaProdutos);
+  aba.setFrozenColumns(0);
+  aba.setTabColor(TEMA.lider);
+  protegerEspelho(aba);
+
+  if (metricas.length) {
+    inserirGraficosComparativo(aba, colunas, metricas, situacao, matriz.length + 4);
+  }
+}
+
+function vereditoProjeto(comp, metricas, situacao, colunas) {
+  if (comp.escolhido || comp.data_decisao) {
+    const data = comp.data_decisao ? ' em ' + String(comp.data_decisao) : '';
+    return {
+      texto: '● Decisao fechada: ' + String(comp.escolhido || 'registrada no repositorio') + data,
+      cor: TEMA.decidido,
+    };
+  }
+  if (!metricas.length) {
+    return {
+      texto: '◐ Score indisponivel neste payload; comparacao textual preservada',
+      cor: TEMA.pesquisando,
+    };
+  }
   const scores = metricas.map(function (m, indice) {
     return situacao[indice] === 'elegivel' && typeof m.score === 'number' ? m.score : null;
+  });
+  const validos = scores.map(function (score, indice) {
+    return { score: score, indice: indice };
+  }).filter(function (item) { return item.score !== null; })
+    .sort(function (a, b) { return b.score - a.score; });
+  if (!validos.length) {
+    return { texto: '◔ Nenhum candidato elegivel ainda — a pesquisa continua', cor: TEMA.aguardando };
+  }
+  const melhor = validos[0];
+  const nomeMelhor = String(colunas[melhor.indice] || 'candidato');
+  if (validos.length > 1 && melhor.score - validos[1].score <= 3) {
+    const nomes = validos.filter(function (item) { return melhor.score - item.score <= 3; })
+      .map(function (item) { return String(colunas[item.indice]); });
+    return {
+      texto: '◐ Empate tecnico: ' + nomes.join(' e ') +
+        ' separados por ' + (melhor.score - validos[1].score).toFixed(1) +
+        ' ponto(s); diferenca ate 3 e empate',
+      cor: TEMA.pesquisando,
+    };
+  }
+  const vantagem = validos.length > 1
+    ? ' — ' + (melhor.score - validos[1].score).toFixed(1) + ' ponto(s) a frente de ' +
+      String(colunas[validos[1].indice])
+    : '';
+  return {
+    texto: '● Lider: ' + nomeMelhor + ' · score ' + melhor.score.toFixed(1) + vantagem,
+    cor: TEMA.lider,
+  };
+}
+
+function alertasProjeto(metricas, situacao, colunas) {
+  // So fatos do payload (schema 3). Com payload antigo os campos faltam e a
+  // faixa simplesmente nao aparece — nunca um alerta inventado.
+  const vencidos = [];
+  const soWeb = [];
+  const cortados = [];
+  metricas.forEach(function (m, indice) {
+    const nome = String(colunas[indice] || 'candidato');
+    if (m.vencida) vencidos.push(nome);
+    if (situacao[indice] === 'elegivel' && m.fonte && m.fonte !== 'manual') soWeb.push(nome);
+    if (situacao[indice] === 'cortado') {
+      const motivos = Array.isArray(m.motivos_corte) && m.motivos_corte.length
+        ? ' (' + m.motivos_corte.join('; ') + ')' : '';
+      cortados.push(nome + motivos);
+    }
+  });
+  const partes = [];
+  if (vencidos.length) partes.push('▲ Cotacao vencida: ' + vencidos.join(', '));
+  if (soWeb.length) partes.push('◔ Preco nao confirmado (so fonte web): ' + soWeb.join(', '));
+  if (cortados.length) partes.push('▲ Fora do gate: ' + cortados.join(', '));
+  return partes;
+}
+
+function vereditosProdutos(metricas, situacao) {
+  const scores = situacao.map(function (estado, indice) {
+    const metrica = metricas[indice] || {};
+    return estado === 'elegivel' && typeof metrica.score === 'number' ? metrica.score : null;
+  });
+  const validos = scores.filter(function (score) { return score !== null; }).sort(function (a, b) { return b - a; });
+  const melhor = validos.length ? validos[0] : null;
+  const empate = validos.length > 1 && melhor - validos[1] <= 3;
+  return situacao.map(function (estado, indice) {
+    const score = scores[indice];
+    if (estado === 'cortado') {
+      const motivos = metricas[indice] && Array.isArray(metricas[indice].motivos_corte)
+        ? metricas[indice].motivos_corte : [];
+      return motivos.length ? '▲ Bloqueado: ' + motivos.join('; ') : '▲ Bloqueado pelo gate';
+    }
+    if (estado === 'sem_cotacao') return '◔ Sem cotacao';
+    if (score === null) return '◐ Pesquisando';
+    if (empate && melhor - score <= 3) return '◐ Empate tecnico · score ' + score.toFixed(1);
+    if (score === melhor) return '● Lider · score ' + score.toFixed(1);
+    return '◐ Atrás por ' + (melhor - score).toFixed(1) + ' pontos';
+  });
+}
+
+function abaLimpa(planilha, nome) {
+  let aba = planilha.getSheetByName(nome);
+  if (!aba) aba = planilha.insertSheet(nome);
+  if (aba.isSheetHidden()) aba.showSheet();
+  aba.getCharts().forEach(function (grafico) { aba.removeChart(grafico); });
+  aba.getBandings().forEach(function (faixa) { faixa.remove(); });
+  if (aba.getFilter()) aba.getFilter().remove();
+  aba.setConditionalFormatRules([]);
+  aba.getRange(1, 1, aba.getMaxRows(), aba.getMaxColumns()).breakApart();
+  aba.clear();
+  aba.setFrozenRows(0);
+  aba.setFrozenColumns(0);
+  aba.setHiddenGridlines(true);
+  return aba;
+}
+
+function renderizarLinha(linha, quantidade) {
+  const tipados = Array.isArray(linha.valores_tipados) ? linha.valores_tipados : null;
+  const valores = [];
+  const formatos = [];
+  const notas = [];
+  const alinhamentos = [];
+  for (let i = 0; i < quantidade; i += 1) {
+    if (tipados && tipados[i]) {
+      const item = tipados[i];
+      const tipo = item.tipo || 'texto';
+      valores.push(tipo === 'vazio' ? '' : item.valor);
+      formatos.push(formatoTipo(tipo));
+      const estrelas = item.estrelas ? item.estrelas + '/5 estrelas' : '';
+      // Ausente nunca vira zero: celula vazia com nota explicando a ausencia.
+      notas.push([item.detalhe || (tipo === 'vazio' ? 'Sem dado' : ''), estrelas]
+        .filter(String).join(' | '));
+      alinhamentos.push(tipo === 'moeda' || tipo === 'nota' || tipo === 'numero' ? 'right' : 'left');
+    } else {
+      const legado = (linha.valores || [])[i];
+      if (linha.tipo === 'estrela' && legado && typeof legado === 'object') {
+        valores.push(legado.texto + (legado.estrelas ? '  ' + estrelas(legado.estrelas) : ''));
+      } else {
+        valores.push(legado === undefined || legado === null ? '' : legado);
+      }
+      formatos.push('@');
+      notas.push('Payload legado; valor preservado como texto.');
+      alinhamentos.push('left');
+    }
+  }
+  return { valores: valores, formatos: formatos, notas: notas, alinhamentos: alinhamentos };
+}
+
+function formatoTipo(tipo) {
+  if (tipo === 'moeda') return 'R$ #,##0.00';
+  if (tipo === 'nota') return '0.0 "estrela"';
+  if (tipo === 'numero') return '0.##';
+  if (tipo === 'booleano') return 'General';
+  return '@';
+}
+
+function adicionarLinhaMetrica(matriz, formatos, notas, fundos, alinhamentos, rotulo, metricas, campo, formato) {
+  matriz.push([rotulo].concat(metricas.map(function (m) {
+    const valor = m[campo];
+    const eixo = ['qualidade', 'valor', 'risco', 'aderencia', 'conveniencia'].indexOf(campo) >= 0;
+    return valor !== undefined && valor !== null && valor !== '' ? valor : (eixo ? 'sem dado' : '');
+  })));
+  formatos.push(['@'].concat(metricas.map(function () { return formato; })));
+  notas.push([''].concat(metricas.map(function (m) {
+    if (m[campo] === undefined || m[campo] === null || m[campo] === '') return 'Sem dado';
+    if (campo === 'score') return 'Score total de 0 a 100, calculado pelo motor de ranking do repositorio.';
+    return '';
+  })));
+  fundos.push(linhaFormato(metricas.length + 1, TEMA.branco));
+  alinhamentos.push(['left'].concat(linhaFormato(metricas.length, 'right')));
+}
+
+function adicionarSecao(matriz, formatos, notas, fundos, alinhamentos, largura, titulo) {
+  matriz.push([titulo].concat(linhaFormato(largura - 1, '')));
+  formatos.push(linhaFormato(largura, '@'));
+  notas.push(linhaFormato(largura, ''));
+  fundos.push(linhaFormato(largura, TEMA.faixa));
+  alinhamentos.push(linhaFormato(largura, 'left'));
+}
+
+function estilizarSecoes(aba, matriz, largura) {
+  matriz.forEach(function (linha, indice) {
+    if (['SCORE', 'PRECOS', 'ATRIBUTOS'].indexOf(linha[0]) >= 0) {
+      aba.getRange(indice + 1, 1, 1, largura).setBackground(TEMA.faixa)
+        .setFontFamily('Inter').setFontSize(10).setFontWeight('bold')
+        .setFontColor(TEMA.secundaria)
+        .setBorder(false, false, true, false, false, false, TEMA.linha, SpreadsheetApp.BorderStyle.SOLID);
+    }
+    if (linha[0] === 'Preco') {
+      aba.getRange(indice + 1, 2, 1, Math.max(1, largura - 1)).setFontWeight('bold');
+    }
+  });
+}
+
+function inserirGraficosComparativo(aba, colunas, metricas, situacao, ancora) {
+  const quantidade = colunas.length;
+  const scores = metricas.map(function (m, indice) {
+    return situacao[indice] === 'elegivel' && typeof m.score === 'number' ? m.score : null;
+  });
+  const validos = scores.filter(function (score) { return score !== null; })
+    .slice().sort(function (a, b) { return b - a; });
+  const melhor = validos.length ? validos[0] : null;
+  const empate = validos.length > 1 && melhor - validos[1] <= 3;
+  const camposEixo = ['qualidade', 'valor', 'risco', 'aderencia', 'conveniencia'];
+  const nomesEixos = camposEixo.map(tituloCampo);
+  const colunaFonte = larguraGraficoFonte(colunas);
+
+  // Fontes contiguas, orientadas como o grafico espera, fora da area
+  // visivel. Intervalos separados e transpostos ja produziram graficos
+  // vazios e rotulos trocados (Versao 7).
+  // Sem dado fica fora do grafico (celula vazia), nunca zero.
+  const rankingDados = [['Produto', 'Lider', 'Demais']];
+  colunas.forEach(function (produto, indice) {
+    if (scores[indice] === null) return;
+    const destaque = scores[indice] === melhor || (empate && melhor - scores[indice] <= 3);
+    rankingDados.push([String(produto), destaque ? scores[indice] : '', destaque ? '' : scores[indice]]);
+  });
+  const eixosDados = [['Eixo'].concat(colunas)];
+  camposEixo.forEach(function (campo, indiceEixo) {
+    eixosDados.push([nomesEixos[indiceEixo]].concat(metricas.map(function (m) {
+      return typeof m[campo] === 'number' ? m[campo] : '';
+    })));
+  });
+
+  const ultimaColunaFonte = colunaFonte + Math.max(2, quantidade);
+  if (aba.getMaxColumns() < ultimaColunaFonte) {
+    aba.insertColumnsAfter(aba.getMaxColumns(), ultimaColunaFonte - aba.getMaxColumns());
+  }
+  const rankingFonte = aba.getRange(ancora, colunaFonte, rankingDados.length, 3);
+  rankingFonte.setValues(rankingDados);
+  const linhaFonteEixos = ancora + rankingDados.length + 1;
+  const eixosFonte = aba.getRange(linhaFonteEixos, colunaFonte, eixosDados.length, quantidade + 1);
+  eixosFonte.setValues(eixosDados);
+  aba.getRange(
+    ancora, colunaFonte, linhaFonteEixos + eixosDados.length - ancora,
+    Math.max(3, quantidade + 1)
+  ).setFontColor(TEMA.branco).setBackground(TEMA.branco).setFontSize(6);
+  aba.setColumnWidths(colunaFonte, Math.max(3, quantidade + 1), 24);
+
+  // Duas series, uma celula vazia por linha: o Sheets nao pinta pontos
+  // isolados, entao o destaque do lider (azul) contra os demais (cinza) sai
+  // por serie. Em empate tecnico, todos os empatados ficam azuis.
+  if (rankingDados.length > 1) {
+    const ranking = aba.newChart().setChartType(Charts.ChartType.BAR)
+      .addRange(rankingFonte).setNumHeaders(1)
+      .setOption('title', 'Score total por candidato (azul = lideranca)')
+      .setOption('fontName', 'Inter')
+      .setOption('legend', { position: 'none' })
+      .setOption('colors', [TEMA.lider, TEMA.apagada])
+      .setOption('hAxis', { viewWindow: { min: 0, max: 100 }, textStyle: { color: TEMA.apagada } })
+      .setPosition(ancora, 1, 0, 0).build();
+    aba.insertChart(ranking);
+  }
+
+  if (quantidade <= 3) {
+    const eixos = aba.newChart().setChartType(Charts.ChartType.COLUMN)
+      .addRange(eixosFonte).setNumHeaders(1)
+      .setOption('title', 'Cinco eixos da decisao (0 a 1)')
+      .setOption('fontName', 'Inter')
+      .setOption('legend', { position: quantidade > 1 ? 'bottom' : 'none' })
+      .setOption('colors', [TEMA.lider, TEMA.slot2, TEMA.slot3].slice(0, quantidade))
+      .setOption('vAxis', { viewWindow: { min: 0, max: 1 }, textStyle: { color: TEMA.apagada } })
+      .setPosition(ancora + 16, 1, 0, 0).build();
+    aba.insertChart(eixos);
+  } else {
+    for (let indice = 0; indice < quantidade; indice += 1) {
+      const mini = aba.newChart().setChartType(Charts.ChartType.COLUMN)
+        .addRange(aba.getRange(linhaFonteEixos, colunaFonte, eixosDados.length, 1))
+        .addRange(aba.getRange(linhaFonteEixos, colunaFonte + indice + 1, eixosDados.length, 1))
+        .setNumHeaders(1).setOption('title', String(colunas[indice]) + ' (0 a 1)')
+        .setOption('fontName', 'Inter').setOption('legend', { position: 'none' })
+        .setOption('colors', [TEMA.lider])
+        .setOption('vAxis', { viewWindow: { min: 0, max: 1 }, textStyle: { color: TEMA.apagada } })
+        .setPosition(ancora + 16 + Math.floor(indice / 2) * 15, 1 + (indice % 2) * 6, 0, 0).build();
+      aba.insertChart(mini);
+    }
+  }
+}
+
+function larguraGraficoFonte(colunas) {
+  return colunas.length + 9;
+}
+
+function colorirProdutos(aba, linha, metricas, situacao, quantidadeLinhas) {
+  const scores = situacao.map(function (estado, indice) {
+    const metrica = metricas[indice] || {};
+    return estado === 'elegivel' && typeof metrica.score === 'number' ? metrica.score : null;
   });
   const validos = scores.filter(function (score) { return score !== null; }).sort(function (a, b) { return b - a; });
   const melhor = validos.length ? validos[0] : null;
@@ -574,7 +861,7 @@ function colorirProdutos(aba, linha, metricas, situacao, quantidadeLinhas) {
   situacao.forEach(function (estado, indice) {
     const score = scores[indice];
     const destaque = score !== null && (score === melhor || (empate && melhor - score <= 3));
-    if (destaque) aba.getRange(linha, indice + 2, quantidadeLinhas, 1)
+    if (destaque) aba.getRange(linha, indice + 2, quantidadeLinhas - linha + 1, 1)
       .setBackground(TEMA.liderFundo).setFontWeight('bold');
     aba.getRange(linha, indice + 2).setFontColor(destaque ? TEMA.tinta : TEMA.secundaria);
     let cor = TEMA.secundaria;
@@ -586,53 +873,14 @@ function colorirProdutos(aba, linha, metricas, situacao, quantidadeLinhas) {
   });
 }
 
-function estadoVisao(linha) {
-  if (linha.cotacoes_vencidas > 0) return '▲ Vencida';
-  if (linha.aguardando_preco > 0) return '◔ Aguardando preco';
-  if (linha.data_decisao || linha.escolhido || linha.estado === 'comprado') return '● Decidido';
-  return '◐ Pesquisando';
-}
+// --------------------------------------------------------------- Utilidades
 
-function colorirEstadosVisao(aba, linhas, campos) {
-  const indice = campos.indexOf('estado');
-  if (indice < 0) return;
-  linhas.forEach(function (linha, linhaIndice) {
-    let cor = TEMA.pesquisando;
-    if (linha.cotacoes_vencidas > 0) cor = TEMA.vencida;
-    else if (linha.aguardando_preco > 0) cor = TEMA.aguardando;
-    else if (linha.data_decisao || linha.escolhido || linha.estado === 'comprado') cor = TEMA.decidido;
-    aba.getRange(linhaIndice + 6, indice + 1).setFontColor(cor).setFontWeight('bold');
-  });
-}
-
-function aplicarLinksProjetos(planilha, aba, linhas, campos, comparativos, destinos) {
-  const indice = campos.indexOf('projeto');
-  if (indice < 0) return;
-  const abas = {};
-  comparativos.forEach(function (comp, i) { abas[comp.projeto] = destinos[i]; });
-  linhas.forEach(function (linha, i) {
-    const destino = planilha.getSheetByName(abas[linha.projeto]);
-    if (!destino) return;
-    const link = planilha.getUrl() + '#gid=' + destino.getSheetId();
-    aba.getRange(i + 6, indice + 1).setRichTextValue(
-      SpreadsheetApp.newRichTextValue().setText(String(linha.projeto)).setLinkUrl(link).build()
-    );
-  });
-}
-
-function inserirGraficoVisao(aba, campos, quantidade, inicio, coluna) {
-  const projeto = campos.indexOf('projeto');
-  const score = campos.indexOf('score');
-  if (projeto < 0 || score < 0 || !quantidade) return;
-  const grafico = aba.newChart().setChartType(Charts.ChartType.BAR)
-    .addRange(aba.getRange(inicio - 1, projeto + 1, quantidade + 1, 1))
-    .addRange(aba.getRange(inicio - 1, score + 1, quantidade + 1, 1))
-    .setNumHeaders(1).setOption('title', 'Score dos projetos')
-    .setOption('fontName', 'Inter').setOption('legend', { position: 'none' })
-    .setOption('colors', [TEMA.lider])
-    .setOption('hAxis', { viewWindow: { min: 0, max: 100 }, textStyle: { color: TEMA.apagada } })
-    .setPosition(5, coluna, 0, 0).build();
-  aba.insertChart(grafico);
+function aplicarFaixas(faixa) {
+  const cores = [];
+  for (let r = 0; r < faixa.getNumRows(); r += 1) {
+    cores.push(linhaFormato(faixa.getNumColumns(), r % 2 ? TEMA.faixa : TEMA.branco));
+  }
+  faixa.setBackgrounds(cores);
 }
 
 function protegerEspelho(aba) {
@@ -678,15 +926,15 @@ function coletarAvisos(dados) {
   ], 'payload', avisos);
   const camposVisaoConhecidos = CAMPOS_VISAO_FALLBACK.concat(camposVisao, [
     'manual', 'dias_ate_decisao', 'escolhido', 'aguardando_preco',
-    'data_decisao', 'cotacoes_vencidas',
+    'data_decisao', 'cotacoes_vencidas', 'abaixo_confianca_minima', 'empate_tecnico',
   ]);
   (Array.isArray(dados.visao_geral) ? dados.visao_geral : []).forEach(function (linha, indice) {
     avisarCampos(linha, camposVisaoConhecidos, 'visao geral ' + indice, avisos);
   });
   (Array.isArray(dados.comparativos) ? dados.comparativos : []).forEach(function (comp, ci) {
-    avisarCampos(comp, ['projeto', 'colunas', 'situacao', 'linhas', 'metricas'], 'comparativo ' + ci, avisos);
+    avisarCampos(comp, ['projeto', 'categoria', 'escolhido', 'data_decisao', 'colunas', 'situacao', 'linhas', 'metricas'], 'comparativo ' + ci, avisos);
     (Array.isArray(comp.metricas) ? comp.metricas : []).forEach(function (metrica, mi) {
-      avisarCampos(metrica, camposMetricas, 'metrica ' + ci + '/' + mi, avisos);
+      avisarCampos(metrica, camposMetricas.concat(['vencida', 'fonte', 'motivos_corte']), 'metrica ' + ci + '/' + mi, avisos);
     });
     (Array.isArray(comp.linhas) ? comp.linhas : []).forEach(function (linha, li) {
       avisarCampos(linha, ['rotulo', 'tipo', 'secao', 'valores', 'valores_tipados'], 'linha ' + ci + '/' + li, avisos);
@@ -786,6 +1034,7 @@ function resposta(obj) {
 | 5 | deploy feito por uma conta editora | o Web App perdeu acesso à pasta que pertence a conta-comercial |
 | 5 → 7 | coluna congelada atravessava títulos mesclados | exceção em tempo de execução, apesar do código salvo e publicado |
 | 7 → 8 | gráficos usavam intervalos horizontais separados e transpostos | ranking vazio e eixos com rótulos misturados, sem erro de sincronização |
+| 8 → 9 | visão geral comparava scores relativos de compras diferentes | gráfico conceitualmente enganoso, substituído por contagens de pendências comparáveis |
 
 Os bugs visuais só apareceram quando a planilha foi aberta. Vale a lição:
 resposta HTTP, execução “Concluído” no Apps Script e contagens corretas não
@@ -834,20 +1083,21 @@ python scripts/central_compras.py sincronizar-planilha
 Sucesso devolve `Planilha sincronizada: N projeto(s), N comparativo(s).`
 
 **Timeout:** a Versão 4 levou até ~47s com 8 projetos no teste de 2026-09-04
-porque escrevia linha por linha. A Versão 8 usa `setValues` em lote, mas a
+porque escrevia linha por linha. As Versões 8 e 9 usam `setValues` em lote, mas a
 renderização dos gráficos ainda pode passar de um minuto. Por isso o cliente
 Python continua com timeout de 120s; **não reduza esse valor**.
 
-## Estado desta mudança
+## Estado implantado e validado
 
-- O cliente Python e o Code.gs da Versão 8 estão versionados com
-  compatibilidade nos dois sentidos: payload antigo tem fallback, e os
-  campos novos são aditivos para a Versão 4.
-- **Deploy concluído:** a implantação ativa é a Versão 8, executada como
-  **conta-comercial**, no mesmo endpoint versionado.
-- Verificação de 05/09/2026: 8 projetos, 8 comparativos, 9 abas sem órfãs,
-  filtros e links na `Visao Geral`, números tipados, 1 gráfico geral, ranking
-  em todos os comparativos e gráficos de eixos por projeto. A conferência
-  visual encontrou e eliminou duas falhas que o retorno `ok` não detectava:
-  congelamento atravessando células mescladas e fontes transpostas que
-  deixavam gráficos vazios ou com rótulos misturados.
+- O cliente Python envia schema 3. Os campos são aditivos, e o receptor mantém
+  fallback para o payload anterior; a ordem de deploy não quebra a planilha.
+- O Code.gs V9 preserva fallback para payload antigo e registra campos
+  desconhecidos sem rejeitar a sincronização inteira.
+- A V9 troca o gráfico inválido de scores entre projetos por pendências
+  comparáveis, acrescenta fila de atenção, contexto, veredito e alertas por
+  projeto, e preserva tipos numéricos e fontes contíguas de gráficos.
+- **VERSÃO 9 IMPLANTADA E VERIFICADA:** publicada em 05/09/2026 pela conta
+  `conta-comercial@exemplo.com` na implantação existente. Duas sincronizações
+  consecutivas devolveram 8 projetos e 8 comparativos. A planilha ficou com 9
+  abas, sem abas órfãs ou erros de célula, e os gráficos foram inspecionados no
+  arquivo real no desktop e em largura de celular.

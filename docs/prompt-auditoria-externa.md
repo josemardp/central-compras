@@ -24,7 +24,7 @@ depois, "deu certo?") vale para sempre.
 
 - Python 3, dependência única `PyYAML`. `scripts/central_compras.py`, arquivo
   único, ~30 subcomandos.
-- **284 testes**: `python -m unittest discover -s tests`. Passam aqui, e levam
+- **287 testes**: `python -m unittest discover -s tests`. Passam aqui, e levam
   uns 2 minutos.
 - Usado de **várias máquinas Windows**, por uma pessoa que **não é
   desenvolvedora**.
@@ -52,6 +52,7 @@ para calibrar o tipo de coisa que passou despercebida:**
 | 5 | implantação publicada por uma conta editora | o Web App perdeu acesso à pasta da conta proprietária |
 | 5 → 7 | congelamento da coluna A atravessava células mescladas | erro em tempo de execução |
 | 7 → 8 | gráficos liam intervalos separados e transpostos | ranking vazio e eixos com rótulos misturados, sem falha no POST |
+| 8 → 9 | gráfico geral comparava scores relativos entre compras diferentes | visual convincente, mas comparação conceitualmente inválida; trocado por pendências contáveis |
 
 O padrão que eu quero que você cace é: **algo pode estar errado sem o pipeline
 parecer quebrado.** Não confie apenas no status HTTP, na execução “Concluído”,
@@ -150,7 +151,7 @@ Então:
   falar dele, escreva "o token". Se encontrar o valor em algum arquivo
   versionado, isso é achado grave — reporte o **caminho e a linha**, nunca o
   valor.
-- Os 284 testes passam aqui. Se falharem aí, isso já é achado. O resumo do
+- Os 287 testes passam aqui. Se falharem aí, isso já é achado. O resumo do
   `unittest` sai em `stderr`; não use pipe que esconda o código de saída.
 - **Se não achar nada, diga isso.** "Abri as 9 abas, conferi contra o
   ranking.csv, está tudo consistente" é resposta útil.
@@ -162,8 +163,9 @@ Então:
 - O comando `sincronizar-planilha` responder `ok` não prova que a planilha
   ficou legível. HTTP 200 e “Concluído” também não: `doPost` captura exceções e
   pode devolver `ok: false`. Já está escrito na doc.
-- A implantação ativa é a **Versão 8**, publicada pela conta proprietária
-  `conta-comercial`, no mesmo endpoint. As versões 5 a 7 foram intermediárias.
+- A implantação ativa é a **Versão 9**, publicada pela conta proprietária
+  `conta-comercial`, no mesmo endpoint. Ela foi sincronizada duas vezes e conferida
+  na planilha real; as versões 5 a 8 foram intermediárias.
 - O checklist consolidado está em
   [`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).
 - A planilha é **espelho descartável**. A verdade é o `cotacoes.csv` de cada

@@ -108,7 +108,7 @@ class SheetsPayloadTest(unittest.TestCase):
     def test_payload_matches_dashboard_counts_and_comparison(self):
         payload = cc.sheets_export_payload()
 
-        self.assertEqual(payload["schema_versao"], 2)
+        self.assertEqual(payload["schema_versao"], 3)
         self.assertEqual(
             payload["visao_geral_colunas"],
             cc.SHEETS_OVERVIEW_COLUMNS,
@@ -126,15 +126,33 @@ class SheetsPayloadTest(unittest.TestCase):
         self.assertEqual(visao["score"], contagem["score"])
         self.assertIn("data_decisao", visao)
         self.assertIn("cotacoes_vencidas", visao)
+        self.assertIn("abaixo_confianca_minima", visao)
+        self.assertFalse(visao["empate_tecnico"])
 
         self.assertEqual(len(payload["comparativos"]), 1)
         comp = payload["comparativos"][0]
         self.assertEqual(comp["projeto"], self.projeto.name)
+        self.assertEqual(comp["categoria"], "camera")
+        self.assertEqual(comp["escolhido"], "")
+        self.assertEqual(comp["data_decisao"], "")
         self.assertEqual(comp["colunas"], ["Boa", "Cara Demais"])
         self.assertEqual(comp["situacao"], ["elegivel", "cortado"])
         self.assertEqual(comp["metricas"][0]["produto"], "Boa")
         self.assertEqual(comp["metricas"][0]["custo_total"], 300.0)
         self.assertIsInstance(comp["metricas"][0]["score"], float)
+        self.assertEqual(comp["metricas"][0]["fonte"], "manual")
+        self.assertIsInstance(comp["metricas"][0]["vencida"], bool)
+        self.assertEqual(comp["metricas"][0]["motivos_corte"], [])
+        self.assertTrue(comp["metricas"][1]["motivos_corte"])
+
+    def test_technical_tie_includes_exactly_three_points(self):
+        primeiro = _item_falso()
+        primeiro.score = 91.0
+        segundo = _item_falso()
+        segundo.score = 88.0
+        self.assertTrue(cc.is_technical_tie([primeiro, segundo]))
+        segundo.score = 87.99
+        self.assertFalse(cc.is_technical_tie([primeiro, segundo]))
 
     def test_price_row_is_never_starred(self):
         payload = cc.sheets_export_payload()
@@ -487,9 +505,9 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         cls.code = doc.split("```javascript", 1)[1].split("```", 1)[0]
 
     def test_deploy_ativo_esta_documentado(self):
-        self.assertIn("versão 8 implantada", self.doc)
-        self.assertIn("a implantação ativa é a Versão 8", self.doc)
-        self.assertIn("executada como", self.doc)
+        self.assertIn("versão 9 ativa", self.doc)
+        self.assertIn("VERSÃO 9 IMPLANTADA E VERIFICADA", self.doc)
+        self.assertNotIn("DEPLOY PENDENTE", self.doc)
 
     def test_renderizacao_e_em_lote_e_tem_lock(self):
         self.assertNotIn(".appendRow(", self.code)
@@ -506,18 +524,25 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
 
     def test_visual_premium_e_dados_tipados_estao_documentados(self):
         self.assertIn("function escreverVisaoGeral", self.code)
-        self.assertIn("function inserirGraficoVisao", self.code)
+        self.assertIn("function inserirGraficoPendencias", self.code)
         self.assertIn("function inserirGraficosComparativo", self.code)
         self.assertIn("function formatoTipo", self.code)
+
+    def test_visao_geral_nao_compara_scores_de_projetos(self):
+        self.assertNotIn("function inserirGraficoVisao", self.code)
+        self.assertIn("Pendencias por projeto (contagem)", self.code)
+        self.assertIn("score total nao e comparavel entre projetos", self.code)
 
     def test_congelamento_nao_corta_celulas_mescladas(self):
         self.assertNotIn("setFrozenColumns(1)", self.code)
         self.assertGreaterEqual(self.code.count("setFrozenColumns(0)"), 3)
+        self.assertNotIn("setFrozenRows(linhaCabecalho)", self.code)
+        self.assertIn("aba.setFrozenRows(3)", self.code)
 
     def test_graficos_comparativos_usam_fontes_contiguas(self):
         self.assertNotIn("setTransposeRowsAndColumns", self.code)
-        self.assertIn("const rankingDados = [['Produto', 'Score']]", self.code)
-        self.assertIn("const eixosDados = [['Eixo'].concat(produtos)]", self.code)
+        self.assertIn("const rankingDados = [['Produto', 'Lider', 'Demais']]", self.code)
+        self.assertIn("const eixosDados = [['Eixo'].concat(colunas)]", self.code)
         self.assertIn(".addRange(rankingFonte).setNumHeaders(1)", self.code)
         self.assertIn(".addRange(eixosFonte).setNumHeaders(1)", self.code)
 
@@ -529,7 +554,12 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         self.assertIn("Empate tecnico", self.code)
         self.assertIn("setRichTextValue", self.code)
         self.assertIn("setWarningOnly(true)", self.code)
+        self.assertIn("getProtections(SpreadsheetApp.ProtectionType.SHEET)", self.code)
         self.assertIn("sem dado", self.code)
+
+    def test_payload_legado_nao_produz_veredito_nan(self):
+        self.assertIn("Score indisponivel neste payload", self.code)
+        self.assertIn("const metrica = metricas[indice] || {}", self.code)
 
     def test_timeout_de_sincronizacao_continua_em_120_segundos(self):
         script = (

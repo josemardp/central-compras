@@ -1,5 +1,11 @@
 # Prompt para o Kimi — Google Sheets premium, Versão 9
 
+> **Status: executado e verificado em 05/09/2026.** A V9 foi publicada pela
+> conta `conta-comercial@exemplo.com` na implantação existente, sincronizada duas vezes
+> com 8 projetos e 8 comparativos e conferida na planilha real no desktop e em
+> largura de celular. A suíte final tem 287 testes passando. O texto abaixo é
+> preservado como especificação histórica da implementação.
+
 Kimi, trabalhe no repositório `C:\projetos\central-compras` e transforme a
 planilha **Central de Compras - Cotacoes e Comparacoes** na melhor versão que
 o Google Sheets consegue oferecer como instrumento pessoal de decisão de

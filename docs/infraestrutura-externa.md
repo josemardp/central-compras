@@ -50,8 +50,8 @@ Na ordem, porque cada passo pega um caso que o anterior não pega:
 
 ### Conta
 
-Tudo na conta Google **conta-comercial@exemplo.com** (perfil "Esdra Aline").
-No navegador, reutilize o perfil Chrome de Esdra quando estiver disponível,
+Tudo na conta Google **conta-comercial@exemplo.com** (perfil Chrome "Esdra" nesta
+máquina). No navegador, reutilize esse perfil quando estiver disponível,
 mas **confirme o e-mail pelo avatar antes de publicar**. Nome de perfil ou de
 servidor de automação não comprova qual conta está ativa.
 
@@ -81,12 +81,13 @@ de propósito: assim não desaparece se a planilha for para a lixeira).
 - Editor: `script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 - Web App **ativo**, execução como conta-comercial, acesso "qualquer pessoa",
   protegido por token no corpo do POST.
-- A implantação ativa é a **Versão 8**, publicada em 05/09/2026 pela conta
-  **conta-comercial**, no mesmo ID e na mesma URL do Web App. O layout premium foi
-  sincronizado com 8 projetos e 8 comparativos e conferido na planilha real:
-  9 abas, filtros, links, formatos numéricos e gráficos. As versões 5 a 7
-  foram etapas intermediárias do mesmo deploy; a 8 corrige o congelamento de
-  colunas com células mescladas e as fontes transpostas dos gráficos.
+- A implantação ativa é a **Versão 9**, publicada em 05/09/2026 pela conta
+  **conta-comercial**, no mesmo ID e na mesma URL do Web App. O layout foi
+  sincronizado duas vezes com 8 projetos e 8 comparativos e conferido na
+  planilha real: 9 abas, fila de atenção, vereditos, filtros, links, formatos
+  numéricos e gráficos. A V9 substitui a comparação inválida de scores entre
+  projetos por contagens de pendências e mantém compatibilidade com o payload
+  anterior. As versões 5 a 8 foram etapas do mesmo deploy.
 - Código e procedimento de redeploy: [`integracao-google-sheets.md`](integracao-google-sheets.md).
 - Lições e checklist de validação: [`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).
 
