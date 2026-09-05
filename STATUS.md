@@ -5,6 +5,61 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## AO RETOMAR — comece por aqui (deixado em 04/09/2026)
+
+Repositório limpo, sincronizado com `origin/main`, **281 testes passando**
+(conferido no fechamento; a suíte leva ~2,5 min e o resumo sai em *stderr*,
+cuidado ao usar pipe).
+
+Duas frentes abertas, **nesta ordem**. As duas terminam no mesmo lugar: abrir
+a planilha e olhar. Nenhuma das duas se conclui com o `ok` do terminal.
+
+### 1. Implantar a Versão 5 do Apps Script (bloqueado, só o Josemar destrava)
+
+O Codex preparou a Versão 5 no repositório (commit `3e65c5c`) e **não
+conseguiu implantar** — o deploy exige navegador logado na conta **conta-comercial**
+com confirmação em duas etapas no celular. **A implantação ativa continua na
+Versão 4.**
+
+O que fazer, em ordem:
+
+1. Abrir `docs/integracao-google-sheets.md`, copiar o bloco `Code.gs`.
+2. Colar no editor do projeto `Central de Compras - Sync`
+   (`script.google.com`, conta conta-comercial), salvar.
+3. Implantar → Gerenciar implantações → editar a existente → Versão: **Nova
+   versão** → Implantar. **Nunca "Nova implantação"**, que gera URL nova e
+   quebra as outras máquinas.
+4. `python scripts/central_compras.py sincronizar-planilha`
+5. **Abrir a planilha e conferir com o olho.** O payload novo é
+   retrocompatível, então a Versão 4 não quebra enquanto isso — mas também
+   não mostra o layout novo.
+
+O Claude consegue fazer os passos 1 a 4 se o Josemar aprovar o 2FA no celular
+na hora, como já foi feito hoje.
+
+### 2. Redesign visual da planilha — leia e execute
+
+**`docs/prompt-design-planilha.md`** — plano completo de design, pronto para
+enviar ao Codex (copie tudo abaixo do `---`).
+
+Cores já validadas por script contra a superfície branca do Sheets; não trocar
+tom "no olho". O plano traz paleta, tipografia, layout aba a aba, dois
+gráficos por projeto, o que o Sheets permite de interação, os anti-padrões
+proibidos e 9 critérios de aceite.
+
+### Também parado, esperando decisão do Josemar
+
+**Relógio** (`2026-relogio-integrado-ao-celular-para-passos-e-batimentos`):
+Huawei Band 9 escolhido pelo critério de saúde, mas **a cor preta cotada a
+R$ 239,88 esgotou**. A cor deixou de ser critério (o módulo é destacável), e
+na Amazon não há Band 9 abaixo de R$ 350. Falta o levantamento de todas as
+cores no Mercado Livre — o prompt está pronto no fim da conversa de 04/09, e o
+ML bloqueia navegador automatizado (403), então depende do Codex ou do
+Josemar. A opção viva mais barata hoje é a **amarela a R$ 312**, R$ 12 acima
+do teto.
+
+---
+
 ## Última sessão: 04/09/2026
 
 - **Versão 5 premium da planilha preparada no repositório, mas ainda não
@@ -277,6 +332,10 @@
   do painel. Ver "Do repositório" abaixo.
 
 ## Próximo passo
+
+> As duas frentes ativas de 04/09 (deploy da Versão 5 e o redesign da
+> planilha) estão no bloco **AO RETOMAR**, no topo deste arquivo. O que segue
+> abaixo são as compras que continuam abertas há mais tempo.
 
 **Câmera de monitoramento:** confirmar manualmente (abrir o checkout de
 verdade) o preço/frete/estoque/garantia de pelo menos o Intelbras iM5 SC e o
