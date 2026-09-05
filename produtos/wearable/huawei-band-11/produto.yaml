@@ -1,0 +1,15 @@
+id: huawei-band-11
+categoria: wearable
+nome: Huawei Band 11
+marca: Huawei
+estado: pesquisando
+projeto: 2026-relogio-integrado-ao-celular-para-passos-e-batimentos
+preco_alvo: null
+preco_teto: 300.0
+atributos:
+  tela: amoled-1.62
+  bateria_dias: 14
+  caixa: liga-aluminio
+requisitos_atendidos: {}
+proveniencia: null
+descartado_porque: null

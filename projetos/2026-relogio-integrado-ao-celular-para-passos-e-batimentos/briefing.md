@@ -1,10 +1,10 @@
 ---
-projeto_id: "2026-relogio-integrado-ao-celular-para-passos-e-batimentos"
-categoria: "wearable"
+projeto_id: 2026-relogio-integrado-ao-celular-para-passos-e-batimentos
+categoria: wearable
 valor_estimado: 250.0
 preco_teto: 300.0
-estado: pesquisando
-criado_em: "2026-09-04"
+estado: comprado
+criado_em: '2026-09-04'
 ---
 
 # Briefing

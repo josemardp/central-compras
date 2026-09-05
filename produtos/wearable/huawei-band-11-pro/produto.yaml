@@ -1,0 +1,15 @@
+id: huawei-band-11-pro
+categoria: wearable
+nome: Huawei Band 11 Pro
+marca: Huawei
+estado: pesquisando
+projeto: 2026-relogio-integrado-ao-celular-para-passos-e-batimentos
+preco_alvo: null
+preco_teto: 300.0
+atributos:
+  tela: amoled-1.62
+  gps: proprio
+  bateria_dias: 14
+requisitos_atendidos: {}
+proveniencia: null
+descartado_porque: null

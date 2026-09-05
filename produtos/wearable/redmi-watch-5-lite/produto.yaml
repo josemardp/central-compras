@@ -1,0 +1,14 @@
+id: redmi-watch-5-lite
+categoria: wearable
+nome: Redmi Watch 5 Lite
+marca: Redmi
+estado: pesquisando
+projeto: 2026-relogio-integrado-ao-celular-para-passos-e-batimentos
+preco_alvo: null
+preco_teto: 300.0
+atributos:
+  gps: proprio
+  bateria_dias: 13
+requisitos_atendidos: {}
+proveniencia: null
+descartado_porque: null

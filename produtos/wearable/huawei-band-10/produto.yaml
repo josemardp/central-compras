@@ -1,0 +1,15 @@
+id: huawei-band-10
+categoria: wearable
+nome: Huawei Band 10
+marca: Huawei
+estado: pesquisando
+projeto: 2026-relogio-integrado-ao-celular-para-passos-e-batimentos
+preco_alvo: null
+preco_teto: 300.0
+atributos:
+  tela: amoled
+  bateria_dias: 14
+  garantia_meses: 3
+requisitos_atendidos: {}
+proveniencia: null
+descartado_porque: null

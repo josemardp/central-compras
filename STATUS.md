@@ -15,18 +15,35 @@ projetos e 8 comparativos. A planilha foi aberta e conferida: 9 abas sem
 gráficos renderizados. Detalhes e endereços em
 `docs/infraestrutura-externa.md`.
 
-### Também parado, esperando decisão do Josemar
-
-**Relógio** (`2026-relogio-integrado-ao-celular-para-passos-e-batimentos`):
-Huawei Band 9 escolhido pelo critério de saúde, mas **a cor preta cotada a
-R$ 239,88 esgotou**. A cor deixou de ser critério (o módulo é destacável), e
-na Amazon não há Band 9 abaixo de R$ 350. Falta o levantamento de todas as
-cores no Mercado Livre — o prompt está pronto no fim da conversa de 04/09, e o
-ML bloqueia navegador automatizado (403), então depende do Codex ou do
-Josemar. A opção viva mais barata hoje é a **amarela a R$ 312**, R$ 12 acima
-do teto.
+**Relógio fechado nesta sessão** (ver bloco "Última sessão: 05/09/2026 —
+decisão do relógio" abaixo): Huawei Band 11 Pro, R$ 346, comprado. Falta só
+rodar o veredito D+30 quando chegar.
 
 ---
+
+## Última sessão: 05/09/2026 — decisão do relógio
+
+- **Compra fechada**: `huawei-band-11-pro`, R$ 346,00 (Mercado Livre),
+  `--permitir-cortado` (passou do teto de R$ 300) e `--comprado`. Perdedores
+  registrados: Samsung Galaxy Fit3 (única com Samsung Health nativo, mas
+  Josemar preferiu geração nova + GPS próprio), Redmi Watch 5 Lite, Xiaomi
+  Smart Band 9 Active, Huawei Band 11 comum, Huawei Band 10, Huawei Band 9
+  (descartado por instabilidade). Snapshot e veredito criados.
+- **Lição cara desta sessão, registrada em `base-conhecimento/licoes.md`**:
+  relatório de IA externa (tipo ChatGPT agêntico) pesquisando preço **não é
+  confiável sozinho**. Nesta compra ele inventou link de produto (Amazon
+  404), errou garantia (disse 12 meses, era 3), o mesmo anúncio do ML voltou
+  com 4 preços diferentes em relatórios seguidos, e quase descartou a Band 11
+  inteira por "cara" (R$339-418) citando só a variante de alumínio — a
+  variante em polímero do mesmo produto estava R$ 214,95 e ninguém tinha
+  achado.
+  **Correção de método**: quando o Playwright MCP desta sessão consegue
+  acessar a loja direto (confirmado em Amazon e KaBuM), pesquisar ali
+  primeiro, antes de pedir relatório pra IA externa. Mercado Livre bloqueia
+  acesso automatizado (403) — ali só resta prompt pra IA externa ou
+  conferência manual do Josemar, e mesmo assim tratar como pista a conferir,
+  nunca como preço fechado. Print de tela do próprio Josemar (logado,
+  Mercado Livre/Amazon) conta como confirmação manual real.
 
 ## Última sessão: 05/09/2026 — Versão 9
 
@@ -394,11 +411,8 @@ tinha poder de detecção real.
 
 - [x] **Implantar e conferir o redesign premium.** Concluído na Versão 8; a
   inspeção real encontrou e corrigiu dois bugs após respostas `ok`.
-- [ ] **Relógio: decidir.** A Huawei Band 9 preta (R$ 239,88) esgotou. A cor
-  deixou de ser critério, mas na Amazon não há Band 9 abaixo de R$ 350 e o
-  Mercado Livre bloqueia navegador automatizado (403). Falta o levantamento
-  de todas as cores no ML — depende do Codex ou do próprio Josemar. Opção
-  viva mais barata hoje: **amarela a R$ 312**, R$ 12 acima do teto.
+- [x] **Relógio: decidir.** Fechado em 05/09/2026: `huawei-band-11-pro`,
+  R$ 346,00, comprado. Ver "Última sessão: 05/09/2026 — decisão do relógio".
 
 ### Passos manuais do Josemar (bloqueiam o projeto do carro)
 

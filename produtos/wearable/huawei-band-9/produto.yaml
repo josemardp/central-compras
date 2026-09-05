@@ -2,7 +2,7 @@ id: huawei-band-9
 categoria: wearable
 nome: Huawei Band 9
 marca: Huawei
-estado: pesquisando
+estado: descartado
 projeto: 2026-relogio-integrado-ao-celular-para-passos-e-batimentos
 preco_alvo: null
 preco_teto: 300.0
@@ -20,4 +20,7 @@ requisitos_atendidos:
   batimentos: true
   resistencia_agua: 5ATM
 proveniencia: null
-descartado_porque: null
+descartado_porque: Preco so tem fonte web instavel (mesmo anuncio variou entre R$239,88
+  e R$312 em relatorios diferentes no mesmo periodo) e o produto aparece esgotado
+  nas lojas onde foi possivel verificar de verdade (KaBuM). Sem cotacao manual confiavel,
+  nao serve pra decisao.
