@@ -46,7 +46,7 @@ Na ordem, porque cada passo pega um caso que o anterior não pega:
    Web App **ativo** (é o que responde na internet) e **Acionadores** para
    ver se há automação agendada.
 
-## Inventário atual (04/09/2026)
+## Inventário atual (05/09/2026)
 
 ### Conta
 
@@ -79,11 +79,12 @@ de propósito: assim não desaparece se a planilha for para a lixeira).
 - Editor: `script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 - Web App **ativo**, execução como conta-comercial, acesso "qualquer pessoa",
   protegido por token no corpo do POST.
-- A implantação ativa continua na **Versão 4**. A Versão 5 premium está
-  preparada no repositório, com deploy pendente por exigir login na conta
-  **conta-comercial** e confirmação em duas etapas pelo dono. Não sincronize
-  esperando o novo layout antes desse deploy; depois de publicar, abra a
-  planilha e valide visualmente em vez de confiar apenas no retorno `ok`.
+- A implantação ativa é a **Versão 8**, publicada em 05/09/2026 pela conta
+  **conta-comercial**, no mesmo ID e na mesma URL do Web App. O layout premium foi
+  sincronizado com 8 projetos e 8 comparativos e conferido na planilha real:
+  9 abas, filtros, links, formatos numéricos e gráficos. As versões 5 a 7
+  foram etapas intermediárias do mesmo deploy; a 8 corrige o congelamento de
+  colunas com células mescladas e as fontes transpostas dos gráficos.
 - Código e procedimento de redeploy: [`integracao-google-sheets.md`](integracao-google-sheets.md).
 
 ### Configuração: o que viaja no `git pull` e o que não viaja

@@ -270,6 +270,28 @@ class _FakeNaoJsonServer(BaseHTTPRequestHandler):
         self.wfile.write(corpo)
 
 
+class _FakeAppsScriptComDetalhe(BaseHTTPRequestHandler):
+    """Devolve uma falha capturada pelo Apps Script com diagnostico util."""
+
+    def log_message(self, *_):
+        pass
+
+    def do_POST(self):
+        tamanho = int(self.headers.get("Content-Length", 0))
+        self.rfile.read(tamanho)
+        resposta = {
+            "ok": False,
+            "error": "falha na sincronizacao",
+            "detalhe": "Range not found",
+        }
+        dados = json.dumps(resposta).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(dados)))
+        self.end_headers()
+        self.wfile.write(dados)
+
+
 class SincronizarPlanilhaTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-sync-"))
@@ -337,6 +359,15 @@ class SincronizarPlanilhaTest(unittest.TestCase):
         with self.assertRaises(SystemExit) as ctx:
             cc.sincronizar_planilha(argparse.Namespace(config=str(caminho)))
         self.assertIn("token invalido", str(ctx.exception))
+
+    def test_apps_script_error_includes_captured_detail(self):
+        url = self._sobe_servidor(_FakeAppsScriptComDetalhe)
+        caminho = self._config(url, "qualquer-token")
+        with self.assertRaises(SystemExit) as ctx:
+            cc.sincronizar_planilha(argparse.Namespace(config=str(caminho)))
+        mensagem = str(ctx.exception)
+        self.assertIn("falha na sincronizacao", mensagem)
+        self.assertIn("Range not found", mensagem)
 
     def test_non_json_response_does_not_crash_with_a_raw_traceback(self):
         url = self._sobe_servidor(_FakeNaoJsonServer)
@@ -455,9 +486,10 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         cls.doc = doc
         cls.code = doc.split("```javascript", 1)[1].split("```", 1)[0]
 
-    def test_deploy_esta_marcado_como_pendente(self):
-        self.assertIn("versão 5 preparada, deploy pendente", self.doc)
-        self.assertIn("a implantação ativa continua na Versão 4", self.doc)
+    def test_deploy_ativo_esta_documentado(self):
+        self.assertIn("versão 8 implantada", self.doc)
+        self.assertIn("a implantação ativa é a Versão 8", self.doc)
+        self.assertIn("executada como", self.doc)
 
     def test_renderizacao_e_em_lote_e_tem_lock(self):
         self.assertNotIn(".appendRow(", self.code)
@@ -477,6 +509,17 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         self.assertIn("function inserirGraficoVisao", self.code)
         self.assertIn("function inserirGraficosComparativo", self.code)
         self.assertIn("function formatoTipo", self.code)
+
+    def test_congelamento_nao_corta_celulas_mescladas(self):
+        self.assertNotIn("setFrozenColumns(1)", self.code)
+        self.assertGreaterEqual(self.code.count("setFrozenColumns(0)"), 3)
+
+    def test_graficos_comparativos_usam_fontes_contiguas(self):
+        self.assertNotIn("setTransposeRowsAndColumns", self.code)
+        self.assertIn("const rankingDados = [['Produto', 'Score']]", self.code)
+        self.assertIn("const eixosDados = [['Eixo'].concat(produtos)]", self.code)
+        self.assertIn(".addRange(rankingFonte).setNumHeaders(1)", self.code)
+        self.assertIn(".addRange(eixosFonte).setNumHeaders(1)", self.code)
 
     def test_visual_segue_a_paleta_e_as_interacoes_aprovadas(self):
         for cor in ("#2a78d6", "#eaf2fd", "#fab219", "#d03b3b", "#f9f9f7"):

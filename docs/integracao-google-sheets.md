@@ -35,12 +35,12 @@ Projeto "Central de Compras - Sync" em https://script.google.com, conta
 conta-comercial. Editor:
 `https://script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 
-## Code.gs (versão 5 preparada, deploy pendente)
+## Code.gs (versão 8 implantada)
 
-> **ATENÇÃO:** o código abaixo ainda não está implantado. A versão publicada
-> continua sendo a Versão 4. O deploy exige navegador autenticado na conta
-> conta-comercial e confirmação em duas etapas pelo dono. Não rode
-> `sincronizar-planilha` esperando este visual antes desse deploy.
+> O código abaixo corresponde à Versão 8, implantada em 05/09/2026 pela conta
+> **conta-comercial** na implantação existente. O ID e a URL do Web App foram
+> preservados. A sincronização e a renderização real foram verificadas com 8
+> projetos e 8 comparativos.
 
 ```javascript
 const TOKEN = '...'; // cole aqui uma senha longa aleatoria. O valor real vive
@@ -243,7 +243,9 @@ function escreverVisaoGeral(planilha, linhas, campos, geradoEm, avisos, comparat
       ' · a fonte e o cotacoes.csv de cada projeto')
     .setFontFamily('Inter').setFontSize(9).setFontColor(TEMA.apagada);
   aba.setFrozenRows(5);
-  aba.setFrozenColumns(1);
+  // Titulos e rodapes atravessam varias colunas mescladas; congelar uma
+  // coluna cortaria essas mesclas e o Google Sheets rejeitaria a renderizacao.
+  aba.setFrozenColumns(0);
   aba.setTabColor(TEMA.lider);
   protegerEspelho(aba);
 }
@@ -336,7 +338,7 @@ function escreverComparativo(planilha, comp, nomeAba, geradoEm, linkVisao) {
       ' · edite o repositorio, nao esta planilha')
     .setFontFamily('Inter').setFontSize(9).setFontColor(TEMA.apagada);
   aba.setFrozenRows(2);
-  aba.setFrozenColumns(1);
+  aba.setFrozenColumns(0);
   aba.setTabColor(TEMA.lider);
   protegerEspelho(aba);
 
@@ -451,23 +453,50 @@ function estilizarSecoes(aba, matriz, largura) {
 }
 
 function inserirGraficosComparativo(aba, linhaProdutos, largura, linhaScore, linhaEixos, ancora, quantidade) {
-  const cores = linhaFormato(Math.max(1, quantidade), TEMA.apagada);
-  if (cores.length) cores[0] = TEMA.lider;
+  const produtos = aba.getRange(linhaProdutos, 2, 1, quantidade).getValues()[0];
+  const scores = aba.getRange(linhaScore, 2, 1, quantidade).getValues()[0];
+  const nomesEixos = aba.getRange(linhaEixos, 1, 5, 1).getValues().map(function (linha) {
+    return linha[0];
+  });
+  const valoresEixos = aba.getRange(linhaEixos, 2, 5, quantidade).getValues();
+  const colunaFonte = largura + 8;
+  const ultimaColunaFonte = colunaFonte + quantidade;
+  if (aba.getMaxColumns() < ultimaColunaFonte) {
+    aba.insertColumnsAfter(aba.getMaxColumns(), ultimaColunaFonte - aba.getMaxColumns());
+  }
+
+  // Os graficos do Sheets sao mais previsiveis com tabelas contiguas. As
+  // fontes ficam estreitas e brancas, fora da area principal do comparativo.
+  const rankingDados = [['Produto', 'Score']].concat(produtos.map(function (produto, indice) {
+    return [produto, scores[indice]];
+  }));
+  const rankingFonte = aba.getRange(ancora, colunaFonte, rankingDados.length, 2);
+  rankingFonte.setValues(rankingDados);
+  const linhaFonteEixos = ancora + rankingDados.length + 1;
+  const eixosDados = [['Eixo'].concat(produtos)].concat(nomesEixos.map(function (eixo, indice) {
+    return [eixo].concat(valoresEixos[indice]);
+  }));
+  const eixosFonte = aba.getRange(
+    linhaFonteEixos, colunaFonte, eixosDados.length, quantidade + 1
+  );
+  eixosFonte.setValues(eixosDados);
+  aba.getRange(
+    ancora, colunaFonte, linhaFonteEixos + eixosDados.length - ancora,
+    Math.max(2, quantidade + 1)
+  ).setFontColor(TEMA.branco).setBackground(TEMA.branco).setFontSize(6);
+  aba.setColumnWidths(colunaFonte, Math.max(2, quantidade + 1), 24);
+
   const ranking = aba.newChart().setChartType(Charts.ChartType.BAR)
-    .addRange(aba.getRange(linhaProdutos, 1, 1, largura))
-    .addRange(aba.getRange(linhaScore, 1, 1, largura))
-    .setTransposeRowsAndColumns(true).setNumHeaders(1)
+    .addRange(rankingFonte).setNumHeaders(1)
     .setOption('title', 'Score total por candidato').setOption('fontName', 'Inter')
-    .setOption('legend', { position: 'none' }).setOption('colors', cores)
+    .setOption('legend', { position: 'none' }).setOption('colors', [TEMA.lider])
     .setOption('hAxis', { viewWindow: { min: 0, max: 100 }, textStyle: { color: TEMA.apagada } })
     .setPosition(ancora, 1, 0, 0).build();
   aba.insertChart(ranking);
 
   if (quantidade <= 3) {
     const eixos = aba.newChart().setChartType(Charts.ChartType.COLUMN)
-      .addRange(aba.getRange(linhaProdutos, 1, 1, largura))
-      .addRange(aba.getRange(linhaEixos, 1, 5, largura))
-      .setTransposeRowsAndColumns(true).setNumHeaders(1)
+      .addRange(eixosFonte).setNumHeaders(1)
       .setOption('title', 'Cinco eixos da decisao').setOption('fontName', 'Inter')
       .setOption('legend', { position: quantidade > 1 ? 'bottom' : 'none' })
       .setOption('colors', [TEMA.lider, TEMA.slot2, TEMA.slot3].slice(0, quantidade))
@@ -477,9 +506,9 @@ function inserirGraficosComparativo(aba, linhaProdutos, largura, linhaScore, lin
   } else {
     for (let indice = 0; indice < quantidade; indice += 1) {
       const mini = aba.newChart().setChartType(Charts.ChartType.COLUMN)
-        .addRange(aba.getRange(linhaEixos, 1, 5, 1))
-        .addRange(aba.getRange(linhaEixos, indice + 2, 5, 1))
-        .setNumHeaders(0).setOption('title', String(aba.getRange(1, indice + 2).getValue()))
+        .addRange(aba.getRange(linhaFonteEixos, colunaFonte, eixosDados.length, 1))
+        .addRange(aba.getRange(linhaFonteEixos, colunaFonte + indice + 1, eixosDados.length, 1))
+        .setNumHeaders(1).setOption('title', String(produtos[indice]))
         .setOption('fontName', 'Inter').setOption('legend', { position: 'none' })
         .setOption('colors', [TEMA.lider])
         .setOption('vAxis', { viewWindow: { min: 0, max: 1 }, textStyle: { color: TEMA.apagada } })
@@ -792,20 +821,21 @@ python scripts/central_compras.py sincronizar-planilha
 
 Sucesso devolve `Planilha sincronizada: N projeto(s), N comparativo(s).`
 
-**Timeout:** a Versão 4, ainda implantada, levou até ~47s com 8 projetos no
-teste de 2026-09-04 porque escreve linha por linha. Por isso o cliente Python
-continua com timeout de 120s; **não reduza esse valor**. A Versão 5 preparada
-acima usa `setValues` em lote, mas esse ganho só existe depois do deploy e da
-verificação visual na planilha real.
+**Timeout:** a Versão 4 levou até ~47s com 8 projetos no teste de 2026-09-04
+porque escrevia linha por linha. A Versão 8 usa `setValues` em lote, mas a
+renderização dos gráficos ainda pode passar de um minuto. Por isso o cliente
+Python continua com timeout de 120s; **não reduza esse valor**.
 
 ## Estado desta mudança
 
-- O cliente Python e o Code.gs da Versão 5 estão versionados com
+- O cliente Python e o Code.gs da Versão 8 estão versionados com
   compatibilidade nos dois sentidos: payload antigo tem fallback, e os
   campos novos são aditivos para a Versão 4.
-- **Deploy pendente:** a implantação ativa continua na Versão 4. Publicar a
-  Versão 5 exige navegador autenticado em **conta-comercial** e confirmação em duas
-  etapas pelo dono da conta.
-- Depois do deploy, execute a sincronização e abra a planilha para conferir
-  indicadores, `Visao Geral`, comparativos, gráficos, filtros, links, formatos
-  numéricos e estados. Uma resposta JSON com `ok` não encerra essa validação.
+- **Deploy concluído:** a implantação ativa é a Versão 8, executada como
+  **conta-comercial**, no mesmo endpoint versionado.
+- Verificação de 05/09/2026: 8 projetos, 8 comparativos, 9 abas sem órfãs,
+  filtros e links na `Visao Geral`, números tipados, 1 gráfico geral, ranking
+  em todos os comparativos e gráficos de eixos por projeto. A conferência
+  visual encontrou e eliminou duas falhas que o retorno `ok` não detectava:
+  congelamento atravessando células mescladas e fontes transpostas que
+  deixavam gráficos vazios ou com rótulos misturados.

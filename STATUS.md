@@ -5,47 +5,15 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (deixado em 04/09/2026)
+## AO RETOMAR — comece por aqui (deixado em 05/09/2026)
 
-Repositório limpo, sincronizado com `origin/main`, **281 testes passando**
-(conferido no fechamento; a suíte leva ~2,5 min e o resumo sai em *stderr*,
-cuidado ao usar pipe).
-
-Duas frentes abertas, **nesta ordem**. As duas terminam no mesmo lugar: abrir
-a planilha e olhar. Nenhuma das duas se conclui com o `ok` do terminal.
-
-### 1. Implantar a Versão 5 do Apps Script (bloqueado, só o Josemar destrava)
-
-O Codex preparou a Versão 5 no repositório (commit `3e65c5c`) e **não
-conseguiu implantar** — o deploy exige navegador logado na conta **conta-comercial**
-com confirmação em duas etapas no celular. **A implantação ativa continua na
-Versão 4.**
-
-O que fazer, em ordem:
-
-1. Abrir `docs/integracao-google-sheets.md`, copiar o bloco `Code.gs`.
-2. Colar no editor do projeto `Central de Compras - Sync`
-   (`script.google.com`, conta conta-comercial), salvar.
-3. Implantar → Gerenciar implantações → editar a existente → Versão: **Nova
-   versão** → Implantar. **Nunca "Nova implantação"**, que gera URL nova e
-   quebra as outras máquinas.
-4. `python scripts/central_compras.py sincronizar-planilha`
-5. **Abrir a planilha e conferir com o olho.** O payload novo é
-   retrocompatível, então a Versão 4 não quebra enquanto isso — mas também
-   não mostra o layout novo.
-
-O Claude consegue fazer os passos 1 a 4 se o Josemar aprovar o 2FA no celular
-na hora, como já foi feito hoje.
-
-### 2. Redesign visual da planilha — leia e execute
-
-**`docs/prompt-design-planilha.md`** — plano completo de design, pronto para
-enviar ao Codex (copie tudo abaixo do `---`).
-
-Cores já validadas por script contra a superfície branca do Sheets; não trocar
-tom "no olho". O plano traz paleta, tipografia, layout aba a aba, dois
-gráficos por projeto, o que o Sheets permite de interação, os anti-padrões
-proibidos e 9 critérios de aceite.
+Repositório sincronizado com `origin/main`, **284 testes passando**. A
+planilha premium está no ar na **Versão 8** do Apps Script, executada como
+**conta-comercial**, usando o mesmo endpoint. A sincronização real devolveu 8
+projetos e 8 comparativos. A planilha foi aberta e conferida: 9 abas sem
+órfãs, KPIs, filtros, links, tipografia Inter/Roboto Mono, destaques, números
+tipados e gráficos em todos os projetos. Detalhes e endereços em
+`docs/infraestrutura-externa.md`.
 
 ### Também parado, esperando decisão do Josemar
 
@@ -60,7 +28,26 @@ do teto.
 
 ---
 
-## Última sessão: 04/09/2026
+## Última sessão: 05/09/2026
+
+- **Redesign premium implantado e verificado na planilha real.** A implantação
+  existente foi atualizada até a Versão 8 sem trocar a URL. O Web App executa
+  como `conta-comercial@exemplo.com`. A sincronização final confirmou 8 projetos e 8
+  comparativos; a planilha tem 9 abas, um gráfico geral, ranking em cada
+  comparativo e gráficos de eixos (ou minigráficos para muitos candidatos).
+- A conferência visual encontrou dois bugs invisíveis ao retorno `ok`: o
+  congelamento de uma coluna cortava células mescladas, e a transposição de
+  intervalos separados deixava o ranking vazio e misturava rótulos no gráfico
+  de eixos. Ambos foram corrigidos com testes; os gráficos agora usam fontes
+  contíguas fora da área principal.
+- `sincronizar-planilha` agora inclui o campo `detalhe` devolvido pelo Apps
+  Script na mensagem de erro. Foi isso que permitiu diagnosticar as duas
+  falhas sem expor o token.
+- Verificações de dados: `11,7`, `11,4` e `10,8` do consumo dos carros seguem
+  como números com formato `0.##`; textos permanecem texto. O comparativo dos
+  relógios mostra Huawei Band 9 e Galaxy Fit3 em empate técnico.
+
+## Sessão anterior: 04/09/2026
 
 - **Versão 5 premium da planilha preparada no repositório, mas ainda não
   implantada.** O payload Python agora acrescenta schema, colunas dinâmicas,
@@ -333,9 +320,8 @@ do teto.
 
 ## Próximo passo
 
-> As duas frentes ativas de 04/09 (deploy da Versão 5 e o redesign da
-> planilha) estão no bloco **AO RETOMAR**, no topo deste arquivo. O que segue
-> abaixo são as compras que continuam abertas há mais tempo.
+> O deploy e o redesign da planilha foram concluídos em 05/09. O que segue
+> abaixo são as compras que continuam abertas.
 
 **Câmera de monitoramento:** confirmar manualmente (abrir o checkout de
 verdade) o preço/frete/estoque/garantia de pelo menos o Intelbras iM5 SC e o
@@ -361,22 +347,10 @@ tinha poder de detecção real.
 
 ## Pendências
 
-### Abertas em 04/09/2026 (as de agora)
+### Abertas em 05/09/2026
 
-- [ ] **Enviar `docs/prompt-design-planilha.md` ao Codex.** O prompt está
-  **pronto**, é só copiar tudo abaixo do `---` e colar. Plano de redesign
-  visual da planilha: paleta já validada por script, tipografia, layout aba a
-  aba, dois gráficos por projeto, anti-padrões proibidos e 9 critérios de
-  aceite. **Só o Josemar dispara** — o envio é dele.
-- [ ] **Implantar a Versão 5 do Apps Script** (preparada pelo Codex em
-  `3e65c5c`, ainda não no ar). Exige navegador na conta **conta-comercial** e
-  confirmação em duas etapas no celular do Josemar. O Claude executa os
-  passos se ele aprovar o 2FA na hora. Passo a passo no bloco **AO RETOMAR**.
-  Enquanto não subir, a planilha continua no layout da Versão 4 — sem quebrar,
-  porque o payload novo é retrocompatível.
-- [ ] **Depois do deploy: abrir a planilha e conferir com o olho.** Não vale o
-  `ok` do terminal. Foi assim que três bugs passaram despercebidos por três
-  agentes.
+- [x] **Implantar e conferir o redesign premium.** Concluído na Versão 8; a
+  inspeção real encontrou e corrigiu dois bugs após respostas `ok`.
 - [ ] **Relógio: decidir.** A Huawei Band 9 preta (R$ 239,88) esgotou. A cor
   deixou de ser critério, mas na Amazon não há Band 9 abaixo de R$ 350 e o
   Mercado Livre bloqueia navegador automatizado (403). Falta o levantamento

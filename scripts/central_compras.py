@@ -3941,7 +3941,11 @@ def sincronizar_planilha(args: argparse.Namespace) -> None:
         ) from erro
 
     if not resultado.get("ok"):
-        raise SystemExit(f"A planilha recusou os dados: {resultado.get('error') or resultado}")
+        mensagem = resultado.get("error") or resultado
+        detalhe = resultado.get("detalhe")
+        if detalhe:
+            mensagem = f"{mensagem}. Detalhe: {detalhe}"
+        raise SystemExit(f"A planilha recusou os dados: {mensagem}")
     avisos = validar_resposta_sheets(resultado, payload)
     print(
         f"Planilha sincronizada: {len(payload['visao_geral'])} projeto(s), "
