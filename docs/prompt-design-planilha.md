@@ -1,6 +1,10 @@
-# Prompt para o Codex — redesign visual da planilha
+# Brief histórico — redesign visual da planilha
 
-Copie tudo daqui para baixo e cole no Codex.
+> **Implementado e implantado em 05/09/2026.** A implantação ativa é a Versão
+> 8 e foi conferida na planilha real. Este arquivo preserva o briefing que
+> orientou o trabalho; não deve ser reutilizado como tarefa pendente. O estado
+> atual está em [`integracao-google-sheets.md`](integracao-google-sheets.md) e
+> os desvios confirmados durante a implantação estão registrados no fim.
 
 O plano de design abaixo foi montado com uma metodologia de visualização de
 dados e **as cores foram validadas por script** (contraste, banda de
@@ -28,10 +32,10 @@ decisão de compra pessoal. Ela não é a fonte da verdade (isso é o
 - Quem lê **não é desenvolvedor**, abre no desktop e no celular, e usa a
   planilha para decidir compras de R$ 70 a R$ 150.000.
 
-**O problema:** a planilha hoje é dado cru despejado em célula. Sem hierarquia,
-sem cor, sem gráfico, sem destaque. Tudo tem o mesmo peso visual, então nada
-tem peso nenhum. O objetivo é que, ao abrir uma aba, o dono veja **em dois
-segundos** quem está ganhando e por quê.
+**Problema original:** a planilha era dado cru despejado em célula. Sem
+hierarquia, cor, gráfico ou destaque, tudo tinha o mesmo peso visual. O
+objetivo era que, ao abrir uma aba, o dono visse **em dois segundos** quem
+estava ganhando e por quê.
 
 ## Restrição de ordem (leia antes de começar)
 
@@ -40,10 +44,10 @@ falsas no consumo, `Página1` órfã, `gerado_em` ignorado), **faça aquilo
 primeiro e em commit separado**. Este trabalho é visual e vai mexer nas mesmas
 funções; misturar os dois deixa impossível dizer o que quebrou o quê.
 
-**Você provavelmente não conseguirá implantar.** O deploy exige navegador
-logado na conta conta-comercial com verificação em duas etapas no celular do dono.
-Altere o arquivo versionado, deixe claro no fim que o deploy está pendente, e
-avise. Não conclua que aplicou.
+**Situação na época do briefing:** o deploy dependia de navegador logado na
+conta conta-comercial e verificação em duas etapas. Ele foi concluído depois, pela
+conta proprietária, na implantação existente. Editar apenas este arquivo nunca
+altera o Apps Script ativo.
 
 ## As regras que não se negociam
 
@@ -136,7 +140,7 @@ São 4 degraus de propósito: testei com 6 e reprovou — os degraus ficavam a
 Use como **cor de texto ou de um marcador pequeno**, não como fundo chapado da
 linha inteira. Fundo saturado em bloco grande fica pesado e infantil.
 
-## Tipografia — uma família só
+## Tipografia — uma base, com exceção numérica
 
 Uma resposta franca a "falta variação de fontes": **variar família é o erro**.
 Duas ou três tipografias diferentes numa planilha lêem como convite de
@@ -181,7 +185,8 @@ indicador.
 **Bloco 2: a tabela dos projetos.** Colunas: Projeto · Categoria · Estado ·
 Líder · Score · Confiança · Cotações · Decidido em.
 
-- Linha 1 congelada, coluna A congelada.
+- Linhas de contexto e cabeçalho congeladas; nenhuma coluna congelada se isso
+  atravessar uma célula mesclada.
 - Cabeçalho com a faixa `#f9f9f7`, texto 10 bold maiúsculo `#52514e`.
 - Linhas alternadas: branco e `#f9f9f7`. Sem borda entre linhas — a alternância
   já separa.
@@ -199,8 +204,8 @@ categorias nominais, colorir por posição é o erro nº 1 da lista acima. Sem
 linhas de grade verticais pesadas; eixo em `#898781`.
 
 **Rodapé**: "Espelho gerado em {gerado_em} · a fonte é o cotacoes.csv de cada
-projeto" em 9px `#898781`. Use o campo `gerado_em` do payload, que hoje é
-descartado.
+projeto" em 9px `#898781`. Use o campo `gerado_em` do payload; na versão
+anterior ao redesign ele era descartado.
 
 ### Abas de projeto
 
@@ -227,8 +232,8 @@ com o título em 10 bold maiúsculo, sem borda.
 **Gráfico 1 — barras do score total por candidato.** Líder em `#2a78d6`,
 demais em `#898781`. Este é o destaque: uma cor no que importa, cinza no resto.
 
-**Gráfico 2 — os eixos do score**, que é o dado mais rico e hoje não aparece
-em lugar nenhum: qualidade, valor, risco, aderência, conveniência, de 0 a 1.
+**Gráfico 2 — os eixos do score**, que era o dado mais rico e não aparecia na
+versão anterior: qualidade, valor, risco, aderência, conveniência, de 0 a 1.
 Barras agrupadas, um grupo por eixo. **Com até 3 candidatos**, use os slots
 categóricos 1-2-3. **Com 4 ou mais, faça pequenos múltiplos**: um mini-gráfico
 por candidato, todos na mesma escala, em vez de amontoar cores.
@@ -244,7 +249,9 @@ líder.
 
 Uma planilha não tem hover customizado, mas tem mais recurso do que se usa:
 
-- **Congelar** linha 1 e coluna A em todas as abas (`setFrozenRows`, `setFrozenColumns`).
+- **Congelar** apenas as linhas úteis. Não congelar coluna se título, rodapé ou
+  qualquer outra faixa estiver mesclada atravessando a divisória; isso causa
+  erro no Apps Script.
 - **Filtro nativo** na tabela da Visão Geral (`sheet.getRange(...).createFilter()`),
   para filtrar por estado ou categoria. Um filtro só, acima de tudo que ele
   controla.
@@ -261,7 +268,7 @@ Uma planilha não tem hover customizado, mas tem mais recurso do que se usa:
 - **Largura de coluna** calculada (`setColumnWidth`), não automática: coluna A
   mais larga para os rótulos, colunas de candidato iguais entre si.
 - **Quebra de texto** (`setWrapStrategy`) nas colunas de texto longo — hoje
-  nome de projeto e líder ficam cortados.
+  aplicada para impedir que nome de projeto e líder fiquem cortados.
 
 ## Detalhes de implementação que vão te morder
 
@@ -269,9 +276,9 @@ Uma planilha não tem hover customizado, mas tem mais recurso do que se usa:
   `\`. Uma `SPARKLINE` escrita com `,` não vai funcionar. Prefira
   `setFormula` com a sintaxe correta do locale, ou monte os gráficos por
   `EmbeddedChartBuilder`, que não depende disso.
-- **Desempenho**: hoje o script escreve linha a linha com `appendRow` e leva
-  ~47s com 8 projetos. Se você acrescentar formatação célula a célula, isso
-  explode e bate no limite de 6 minutos do Apps Script. **Escreva em lote**
+- **Desempenho**: a versão anterior escrevia linha a linha com `appendRow` e
+  levava ~47s com 8 projetos. Formatação célula a célula poderia bater no
+  limite de 6 minutos do Apps Script. **Escreva em lote**
   (`setValues`, `setBackgrounds`, `setFontColors`, `setFontWeights` sobre um
   `Range` inteiro) — a formatação em lote é obrigatória aqui, não opcional.
 - **`clear()` apaga formatação junto**, o que é o que queremos entre
@@ -279,6 +286,10 @@ Uma planilha não tem hover customizado, mas tem mais recurso do que se usa:
   a cada rodada. Não dá para formatar à mão uma vez.
 - **Gráficos precisam ser removidos antes de recriados**, senão duplicam a cada
   sincronização: `sheet.getCharts().forEach(c => sheet.removeChart(c))`.
+- **Fontes de gráfico precisam ser contíguas.** Intervalos horizontais
+  separados com `setTransposeRowsAndColumns(true)` chegaram a sincronizar sem
+  erro, mas produziram ranking vazio e rótulos misturados. Monte tabelas
+  auxiliares contíguas fora da área principal.
 - **Não coloque o número em cada barra** do gráfico; a tabela acima já tem.
 - O dono abre no celular. Teste se a faixa de indicadores não quebra em tela
   estreita; prefira 4 colunas curtas a 1 linha longa.
@@ -294,7 +305,7 @@ Uma planilha não tem hover customizado, mas tem mais recurso do que se usa:
 6. A sincronização inteira continua abaixo de 2 minutos com 8 projetos.
 7. Rodar duas vezes seguidas produz o mesmo resultado, sem gráfico duplicado e
    sem formatação acumulada.
-8. Os 270 testes continuam passando (`python -m unittest discover -s tests`;
+8. Os 284 testes continuam passando (`python -m unittest discover -s tests`;
    o resumo sai em **stderr**, cuidado ao usar pipe, e leva 2-3 minutos).
 9. `python scripts/central_compras.py checar-segredos --strict` continua limpo.
 
@@ -306,8 +317,24 @@ Uma planilha não tem hover customizado, mas tem mais recurso do que se usa:
    funciona com o payload antigo — porque o deploy e o commit não acontecem no
    mesmo instante.
 3. Uma lista do que você **não** conseguiu implementar e por quê.
-4. O aviso de deploy pendente, se for o caso.
+4. O estado real do deploy, separado do estado do arquivo versionado.
 
 Não invente valor de cor. Se precisar de um tom que não está na tabela acima,
 diga qual papel ele cumpre e por que os existentes não servem — em vez de
 escolher um.
+
+## Resultado implantado e desvios conscientes
+
+- A Versão 8 usa Inter na interface e Roboto Mono nos valores tabulares. A
+  segunda família é funcional: alinha números, não é decoração.
+- `Visao Geral` congela cinco linhas; abas de projeto congelam duas. Nenhuma
+  coluna é congelada, porque títulos e rodapés mesclados atravessam a coluna A.
+- As barras `SPARKLINE` planejadas para score e confiança não foram mantidas.
+  O score ganhou gráfico geral e os estados ganharam formatação condicional,
+  evitando fórmulas frágeis ao locale sem esconder o valor numérico.
+- Os gráficos usam blocos auxiliares contíguos fora da área principal. Foi a
+  correção que eliminou gráficos vazios e rótulos misturados.
+- A validação final exigiu duas sincronizações e inspeção das nove abas. O
+  retorno `ok` sozinho não detectou nenhum dos dois bugs visuais.
+- O registro completo das lições está em
+  [`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).

@@ -26,6 +26,10 @@ e dentro da planilha em **Extensões → Apps Script** (script *container-bound*
 não aparece em listagem nenhuma quando o arquivo dono está na lixeira).
 
 Mexeu nessa infraestrutura? Atualize o inventário **no mesmo commit**.
+Para deploy e validação da planilha, siga também
+[`docs/aprendizados-google-sheets.md`](docs/aprendizados-google-sheets.md):
+publique pela conta proprietária, preserve a implantação existente e abra a
+planilha. HTTP 200, execução “Concluído” e retorno `ok` não validam o visual.
 
 ## 2. `cotacoes.csv` é append-only
 

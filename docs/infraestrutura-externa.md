@@ -51,7 +51,9 @@ Na ordem, porque cada passo pega um caso que o anterior não pega:
 ### Conta
 
 Tudo na conta Google **conta-comercial@exemplo.com** (perfil "Esdra Aline").
-Navegador: servidor MCP `nav-conta-comercial`.
+No navegador, reutilize o perfil Chrome de Esdra quando estiver disponível,
+mas **confirme o e-mail pelo avatar antes de publicar**. Nome de perfil ou de
+servidor de automação não comprova qual conta está ativa.
 
 ### Pasta no Drive
 
@@ -86,6 +88,13 @@ de propósito: assim não desaparece se a planilha for para a lixeira).
   foram etapas intermediárias do mesmo deploy; a 8 corrige o congelamento de
   colunas com células mescladas e as fontes transpostas dos gráficos.
 - Código e procedimento de redeploy: [`integracao-google-sheets.md`](integracao-google-sheets.md).
+- Lições e checklist de validação: [`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).
+
+**Identidade de implantação é parte da infraestrutura.** A Versão 5 chegou a
+ser publicada por uma conta editora e não conseguiu acessar a pasta do Drive.
+“Executar como eu” é relativo a quem publica. O deploy correto deve ser feito
+pela conta proprietária `conta-comercial@exemplo.com`, editando a implantação existente
+e selecionando **Nova versão** para preservar o endpoint.
 
 ### Configuração: o que viaja no `git pull` e o que não viaja
 

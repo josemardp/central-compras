@@ -1,14 +1,15 @@
-# Prompt para auditoria externa (Codex) — quarta rodada
+# Prompt para auditoria externa (Codex) — quinta rodada
 
 Copie tudo daqui para baixo e cole no Codex, com o repositório aberto.
-(As rodadas 1 a 3 estão no histórico do Git: `git log -- docs/prompt-auditoria-externa.md`.)
+(As rodadas anteriores estão no histórico do Git:
+`git log -- docs/prompt-auditoria-externa.md`.)
 
 ---
 
 Esta rodada tem um alvo estreito e um motivo concreto: **a integração com o
-Google Sheets foi construída três vezes, por três agentes diferentes, e o
-código dela já produziu três bugs — todos descobertos tarde, um deles só
-porque o dono abriu a planilha e reparou que faltava coisa.**
+Google Sheets já falhou no contrato, no deploy, na coerção de tipos e na
+renderização. Várias falhas devolveram HTTP 200 ou execução “Concluído” e só
+foram percebidas quando o dono abriu a planilha.**
 
 Quero que você olhe justamente isso: a planilha publicada, o script que a
 escreve, e os documentos que deviam ter impedido a confusão toda.
@@ -23,7 +24,7 @@ depois, "deu certo?") vale para sempre.
 
 - Python 3, dependência única `PyYAML`. `scripts/central_compras.py`, arquivo
   único, ~30 subcomandos.
-- **270 testes**: `python -m unittest discover -s tests`. Passam aqui, e levam
+- **284 testes**: `python -m unittest discover -s tests`. Passam aqui, e levam
   uns 2 minutos.
 - Usado de **várias máquinas Windows**, por uma pessoa que **não é
   desenvolvedora**.
@@ -39,43 +40,41 @@ depois, "deu certo?") vale para sempre.
 Código versionado em [`docs/integracao-google-sheets.md`](integracao-google-sheets.md)
 (bloco `Code.gs`), implantado na conta conta-comercial como Web App.
 
-**Três bugs já saíram desse mesmo arquivo. Todos corrigidos, e listo aqui para
-você não gastar tempo redescobrindo — e para calibrar o tipo de coisa que
-passou despercebida:**
+**Falhas já corrigidas, listadas para você não gastar tempo redescobrindo e
+para calibrar o tipo de coisa que passou despercebida:**
 
 | Versão | Bug | Como se manifestou |
 |---|---|---|
 | 1 → 2 | `DriveApp.getRoot()` não existe na API (é `getRootFolder()`) | `TypeError`, sincronização 100% quebrada |
 | 2 → 3 | pasta procurada só na raiz do Drive | criou pasta duplicada, porque a certa é aninhada |
 | 3 → 4 | campo `comp.colunas` do payload simplesmente ignorado | tabela sem cabeçalho: dava para ler preço e nota, mas **não qual coluna era qual produto** |
+| 4 → 5 | emissor e receptor evoluíam sem compatibilidade nos dois sentidos | a ordem de commit/deploy podia quebrar a `Visao Geral` |
+| 5 | implantação publicada por uma conta editora | o Web App perdeu acesso à pasta da conta proprietária |
+| 5 → 7 | congelamento da coluna A atravessava células mescladas | erro em tempo de execução |
+| 7 → 8 | gráficos liam intervalos separados e transpostos | ranking vazio e eixos com rótulos misturados, sem falha no POST |
 
-O terceiro é o que mais me incomoda, e é o padrão que eu quero que você cace:
-**o script recebia o dado certo e jogava fora em silêncio.** Nada falhou, nada
-logou erro, o comando respondeu `ok`. Só quem abriu a planilha viu.
+O padrão que eu quero que você cace é: **algo pode estar errado sem o pipeline
+parecer quebrado.** Não confie apenas no status HTTP, na execução “Concluído”,
+no JSON nem na existência do gráfico. Verifique dado, tipo, fonte e aparência.
 
 Perguntas concretas:
 
-- O `Code.gs` atual usa **tudo** o que o payload manda? Compare campo a campo
-  com o que `sheets_export_payload()` produz em `scripts/central_compras.py`.
-  Tem mais algum dado sendo descartado calado?
-- `escreverVisaoGeral` monta a lista `campos` **cravada no script**. Se o
-  Python passar a mandar um campo novo, ele entra na planilha ou é ignorado em
-  silêncio, como aconteceu com `colunas`?
-- O tratamento de `linha.tipo === 'estrela'` cobre os tipos que o Python
-  realmente emite? O que acontece com um tipo novo — vira texto, vira vazio,
-  ou quebra?
-- `appendRow` linha a linha: com 8 projetos a execução leva ~47 s (foi por isso
-  que o timeout do cliente subiu de 30 s para 120 s). Em quantos projetos isso
-  estoura o limite de 6 minutos do Apps Script? Vale trocar por `setValues` em
-  lote antes de chegar lá?
-- `abaLimpa` usa `clear()` e refaz `setFrozenRows`. Aba que existia antes com
-  mais colunas do que agora fica com resíduo?
-- **Nome de aba**: `comp.projeto.replace(/[\[\]:*?\/\\]/g, '-').slice(0, 100)`.
-  Isso cobre todos os caracteres que o Google recusa? E dois projetos com nome
-  longo que só diferem depois do caractere 100 — colidem?
-- O token é conferido com `dados.token !== TOKEN`, comparação simples. Para
-  este caso (endpoint que só escreve planilha de compras pessoais) isso basta,
-  ou você vê um risco concreto que justifique mudar?
+- Compare campo a campo `sheets_export_payload()` e o `Code.gs`. Campo novo
+  continua aditivo, com fallback antigo e aviso para descarte desconhecido?
+- Force payload antigo, payload novo, campo desconhecido, tipo desconhecido e
+  comparativo ausente. O comportamento observado bate com o contrato?
+- Force exceção dentro do `doPost`. O cliente mostra `detalhe`, mesmo quando o
+  Apps Script responde HTTP 200?
+- Confirme que preços, scores, notas e medidas chegam como números, enquanto
+  códigos, datas textuais e atributos textuais não sofrem coerção.
+- Rode a sincronização duas vezes. A segunda mantém exatamente as mesmas abas,
+  filtros, proteções e quantidades de gráficos?
+- Teste nomes de projeto inválidos, vazios, longos e colidentes. Nenhuma aba é
+  sobrescrita ou reaproveitada para o projeto errado?
+- Estime o crescimento com mais projetos e candidatos. `setValues` em lote e
+  timeout de 120 s ainda deixam margem para o limite do Apps Script?
+- Faça revisão de ameaça do endpoint e do token sem reproduzir o segredo.
+  Reporte apenas risco concreto compatível com o uso pessoal desta integração.
 
 ### 2. A planilha publicada, aba por aba
 
@@ -83,8 +82,8 @@ Perguntas concretas:
 `Meu Drive/10_JOSEMAR_PESSOAL/03_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/Central de Compras`.
 
 São 8 abas de projeto mais a `Visao Geral`. **Abra uma por uma.** Foi assim
-que o terceiro bug apareceu, e a única razão de ele ter passado por três
-agentes é que ninguém abriu.
+que os bugs silenciosos apareceram; eles atravessaram mais de uma revisão
+porque ninguém tinha conferido o resultado final.
 
 - Alguma aba está com dado faltando, trocado de coluna, ou desalinhado em
   relação ao que está no repositório (`ranking.csv` e `cotacoes.csv` do projeto
@@ -98,13 +97,13 @@ agentes é que ninguém abriu.
 
 ### 3. Os documentos do repositório
 
-Foram escritos ou reescritos hoje, depois de o problema acontecer, e nunca
-foram lidos por ninguém de fora:
+Foram escritos ou reescritos depois dos incidentes e precisam ser avaliados
+como um conjunto, sem depender do contexto desta conversa:
 
-- `CLAUDE.md` e `AGENTS.md` (novos — o repositório não tinha instrução nenhuma
-  para agente até hoje)
-- `docs/infraestrutura-externa.md` (novo — inventário do que existe fora do Git)
-- `docs/integracao-google-sheets.md` (reescrito)
+- `CLAUDE.md` e `AGENTS.md` (entrada obrigatória para agentes)
+- `docs/infraestrutura-externa.md` (inventário do que existe fora do Git)
+- `docs/integracao-google-sheets.md` (código e operação)
+- `docs/aprendizados-google-sheets.md` (falhas conhecidas e checklist)
 - `STATUS.md` (doc de handoff entre máquinas)
 - `README.md`
 
@@ -151,7 +150,8 @@ Então:
   falar dele, escreva "o token". Se encontrar o valor em algum arquivo
   versionado, isso é achado grave — reporte o **caminho e a linha**, nunca o
   valor.
-- Os 270 testes passam aqui. Se falharem aí, isso já é achado.
+- Os 284 testes passam aqui. Se falharem aí, isso já é achado. O resumo do
+  `unittest` sai em `stderr`; não use pipe que esconda o código de saída.
 - **Se não achar nada, diga isso.** "Abri as 9 abas, conferi contra o
   ranking.csv, está tudo consistente" é resposta útil.
 - Ordene por **impacto na decisão de compra**, não por severidade técnica.
@@ -160,7 +160,12 @@ Então:
 ## Já sei, não gaste tempo
 
 - O comando `sincronizar-planilha` responder `ok` não prova que a planilha
-  ficou legível — prova só que o POST chegou. Já está escrito na doc.
+  ficou legível. HTTP 200 e “Concluído” também não: `doPost` captura exceções e
+  pode devolver `ok: false`. Já está escrito na doc.
+- A implantação ativa é a **Versão 8**, publicada pela conta proprietária
+  `conta-comercial`, no mesmo endpoint. As versões 5 a 7 foram intermediárias.
+- O checklist consolidado está em
+  [`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).
 - A planilha é **espelho descartável**. A verdade é o `cotacoes.csv` de cada
   projeto. Se ela for apagada, o script recria.
 - Existe uma planilha antiga (`Central de Compras - Comparativo de Produtos`,

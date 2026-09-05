@@ -775,26 +775,38 @@ function resposta(obj) {
 }
 ```
 
-**Nota histórica — três bugs, todos herdados do mesmo Code.gs de origem:**
+**Nota histórica — falhas já encontradas nesta integração:**
 
 | Versão | Bug | Sintoma |
 |---|---|---|
 | 1 → 2 | `DriveApp.getRoot()` não existe (é `getRootFolder()`) | `TypeError`, sincronização quebrada por completo |
 | 2 → 3 | pasta buscada só na raiz do Drive | criou pasta duplicada na raiz, já que a certa é aninhada |
 | 3 → 4 | `comp.colunas` ignorado | tabela sem cabeçalho: dava para ver preço e nota, mas **não qual coluna era qual produto** |
+| 4 → 5 | payload e receptor evoluíam sem contrato compatível | a ordem entre commit e deploy podia quebrar a `Visao Geral` |
+| 5 | deploy feito por uma conta editora | o Web App perdeu acesso à pasta que pertence a conta-comercial |
+| 5 → 7 | coluna congelada atravessava títulos mesclados | exceção em tempo de execução, apesar do código salvo e publicado |
+| 7 → 8 | gráficos usavam intervalos horizontais separados e transpostos | ranking vazio e eixos com rótulos misturados, sem erro de sincronização |
 
-O terceiro só apareceu quando o Josemar olhou a planilha e perguntou "não
-estou vendo as marcas". Vale a lição: `sincronizar-planilha` responder
-`ok` prova que o POST chegou, não que a planilha ficou legível. **Confira
-abrindo a planilha.**
+Os bugs visuais só apareceram quando a planilha foi aberta. Vale a lição:
+resposta HTTP, execução “Concluído” no Apps Script e contagens corretas não
+provam que a planilha ficou legível. O `doPost` captura exceções e pode devolver
+HTTP 200 com `ok: false`; por isso o cliente também precisa exibir `detalhe`.
+O procedimento completo e as razões estão em
+[`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).
 
 ## Implantação (para redeploy futuro)
 
-1. Editor do projeto → editar o `Código.gs` → salvar (Ctrl+S).
-2. Implantar → Gerenciar implantações → editar a implantação existente →
+1. Entre como **`conta-comercial@exemplo.com`**, proprietária da pasta e do projeto.
+   Compartilhar o script com outro editor não transfere a identidade de
+   execução. Confirme o e-mail no avatar e na tela de implantação; “executar
+   como eu” significa a conta que está publicando.
+2. Editor do projeto → editar o `Código.gs` → salvar (Ctrl+S).
+3. Implantar → Gerenciar implantações → editar a implantação existente →
    Versão: **Nova versão** → Implantar. (Isso preserva a mesma URL /exec —
    nunca criar uma implantação nova do zero, senão a URL muda e o
    `integracao_sheets.json` local fica desatualizado.)
+4. Rode a sincronização duas vezes e abra a planilha. Confira dados, tipos,
+   filtros, links e gráficos; a segunda execução prova que não houve duplicação.
 
 ## Configuração da máquina
 

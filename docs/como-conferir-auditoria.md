@@ -34,6 +34,22 @@ manutenção. Já aconteceu de auditoria boa vir com achado errado no meio.
 5. **Separe bug de recomendação de produto** (leia a próxima seção).
 6. Só então escreva o prompt de implementação, e **só com o que foi confirmado**.
 
+### Quando o achado envolve sistema externo
+
+Teste unitário não substitui o estado real de Drive, Sheets, Apps Script ou de
+uma loja. Nesses casos, a reprodução tem camadas:
+
+1. confirme conta, arquivo, implantação e endpoint no inventário;
+2. execute o fluxo real e leia o corpo da resposta, não apenas o status HTTP;
+3. abra o artefato final e confira conteúdo e aparência;
+4. repita uma vez para detectar duplicação e falta de idempotência.
+
+No Apps Script, uma execução marcada “Concluído” pode ter sido capturada pelo
+`doPost` e devolvida como `{ok: false}`. Na planilha, gráfico existente pode
+estar vazio ou ler rótulos errados. A evidência só fecha quando o resultado
+visível bate com a fonte do repositório. Para esta integração, siga também
+[`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).
+
 ## Bug e recomendação de produto não seguem o mesmo caminho
 
 A 3ª auditoria pede julgamento sobre a distância entre a ideia original do

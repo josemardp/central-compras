@@ -46,6 +46,27 @@ do teto.
 - Verificações de dados: `11,7`, `11,4` e `10,8` do consumo dos carros seguem
   como números com formato `0.##`; textos permanecem texto. O comparativo dos
   relógios mostra Huawei Band 9 e Galaxy Fit3 em empate técnico.
+- **Documentação operacional consolidada.** Os aprendizados de infraestrutura,
+  contrato, deploy, tipos, gráficos, validação visual, testes no Windows e
+  pesquisa bloqueada por 403 estão em
+  `docs/aprendizados-google-sheets.md`. README, CLAUDE, rotina semanal,
+  inventário, guia de auditoria e os dois prompts históricos foram alinhados
+  ao estado da Versão 8 e à suíte de 284 testes.
+
+### Aprendizados que não podem se perder
+
+- Deploy de Web App deve ser feito por `conta-comercial@exemplo.com`; permissão de
+  editor não transfere identidade nem acesso à pasta. Atualize a implantação
+  existente com **Nova versão** para manter URL e ID.
+- Código documentado, código salvo e código implantado são três estados
+  diferentes. Registre qual deles foi realmente alterado.
+- HTTP 200 e execução “Concluído” podem conter `{ok: false}`; o cliente deve
+  mostrar `detalhe`. Mesmo `ok: true` não valida aparência: abra a planilha.
+- Células mescladas não podem atravessar a divisória de colunas congeladas.
+  Gráficos devem ler blocos contíguos, orientados como a série espera.
+- Rode sincronização duas vezes para conferir idempotência. Rode `unittest` sem
+  pipe porque o resumo sai em `stderr`, preserve LF e passe no
+  `checar-segredos --strict` antes do commit.
 
 ## Sessão anterior: 04/09/2026
 

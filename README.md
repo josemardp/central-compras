@@ -68,6 +68,16 @@ python scripts/central_compras.py resumo projetos/2026-fone-bluetooth-para-chama
 python scripts/central_compras.py status projetos/2026-fone-bluetooth-para-chamadas
 ```
 
+### Espelho no Google Sheets
+
+`sincronizar-planilha` reescreve a planilha publicada a partir dos arquivos do
+repositório; editar célula manualmente não altera a fonte. Uma resposta de
+sucesso confirma o payload e as contagens, mas não a renderização. Depois de
+mudança no Apps Script, rode duas vezes e abra a planilha para conferir tipos,
+links, filtros e gráficos. Veja
+[`docs/integracao-google-sheets.md`](docs/integracao-google-sheets.md) e
+[`docs/aprendizados-google-sheets.md`](docs/aprendizados-google-sheets.md).
+
 Para compra cara, como carro, informe os campos de TCO:
 
 ```powershell
@@ -377,7 +387,7 @@ Ela nao deve fingir que confirmou preco, estoque, frete ou cupom quando isso dep
 python -m unittest discover -s tests
 ```
 
-281 testes. Alem dos casos de exemplo, ha teste de invariante que gera cotacoes
+284 testes. Alem dos casos de exemplo, ha teste de invariante que gera cotacoes
 aleatorias (inclusive patologicas: preco negativo, `1e309`, data impossivel,
 unicode) e confere propriedades que tem que valer sempre: score entre 0 e 100,
 eixo entre 0 e 1, cortado nunca pontua, o mais barato elegivel sempre tira 1,00
