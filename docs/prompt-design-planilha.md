@@ -1,340 +1,334 @@
-# Brief histórico — redesign visual da planilha
+# Prompt para o Kimi — Google Sheets premium, Versão 9
 
-> **Implementado e implantado em 05/09/2026.** A implantação ativa é a Versão
-> 8 e foi conferida na planilha real. Este arquivo preserva o briefing que
-> orientou o trabalho; não deve ser reutilizado como tarefa pendente. O estado
-> atual está em [`integracao-google-sheets.md`](integracao-google-sheets.md) e
-> os desvios confirmados durante a implantação estão registrados no fim.
+Kimi, trabalhe no repositório `C:\projetos\central-compras` e transforme a
+planilha **Central de Compras - Cotacoes e Comparacoes** na melhor versão que
+o Google Sheets consegue oferecer como instrumento pessoal de decisão de
+compra.
 
-O plano de design abaixo foi montado com uma metodologia de visualização de
-dados e **as cores foram validadas por script** (contraste, banda de
-luminosidade, separação para daltonismo) contra a superfície branca do Google
-Sheets. Não troque os valores hex "no olho": eles passaram em teste e a
-substituição por outro tom quebra o que foi verificado.
+Não quero apenas “mais cor”. Quero um produto visual maduro: hierarquia forte,
+leitura rápida, comparações honestas, estados claros, boa densidade de
+informação, interação útil e acabamento consistente no desktop e no celular.
+O resultado deve parecer um painel executivo feito por alguém que entende de
+design de informação, não uma planilha decorada.
 
----
+## Missão
 
-Você vai redesenhar a planilha `Central de Compras - Cotacoes e Comparacoes`
-inteiramente por código, no Apps Script que a gera.
+Evolua a **Versão 8**, que já está implantada e funcional, para uma proposta de
+**Versão 9 top de linha**. Inspecione o que existe, planeje, implemente e teste.
+Não pare na análise nem entregue apenas um mockup.
 
-## Contexto
+Ao abrir a planilha, o Josemar deve conseguir:
 
-A planilha é o **espelho publicado** da Central de Compras — um sistema de
-decisão de compra pessoal. Ela não é a fonte da verdade (isso é o
-`cotacoes.csv` de cada projeto); ela é onde o dono **olha** para decidir.
+1. entender em poucos segundos quais compras exigem atenção;
+2. entrar num projeto e identificar líder, empate ou bloqueio imediatamente;
+3. comparar preço, qualidade, risco, aderência e conveniência sem ambiguidade;
+4. distinguir dado confirmado, dado vencido e dado ausente;
+5. navegar entre visão geral e projetos sem se perder;
+6. confiar que o visual não distorce a lógica registrada no repositório.
 
-- Repositório: `C:\projetos\central-compras`, GitHub privado `josemardp/central-compras`.
-- O script que a escreve está versionado em
-  [`docs/integracao-google-sheets.md`](integracao-google-sheets.md), bloco `Code.gs`,
-  e implantado como Web App na conta **conta-comercial**.
-- O payload vem de `sheets_export_payload()` em `scripts/central_compras.py`.
-- Hoje são 9 abas: `Visao Geral` + uma por projeto de compra.
-- Quem lê **não é desenvolvedor**, abre no desktop e no celular, e usa a
-  planilha para decidir compras de R$ 70 a R$ 150.000.
+## Leia antes de alterar
 
-**Problema original:** a planilha era dado cru despejado em célula. Sem
-hierarquia, cor, gráfico ou destaque, tudo tinha o mesmo peso visual. O
-objetivo era que, ao abrir uma aba, o dono visse **em dois segundos** quem
-estava ganhando e por quê.
+Leia integralmente, nesta ordem:
 
-## Restrição de ordem (leia antes de começar)
+1. `CLAUDE.md`
+2. `docs/infraestrutura-externa.md`
+3. `docs/aprendizados-google-sheets.md`
+4. `docs/integracao-google-sheets.md`
+5. `README.md`, especialmente a explicação do score
+6. `STATUS.md`
+7. `scripts/central_compras.py`, funções do payload do Sheets
+8. testes relacionados à integração e ao `Code.gs`
 
-Se você ainda não aplicou as correções de bug da auditoria anterior (datas
-falsas no consumo, `Página1` órfã, `gerado_em` ignorado), **faça aquilo
-primeiro e em commit separado**. Este trabalho é visual e vai mexer nas mesmas
-funções; misturar os dois deixa impossível dizer o que quebrou o quê.
+A ausência de configuração local não significa que a infraestrutura não
+existe. Não crie outra planilha, pasta, Apps Script ou implantação.
 
-**Situação na época do briefing:** o deploy dependia de navegador logado na
-conta conta-comercial e verificação em duas etapas. Ele foi concluído depois, pela
-conta proprietária, na implantação existente. Editar apenas este arquivo nunca
-altera o Apps Script ativo.
+## Estado atual que você deve preservar
 
-## As regras que não se negociam
+- A implantação ativa é a **Versão 8**, no projeto `Central de Compras - Sync`,
+  sob a conta proprietária `conta-comercial@exemplo.com`.
+- O código implantável é o bloco `Code.gs` de
+  `docs/integracao-google-sheets.md`.
+- O Python envia o payload por `sheets_export_payload()`.
+- A planilha é um espelho descartável. A fonte da verdade continua sendo o
+  `cotacoes.csv` de cada projeto.
+- O fluxo atual trabalha com `Visao Geral` e uma aba por projeto.
+- A suíte tinha 284 testes passando em 05/09/2026. Rode-a e informe a contagem
+  real encontrada; não suponha que esse número continua igual.
 
-Estas vêm da metodologia e cada uma existe porque o contrário já deu errado em
-dashboards reais. **Se o seu resultado bater com um destes, está errado:**
+Não altere produtos, preços, cotações, decisões, pesos ou regras de score para
+“melhorar” a aparência. Este trabalho é de apresentação, interação e, somente
+se indispensável, contrato aditivo de dados.
 
-1. **Nunca colorir barras por posição no ranking.** Projetos e produtos são
-   categorias nominais. Colorir "mais escuro = maior" duplica o comprimento da
-   barra na cor e queima o único canal livre. Uma série, uma cor.
-2. **Nunca dois eixos Y no mesmo gráfico.** Duas medidas de escala diferente
-   viram dois gráficos.
-3. **Nada de pizza nem rosca.** Nem para "part-to-whole".
-4. **Nada de arco-íris para magnitude.** Escala de magnitude é uma cor só,
-   clara para escura.
-5. **Cor de status nunca aparece sozinha.** Sempre acompanhada de ícone **e**
-   rótulo em texto. Testei a paleta de status como se fosse categórica e ela
-   reprova (vermelho e verde ficam a ΔE 4.1 sob daltonismo deutan) — é
-   exatamente por isso que a cor não pode carregar o significado sozinha.
-6. **Texto nunca usa a cor da série.** Valores e rótulos ficam em tinta
-   primária/secundária; quem carrega identidade é a marca colorida ao lado.
-7. **Não põe número em cima de todo ponto do gráfico.** Rotule o extremo, o
-   líder, o que importa. O resto fica no eixo e na tabela.
-8. **Nada de linha de grade tracejada** nem borda desenhada em volta das
-   marcas. Grade é fio fino sólido, um tom acima da superfície.
-9. **Se a história é "este venceu", isso é destaque, não paleta categórica.**
-   Uma cor no vencedor, cinza recuado no resto. Este é o caso da maioria das
-   abas desta planilha.
+## Método de trabalho obrigatório
 
-## Paleta — valores validados, use exatamente estes
+### 1. Diagnóstico real
 
-Validados contra a superfície `#ffffff` do Sheets.
+Antes de codificar, abra a planilha existente quando tiver acesso e examine:
 
-### Tinta e superfície
+- a primeira tela da `Visao Geral`;
+- uma aba com dois ou três candidatos;
+- uma aba com quatro ou mais candidatos;
+- uma aba com empate técnico;
+- estados vazios, bloqueados, vencidos ou sem dados;
+- comportamento em viewport de desktop e de celular.
 
-| Papel | Hex |
+Compare o que aparece com o payload e com os arquivos do repositório. Registre
+em poucas linhas o que já funciona, o que confunde e o que falta. Se não tiver
+acesso ao navegador autenticado, marque a análise visual como não verificada e
+continue com a inspeção estática; não invente observações.
+
+### 2. Plano de design
+
+Apresente um plano curto antes de editar, cobrindo:
+
+- arquitetura da informação;
+- hierarquia visual;
+- gráficos e a pergunta que cada um responde;
+- interações nativas do Sheets;
+- comportamento para dados ausentes e diferentes quantidades de candidatos;
+- estratégia de validação e compatibilidade.
+
+Depois implemente o plano. Se descobrir que uma ideia não funciona bem no
+Sheets, adapte-a e explique a decisão no fechamento.
+
+### 3. Implementação completa
+
+Edite o `Code.gs` versionado. Mude o Python apenas quando o visual realmente
+precisar de um dado que o payload ainda não fornece. Nesse caso, a mudança deve
+ser aditiva, compatível com o receptor antigo e coberta por testes.
+
+## Direção visual
+
+### Linguagem
+
+- Aparência editorial e executiva, silenciosa e precisa.
+- Fundo branco, superfícies neutras, espaço suficiente e divisórias discretas.
+- Sem gradientes, clip-art, sombras pesadas, arco-íris, bordas em todas as
+  células ou grandes blocos de cor saturada.
+- Ícones e símbolos servem ao estado ou à navegação; não são decoração.
+- Nada pode depender só da cor. Estado sempre combina cor, símbolo e texto.
+- O líder recebe destaque; os demais recuam sem perder legibilidade.
+- Texto à esquerda, números à direita e cabeçalho alinhado ao conteúdo.
+- Use Inter na interface e Roboto Mono apenas em números tabulares.
+- Garanta quebra de texto, alturas e larguras estáveis. Nenhum rótulo pode
+  ficar cortado ou sobrepor outro conteúdo.
+
+### Paleta-base validada
+
+Preserve estes papéis. Só acrescente cor se houver uma função semântica nova e
+se documentar contraste e comportamento para daltonismo.
+
+| Papel | Cor |
 |---|---|
 | Superfície | `#ffffff` |
-| Faixa de cabeçalho | `#f9f9f7` |
-| Tinta primária (título, valor que importa) | `#0b0b0b` |
-| Tinta secundária (rótulo de linha) | `#52514e` |
-| Tinta apagada (eixo, nota de rodapé, unidade) | `#898781` |
-| Fio de grade / divisória | `#e1e0d9` |
-| Linha de base / borda de bloco | `#c3c2b7` |
+| Cabeçalho suave | `#f9f9f7` |
+| Tinta primária | `#0b0b0b` |
+| Tinta secundária | `#52514e` |
+| Tinta apagada | `#898781` |
+| Divisória | `#e1e0d9` |
+| Borda estrutural | `#c3c2b7` |
+| Líder | `#2a78d6` |
+| Fundo do líder | `#eaf2fd` |
+| Atenção | `#fab219` |
+| Alerta | `#d03b3b` |
+| Confirmação | `#0ca30c` |
 
-### Destaque (o uso principal desta planilha)
+Para gráficos com até três candidatos, os slots permitidos são `#2a78d6`,
+`#eb6834` e `#1baf7a`. Com quatro ou mais, prefira pequenos múltiplos na mesma
+escala ou uma série única com destaque seletivo. Não invente uma quarta cor.
 
-| Papel | Hex |
-|---|---|
-| Líder / vencedor | `#2a78d6` |
-| Fundo suave do líder | `#eaf2fd` |
-| Demais candidatos (recuado) | `#898781` |
+## Experiência da `Visao Geral`
 
-### Categórica — só quando os candidatos são o assunto, no máximo 3
+Trate a aba como um **cockpit de decisões**, não como um relatório genérico.
+A primeira tela deve priorizar ação e contexto.
 
-| Slot | Hex |
-|---|---|
-| 1 | `#2a78d6` |
-| 2 | `#eb6834` |
-| 3 | `#1baf7a` |
+### Faixa superior
 
-Nesta ordem, sempre. Não cicle, não gere um quarto. Passou com pior par ΔE 9.2
-sob deutan e 24.0 em visão normal. **Com 4 ou mais candidatos**, use gráfico de
-barras com uma cor só (`#2a78d6`) e deixe a identidade para o rótulo do eixo.
+Mostre indicadores compactos e comparáveis, como:
 
-O verde `#1baf7a` tem contraste 2.82:1 contra o branco, abaixo de 3:1. Numa
-planilha isso é aceitável **porque o valor numérico está sempre visível na
-célula ao lado** — a tabela é o alívio. Não use esse tom para texto.
+- projetos ativos;
+- decisões concluídas;
+- aguardando confirmação de preço;
+- cotações vencidas ou projetos bloqueados.
 
-### Magnitude (score, confiança) — uma cor, 4 degraus
+O número é protagonista; o rótulo é curto. Alerta só ganha cor forte quando há
+algo a resolver.
 
-| Faixa | Hex |
-|---|---|
-| baixo | `#86b6ef` |
-| médio | `#3987e5` |
-| alto | `#1c5cab` |
-| máximo | `#0d366b` |
+### Fila de atenção
 
-São 4 degraus de propósito: testei com 6 e reprovou — os degraus ficavam a
-ΔL 0.047, indistinguíveis. Com 4, todos os intervalos passam de 0.06.
+Crie uma leitura clara dos projetos que precisam de ação: cotação vencida,
+falta de fonte manual, preço acima do teto, confiança insuficiente, empate ou
+ausência de candidato elegível. Pode ser uma faixa ou uma tabela compacta, mas
+deve usar apenas fatos presentes no payload. Não transforme ausência em zero e
+não invente recomendação.
 
-### Status — sempre com ícone e rótulo
+### Tabela principal
 
-| Estado | Hex | Ícone | Rótulo |
-|---|---|---|---|
-| decidido / comprado | `#0ca30c` | ● | "Decidido" |
-| pesquisando | `#fab219` | ◐ | "Pesquisando" |
-| aguardando preço | `#ec835a` | ◔ | "Aguardando preço" |
-| cotação vencida / bloqueado | `#d03b3b` | ▲ | "Vencida" |
+- Cabeçalho forte, linhas leves e filtro nativo.
+- Projeto como link interno para a aba correspondente.
+- Estado com símbolo, texto e cor semântica.
+- Score, confiança, contagens e datas com formatação correta.
+- Links, observações e textos longos devem quebrar sem aumentar a tabela de
+  forma caótica.
+- Use formatação condicional com parcimônia para vencimento, bloqueio e baixa
+  confiança.
 
-Use como **cor de texto ou de um marcador pequeno**, não como fundo chapado da
-linha inteira. Fundo saturado em bloco grande fica pesado e infantil.
+**Não compare score total entre projetos em gráfico.** O eixo `valor` é
+relativo aos candidatos de cada compra; por isso scores de projetos diferentes
+não compartilham a mesma base. Remova ou substitua o gráfico geral atual por
+algo realmente comparável, como distribuição por estado, volume de pendências
+ou outro indicador cuja semântica esteja comprovada.
 
-## Tipografia — uma base, com exceção numérica
+## Experiência das abas de projeto
 
-Uma resposta franca a "falta variação de fontes": **variar família é o erro**.
-Duas ou três tipografias diferentes numa planilha lêem como convite de
-casamento, não como instrumento de decisão. A hierarquia vem de **peso,
-tamanho, cor e espaço** — e fica mais forte assim, não mais fraca.
+Cada aba deve contar uma história única: **quem está ganhando, por quê e o que
+impede a decisão**.
 
-Família única: **Inter** (se indisponível, `Roboto`; nunca serifada, nunca
-decorativa).
+### Cabeçalho e veredito
 
-| Papel | Tamanho | Peso | Cor |
-|---|---|---|---|
-| Número-herói do topo | 24 | bold | `#0b0b0b` |
-| Título de bloco | 13 | bold | `#0b0b0b` |
-| Cabeçalho de coluna | 10 | bold | `#52514e`, MAIÚSCULAS, espaçado |
-| Rótulo de linha (coluna A) | 10 | bold | `#52514e` |
-| Valor comum | 10 | normal | `#0b0b0b` |
-| Valor do líder | 10 | bold | `#0b0b0b` |
-| Unidade, nota, fonte do dado | 9 | normal | `#898781` |
+- Link discreto de volta para `Visao Geral`.
+- Nome do projeto, categoria e data/hora da geração.
+- Faixa de veredito que trate corretamente: líder claro, empate técnico,
+  nenhum elegível e decisão já fechada.
+- Se a diferença entre os dois primeiros for menor ou igual a 3 pontos, mostre
+  “Empate técnico” nos dois; não finja precisão que o score não tem.
+- Exiba alertas úteis: cotação vencida, preço não confirmado, fonte manual
+  ausente, dado essencial ausente ou candidato acima do teto.
 
-**Números em coluna usam fonte de largura fixa** (`Roboto Mono`, 10) para
-alinharem casa a casa. O número-herói **não** — em tamanho grande, largura fixa
-faz `121` parecer frouxo.
+### Comparação
 
-Alinhamento: texto à esquerda, número à direita, cabeçalho acompanha a coluna
-que titula. Nunca centralize número.
+- Produtos em colunas de mesma largura, com o líder reconhecível em dois
+  segundos.
+- Seções visuais claras para preço, informações comerciais, atributos e score.
+- Preço, frete, total, nota, garantia, prazo, estoque e demais valores devem
+  manter o tipo correto e a unidade visível.
+- Valor ausente aparece como “Sem dado” ou vazio explicado, nunca como zero.
+- Candidato cortado ou inelegível continua legível, mas não parece vencedor.
+- Notas de célula podem explicar score, fonte ou transformação sem poluir a
+  tabela.
 
-## Layout — aba por aba
+### Visualizações
 
-### Aba `Visao Geral`
+Use gráficos somente quando responderem uma pergunta melhor que a tabela:
 
-**Bloco 1, linhas 1-3: faixa de indicadores.** Quatro números grandes, lado a
-lado, cada um com rótulo pequeno em cima e o valor 24px embaixo:
+1. **Ranking do projeto:** score total por candidato, com o líder em azul e os
+   demais em cinza. Scores só são comparados dentro do mesmo projeto.
+2. **Eixos do score:** qualidade, valor, risco, aderência e conveniência na
+   mesma escala de 0 a 1. Até três candidatos podem usar séries agrupadas; com
+   quatro ou mais, use pequenos múltiplos sincronizados.
+3. **Preço ou custo total:** inclua apenas se ajudar a explicar o resultado e
+   ficar separado do score. Nunca use dois eixos Y.
 
-- Projetos ativos
-- Decisões fechadas
-- Aguardando confirmação de preço
-- Cotações vencidas (se > 0, valor em `#d03b3b` com o ▲; se 0, tinta primária)
+Não use pizza, rosca, radar, 3D ou gráfico puramente decorativo. Não rotule
+todos os pontos. Legenda, escala e unidade precisam estar claras.
 
-Isso substitui um gráfico: quatro números soltos não viram barra, viram
-indicador.
+## Interação que agrega valor
 
-**Bloco 2: a tabela dos projetos.** Colunas: Projeto · Categoria · Estado ·
-Líder · Score · Confiança · Cotações · Decidido em.
+Use recursos nativos confiáveis do Sheets:
 
-- Linhas de contexto e cabeçalho congeladas; nenhuma coluna congelada se isso
-  atravessar uma célula mesclada.
-- Cabeçalho com a faixa `#f9f9f7`, texto 10 bold maiúsculo `#52514e`.
-- Linhas alternadas: branco e `#f9f9f7`. Sem borda entre linhas — a alternância
-  já separa.
-- **Estado**: ícone + rótulo, cor de status no texto.
-- **Score**: número à direita **mais** uma barra na célula seguinte, via
-  `SPARKLINE` tipo `bar`, `max` 100, cor `#2a78d6`.
-- **Confiança**: é uma razão contra um limite, então é medidor, não barra
-  colorida por valor. Barra `SPARKLINE` na cor do degrau correspondente
-  (`#86b6ef` até 60%, `#3987e5` até 80%, `#1c5cab` até 95%, `#0d366b` acima).
-- Nome do projeto vira **link para a aba dele** (`HYPERLINK` com `#gid=`).
+- filtros na tabela geral;
+- links de ida e volta entre abas;
+- notas de célula para explicações contextuais;
+- proteção em modo de aviso, lembrando que a fonte é o repositório;
+- linhas congeladas que preservem contexto;
+- agrupamento de linhas ou colunas somente se melhorar a leitura no celular;
+- formatação condicional para estados que exigem atenção.
 
-**Bloco 3: um gráfico de barras horizontais** com o score dos projetos,
-ordenado do maior para o menor. **Todas as barras em `#2a78d6`** — projetos são
-categorias nominais, colorir por posição é o erro nº 1 da lista acima. Sem
-linhas de grade verticais pesadas; eixo em `#898781`.
+Não crie botões, checkboxes ou seletores que pareçam persistir decisões se a
+próxima sincronização vai apagá-los. Interação falsa é pior que ausência de
+interação.
 
-**Rodapé**: "Espelho gerado em {gerado_em} · a fonte é o cotacoes.csv de cada
-projeto" em 9px `#898781`. Use o campo `gerado_em` do payload; na versão
-anterior ao redesign ele era descartado.
+## Restrições técnicas inegociáveis
 
-### Abas de projeto
+1. **Compatibilidade:** o Apps Script deve aceitar payload antigo e novo. Campo
+   desconhecido gera aviso; não é ignorado em silêncio nem derruba toda a
+   sincronização.
+2. **Tipos:** não aplique `setNumberFormat('@')` em tudo. Texto permanece texto;
+   preço, nota, score, quantidade e medida permanecem números.
+3. **Desempenho:** escreva e formate em lote. Não volte a `appendRow` ou a
+   chamadas célula por célula em laços grandes.
+4. **Idempotência:** remova gráficos, filtros, regras e mesclagens antigas antes
+   de recriar. Duas sincronizações devem produzir o mesmo resultado.
+5. **Células mescladas:** não congele uma coluna se a divisória atravessar uma
+   mesclagem. A Versão 8 usa zero colunas congeladas por esse motivo.
+6. **Gráficos:** use tabelas-fonte contíguas, orientadas como o gráfico espera e
+   posicionadas fora da área principal. Intervalos separados e transpostos já
+   produziram gráficos vazios e rótulos trocados.
+7. **Locale:** a planilha é `pt-BR`. Evite fórmulas frágeis a separadores; se
+   usar `SPARKLINE`, teste a fórmula no arquivo real. Prefira APIs nativas de
+   gráfico quando entregarem o mesmo resultado.
+8. **Tempo:** mantenha timeout de 120 segundos no cliente.
+9. **Segredos:** nunca copie o token para código versionado, logs, screenshots
+   ou resposta. O scanner estrito é gate de commit.
+10. **LF no Windows:** não regrave CSV ou YAML com CRLF. Preserve `\n`.
 
-A história aqui é **quem está ganhando e por quê**. Isso é destaque, não
-paleta categórica.
+## Deploy
 
-**Linha 1 — cabeçalho de produto** (já existe, melhore): nome de cada
-candidato, 13px bold. A coluna do líder ganha fundo `#eaf2fd` e texto
-`#0b0b0b`; as demais ficam com texto `#52514e`. Linha congelada.
+Editar `docs/integracao-google-sheets.md` não altera o que está no ar.
 
-**Linha 2 — faixa de veredito**, nova: uma frase por coluna. Para o líder,
-"Líder · score 71,9". Para os outros, o motivo de estarem atrás, curto.
-Se a diferença entre o primeiro e o segundo for **≤ 3 pontos**, escreva
-"Empate técnico" nos dois, em `#fab219` com ◐ — porque nesse caso o número não
-decidiu, e a planilha não pode fingir que decidiu.
+Se houver autorização explícita e navegador autenticado como
+`conta-comercial@exemplo.com`:
 
-**Linhas de dados**: rótulo em coluna A (10 bold `#52514e`), valores
-alinhados por tipo. Preço em negrito. A coluna do líder inteira com fundo
-`#eaf2fd` bem claro — é o destaque que faz o olho pousar sem gritar.
+1. salve o `Code.gs` no projeto existente;
+2. abra **Implantar → Gerenciar implantações**;
+3. edite a implantação existente e selecione **Nova versão**;
+4. confirme que “Executar como eu” se refere a `conta-comercial@exemplo.com`;
+5. preserve o mesmo ID e a mesma URL `/exec`.
 
-**Separadores de seção** (PREÇOS, ATRIBUTOS, SCORE): linha de faixa `#f9f9f7`
-com o título em 10 bold maiúsculo, sem borda.
+Não publique pela conta `josemardp` ou por outro editor. Se não puder confirmar
+a conta proprietária ou a autenticação em duas etapas, limite-se ao código
+versionado e marque **DEPLOY PENDENTE**. Não afirme que aplicou.
 
-**Gráfico 1 — barras do score total por candidato.** Líder em `#2a78d6`,
-demais em `#898781`. Este é o destaque: uma cor no que importa, cinza no resto.
+## Validação obrigatória
 
-**Gráfico 2 — os eixos do score**, que era o dado mais rico e não aparecia na
-versão anterior: qualidade, valor, risco, aderência, conveniência, de 0 a 1.
-Barras agrupadas, um grupo por eixo. **Com até 3 candidatos**, use os slots
-categóricos 1-2-3. **Com 4 ou mais, faça pequenos múltiplos**: um mini-gráfico
-por candidato, todos na mesma escala, em vez de amontoar cores.
-Nada de radar: área de polígono engana sobre magnitude.
+1. Rode a suíte completa sem pipe:
+   `python -m unittest discover -s tests`. O resumo sai em `stderr`; capture o
+   código de saída separadamente.
+2. Acrescente testes de regressão para cada risco novo ou falha corrigida.
+3. Rode `python scripts/central_compras.py checar-segredos --strict`.
+4. Rode `git diff --check`.
+5. Se o deploy for feito, rode `sincronizar-planilha` duas vezes.
+6. Abra a planilha real e confira todas as abas contra o repositório.
+7. Valide desktop e celular: primeira tela, textos, larguras, mesclagens,
+   filtros, links, notas, formatação numérica e gráficos renderizados.
+8. Conte os gráficos e confirme as tabelas-fonte. Existência do objeto não
+   prova que ele contém dados corretos.
 
-Se um eixo não tiver dado, ele **não vira zero** — fica fora do gráfico, com
-nota "sem dado" abaixo. Zerar seria mentir sobre o candidato.
-
-**Legenda** sempre presente quando houver 2 ou mais séries. Rotule direto só o
-líder.
-
-## Interação — o que dá para fazer no Sheets
-
-Uma planilha não tem hover customizado, mas tem mais recurso do que se usa:
-
-- **Congelar** apenas as linhas úteis. Não congelar coluna se título, rodapé ou
-  qualquer outra faixa estiver mesclada atravessando a divisória; isso causa
-  erro no Apps Script.
-- **Filtro nativo** na tabela da Visão Geral (`sheet.getRange(...).createFilter()`),
-  para filtrar por estado ou categoria. Um filtro só, acima de tudo que ele
-  controla.
-- **Links entre abas**: nome do projeto na Visão Geral leva à aba dele; um
-  "← Visão Geral" no topo de cada aba de projeto volta.
-- **Nota em célula** (`setNote`) explicando como o score foi montado, na célula
-  do score. É o mais perto de tooltip que existe aqui, e o valor continua
-  visível sem ela.
-- **Formatação condicional** para as faixas de score e para destacar cotação
-  vencida.
-- **Proteger as abas** (`protect().setWarningOnly(true)`) com o aviso "espelho
-  gerado por script; edite o repositório, não aqui". Evita que alguém corrija
-  na planilha e perca na próxima sincronização.
-- **Largura de coluna** calculada (`setColumnWidth`), não automática: coluna A
-  mais larga para os rótulos, colunas de candidato iguais entre si.
-- **Quebra de texto** (`setWrapStrategy`) nas colunas de texto longo — hoje
-  aplicada para impedir que nome de projeto e líder fiquem cortados.
-
-## Detalhes de implementação que vão te morder
-
-- **Locale pt-BR**: em fórmula o separador de argumentos é `;` e o de array é
-  `\`. Uma `SPARKLINE` escrita com `,` não vai funcionar. Prefira
-  `setFormula` com a sintaxe correta do locale, ou monte os gráficos por
-  `EmbeddedChartBuilder`, que não depende disso.
-- **Desempenho**: a versão anterior escrevia linha a linha com `appendRow` e
-  levava ~47s com 8 projetos. Formatação célula a célula poderia bater no
-  limite de 6 minutos do Apps Script. **Escreva em lote**
-  (`setValues`, `setBackgrounds`, `setFontColors`, `setFontWeights` sobre um
-  `Range` inteiro) — a formatação em lote é obrigatória aqui, não opcional.
-- **`clear()` apaga formatação junto**, o que é o que queremos entre
-  sincronizações, mas significa que **toda** a formatação precisa ser reaplicada
-  a cada rodada. Não dá para formatar à mão uma vez.
-- **Gráficos precisam ser removidos antes de recriados**, senão duplicam a cada
-  sincronização: `sheet.getCharts().forEach(c => sheet.removeChart(c))`.
-- **Fontes de gráfico precisam ser contíguas.** Intervalos horizontais
-  separados com `setTransposeRowsAndColumns(true)` chegaram a sincronizar sem
-  erro, mas produziram ranking vazio e rótulos misturados. Monte tabelas
-  auxiliares contíguas fora da área principal.
-- **Não coloque o número em cada barra** do gráfico; a tabela acima já tem.
-- O dono abre no celular. Teste se a faixa de indicadores não quebra em tela
-  estreita; prefira 4 colunas curtas a 1 linha longa.
+HTTP 200, execução “Concluído” no Apps Script e retorno `ok` do terminal não
+substituem a inspeção visual. O `doPost` pode capturar erro e devolver
+`{ok: false, detalhe: ...}` com status HTTP 200.
 
 ## Critérios de aceite
 
-1. Abrindo qualquer aba de projeto, dá para dizer **em dois segundos** quem é o
-   líder, sem ler número nenhum.
-2. Nenhum estado é comunicado só por cor — todos têm ícone e rótulo.
-3. Nenhuma barra é colorida por posição no ranking.
-4. Empate técnico (≤ 3 pontos) está escrito, não deduzido.
-5. Eixo sem dado aparece como "sem dado", nunca como zero.
-6. A sincronização inteira continua abaixo de 2 minutos com 8 projetos.
-7. Rodar duas vezes seguidas produz o mesmo resultado, sem gráfico duplicado e
-   sem formatação acumulada.
-8. Os 284 testes continuam passando (`python -m unittest discover -s tests`;
-   o resumo sai em **stderr**, cuidado ao usar pipe, e leva 2-3 minutos).
-9. `python scripts/central_compras.py checar-segredos --strict` continua limpo.
+- A `Visao Geral` mostra prioridade e pendências sem comparar scores
+  incomparáveis.
+- Em qualquer projeto, líder, empate, bloqueio ou ausência de elegível são
+  percebidos em poucos segundos.
+- Nenhum estado depende só de cor.
+- Nenhum dado ausente vira zero.
+- Tipos numéricos continuam ordenáveis, somáveis e utilizáveis em gráficos.
+- As visualizações têm pergunta, escala, unidade e fonte corretas.
+- A planilha permanece legível no desktop e no celular.
+- Duas sincronizações não duplicam nem acumulam elementos.
+- Payload antigo continua funcionando; campo novo não desaparece em silêncio.
+- Suíte, scanner de segredos e `git diff --check` passam.
+- O estado do deploy é descrito com precisão.
 
-## Formato da entrega
+## Entrega final
 
-1. O diff do `Code.gs` no arquivo versionado.
-2. Se mexer no Python (por exemplo para expor `gerado_em` ou os eixos do score
-   no payload), diff separado, e diga **explicitamente** se o script novo
-   funciona com o payload antigo — porque o deploy e o commit não acontecem no
-   mesmo instante.
-3. Uma lista do que você **não** conseguiu implementar e por quê.
-4. O estado real do deploy, separado do estado do arquivo versionado.
+Entregue nesta ordem:
 
-Não invente valor de cor. Se precisar de um tom que não está na tabela acima,
-diga qual papel ele cumpre e por que os existentes não servem — em vez de
-escolher um.
+1. diagnóstico curto da Versão 8;
+2. decisões de design e o motivo de cada uma;
+3. arquivos alterados e comportamento implementado;
+4. antes/depois, com screenshots quando houver acesso;
+5. resultados exatos dos testes, scanner e sincronizações;
+6. conferência aba por aba, incluindo desktop e celular;
+7. limitações ou itens não implementados;
+8. estado explícito: `SOMENTE VERSIONADO`, `DEPLOY PENDENTE` ou
+   `VERSÃO 9 IMPLANTADA E VERIFICADA`.
 
-## Resultado implantado e desvios conscientes
-
-- A Versão 8 usa Inter na interface e Roboto Mono nos valores tabulares. A
-  segunda família é funcional: alinha números, não é decoração.
-- `Visao Geral` congela cinco linhas; abas de projeto congelam duas. Nenhuma
-  coluna é congelada, porque títulos e rodapés mesclados atravessam a coluna A.
-- As barras `SPARKLINE` planejadas para score e confiança não foram mantidas.
-  O score ganhou gráfico geral e os estados ganharam formatação condicional,
-  evitando fórmulas frágeis ao locale sem esconder o valor numérico.
-- Os gráficos usam blocos auxiliares contíguos fora da área principal. Foi a
-  correção que eliminou gráficos vazios e rótulos misturados.
-- A validação final exigiu duas sincronizações e inspeção das nove abas. O
-  retorno `ok` sozinho não detectou nenhum dos dois bugs visuais.
-- O registro completo das lições está em
-  [`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).
+Atualize `STATUS.md`, `docs/integracao-google-sheets.md`,
+`docs/infraestrutura-externa.md` e `docs/aprendizados-google-sheets.md` sempre
+que o estado real mudar. Só faça commit e push se isso tiver sido autorizado na
+conversa. Não misture melhoria visual com alteração de regra de negócio.
