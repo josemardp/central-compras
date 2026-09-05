@@ -3166,6 +3166,7 @@ def project_counts(project: Path) -> dict[str, Any]:
         "estado": briefing.get("estado"),
         "preco_teto": briefing.get("preco_teto"),
         "cotacoes": len(quotes),
+        "cotacoes_vencidas": sum(quote_is_stale(row) for row in latest.values()),
         "manual": len(manual_ids),
         "candidatos": len(latest),
         "erros": len(errors),
@@ -3650,6 +3651,10 @@ SHEETS_OVERVIEW_FIELDS = [
     "categoria", "estado", "lider", "score", "confianca", "cotacoes",
     "manual", "dias_ate_decisao", "escolhido", "aguardando_preco",
 ]
+SHEETS_OVERVIEW_COLUMNS = [
+    "projeto", "categoria", "estado", "lider", "score", "confianca",
+    "cotacoes", "data_decisao",
+]
 SHEETS_SCHEMA_VERSION = 2
 SHEETS_METRIC_FIELDS = [
     "produto", "situacao", "score", "confianca", "custo_total", "nota",
@@ -3733,6 +3738,8 @@ def sheets_export_payload() -> dict[str, Any]:
         counts = project_counts(project)
         linha = {"projeto": counts["id"]}
         linha.update({campo: counts[campo] for campo in SHEETS_OVERVIEW_FIELDS})
+        linha["data_decisao"] = counts["data_decisao"]
+        linha["cotacoes_vencidas"] = counts["cotacoes_vencidas"]
         visao_geral.append(linha)
 
         categoria, atributos, itens = spec_comparison_rows(project)
@@ -3750,11 +3757,13 @@ def sheets_export_payload() -> dict[str, Any]:
             tipo = "estrela" if chave in {"nota", "garantia"} else "texto"
             valores = [comercial_valor(item, chave) for item in itens]
             linha = _linha_export(chave, tipo, valores)
+            linha["secao"] = "precos"
             linha["valores_tipados"] = _valores_tipados_comerciais(chave, itens)
             linhas.append(linha)
         for chave in atributos:
             valores = [atributo_valor(categoria, item, chave) for item in itens]
             linha = _linha_export(chave, "estrela", valores)
+            linha["secao"] = "atributos"
             linha["valores_tipados"] = [
                 _valor_tipado((item.product.get("atributos") or {}).get(chave), texto, estrelas)
                 for item, (texto, estrelas) in zip(itens, valores)
@@ -3771,7 +3780,7 @@ def sheets_export_payload() -> dict[str, Any]:
     return {
         "schema_versao": SHEETS_SCHEMA_VERSION,
         "gerado_em": now_iso(),
-        "visao_geral_colunas": ["projeto", *SHEETS_OVERVIEW_FIELDS],
+        "visao_geral_colunas": SHEETS_OVERVIEW_COLUMNS,
         "metricas_colunas": ["projeto", *SHEETS_METRIC_FIELDS],
         "visao_geral": visao_geral,
         "comparativos": comparativos,
@@ -3879,6 +3888,27 @@ def configurar_sheets(args: argparse.Namespace) -> None:
     print("Agora rode: python scripts/central_compras.py sincronizar-planilha")
 
 
+def validar_resposta_sheets(resultado: dict[str, Any], payload: dict[str, Any]) -> list[str]:
+    """Confere contagens quando o Web App v2+ as oferece; aceita a Versao 4."""
+    if quote_int(resultado.get("schema_versao")) < 2:
+        return []
+    esperados = {
+        "linhas_visao": len(payload["visao_geral"]),
+        "projetos_escritos": len(payload["comparativos"]),
+    }
+    divergencias = [
+        f"{campo}: esperado {esperado}, recebido {resultado.get(campo)!r}"
+        for campo, esperado in esperados.items()
+        if resultado.get(campo) != esperado
+    ]
+    if divergencias:
+        raise SystemExit(
+            "A planilha respondeu ok, mas a leitura de volta divergiu: "
+            + "; ".join(divergencias)
+        )
+    return [str(aviso) for aviso in (resultado.get("avisos") or [])]
+
+
 def sincronizar_planilha(args: argparse.Namespace) -> None:
     """Monta o payload e faz o POST pro Web App do Apps Script.
 
@@ -3912,10 +3942,13 @@ def sincronizar_planilha(args: argparse.Namespace) -> None:
 
     if not resultado.get("ok"):
         raise SystemExit(f"A planilha recusou os dados: {resultado.get('error') or resultado}")
+    avisos = validar_resposta_sheets(resultado, payload)
     print(
         f"Planilha sincronizada: {len(payload['visao_geral'])} projeto(s), "
         f"{len(payload['comparativos'])} comparativo(s)."
     )
+    for aviso in avisos:
+        print(f"Aviso da planilha: {aviso}")
 
 
 def generate_project_page(project: Path) -> Path:

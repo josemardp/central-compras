@@ -377,7 +377,7 @@ Ela nao deve fingir que confirmou preco, estoque, frete ou cupom quando isso dep
 python -m unittest discover -s tests
 ```
 
-176 testes. Alem dos casos de exemplo, ha teste de invariante que gera cotacoes
+281 testes. Alem dos casos de exemplo, ha teste de invariante que gera cotacoes
 aleatorias (inclusive patologicas: preco negativo, `1e309`, data impossivel,
 unicode) e confere propriedades que tem que valer sempre: score entre 0 e 100,
 eixo entre 0 e 1, cortado nunca pontua, o mais barato elegivel sempre tira 1,00

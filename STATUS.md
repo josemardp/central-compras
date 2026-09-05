@@ -7,6 +7,16 @@
 
 ## Última sessão: 04/09/2026
 
+- **Versão 5 premium da planilha preparada no repositório, mas ainda não
+  implantada.** O payload Python agora acrescenta schema, colunas dinâmicas,
+  métricas e valores tipados sem remover os campos lidos pela Versão 4. O
+  Code.gs documentado aceita os formatos antigo e novo, registra campos
+  ignorados sem abortar, usa escrita em lote, lock, indicadores, gráficos,
+  formatação numérica seletiva e limpeza controlada de abas. **A implantação
+  ativa continua na Versão 4.** O deploy depende de navegador autenticado em
+  **conta-comercial** e confirmação em duas etapas pelo dono; depois disso é
+  obrigatório sincronizar e abrir a planilha para validar visualmente. Não
+  considerar o retorno `ok` como comprovação.
 - **Integração Google Sheets reativada nesta máquina, do zero.** A sessão de
   31/08 (abaixo) dizia que a sincronização já rodava contra "o link
   publicado" — e rodava mesmo, mas **essa informação não bastava para
@@ -62,11 +72,10 @@
      primeira execução. Trocado por ID fixo (`DriveApp.getFolderById`). A
      duplicata foi movida para a lixeira com autorização do Josemar.
   3. `sincronizar-planilha` usava `timeout=30` no `urllib`, mas com 8
-     projetos o Apps Script leva ~47s para responder (escreve linha a linha,
-     sem batch). Passava do timeout **sempre**, com traceback cru de
-     `TimeoutError`. Timeout subido para 120s. Se o número de projetos
-     crescer muito, o próximo passo é trocar `appendRow` por `setValues` em
-     lote no Apps Script.
+     projetos a Versão 4 implantada leva ~47s para responder (escreve linha a
+     linha, sem batch). Passava do timeout **sempre**, com traceback cru de
+     `TimeoutError`. Timeout subido para 120s e mantido. A Versão 5 preparada
+     usa `setValues` em lote, mas ainda aguarda deploy e validação visual.
 - Sincronização rodada de verdade no fim: `8 projeto(s), 8 comparativo(s)`,
   conferida abrindo a planilha real (abas por projeto, incluindo relógio e
   pulseira).

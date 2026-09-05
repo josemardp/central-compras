@@ -108,6 +108,15 @@ class SheetsPayloadTest(unittest.TestCase):
     def test_payload_matches_dashboard_counts_and_comparison(self):
         payload = cc.sheets_export_payload()
 
+        self.assertEqual(payload["schema_versao"], 2)
+        self.assertEqual(
+            payload["visao_geral_colunas"],
+            cc.SHEETS_OVERVIEW_COLUMNS,
+        )
+        self.assertEqual(
+            payload["metricas_colunas"],
+            ["projeto", *cc.SHEETS_METRIC_FIELDS],
+        )
         self.assertEqual(len(payload["visao_geral"]), 1)
         visao = payload["visao_geral"][0]
         self.assertEqual(visao["projeto"], self.projeto.name)
@@ -115,18 +124,45 @@ class SheetsPayloadTest(unittest.TestCase):
         self.assertEqual(visao["categoria"], contagem["categoria"])
         self.assertEqual(visao["lider"], contagem["lider"])
         self.assertEqual(visao["score"], contagem["score"])
+        self.assertIn("data_decisao", visao)
+        self.assertIn("cotacoes_vencidas", visao)
 
         self.assertEqual(len(payload["comparativos"]), 1)
         comp = payload["comparativos"][0]
         self.assertEqual(comp["projeto"], self.projeto.name)
         self.assertEqual(comp["colunas"], ["Boa", "Cara Demais"])
         self.assertEqual(comp["situacao"], ["elegivel", "cortado"])
+        self.assertEqual(comp["metricas"][0]["produto"], "Boa")
+        self.assertEqual(comp["metricas"][0]["custo_total"], 300.0)
+        self.assertIsInstance(comp["metricas"][0]["score"], float)
 
     def test_price_row_is_never_starred(self):
         payload = cc.sheets_export_payload()
         linhas = payload["comparativos"][0]["linhas"]
         preco = next(linha for linha in linhas if linha["rotulo"] == "Preco")
         self.assertEqual(preco["tipo"], "texto")
+        self.assertEqual(preco["secao"], "precos")
+        self.assertIsInstance(preco["valores"][0], str)  # contrato legado da versao 4
+        self.assertEqual(preco["valores_tipados"][0]["tipo"], "moeda")
+        self.assertEqual(preco["valores_tipados"][0]["valor"], 300.0)
+
+    def test_note_keeps_legacy_text_and_adds_numeric_value(self):
+        payload = cc.sheets_export_payload()
+        linhas = payload["comparativos"][0]["linhas"]
+        nota = next(linha for linha in linhas if linha["rotulo"] == "Nota")
+        self.assertEqual(nota["tipo"], "estrela")
+        self.assertEqual(nota["valores"][0]["texto"], "4.8 (500 aval.)")
+        self.assertEqual(nota["valores_tipados"][0]["tipo"], "nota")
+        self.assertEqual(nota["valores_tipados"][0]["valor"], 4.8)
+        self.assertEqual(nota["valores_tipados"][0]["detalhe"], "500 avaliacoes")
+
+    def test_typed_value_does_not_turn_decimal_text_into_a_number(self):
+        texto = cc._valor_tipado("11.7", "11.7")
+        numero = cc._valor_tipado(11.7, "11.7")
+        self.assertEqual(texto["tipo"], "texto")
+        self.assertEqual(texto["valor"], "11.7")
+        self.assertEqual(numero["tipo"], "numero")
+        self.assertEqual(numero["valor"], 11.7)
 
     def test_cut_candidate_has_no_star_anywhere(self):
         payload = cc.sheets_export_payload()
@@ -145,6 +181,7 @@ class SheetsPayloadTest(unittest.TestCase):
         linhas = payload["comparativos"][0]["linhas"]
         resolucao = next(linha for linha in linhas if linha["rotulo"] == "Resolucao")
         self.assertEqual(resolucao["valores"][0]["estrelas"], 4)
+        self.assertEqual(resolucao["secao"], "atributos")
 
 
 class ComercialAtributoValorTest(unittest.TestCase):
@@ -308,6 +345,37 @@ class SincronizarPlanilhaTest(unittest.TestCase):
             cc.sincronizar_planilha(argparse.Namespace(config=str(caminho)))
         self.assertIn("nao devolveu JSON valido", str(ctx.exception))
 
+    def test_legacy_web_app_response_remains_accepted(self):
+        payload = {"visao_geral": [{}], "comparativos": [{}, {}]}
+        self.assertEqual(cc.validar_resposta_sheets({"ok": True}, payload), [])
+
+    def test_v2_response_returns_warnings_without_rejecting_sync(self):
+        payload = {"visao_geral": [{}], "comparativos": [{}, {}]}
+        resultado = {
+            "ok": True,
+            "schema_versao": 2,
+            "linhas_visao": 1,
+            "projetos_escritos": 2,
+            "avisos": ["campo futuro ignorado"],
+        }
+        self.assertEqual(
+            cc.validar_resposta_sheets(resultado, payload),
+            ["campo futuro ignorado"],
+        )
+
+    def test_v2_response_with_wrong_counts_is_not_a_false_ok(self):
+        payload = {"visao_geral": [{}], "comparativos": [{}, {}]}
+        resultado = {
+            "ok": True,
+            "schema_versao": 2,
+            "linhas_visao": 1,
+            "projetos_escritos": 1,
+        }
+        with self.assertRaises(SystemExit) as ctx:
+            cc.validar_resposta_sheets(resultado, payload)
+        self.assertIn("respondeu ok", str(ctx.exception))
+        self.assertIn("projetos_escritos", str(ctx.exception))
+
 
 class ConfigDivididaTest(unittest.TestCase):
     """A URL e versionada, o token nao.
@@ -376,6 +444,55 @@ class ConfigDivididaTest(unittest.TestCase):
         self._versionado("https://nova/exec")
         cc.configurar_sheets(argparse.Namespace(token="t", url="https://teste/exec"))
         self.assertEqual(cc.carregar_config_sheets(), ("https://teste/exec", "t"))
+
+
+class AppsScriptDocumentadoTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        doc = (
+            Path(__file__).parents[1] / "docs" / "integracao-google-sheets.md"
+        ).read_text(encoding="utf-8")
+        cls.doc = doc
+        cls.code = doc.split("```javascript", 1)[1].split("```", 1)[0]
+
+    def test_deploy_esta_marcado_como_pendente(self):
+        self.assertIn("versão 5 preparada, deploy pendente", self.doc)
+        self.assertIn("a implantação ativa continua na Versão 4", self.doc)
+
+    def test_renderizacao_e_em_lote_e_tem_lock(self):
+        self.assertNotIn(".appendRow(", self.code)
+        self.assertNotIn("setNumberFormat('@')", self.code)
+        self.assertIn("setValues", self.code)
+        self.assertIn("setNumberFormats", self.code)
+        self.assertIn("LockService.getScriptLock", self.code)
+
+    def test_payload_antigo_tem_fallback_e_campos_novos_geram_aviso(self):
+        self.assertIn("CAMPOS_VISAO_FALLBACK", self.code)
+        self.assertIn("colunasOuFallback", self.code)
+        self.assertIn("campo ignorado", self.code)
+        self.assertIn("avisos", self.code)
+
+    def test_visual_premium_e_dados_tipados_estao_documentados(self):
+        self.assertIn("function escreverVisaoGeral", self.code)
+        self.assertIn("function inserirGraficoVisao", self.code)
+        self.assertIn("function inserirGraficosComparativo", self.code)
+        self.assertIn("function formatoTipo", self.code)
+
+    def test_visual_segue_a_paleta_e_as_interacoes_aprovadas(self):
+        for cor in ("#2a78d6", "#eaf2fd", "#fab219", "#d03b3b", "#f9f9f7"):
+            self.assertIn(cor, self.code)
+        self.assertNotIn("Google Sans", self.code)
+        self.assertIn("setFontFamily('Inter')", self.code)
+        self.assertIn("Empate tecnico", self.code)
+        self.assertIn("setRichTextValue", self.code)
+        self.assertIn("setWarningOnly(true)", self.code)
+        self.assertIn("sem dado", self.code)
+
+    def test_timeout_de_sincronizacao_continua_em_120_segundos(self):
+        script = (
+            Path(__file__).parents[1] / "scripts" / "central_compras.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("urlopen(requisicao, timeout=120)", script)
 
 
 if __name__ == "__main__":

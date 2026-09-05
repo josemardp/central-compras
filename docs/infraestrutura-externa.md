@@ -79,6 +79,11 @@ de propósito: assim não desaparece se a planilha for para a lixeira).
 - Editor: `script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 - Web App **ativo**, execução como conta-comercial, acesso "qualquer pessoa",
   protegido por token no corpo do POST.
+- A implantação ativa continua na **Versão 4**. A Versão 5 premium está
+  preparada no repositório, com deploy pendente por exigir login na conta
+  **conta-comercial** e confirmação em duas etapas pelo dono. Não sincronize
+  esperando o novo layout antes desse deploy; depois de publicar, abra a
+  planilha e valide visualmente em vez de confiar apenas no retorno `ok`.
 - Código e procedimento de redeploy: [`integracao-google-sheets.md`](integracao-google-sheets.md).
 
 ### Configuração: o que viaja no `git pull` e o que não viaja
