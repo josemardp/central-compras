@@ -361,6 +361,28 @@ tinha poder de detecção real.
 
 ## Pendências
 
+### Abertas em 04/09/2026 (as de agora)
+
+- [ ] **Enviar `docs/prompt-design-planilha.md` ao Codex.** O prompt está
+  **pronto**, é só copiar tudo abaixo do `---` e colar. Plano de redesign
+  visual da planilha: paleta já validada por script, tipografia, layout aba a
+  aba, dois gráficos por projeto, anti-padrões proibidos e 9 critérios de
+  aceite. **Só o Josemar dispara** — o envio é dele.
+- [ ] **Implantar a Versão 5 do Apps Script** (preparada pelo Codex em
+  `3e65c5c`, ainda não no ar). Exige navegador na conta **conta-comercial** e
+  confirmação em duas etapas no celular do Josemar. O Claude executa os
+  passos se ele aprovar o 2FA na hora. Passo a passo no bloco **AO RETOMAR**.
+  Enquanto não subir, a planilha continua no layout da Versão 4 — sem quebrar,
+  porque o payload novo é retrocompatível.
+- [ ] **Depois do deploy: abrir a planilha e conferir com o olho.** Não vale o
+  `ok` do terminal. Foi assim que três bugs passaram despercebidos por três
+  agentes.
+- [ ] **Relógio: decidir.** A Huawei Band 9 preta (R$ 239,88) esgotou. A cor
+  deixou de ser critério, mas na Amazon não há Band 9 abaixo de R$ 350 e o
+  Mercado Livre bloqueia navegador automatizado (403). Falta o levantamento
+  de todas as cores no ML — depende do Codex ou do próprio Josemar. Opção
+  viva mais barata hoje: **amarela a R$ 312**, R$ 12 acima do teto.
+
 ### Passos manuais do Josemar (bloqueiam o projeto do carro)
 
 - Levantar em casa: **capacidade do quadro elétrico e distância do quadro até
@@ -378,7 +400,9 @@ conta de energia e da rotina declarada, ver `briefing.md` do projeto.
 
 ### Do repositório
 
-Nenhuma pendência aberta no momento. As 6 que existiam foram todas
+As de 04/09 estão no bloco acima. O que segue é histórico das anteriores.
+
+As 6 que existiam foram todas
 resolvidas: skill installer, rotina semanal, `peso_ancora` por categoria e
 filtro de CEP (já estavam feitas, a lista é que estava desatualizada); e as
 duas últimas — **`write_yaml` apagava comentário de proveniência** e
