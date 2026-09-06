@@ -28,24 +28,46 @@ from scripts import central_compras as cc
 
 
 class OperationRecoveryTest(ambiente.RepoTestCase):
-    def _abrir_candidato(self, project):
-        self.product(project)
-        self.quote(project, "candidato", "--fonte", "manual")
+    def _abrir_candidato(self, project, pid="candidato"):
+        # produto_id e global por categoria (produtos/<categoria>/<id>), nao
+        # por projeto - projetos distintos usados no mesmo teste precisam de
+        # pid distinto para nao colidir com "Produto ja existe".
+        self.product(project, pid)
+        self.quote(project, pid, "--fonte", "manual")
 
-    def _decidir(self, project, **overrides):
-        args = ["decidir", str(project), "--produto-id", "candidato",
+    def _decidir(self, project, pid="candidato", **overrides):
+        args = ["decidir", str(project), "--produto-id", pid,
                 "--porque", overrides.pop("porque", "unico candidato"),
                 "--sem-perdedores", "--comprado"]
         return self.cli(*args)
 
     def _fechar_com_veredito(self, project):
-        self._abrir_candidato(project)
-        self._decidir(project)
-        veredito = next(cc.VEREDITOS.glob("*.md"))
+        return self._fechar_com_veredito_generico(project, licao="conferir estoque antes")
+
+    def _fechar_com_veredito_generico(self, project, licao, pid="candidato"):
+        self._abrir_candidato(project, pid)
+        self._decidir(project, pid)
+        veredito = next(p for p in cc.VEREDITOS.glob("*.md") if project.name in p.name)
         self.cli("preencher-veredito", str(veredito), "--fase", "d30",
-                 "--resumo", "foi bem", "--licao", "conferir estoque antes",
+                 "--resumo", "foi bem", "--licao", licao,
                  "--nota-arrependimento", "1", "--compraria-de-novo", "sim")
         return veredito
+
+    def _cli_capturando(self, *argv):
+        """Como `self.cli`, mas devolve (saida, excecao) em vez de propagar
+        SystemExit - para inspecionar o que foi impresso mesmo quando o
+        comando falha (ex.: `auditar-decisoes --strict` imprime os problemas
+        antes de levantar)."""
+        import contextlib as ctxlib
+        import io
+        output = io.StringIO()
+        excecao = None
+        with ctxlib.redirect_stdout(output):
+            try:
+                cc.main(list(argv))
+            except SystemExit as erro:
+                excecao = erro
+        return output.getvalue(), excecao
 
     # ---- Bug 1: licao duplicada com sucesso aparente -----------------------
 
@@ -236,6 +258,162 @@ class OperationRecoveryTest(ambiente.RepoTestCase):
         self.assertIn("Nenhuma operacao pendente", saida)
         self.cli("operacoes-pendentes", "--strict")  # nao deve sair com erro
 
+    # ---- 3a revisao (Codex), sobre o commit 2a682a7 ------------------------
+
+    def test_rev3_bug1_manifesto_nao_e_invalidado_pela_propria_recuperacao(self):
+        project = self.project()
+        self._abrir_candidato(project)
+
+        real_append_timeline = cc.append_timeline
+
+        def falha_no_veredito(project_, etapa, decisao, porque):
+            if etapa == "veredito":
+                raise RuntimeError("crash simulado antes da linha do veredito")
+            return real_append_timeline(project_, etapa, decisao, porque)
+
+        with patch.object(cc, "append_timeline", side_effect=falha_no_veredito):
+            with self.assertRaises(RuntimeError):
+                self._decidir(project)
+
+        self._decidir(project)  # retomada: reusa o mesmo diretorio de snapshot
+
+        # So existir o manifesto.json nao prova integridade - precisa bater
+        # com o conteudo real de cada arquivo listado, incluindo ele mesmo
+        # nao se autodescrever de forma inconsistente.
+        saida, erro = self._cli_capturando("auditar-decisoes", str(project), "--strict")
+        self.assertIsNone(erro, f"BUG: auditar-decisoes --strict reprovou apos a recuperacao:\n{saida}")
+        self.assertEqual(len(cc.pending_operations([project])), 0)
+
+    def test_rev3_bug2_snapshot_nao_e_reescrito_com_config_diferente_apos_crash(self):
+        project = self.project()
+        self._abrir_candidato(project)
+
+        real_append_timeline = cc.append_timeline
+
+        def falha_no_veredito(project_, etapa, decisao, porque):
+            if etapa == "veredito":
+                raise RuntimeError("crash simulado antes da linha do veredito")
+            return real_append_timeline(project_, etapa, decisao, porque)
+
+        with patch.object(cc, "append_timeline", side_effect=falha_no_veredito):
+            with self.assertRaises(RuntimeError):
+                self._decidir(project)
+
+        snapshot_dir = next((project / "snapshots").iterdir())
+        prefs_no_snapshot = snapshot_dir / "preferencias.yaml"
+        categorias_no_snapshot = snapshot_dir / "categorias.yaml"
+        bytes_prefs_originais = prefs_no_snapshot.read_bytes()
+        bytes_categorias_originais = categorias_no_snapshot.read_bytes()
+
+        # Muda a config REAL depois do crash, antes do retry - simula o
+        # Josemar calibrando um peso entre a falha e a retomada.
+        prefs_reais = self.root / "config" / "preferencias.yaml"
+        prefs_reais.write_text(
+            prefs_reais.read_text(encoding="utf-8") + "\nvalor_alterado_no_teste: true\n",
+            encoding="utf-8",
+        )
+
+        self._decidir(project)  # retomada, MESMO comando
+
+        self.assertEqual(prefs_no_snapshot.read_bytes(), bytes_prefs_originais,
+                         "BUG: snapshot foi reescrito com a config alterada apos o crash")
+        self.assertEqual(categorias_no_snapshot.read_bytes(), bytes_categorias_originais)
+        saida, erro = self._cli_capturando("auditar-decisoes", str(project), "--strict")
+        self.assertIsNone(erro, saida)
+
+        # a config real, fora do snapshot, continua alterada - a correcao
+        # nao deve ter revertido nada fora da evidencia congelada.
+        self.assertIn("valor_alterado_no_teste", prefs_reais.read_text(encoding="utf-8"))
+
+    def test_rev3_bug3_texto_identico_nao_confunde_operacoes_distintas_antes_de_executar(self):
+        # Operacao A: exportacao legitima e completa, registrando uma licao.
+        projeto_a = self.project("compra-a")
+        veredito_a = self._fechar_com_veredito_generico(projeto_a, licao="conferir garantia antes", pid="candidato-a")
+        self.cli("aprender-veredito", str(veredito_a))
+        self.assertEqual((cc.BASE / "licoes.md").read_text(encoding="utf-8").count("conferir garantia antes"), 1)
+
+        # Operacao B: outro projeto, MESMO texto de licao, no mesmo dia.
+        # Interrompida exatamente entre persistir "licao:iniciado" (a
+        # assinatura ja congelada) e executar a gravacao de verdade.
+        projeto_b = self.project("compra-b")
+        veredito_b = self._fechar_com_veredito_generico(projeto_b, licao="conferir garantia antes", pid="candidato-b")
+
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def falha_em(ponto_alvo):
+            def _hook(ponto):
+                if ponto == ponto_alvo:
+                    raise RuntimeError(f"crash simulado em {ponto}")
+                return real_hook(ponto)
+            return _hook
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", falha_em("licao:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito_b))
+
+        licoes = (cc.BASE / "licoes.md").read_text(encoding="utf-8")
+        self.assertEqual(licoes.count("conferir garantia antes"), 1,
+                         "so a operacao A devia ter gravado ate aqui; B foi interrompida antes de executar")
+
+        # Retomada de B: precisa gravar a PROPRIA ocorrencia, sem confundir
+        # com a entrada legitima e independente que A ja tinha gravado.
+        self.cli("aprender-veredito", str(veredito_b))
+        licoes = (cc.BASE / "licoes.md").read_text(encoding="utf-8")
+        self.assertEqual(licoes.count("conferir garantia antes"), 2,
+                         "BUG: a retomada de B confundiu a entrada de A com o proprio efeito e nao gravou nada")
+        self.assertEqual(cc.pending_operations([cc.BASE]), [])
+
+    def test_rev3_bug3_texto_identico_falha_apos_executar_tambem_nao_duplica(self):
+        projeto_a = self.project("compra-a")
+        veredito_a = self._fechar_com_veredito_generico(projeto_a, licao="conferir garantia antes", pid="candidato-a")
+        self.cli("aprender-veredito", str(veredito_a))
+
+        projeto_b = self.project("compra-b")
+        veredito_b = self._fechar_com_veredito_generico(projeto_b, licao="conferir garantia antes", pid="candidato-b")
+
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def falha_em(ponto_alvo):
+            def _hook(ponto):
+                if ponto == ponto_alvo:
+                    raise RuntimeError(f"crash simulado em {ponto}")
+                return real_hook(ponto)
+            return _hook
+
+        # Desta vez a falha e DEPOIS de executar a gravacao de B (que produz
+        # a 2a ocorrencia do texto), mas antes de confirmar o passo.
+        with patch.object(cc, "_crash_de_teste_se_pedido", falha_em("licao:executado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito_b))
+
+        licoes = (cc.BASE / "licoes.md").read_text(encoding="utf-8")
+        self.assertEqual(licoes.count("conferir garantia antes"), 2,
+                         "a gravacao de B ja devia ter acontecido antes do crash simulado")
+
+        # Retomada: NAO deve gravar uma 3a ocorrencia.
+        self.cli("aprender-veredito", str(veredito_b))
+        licoes = (cc.BASE / "licoes.md").read_text(encoding="utf-8")
+        self.assertEqual(licoes.count("conferir garantia antes"), 2,
+                         "BUG: a retomada duplicou a licao de B apos falha pos-execucao")
+        self.assertEqual(cc.pending_operations([cc.BASE]), [])
+
+    def test_rev3_bug3_duas_fases_com_texto_identico_nao_se_confundem(self):
+        project = self.project()
+        veredito = self._fechar_com_veredito_generico(project, licao="conferir garantia antes")
+        self.cli("aprender-veredito", str(veredito))  # exporta D+30
+
+        # Preenche e exporta D+180 com o MESMO texto de licao que o D+30 ja
+        # exportou. Sao operacoes (op_id) distintas por causa da fase.
+        self.cli("preencher-veredito", str(veredito), "--fase", "d180",
+                 "--resumo", "continua bom", "--licao", "conferir garantia antes",
+                 "--nota-arrependimento", "1", "--compraria-de-novo", "sim",
+                 "--ainda-usa", "sim")
+        self.cli("aprender-veredito", str(veredito))
+        licoes = (cc.BASE / "licoes.md").read_text(encoding="utf-8")
+        self.assertEqual(licoes.count("conferir garantia antes"), 2,
+                         "as duas fases sao exportacoes distintas; as duas devem ter gravado")
+        self.assertEqual(cc.pending_operations([cc.BASE]), [])
+
     # ---- Concorrencia: as travas existentes ainda serializam --------------
 
     def test_comandos_concorrentes_no_mesmo_projeto_sao_serializados(self):
@@ -247,7 +425,7 @@ class OperationRecoveryTest(ambiente.RepoTestCase):
         def tentar():
             try:
                 resultados.append(self._decidir(project))
-            except BaseException as erro:  # inclui SystemExit de timeout da trava
+            except BaseException as erro:  # so aceitavel se for o timeout da trava
                 erros.append(erro)
 
         import threading
@@ -256,6 +434,12 @@ class OperationRecoveryTest(ambiente.RepoTestCase):
             t.start()
         for t in threads:
             t.join(timeout=60)
+
+        # Toda excecao tem que ser EXATAMENTE o timeout de trava esperado -
+        # qualquer outro tipo de erro (corrupcao, dado inconsistente) reprova.
+        for erro in erros:
+            self.assertIsInstance(erro, SystemExit)
+            self.assertIn("Outro comando esta escrevendo", str(erro))
 
         # Ninguem deve ter corrompido processo.md: as linhas da linha do
         # tempo (comecam com a data) precisam continuar com as 4 colunas
@@ -266,8 +450,15 @@ class OperationRecoveryTest(ambiente.RepoTestCase):
             if re.match(r"^\| \d{4}-\d{2}-\d{2} \|", linha):
                 self.assertEqual(linha.count("|"), 5, f"linha corrompida por corrida: {linha!r}")
         self.assertEqual(len(cc.pending_operations([project])), 0)
-        # ao menos uma tentativa deve ter completado com sucesso
+        # O numero de sucessos tem que bater EXATAMENTE com o numero de linhas
+        # de decisao gravadas - nem mais (duplicacao), nem menos (perda).
+        linhas_decisao = processo.count("| decisao | Escolhido candidato |")
+        self.assertEqual(linhas_decisao, len(resultados))
+        self.assertEqual(len(resultados) + len(erros), 3)
         self.assertGreaterEqual(len(resultados), 1)
+
+        saida, erro_auditoria = self._cli_capturando("auditar-decisoes", str(project), "--strict")
+        self.assertIsNone(erro_auditoria, saida)
 
 
 class SubprocessRecoveryTest(unittest.TestCase):
@@ -333,6 +524,72 @@ class SubprocessRecoveryTest(unittest.TestCase):
             self.assertEqual(processo.count("| veredito | Arquivo de veredito criado |"), 1)
 
             r = rodar("operacoes-pendentes", "--strict")
+            self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_concorrencia_com_processos_separados(self):
+        """Threads no mesmo processo compartilham handle de arquivo com o SO
+        de um jeito que nao testa a trava entre PROCESSOS de verdade - o
+        cenario real de duas maquinas, ou dois terminais, rodando o mesmo
+        comando. Isto aqui usa `subprocess.Popen` de verdade."""
+        with tempfile.TemporaryDirectory() as tmp:
+            raiz = ambiente.montar(Path(tmp))
+            script = raiz / "scripts" / "central_compras.py"
+
+            def rodar(*args):
+                return subprocess.run(
+                    [sys.executable, str(script), *args],
+                    cwd=str(raiz), capture_output=True, text=True, timeout=60,
+                )
+
+            nome_projeto = "concorrencia-processos-separados"
+            r = rodar("novo-projeto", nome_projeto, "--categoria", "fone", "--valor-estimado", "400")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            projeto_dir = raiz / "projetos" / f"{cc.today()[:4]}-{cc.slugify(nome_projeto)}"
+            r = rodar("novo-produto", str(projeto_dir), "candidato", "--produto-id", "candidato",
+                      "--marca", "Marca", "--requisito", "uso=true")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = rodar("cotar", str(projeto_dir), "--produto-id", "candidato", "--loja", "Amazon",
+                      "--vendedor", "V", "--vendedor-tipo", "oficial", "--preco", "200",
+                      "--nota", "4.8", "--avaliacoes", "1000", "--frete-prazo-dias", "2",
+                      "--garantia-tipo", "nacional", "--garantia-meses", "12",
+                      "--link", "https://example.invalid/item", "--fonte", "manual")
+            self.assertEqual(r.returncode, 0, r.stderr)
+
+            decidir_args = ("decidir", str(projeto_dir), "--produto-id", "candidato",
+                            "--porque", "unico candidato", "--sem-perdedores", "--comprado")
+
+            processos = [
+                subprocess.Popen([sys.executable, str(script), *decidir_args], cwd=str(raiz),
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                for _ in range(3)
+            ]
+            resultados = []
+            for p in processos:
+                saida, erro = p.communicate(timeout=60)  # .wait() implicito: so entao .returncode e real
+                resultados.append((p.returncode, saida, erro))
+
+            sucessos = 0
+            for codigo, saida, erro in resultados:
+                if codigo == 0:
+                    sucessos += 1
+                else:
+                    # A UNICA falha aceitavel e o timeout da propria trava -
+                    # qualquer outra coisa (traceback cru, corrupcao) reprova.
+                    self.assertIn("Outro comando esta escrevendo", saida + erro,
+                                 f"processo separado falhou por motivo inesperado: {erro}")
+            self.assertGreaterEqual(sucessos, 1)
+
+            processo_md = (projeto_dir / "processo.md").read_text(encoding="utf-8")
+            linhas_decisao = processo_md.count("| decisao | Escolhido candidato |")
+            self.assertEqual(linhas_decisao, sucessos,
+                             "numero de linhas de decisao deve bater exatamente com o numero de sucessos")
+            for linha in processo_md.splitlines():
+                if re.match(r"^\| \d{4}-\d{2}-\d{2} \|", linha):
+                    self.assertEqual(linha.count("|"), 5, f"linha corrompida por corrida entre processos: {linha!r}")
+
+            r = rodar("operacoes-pendentes", "--strict")
+            self.assertEqual(r.returncode, 0, r.stdout)
+            r = rodar("auditar-decisoes", str(projeto_dir), "--strict")
             self.assertEqual(r.returncode, 0, r.stdout)
 
 

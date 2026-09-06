@@ -22,9 +22,11 @@ Estados possíveis: `não iniciada` · `em andamento` · `concluída` · `bloque
 
 ## 2. Recuperação de operações parciais — PRIORIDADE
 
-**Estado: concluída** (revisada e corrigida na sessão de 06/09/2026, noite).
-Ficou **em andamento** entre a 1ª entrega (commit `83c0901`) e esta correção
-— não declarar concluído de novo até o próximo revisor confirmar.
+**Estado: concluída** (3ª revisão corrigida na sessão de 06/09/2026, noite —
+commit a publicar). Ficou **em andamento** entre cada entrega e a revisão
+seguinte que achou lacuna nova — não declarar concluído de novo sem que o
+próximo revisor confirme contra os 4 pontos do "critérios para encerrar" da
+3ª revisão, citados na subseção abaixo.
 
 ### 1ª entrega (commit `83c0901`) — insuficiente, revisada pelo Codex
 
@@ -146,24 +148,94 @@ prometido, e está dito assim no código.
 
 Suíte completa depois da mudança: ver `STATUS.md` para o número final.
 
+### 3ª revisão (Codex, sobre o commit `2a682a7`) — 3 falhas mais profundas
+
+A 2ª correção resolveu os 3 bugs daquela rodada, mas o Codex reproduziu mais
+3, todos na mesma raiz: eu tratava "gravar o snapshot" como uma sequência de
+escritas independentes, quando deveria ser uma unidade que vira imutável ao
+concluir; e `registrar_efeito` confundia "esse texto existe no arquivo" com
+"esta operação, especificamente, teve efeito".
+
+1. **Manifesto invalidado pela própria recuperação.** Numa retomada,
+   `_decide_writes` reusava o diretório do snapshot (correto) mas
+   RECALCULAVA o manifesto contando também o `manifesto.json` que a própria
+   tentativa anterior tinha deixado ali — um arquivo que descreve a si mesmo
+   nunca bate com o próprio conteúdo depois de ser reescrito. `auditar-
+   decisoes --strict` acusava "arquivo alterado: manifesto.json" mesmo com
+   `operacoes-pendentes` vazio. Confirmado existir apenas o arquivo nunca
+   provou integridade — era preciso rodar a auditoria de verdade.
+2. **Snapshot reescrito com entradas diferentes.** O caminho do snapshot
+   estava congelado, mas o CONTEÚDO era recalculado a cada tentativa —
+   `config/preferencias.yaml`, `categorias.yaml`, briefing e fichas de
+   produto eram relidos do disco atual. Uma calibragem feita entre a falha e
+   o retry (reproduzido mudando `preferencias.yaml`) vazava para dentro da
+   evidência já "congelada", contradizendo o propósito do snapshot.
+3. **Texto igual não identificava a operação.** `registrar_efeito` decidia
+   "o efeito já aconteceu" só checando se a assinatura aparecia em algum
+   lugar do arquivo — sem distinguir uma ocorrência de uma operação
+   completamente diferente e legítima (duas lições idênticas, exportadas de
+   projetos distintos, no mesmo dia). Uma retomada interrompida bem no início
+   (antes de executar a gravação de verdade) via a entrada ALHEIA já
+   presente, concluía "já feito" e nunca gravava a própria — perda
+   silenciosa de conhecimento, com a pendência desaparecendo mesmo assim.
+
+**Reprodução dos 3, contra o código antigo (`2a682a7`, via `git stash` + os
+testes atuais):** `ERRO 2026-auditoria/<snapshot>: arquivo alterado:
+manifesto.json` (bug 1); bytes do `preferencias.yaml` dentro do snapshot
+literalmente ganhando a linha `valor_alterado_no_teste: true` injetada depois
+do crash (bug 2); contagem de `"conferir garantia antes"` ficando em 1 em vez
+de 2 depois da retomada de uma segunda exportação legítima (bug 3).
+
+**Correção — revisão do contrato inteiro, não só dos 3 exemplos:**
+
+- **`OperationHandle.executar_uma_vez(passo, executar)`**: primitivo novo
+  para captura de VÁRIOS arquivos por sobrescrita cega (não append-only).
+  Regra binária: `passo` concluído → não toca em NADA (evidência já
+  finalizada permanece intacta, resolve os bugs 1 e 2 de uma vez, sem
+  precisar fingerprintar preferências/categorias/fichas uma por uma); `passo`
+  nunca concluído (nem tentado, ou interrompido no meio) → refaz a captura
+  inteira do zero, seguro porque é sobrescrita, nunca duplica. `_decide_writes`
+  agora chama isto uma vez, envolvendo build_ranking + todo o snapshot +
+  `decisao.md`.
+- **`manifesto.json` nunca entra no próprio manifesto** (`path.name !=
+  "manifesto.json"` no glob) — defesa adicional, ainda que
+  `executar_uma_vez` já torne o cenário que expôs isso impossível.
+- **`registrar_efeito` agora identifica pela CONTAGEM de ocorrências antes
+  da tentativa começar** (`contagem_anterior`, congelada junto da
+  assinatura), não pela presença. Uma retomada só considera o efeito feito
+  se uma ocorrência NOVA apareceu depois que ESTA tentativa começou —
+  ocorrências pré-existentes (de outra operação legítima) nunca contam como
+  prova de que esta, especificamente, teve efeito.
+
+### Testes
+
+`tests/test_operation_recovery.py`, **18 testes** (12 da 2ª revisão + 6
+novos): as 3 reproduções da 3ª revisão (incluindo variantes "falha antes de
+executar" e "falha depois de executar" para o bug 3, mais duas fases com
+texto idêntico), e o teste de concorrência trocado de threads por
+**processos separados de verdade** (`subprocess.Popen`), com verificação de
+que todo código de saída não-zero é exatamente o timeout de trava esperado
+(nunca corrupção), que o número de linhas de decisão bate exatamente com o
+número de sucessos, e que `auditar-decisoes --strict` passa ao final.
+
 ### O que este mecanismo não cobre (registrado, não é lacuna escondida)
 
 - Concorrência entre dois processos ao mesmo tempo continua dependendo só de
   `project_lock`/`BASE` lock; o journal em si não tem lock próprio (documentado
-  no docstring de `tracked_operation`). O teste de concorrência cobre threads
-  no mesmo processo, que exercitam a mesma trava de arquivo do SO.
+  no docstring de `tracked_operation`). Testado agora com processos
+  separados de verdade, não só threads.
 - Falta de espaço em disco no meio da própria escrita do journal ainda pode
   deixar um estado inconsistente — é o mesmo limite que já existia em
   `atomic_write_text` para qualquer arquivo isolado.
 - Retomada que atravessa a virada do dia: a linha de linha do tempo
   reexecutada leva a data do dia da retomada, não da tentativa original (a
-  assinatura congelada evita duplicação, mas não fixa a data de um efeito que
-  nunca chegou a acontecer). Não é duplicação, é nuance de atribuição de
-  data — registrado, não escondido.
+  assinatura/contagem congeladas evitam duplicação, mas não fixam a data de
+  um efeito que nunca chegou a acontecer). Não é duplicação, é nuance de
+  atribuição de data — registrado, não escondido.
 - Não cobre a exportação para o Google Sheets (frente 3) nem qualquer outra
   sequência multi-arquivo fora de `decidir`/`aprender-veredito`. Se uma
-  sessão futura achar outro ponto candidato, o mesmo `tracked_operation` deve
-  ser reaproveitado, não reinventado.
+  sessão futura achar outro ponto candidato, reaproveite
+  `registrar_efeito`/`executar_uma_vez`, não reinvente.
 
 ## 3. Receptor do Google Sheets
 

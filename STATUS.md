@@ -5,14 +5,49 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (06/09/2026, sessao 3)
+## AO RETOMAR — comece por aqui (06/09/2026, sessao 4)
 
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
-Frente 2 (recuperacao de operacoes parciais) **concluida** (revisada e
-corrigida nesta sessao). Frentes 3 (receptor Sheets), 4 (proveniencia), 5
-(produtos reutilizados) e 6 (datas/veredito) **nao iniciadas** — comece pelo
-plano, nao redescubra o escopo.
+Frente 2 (recuperacao de operacoes parciais) **concluida** — na 3a rodada de
+revisao (Codex sobre o commit `2a682a7`). Frentes 3 (receptor Sheets), 4
+(proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito) **nao
+iniciadas** — comece pelo plano, nao redescubra o escopo.
+
+- **A 2a correcao (commit `2a682a7`) tambem estava incompleta.** O Codex
+  revisou de novo e reproduziu 3 falhas mais profundas, todas na mesma raiz:
+  eu tratava "gravar o snapshot" como uma sequencia de escritas
+  independentes em vez de uma unidade que devia virar imutavel ao concluir,
+  e `registrar_efeito` confundia "esse texto existe no arquivo" com "esta
+  operacao teve efeito". (1) retomada recalculava o manifesto contando o
+  `manifesto.json` que a propria tentativa anterior tinha deixado no
+  diretorio - um arquivo que se autodescreve nunca bate com o proprio
+  conteudo depois de reescrito, e `auditar-decisoes --strict` acusava
+  "arquivo alterado: manifesto.json"; (2) o CONTEUDO do snapshot (nao so o
+  caminho) era recalculado a cada retomada - uma calibragem em
+  `preferencias.yaml` feita entre a falha e o retry vazava para dentro da
+  evidencia ja congelada; (3) `registrar_efeito` decidia "ja aconteceu" so
+  pela presenca do texto, sem distinguir a ocorrencia de uma operacao
+  diferente e legitima - duas licoes identicas em projetos distintos, no
+  mesmo dia, faziam a retomada da segunda "concluir" sem gravar nada,
+  perdendo conhecimento em silencio. As 3 reproduzidas contra o codigo
+  antigo antes de corrigir — evidencia completa na secao 2 do plano.
+- **Correcao — revisao do contrato, nao so dos exemplos**: primitivo novo
+  `OperationHandle.executar_uma_vez()` para captura de varios arquivos por
+  sobrescrita cega: passo concluido nunca mais toca em nada (resolve 1 e 2
+  juntos, sem precisar fingerprintar cada arquivo de entrada);
+  `registrar_efeito()` agora identifica pela CONTAGEM de ocorrencias antes
+  da tentativa comecar, nao pela presenca (resolve 3).
+- **Testes**: `tests/test_operation_recovery.py` foi de 12 para **18
+  testes**; o teste de concorrencia trocou de threads por **processos
+  separados de verdade**, com verificacao de que todo codigo de saida
+  nao-zero e exatamente o timeout de trava esperado e que `auditar-decisoes
+  --strict` passa ao final.
+- **Nota**: esta sessao encontrou `produtos/autopecas/` e dois projetos HB20S
+  nao rastreados no repositorio (provavelmente outra sessao do Josemar
+  rodando em paralelo) - nao foram tocados nem commitados aqui.
+
+## Sessao anterior (06/09/2026, sessao 3) — historico
 
 - **A entrega da sessao 2 (commit `83c0901`) estava incompleta.** O Codex
   revisou o commit e reproduziu 3 falhas reais que os 4 testes daquela

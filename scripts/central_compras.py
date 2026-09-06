@@ -364,17 +364,24 @@ class OperationHandle:
         chamada. `assinatura_efeito` e o texto que aparece em `arquivo` uma
         vez que o efeito aconteceu.
 
-        Se o passo nunca foi tentado: grava ANTES de executar qual arquivo e
-        qual assinatura sao esperados (para uma proxima chamada saber o que
-        procurar), so entao executa e confirma.
+        A identidade do efeito NAO e "esse texto existe no arquivo" - texto
+        igual pode pertencer a uma operacao anterior legitima e independente
+        (duas licoes iguais registradas no mesmo dia, por exemplo). A
+        identidade e "quantas ocorrencias existiam ANTES desta tentativa
+        comecar" (`contagem_anterior`, congelada junto da assinatura). Uma
+        retomada so considera o efeito feito se a contagem AGORA for maior
+        que a congelada - ou seja, se uma ocorrencia NOVA apareceu depois que
+        esta tentativa comecou. Ocorrencias que ja existiam antes nunca contam
+        como prova de que esta tentativa, especificamente, teve efeito.
 
-        Se o passo ja estava `tentando` - a falha anterior pode ter sido
-        antes ou depois do efeito de verdade acontecer - confere se a
-        assinatura CONGELADA daquela tentativa ja esta no arquivo. So
-        executa de novo se nao estiver. Nunca decide isso pela assinatura
-        recem-calculada: ela pode diferir da congelada (por exemplo, o
-        titulo de um arquivo de marca que ainda nao existia na 1a tentativa
-        e passou a existir depois que o efeito realmente ocorreu).
+        Se o passo nunca foi tentado: conta as ocorrencias atuais, grava ANTES
+        de executar qual arquivo, assinatura e contagem eram esperados (para
+        uma proxima chamada saber o que procurar), so entao executa e
+        confirma.
+
+        Se o passo ja estava `tentando`: confere a contagem contra a
+        CONGELADA daquela tentativa, nunca contra uma recem-calculada (que
+        poderia diferir por motivo alheio a esta operacao).
         """
         if self.concluido(passo):
             return
@@ -382,17 +389,49 @@ class OperationHandle:
         if existente and existente.get("situacao") == "tentando":
             arquivo_congelado = Path(existente.get("arquivo") or str(arquivo))
             assinatura_congelada = existente.get("assinatura_efeito", assinatura_efeito)
+            contagem_anterior = existente.get("contagem_anterior", 0)
             atual = arquivo_congelado.read_text(encoding="utf-8") if arquivo_congelado.exists() else ""
-            if assinatura_congelada not in atual:
+            if atual.count(assinatura_congelada) <= contagem_anterior:
                 executar()
             self._concluir(passo)
             return
+        atual = arquivo.read_text(encoding="utf-8") if arquivo.exists() else ""
         self._registro["passos"][passo] = {
             "situacao": "tentando",
             "arquivo": str(arquivo),
             "assinatura_efeito": assinatura_efeito,
+            "contagem_anterior": atual.count(assinatura_efeito),
         }
         self._persistir()
+        _crash_de_teste_se_pedido(f"{passo}:iniciado")
+        executar()
+        _crash_de_teste_se_pedido(f"{passo}:executado")
+        self._concluir(passo)
+
+    def executar_uma_vez(self, passo: str, executar) -> None:
+        """Executa uma captura de varios arquivos (nao append-only, sobrescrita
+        cega) exatamente uma vez por operacao concluida.
+
+        Diferente de `registrar_efeito`, aqui o efeito nao e "uma linha a
+        mais": e um CONJUNTO de arquivos sobrescritos (snapshot inteiro,
+        decisao.md). Reconciliar por conteudo linha a linha nao faz sentido
+        e recalcular os dados de entrada (preferencias, categorias, fichas de
+        produto) numa retomada pode capturar valores DIFERENTES dos que
+        informaram a decisao original, se algo mudou entre a falha e o
+        retry - isso corrompe a evidencia, nao recupera ela.
+
+        Por isso a regra e binaria: se `passo` ja esta `concluido`, esta
+        chamada NAO TOCA em nenhum arquivo - a captura anterior, completa,
+        e a evidencia, e permanece intocada. Se `passo` nunca foi concluido
+        (nem tentado, ou tentado e interrompido no meio), executa a captura
+        inteira do zero: como e sobrescrita cega (nao append), refazer do
+        zero apos uma interrupcao no meio e seguro, nunca duplica.
+        """
+        if self.concluido(passo):
+            return
+        if passo not in self._registro["passos"]:
+            self._registro["passos"][passo] = {"situacao": "tentando"}
+            self._persistir()
         _crash_de_teste_se_pedido(f"{passo}:iniciado")
         executar()
         _crash_de_teste_se_pedido(f"{passo}:executado")
@@ -2798,134 +2837,156 @@ def decide(args: argparse.Namespace) -> None:
 
 def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado, minima,
                     obrigatorios, perdedores, briefing_meta, op: "OperationHandle") -> None:
-    # O snapshot precisa nascer da mesma execucao que fecha a compra. Um
-    # ranking.md antigo nao e evidencia do que o motor calculou agora. O
-    # caminho vem congelado em `op.detalhe`: numa retomada e o MESMO diretorio
-    # da tentativa anterior, nunca um novo.
-    build_ranking(argparse.Namespace(projeto=args.projeto))
+    # O caminho do snapshot vem congelado em `op.detalhe`: numa retomada e o
+    # MESMO diretorio da tentativa anterior, nunca um novo.
     snapshot_dir = project / op.detalhe["snapshot_rel"]
-    snapshot_dir.mkdir(parents=True, exist_ok=True)
-    excecoes = []
-    condicoes = {
-        "permitir_web": quote.get("fonte") != "manual",
-        "permitir_cortado": bool(cortes),
-        "permitir_vencida": quote_is_stale(quote),
-        "permitir_aguardando": bool(waiting_gap(product, quote)),
-        "permitir_incompleto": bool(obrigatorios or ranqueado.confianca < minima),
-    }
-    for flag, necessaria in condicoes.items():
-        if necessaria and getattr(args, flag, False):
-            excecoes.append("--" + flag.replace("_", "-"))
-    for nome in ("ranking.md", "ranking.csv"):
-        origem = project / nome
-        if not origem.exists():
-            raise SystemExit(f"Nao foi possivel congelar a decisao: {origem} nao existe.")
-        atomic_write_text(snapshot_dir / nome, origem.read_text(encoding="utf-8"))
-    snapshot_rel = snapshot_dir.relative_to(project).as_posix()
-    atomic_write_text(
-        snapshot_dir / "metadados.json",
-        json.dumps(
-            {
-                "criado_em": now_iso(),
-                "produto_id": args.produto_id,
-                "cotacao_sha256": quote_hash,
-                "cotacao": quote,
-                "schema_versao": 2,
-                "categoria": briefing_meta.get("categoria"),
-                "excecoes": excecoes,
-                "justificativa": args.porque,
-                "riscos_declarados": args.risco or [],
-                "cortes": cortes,
-                "confianca": ranqueado.confianca,
-                "confianca_minima": minima,
-            },
-            ensure_ascii=True,
-            indent=2,
-            sort_keys=True,
-        ) + "\n",
-    )
 
-    custo_rotulo = "Custo total confirmado" if quote.get("fonte") == "manual" else "Custo total estimado (fonte=web)"
-    lines = [
-        "# Decisao",
-        "",
-        "## Escolhido",
-        "",
-        f"- Produto: {product.get('nome')}",
-        f"- Produto ID: {args.produto_id}",
-        f"- Cotacao usada: {quote.get('loja')} / {quote.get('vendedor')}",
-        f"- Data: {today()}",
-        f"- {custo_rotulo}: {brl(quote.get('custo_total'))}",
-        f"- Evidencia congelada: {snapshot_rel}/ranking.md",
-        f"- Cotacao SHA-256: {quote_hash}",
-        "",
-        "## Por que escolhi",
-        "",
-        f"- {args.porque}",
-        "",
-        "## Por que os outros perderam",
-        "",
-        "| Produto | Motivo |",
-        "|---|---|",
-    ]
-    if perdedores:
-        lines.extend(f"| {produto} | {motivo} |" for produto, motivo in perdedores)
-    else:
-        lines.append("|  |  |")
-    lines.extend(
-        [
+    def _capturar() -> None:
+        """Congela ranking, decisao e as entradas que a informaram.
+
+        So roda uma vez por decisao (`op.executar_uma_vez` abaixo). Numa
+        retomada com a captura ja concluida, esta funcao NEM E CHAMADA: se
+        `config/preferencias.yaml`, `categorias.yaml`, o briefing ou a ficha
+        de um candidato mudarem entre a falha e o retry, a evidencia
+        congelada continua sendo a de quando a decisao foi tomada de
+        verdade, nao a config atual. Recalcular aqui a cada tentativa foi o
+        que corrompia o manifesto (recontava um `manifesto.json` que a
+        propria tentativa anterior tinha deixado no diretorio) e reescrevia
+        o snapshot com dado diferente do que decidiu a compra.
+        """
+        # O ranking.md antigo nao e evidencia do que o motor calculou agora.
+        build_ranking(argparse.Namespace(projeto=args.projeto))
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        excecoes = []
+        condicoes = {
+            "permitir_web": quote.get("fonte") != "manual",
+            "permitir_cortado": bool(cortes),
+            "permitir_vencida": quote_is_stale(quote),
+            "permitir_aguardando": bool(waiting_gap(product, quote)),
+            "permitir_incompleto": bool(obrigatorios or ranqueado.confianca < minima),
+        }
+        for flag, necessaria in condicoes.items():
+            if necessaria and getattr(args, flag, False):
+                excecoes.append("--" + flag.replace("_", "-"))
+        for nome in ("ranking.md", "ranking.csv"):
+            origem = project / nome
+            if not origem.exists():
+                raise SystemExit(f"Nao foi possivel congelar a decisao: {origem} nao existe.")
+            atomic_write_text(snapshot_dir / nome, origem.read_text(encoding="utf-8"))
+        snapshot_rel = snapshot_dir.relative_to(project).as_posix()
+        atomic_write_text(
+            snapshot_dir / "metadados.json",
+            json.dumps(
+                {
+                    "criado_em": now_iso(),
+                    "produto_id": args.produto_id,
+                    "cotacao_sha256": quote_hash,
+                    "cotacao": quote,
+                    "schema_versao": 2,
+                    "categoria": briefing_meta.get("categoria"),
+                    "excecoes": excecoes,
+                    "justificativa": args.porque,
+                    "riscos_declarados": args.risco or [],
+                    "cortes": cortes,
+                    "confianca": ranqueado.confianca,
+                    "confianca_minima": minima,
+                },
+                ensure_ascii=True,
+                indent=2,
+                sort_keys=True,
+            ) + "\n",
+        )
+
+        custo_rotulo = "Custo total confirmado" if quote.get("fonte") == "manual" else "Custo total estimado (fonte=web)"
+        lines = [
+            "# Decisao",
             "",
-            "## Riscos aceitos",
+            "## Escolhido",
             "",
-            *(f"- Excecao efetiva: {flag}. Justificativa: {args.porque}" for flag in excecoes),
-            *(f"- Gate ignorado: {corte}" for corte in cortes),
-            *(f"- {risco}" for risco in (args.risco or ([] if excecoes else ["Nenhum risco relevante registrado."]))),
+            f"- Produto: {product.get('nome')}",
+            f"- Produto ID: {args.produto_id}",
+            f"- Cotacao usada: {quote.get('loja')} / {quote.get('vendedor')}",
+            f"- Data: {today()}",
+            f"- {custo_rotulo}: {brl(quote.get('custo_total'))}",
+            f"- Evidencia congelada: {snapshot_rel}/ranking.md",
+            f"- Cotacao SHA-256: {quote_hash}",
             "",
-            "## O que conferir antes de pagar",
+            "## Por que escolhi",
             "",
-            "- [ ] Preco final",
-            "- [ ] Frete",
-            "- [ ] Prazo",
-            "- [ ] Estoque",
-            "- [ ] Vendedor",
-            "- [ ] Garantia",
-            "- [ ] Politica de devolucao",
+            f"- {args.porque}",
             "",
-            "## Lembretes de veredito",
+            "## Por que os outros perderam",
             "",
-            "- D+30:",
-            "- D+180:",
+            "| Produto | Motivo |",
+            "|---|---|",
         ]
-    )
-    atomic_write_text((project / "decisao.md"), "\n".join(lines) + "\n")
-    # Preserva entradas e justificativa antes de atualizar estado/processo.
-    fontes = {
-        "decisao.md": project / "decisao.md",
-        "briefing.md": project / "briefing.md",
-        "modelo.md": project / "01-definir-modelo.md",
-        "cotacoes.csv": project / "cotacoes.csv",
-        "categorias.yaml": CONFIG / "categorias.yaml",
-        "preferencias.yaml": CONFIG / "preferencias.yaml",
-        "motor.py": Path(__file__),
-    }
-    for pid in sorted(project_product_ids(project)):
-        path = find_product_path(pid)
-        if path:
-            fontes[f"produtos/{pid}.yaml"] = path
-    for nome, path in fontes.items():
-        if path.exists():
-            atomic_write_text(snapshot_dir / nome, path.read_text(encoding="utf-8"))
-    atomic_write_text(snapshot_dir / "ambiente.json", json.dumps({
-        "python": sys.version, "pyyaml": yaml.__version__,
-        "argumentos": {key: value for key, value in vars(args).items() if key != "func"},
-    }, indent=2, ensure_ascii=True, default=str) + "\n")
-    manifesto = {path.relative_to(snapshot_dir).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-                 for path in sorted(snapshot_dir.rglob("*")) if path.is_file()}
-    atomic_write_text(snapshot_dir / "manifesto.json", json.dumps(manifesto, indent=2, sort_keys=True) + "\n")
+        if perdedores:
+            lines.extend(f"| {produto} | {motivo} |" for produto, motivo in perdedores)
+        else:
+            lines.append("|  |  |")
+        lines.extend(
+            [
+                "",
+                "## Riscos aceitos",
+                "",
+                *(f"- Excecao efetiva: {flag}. Justificativa: {args.porque}" for flag in excecoes),
+                *(f"- Gate ignorado: {corte}" for corte in cortes),
+                *(f"- {risco}" for risco in (args.risco or ([] if excecoes else ["Nenhum risco relevante registrado."]))),
+                "",
+                "## O que conferir antes de pagar",
+                "",
+                "- [ ] Preco final",
+                "- [ ] Frete",
+                "- [ ] Prazo",
+                "- [ ] Estoque",
+                "- [ ] Vendedor",
+                "- [ ] Garantia",
+                "- [ ] Politica de devolucao",
+                "",
+                "## Lembretes de veredito",
+                "",
+                "- D+30:",
+                "- D+180:",
+            ]
+        )
+        atomic_write_text((project / "decisao.md"), "\n".join(lines) + "\n")
+        # Preserva entradas e justificativa antes de atualizar estado/processo.
+        fontes = {
+            "decisao.md": project / "decisao.md",
+            "briefing.md": project / "briefing.md",
+            "modelo.md": project / "01-definir-modelo.md",
+            "cotacoes.csv": project / "cotacoes.csv",
+            "categorias.yaml": CONFIG / "categorias.yaml",
+            "preferencias.yaml": CONFIG / "preferencias.yaml",
+            "motor.py": Path(__file__),
+        }
+        for pid in sorted(project_product_ids(project)):
+            path = find_product_path(pid)
+            if path:
+                fontes[f"produtos/{pid}.yaml"] = path
+        for nome, path in fontes.items():
+            if path.exists():
+                atomic_write_text(snapshot_dir / nome, path.read_text(encoding="utf-8"))
+        atomic_write_text(snapshot_dir / "ambiente.json", json.dumps({
+            "python": sys.version, "pyyaml": yaml.__version__,
+            "argumentos": {key: value for key, value in vars(args).items() if key != "func"},
+        }, indent=2, ensure_ascii=True, default=str) + "\n")
+        # `manifesto.json` nunca entra no proprio manifesto: numa retomada
+        # que precisasse refazer a captura do zero (ela ainda nao tinha
+        # concluido), o arquivo de uma tentativa anterior incompleta poderia
+        # estar no diretorio, e um manifesto que se auto-descrevesse nunca
+        # bateria com o proprio conteudo depois de ser sobrescrito.
+        manifesto = {path.relative_to(snapshot_dir).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                     for path in sorted(snapshot_dir.rglob("*"))
+                     if path.is_file() and path.name != "manifesto.json"}
+        atomic_write_text(snapshot_dir / "manifesto.json", json.dumps(manifesto, indent=2, sort_keys=True) + "\n")
+
+    op.executar_uma_vez("captura", _capturar)
+
     # append_timeline sempre adiciona linha nova; uma repeticao apos falha
     # podia duplicar a mesma linha em `processo.md`. `registrar_efeito`
-    # confere se a linha ja esta la (pela assinatura congelada na 1a
-    # tentativa) antes de decidir se escreve de novo.
+    # confere se uma ocorrencia NOVA da linha apareceu depois desta tentativa
+    # comecar antes de decidir se escreve de novo.
     timeline_path = project / "processo.md"
     op.registrar_efeito(
         "timeline_decisao", timeline_path,
