@@ -61,6 +61,7 @@ def _linha_ranking(item: Any, campo_valor: str, rotulo_valor: str) -> dict[str, 
     }
 
 
+@cc.read_session
 def estado(project: Path) -> dict[str, Any]:
     """Tudo que a tela mostra, calculado com o motor. Nao escreve nada."""
     briefing, _ = cc.load_frontmatter(project / "briefing.md")
@@ -81,6 +82,8 @@ def estado(project: Path) -> dict[str, Any]:
         "confianca_minima": cc.minimum_confidence(briefing),
         "eixos_obrigatorios": list(cc.preferences().get("eixos_obrigatorios_para_decidir") or []),
         "pesos": cc.preferences().get("score", {}),
+        "candidatos": [{"produto_id": pid, "nome": (cc.find_product(pid) or {}).get("nome") or pid}
+                       for pid in sorted(cc.project_product_ids(project))],
         "elegiveis": [_linha_ranking(i, campo_valor, rotulo_valor) for i in elegiveis],
         "cortados": [_linha_ranking(i, campo_valor, rotulo_valor) for i in cortados],
         "erros": erros,
@@ -117,31 +120,25 @@ ACOES = {
 }
 
 
-def acao(project: Path, nome: str, dados: dict[str, Any]) -> dict[str, Any]:
-    """Executa uma acao. Sempre pelos caminhos do CLI, sempre sob a trava."""
-    if nome not in ACOES:
-        return {"ok": False, "erro": f"Acao desconhecida: {nome}"}
+_ACTION_LOCK = threading.RLock()
 
-    # As funcoes do CLI imprimem no terminal. Aqui a resposta vai pelo JSON,
-    # entao o print vira ruido no console de quem subiu o servidor.
+
+def acao(project: Path, nome: str, dados: dict[str, Any]) -> dict[str, Any]:
+    """Compartilha parser e plano de travas do CLI; serializa captura de stdout."""
+    if not isinstance(nome, str) or nome not in ACOES:
+        return {"ok": False, "erro": f"Acao desconhecida: {nome}"}
+    if not isinstance(dados, dict):
+        return {"ok": False, "erro": "dados precisa ser um objeto."}
+    saida = io.StringIO()
     try:
-        with cc.project_lock(project), contextlib.redirect_stdout(io.StringIO()):
+        with _ACTION_LOCK, contextlib.redirect_stdout(saida), contextlib.redirect_stderr(saida):
             if nome == "cotar":
                 return _gravar_cotacao(project, dados)
-            alvo = argparse.Namespace(projeto=str(project), produto_id=None, strict=False)
-            if nome == "ranking":
-                cc.build_ranking(alvo)
-            elif nome == "validar":
-                cc.validate(alvo)
-            elif nome == "auditar":
-                cc.audit_score(alvo)
-            elif nome == "historico":
-                cc.show_history(alvo)
-            elif nome == "regenerar":
-                cc.regenerate(argparse.Namespace(projeto=str(project)))
+            cc.main([ACOES[nome], str(project)])
         return {"ok": True, "mensagem": f"`{ACOES[nome]}` executado."}
     except SystemExit as erro:
-        return {"ok": False, "erro": str(erro)}
+        detalhe = saida.getvalue().strip().splitlines()
+        return {"ok": False, "erro": detalhe[-1] if isinstance(erro.code, int) and detalhe else str(erro)}
 
 
 CAMPOS_COTACAO = [
@@ -153,88 +150,25 @@ CAMPOS_COTACAO = [
 
 
 def _gravar_cotacao(project: Path, dados: dict[str, Any]) -> dict[str, Any]:
-    """Uma cotacao nova, com a mesma validacao de entrada do CLI.
-
-    Nao existe "editar cotacao" no painel de proposito: o `cotacoes.csv` e
-    append-only, e a serie historica e o que desmascara preco ancora.
-    """
-    if not (dados.get("produto_id") or "").strip():
-        return {"ok": False, "erro": "Escolha o produto."}
-    if not (dados.get("loja") or "").strip():
-        return {"ok": False, "erro": "Informe a loja."}
-
-    numericos = {
-        "preco": None, "preco_promocional": None, "frete": 0.0, "custo_extra": 0.0,
-        "custo_operacional_mensal": 0.0, "valor_revenda_estimado": 0.0, "nota": 0.0,
-    }
-    valores: dict[str, Any] = {}
-    for campo, padrao in numericos.items():
-        bruto = str(dados.get(campo) or "").strip()
-        if not bruto:
-            valores[campo] = padrao
+    """Traduz campos para o CLI, sem uma segunda implementacao das validacoes."""
+    valores = {}
+    for campo in CAMPOS_COTACAO:
+        valor = dados.get(campo)
+        if valor is None:
             continue
-        try:
-            valores[campo] = cc.real_number(bruto)
-        except argparse.ArgumentTypeError as erro:
-            return {"ok": False, "erro": f"{campo}: {erro}"}
-    if valores["preco"] is None:
-        return {"ok": False, "erro": "Informe o preco."}
-
-    inteiros: dict[str, Any] = {}
-    for campo in ["frete_prazo_dias", "avaliacoes", "garantia_meses"]:
-        bruto = str(dados.get(campo) or "").strip()
-        if not bruto:
-            inteiros[campo] = None
-            continue
-        try:
-            inteiros[campo] = int(cc.real_number(bruto))
-        except (argparse.ArgumentTypeError, ValueError) as erro:
-            return {"ok": False, "erro": f"{campo}: {erro}"}
-
-    fonte = dados.get("fonte") or "manual"
-    if fonte not in {"web", "manual"}:
-        return {"ok": False, "erro": "fonte deve ser `web` ou `manual`."}
-    vendedor_tipo = dados.get("vendedor_tipo") or "terceiro"
-    if vendedor_tipo not in {"oficial", "terceiro", "fisica"}:
-        return {"ok": False, "erro": "vendedor_tipo invalido."}
-    garantia_tipo = dados.get("garantia_tipo") or "nenhuma"
-    if garantia_tipo not in {"nacional", "importada", "vendedor", "nenhuma"}:
-        return {"ok": False, "erro": "garantia_tipo invalido."}
-
-    alvo = argparse.Namespace(
-        projeto=str(project),
-        produto_id=str(dados["produto_id"]).strip(),
-        loja=str(dados["loja"]).strip(),
-        vendedor=str(dados.get("vendedor") or "").strip(),
-        vendedor_tipo=vendedor_tipo,
-        anuncio_id=str(dados.get("anuncio_id") or "").strip() or None,
-        variacao=str(dados.get("variacao") or "").strip() or None,
-        preco=valores["preco"],
-        preco_promocional=valores["preco_promocional"],
-        frete=valores["frete"],
-        frete_prazo_dias=inteiros["frete_prazo_dias"],
-        custo_extra=valores["custo_extra"],
-        custo_total=None,
-        custo_operacional_mensal=valores["custo_operacional_mensal"],
-        tco_meses=None,
-        valor_revenda_estimado=valores["valor_revenda_estimado"],
-        nota=valores["nota"],
-        avaliacoes=inteiros["avaliacoes"] or 0,
-        garantia_meses=inteiros["garantia_meses"],
-        garantia_tipo=garantia_tipo,
-        link=str(dados.get("link") or "").strip() or None,
-        flag_suspeita="",
-        fonte=fonte,
-        data=None,
-    )
-    try:
-        cc.add_quote(alvo)
-    except SystemExit as erro:
-        return {"ok": False, "erro": str(erro)}
-
-    cc.build_ranking(argparse.Namespace(projeto=str(project)))
-    cc.validate(argparse.Namespace(projeto=str(project), strict=False))
-    return {"ok": True, "mensagem": f"Cotacao `{fonte}` gravada e ranking refeito."}
+        if isinstance(valor, bool) or not isinstance(valor, (str, int, float)):
+            return {"ok": False, "erro": f"{campo}: use texto ou numero."}
+        valores[campo] = str(valor).strip()
+    for campo in ("produto_id", "loja", "preco"):
+        if not valores.get(campo):
+            return {"ok": False, "erro": f"Informe {campo}."}
+    argv = ["cotar", str(project)]
+    argv.extend(f"--{campo.replace('_', '-')}={valor}"
+                for campo, valor in valores.items() if valor != "")
+    cc.main(argv)
+    cc.main(["ranking", str(project)])
+    cc.main(["validar", str(project)])
+    return {"ok": True, "mensagem": "Cotacao gravada e ranking refeito."}
 
 
 def projetos_disponiveis() -> list[str]:
@@ -336,15 +270,15 @@ function linha(l, cortado){
     +'<td class="n"><b>'+(cortado?0:l.score.toFixed(1))+'</b></td>'
     +'<td>'+(cortado?'&mdash;':barras(l))+'</td>'
     +'<td class="n">'+Math.round(l.confianca*100)+'%</td>'
-    +'<td class="n">'+esc(l.custo_texto)+'</td>'
-    +'<td class="n">'+(l.prazo||'&mdash;')+'</td>'
+    +'<td class="n">'+esc(l.valor_comparado)+'</td>'
+    +'<td class="n">'+(l.prazo === '' ? '&mdash;' : esc(l.prazo))+'</td>'
     +'<td><span class="pill">'+esc(l.fonte)+'</span></td>'
     +'<td>'+sit+'</td></tr>';
 }
 
 function desenha(){
   const todos=[...E.elegiveis,...E.cortados];
-  const opts=todos.map(l=>'<option value="'+esc(l.produto_id)+'">'+esc(l.nome)+'</option>').join("");
+  const opts=E.candidatos.map(l=>'<option value="'+esc(l.produto_id)+'">'+esc(l.nome)+'</option>').join("");
   const r=E.regra||{};
   $("#app").innerHTML = `
   <h1>${esc(E.projeto)}</h1>
@@ -372,24 +306,24 @@ function desenha(){
       : '<tr><td colspan="8">Nenhum candidato ainda.</td></tr>'}
     </tbody></table>
     <div class="in nota">Barra cinza no fim = eixo <b>sem dado</b>, que fica fora da conta.
-     Por isso a confianca nao e 100%. Score so e comparavel dentro deste projeto.</div>
+     Confianca mede cobertura de campos, nao veracidade da oferta. Score so e comparavel dentro deste projeto.</div>
   </div>
   <div class="card"><h2>Nova cotacao</h2><div class="in">
     <div class="form">
-      <div><label>Produto</label><select id="f_produto_id">${opts}</select></div>
-      <div><label>Fonte</label><select id="f_fonte"><option value="manual">manual (conferi no site)</option><option value="web">web (estimativa)</option></select></div>
-      <div><label>Loja</label><input id="f_loja" placeholder="Amazon"></div>
-      <div><label>Vendedor</label><input id="f_vendedor"></div>
-      <div><label>Tipo</label><select id="f_vendedor_tipo"><option>oficial</option><option selected>terceiro</option><option>fisica</option></select></div>
-      <div><label>Preco</label><input id="f_preco" placeholder="289"></div>
-      <div><label>Frete</label><input id="f_frete" placeholder="0"></div>
-      <div><label>Prazo (dias)</label><input id="f_frete_prazo_dias" placeholder="3"></div>
-      <div><label>Nota</label><input id="f_nota" placeholder="4.8"></div>
-      <div><label>Avaliacoes</label><input id="f_avaliacoes" placeholder="5360"></div>
-      <div><label>Garantia (meses)</label><input id="f_garantia_meses" placeholder="12"></div>
-      <div><label>Garantia</label><select id="f_garantia_tipo"><option>nacional</option><option>importada</option><option>vendedor</option><option selected>nenhuma</option></select></div>
-      <div style="grid-column:span 2"><label>Link</label><input id="f_link" placeholder="https://..."></div>
-      <div><label>Anuncio</label><input id="f_anuncio_id" placeholder="MLB..."></div>
+      <div><label for="f_produto_id">Produto</label><select id="f_produto_id">${opts}</select></div>
+      <div><label for="f_fonte">Fonte</label><select id="f_fonte"><option value="manual">manual (conferi no site)</option><option value="web">web (estimativa)</option></select></div>
+      <div><label for="f_loja">Loja</label><input id="f_loja" placeholder="Amazon"></div>
+      <div><label for="f_vendedor">Vendedor</label><input id="f_vendedor"></div>
+      <div><label for="f_vendedor_tipo">Tipo</label><select id="f_vendedor_tipo"><option>oficial</option><option selected>terceiro</option><option>fisica</option></select></div>
+      <div><label for="f_preco">Preco</label><input id="f_preco" placeholder="289"></div>
+      <div><label for="f_frete">Frete</label><input id="f_frete" placeholder="0"></div>
+      <div><label for="f_frete_prazo_dias">Prazo (dias)</label><input id="f_frete_prazo_dias" placeholder="3"></div>
+      <div><label for="f_nota">Nota</label><input id="f_nota" placeholder="4.8"></div>
+      <div><label for="f_avaliacoes">Avaliacoes</label><input id="f_avaliacoes" placeholder="5360"></div>
+      <div><label for="f_garantia_meses">Garantia (meses)</label><input id="f_garantia_meses" placeholder="12"></div>
+      <div><label for="f_garantia_tipo">Garantia</label><select id="f_garantia_tipo"><option>nacional</option><option>importada</option><option>vendedor</option><option selected>nenhuma</option></select></div>
+      <div style="grid-column:span 2"><label for="f_link">Link</label><input id="f_link" placeholder="https://..."></div>
+      <div><label for="f_anuncio_id">Anuncio</label><input id="f_anuncio_id" placeholder="MLB..."></div>
       <div style="display:flex;align-items:flex-end"><button class="p" id="salvar" style="width:100%">Gravar cotacao</button></div>
     </div>
     <div class="nota"><b>Grava uma linha nova</b> no <code>cotacoes.csv</code>. Nunca sobrescreve:
@@ -410,6 +344,7 @@ function desenha(){
       : '<tr><td colspan="6">Sem cotacoes.</td></tr>'}
     </tbody></table></div>`;
 
+  document.querySelectorAll("[id^='f_']").forEach(el=>el.dataset.inicial=el.value);
   document.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>executa(b.dataset.a,{},b));
   $("#salvar").onclick = e => {
     const d={};
@@ -431,7 +366,7 @@ async function executa(nome, dados, botao){
     const r = await fetch("/api/acao", {method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({projeto:PROJ, acao:nome, dados})});
     const j = await r.json();
-    await carrega(true);
+    if(j.ok) await carrega(true);
     aviso(j.ok ? j.mensagem : j.erro, j.ok);
   }catch(err){ aviso(String(err), false); }
   finally{ if(botao) botao.disabled=false; }
@@ -442,7 +377,7 @@ async function carrega(forcar=false){
     const active = document.activeElement;
     if(active && active.closest && active.closest(".form")) return;
     for(const el of document.querySelectorAll("[id^='f_']")){
-      if(el.value && el.value.trim() !== "") return;
+      if(el.value !== el.dataset.inicial) return;
     }
   }
   const r = await fetch("/api/estado?projeto="+encodeURIComponent(PROJ));
@@ -450,7 +385,7 @@ async function carrega(forcar=false){
   if(j.erro){ $("#app").textContent = j.erro; return; }
   E = j; PROJ = j.projeto; desenha();
 }
-carrega();
+carrega().catch(err=>{$("#app").textContent=String(err);});
 setInterval(carrega, 3000);
 </script></body></html>
 """
@@ -477,6 +412,17 @@ def _resolver(nome: str | None) -> Path:
 class _Handler(BaseHTTPRequestHandler):
     server_version = "CentralCompras"
 
+    def _origem_local(self) -> bool:
+        porta = self.server.server_address[1]
+        hosts = {f"127.0.0.1:{porta}", f"localhost:{porta}"}
+        host = self.headers.get("Host", "").lower()
+        origem = self.headers.get("Origin")
+        if host not in hosts or (origem is not None and origem != f"http://{host}"):
+            self._consume_body()
+            self._json({"ok": False, "erro": "Origem local obrigatoria."}, 403)
+            return False
+        return True
+
     def log_message(self, *_):  # silencia o log de cada request
         pass
 
@@ -485,12 +431,16 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(corpo)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(corpo)
 
     def do_GET(self) -> None:
         from urllib.parse import parse_qs, urlparse
 
+        if not self._origem_local():
+            return
         rota = urlparse(self.path)
         if rota.path in {"/", "/index.html"}:
             corpo = pagina().encode("utf-8")
@@ -517,13 +467,6 @@ class _Handler(BaseHTTPRequestHandler):
         status HTTP esperado. Le o que ja chegou com timeout curto, sem
         bloquear ate o fim da conexao.
         """
-        try:
-            length = int(self.headers.get("Content-Length", 0))
-            if length > 0:
-                self.rfile.read(min(length, 1_000_000))
-                return
-        except ValueError:
-            pass
         original_timeout = self.connection.gettimeout()
         self.connection.settimeout(0.1)
         try:
@@ -538,6 +481,8 @@ class _Handler(BaseHTTPRequestHandler):
             self.connection.settimeout(original_timeout)
 
     def do_POST(self) -> None:
+        if not self._origem_local():
+            return
         if self.path != "/api/acao":
             self.send_error(404)
             return
@@ -554,7 +499,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._consume_body()
             self._json({"ok": False, "erro": "Pedido grande demais."}, 413)
             return
-        corpo = self.rfile.read(tamanho)
+        self.connection.settimeout(5)
+        try:
+            corpo = self.rfile.read(tamanho)
+        except (TimeoutError, OSError):
+            self._json({"ok": False, "erro": "Tempo esgotado ao receber pedido."}, 408)
+            return
         content_type = self.headers.get("Content-Type") or ""
         parts = [p.strip() for p in content_type.split(";")]
         if not parts or parts[0].lower() != "application/json":
@@ -562,8 +512,14 @@ class _Handler(BaseHTTPRequestHandler):
             return
         try:
             pedido = json.loads(corpo or b"{}")
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             self._json({"ok": False, "erro": "JSON invalido."}, 400)
+            return
+        if (not isinstance(pedido, dict)
+                or not isinstance(pedido.get("projeto", ""), str)
+                or not isinstance(pedido.get("acao", ""), str)
+                or not isinstance(pedido.get("dados", {}), dict)):
+            self._json({"ok": False, "erro": "Use um objeto JSON com projeto/acao textuais e dados como objeto."}, 400)
             return
         try:
             project = _resolver(pedido.get("projeto"))
@@ -640,7 +596,7 @@ def _bloco_produto(linha: dict[str, Any], cortado: bool) -> str:
         f'<div class="rowc{" cut" if cortado else ""}">'
         f'<div class="top"><span class="nm">{esc(linha["nome"])}</span>'
         f'<span class="sc{" z" if cortado else ""}">{"cortado" if cortado else f"{linha['score']:.1f}"}</span></div>'
-        f'<div class="mini">{esc(linha["custo_texto"])} &middot; {esc(linha["loja"])} '
+        f'<div class="mini">{esc(linha["base_valor"]) + ": " + esc(linha["valor_comparado"])} &middot; {esc(linha["loja"])} '
         f'&middot; confianca {linha["confianca"]:.0%}</div>'
         f"{barras}"
         + (f'<div style="margin-top:8px">{marca}</div>' if marca else "")
@@ -665,6 +621,7 @@ def artifact_fragmento() -> str:
     )
 
 
+@cc.read_session
 def artifact_html() -> str:
     """Foto do repositorio inteiro, so leitura, boa de ler no celular."""
     from html import escape as esc

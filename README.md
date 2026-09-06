@@ -261,10 +261,16 @@ e `dashboard/` sao derivados, mas ficam versionados de proposito: o `ranking.md`
 ao lado do `decisao.md` e a evidencia de por que voce decidiu naquele dia.
 
 No ato da decisao, o motor recalcula o ranking e congela `ranking.md`,
-`ranking.csv` e a cotacao usada em `snapshots/<instante>-<produto>/`. O
-`decisao.md` registra o caminho e o SHA-256 da cotacao. Uma cotacao nova pode
+`ranking.csv`, cotacoes, fichas, briefing, modelo, configuracao, codigo e
+justificativa em `snapshots/<instante>-<produto>/`. O manifesto registra os
+hashes dos arquivos; excecoes efetivas ficam nos metadados e na decisao.
+O `decisao.md` registra o caminho e o SHA-256 da cotacao. Uma cotacao nova pode
 mudar os derivados atuais, mas nunca essa evidencia; `regenerar` ignora
 `snapshots/`.
+
+Confira integridade e contagens de excecoes por categoria com
+`python scripts/central_compras.py auditar-decisoes --strict`.
+Snapshots antigos continuam legados: nao recebem evidencias inventadas.
 
 Se der conflito num derivado, **nao resolva a mao**. Fique com qualquer lado e rode:
 
@@ -317,11 +323,17 @@ o que vazou.
 - Cotacao vencida nao fecha compra. Preco de tres semanas atras nao e preco.
 - Decisao sem o motivo da derrota do segundo colocado nao e aceita.
 - Coluna que o schema nao conhece nunca e descartada do `cotacoes.csv`.
-- Toda gravacao e atomica: Ctrl+C no meio nao deixa arquivo truncado.
+- Substituicoes de arquivos usam escrita atomica e comandos de escrita usam
+  travas. Uma operacao com varios arquivos nao e uma transacao unica.
 - `preco_teto` do produto vence o do briefing quando for menor.
 - Cotacao manual nao herda a suspeita da linha web: e observacao nova.
 - `promover-cotacao` exige dizer o que foi conferido no site: `manual` sem
   conferencia seria carimbar preco velho de novo.
+- Confirmar apenas link/garantia nao renova preco; informe valor monetario
+  conferido ou `--sem-alteracao`. Para encerrar desconto antigo, use
+  `--preco-promocional 0` junto do preco atual.
+- Regra de parada conta ofertas atuais distintas por loja/vendedor/variacao;
+  reconfirmar a mesma oferta nao cria uma segunda fonte.
 - Produto reprovado no gate nao fecha compra, so com excecao declarada.
 - `NaN`, infinito, negativo e data no futuro sao recusados na entrada do CLI.
 - Cotacao sem custo utilizavel e cortada no gate: produto sem preco nao e candidato.
@@ -330,10 +342,11 @@ o que vazou.
 - `regenerar` refaz derivado e nao encosta em fonte.
 - O CSV registra se a cotacao manual foi coleta, conferencia com alteracao ou reconfirmacao.
 - Manual vencida nao vence observacao recente.
-- `aprender-veredito` roda uma vez por veredito; repetir exige `--force`.
+- `aprender-veredito` roda uma vez por fase D+30/D+180; repetir exige `--force`.
 - Editar gate por `--gate` preserva os comentarios do `categorias.yaml`.
 - Dinheiro sai no formato brasileiro: `R$ 1.234,50`.
-- Nenhuma constante de score mora no codigo: tudo em `preferencias.yaml`.
+- Pesos e escalas principais ficam em `preferencias.yaml`; gates e regras
+  especificas ficam em `categorias.yaml`. O motor aplica essas regras.
 
 ## Estrutura
 
@@ -363,7 +376,10 @@ A IA ajuda principalmente em tres momentos:
 - mapear candidatos e problemas recorrentes em reviews;
 - explicar a decisao, inclusive por que os finalistas perderam.
 
-Os prompts gerados por `prompt-ia` incluem automaticamente licoes da categoria, marcas e lojas ja registradas na base de conhecimento.
+Os prompts de `prompt-ia` incluem a definicao do modelo, candidatos atuais,
+licoes gerais e da categoria e registros relevantes de marcas/lojas, inclusive
+antes de elas entrarem no projeto. Pedem conferencia de geracoes, variantes e
+fontes. Confianca do score mede cobertura de campos, nao veracidade da oferta.
 
 Tambem ha uma skill local. Apos cada `git pull`, instale-a nas maquinas de agente que voce usa:
 
@@ -379,7 +395,9 @@ $central-compras abra um processo para comprar um fone de ate R$ 600
 
 A copia versionada da skill fica em `skills/central-compras/`.
 
-Ela nao deve fingir que confirmou preco, estoque, frete ou cupom quando isso depende do site no momento da compra. Esses dados entram como `fonte=manual`.
+Ela nao deve fingir que confirmou preco, estoque, frete ou cupom.
+Sem conferencia real, inclusive em relatorio de IA externa, use `fonte=web`.
+Use `fonte=manual` somente depois da conferencia da oferta exata.
 
 ## Testes
 
@@ -387,9 +405,13 @@ Ela nao deve fingir que confirmou preco, estoque, frete ou cupom quando isso dep
 python -m unittest discover -s tests
 ```
 
-287 testes. Alem dos casos de exemplo, ha teste de invariante que gera cotacoes
+321 testes. Alem dos casos de exemplo, ha teste de invariante que gera cotacoes
 aleatorias (inclusive patologicas: preco negativo, `1e309`, data impossivel,
 unicode) e confere propriedades que tem que valer sempre: score entre 0 e 100,
 eixo entre 0 e 1, cortado nunca pontua, o mais barato elegivel sempre tira 1,00
 no eixo valor, processos concorrentes nao perdem linha e um processo morto nao
 deixa trava orfa.
+
+Relatorio da [auditoria completa de 06/09/2026](docs/auditoria-completa-2026-09-06.md),
+com correcoes, evidencias e limites. Benchmark sintetico reproduzivel:
+`python tests/benchmark_pipeline.py --projetos 40`.

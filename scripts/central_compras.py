@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import contextvars
+import copy
 import csv
 import datetime as dt
 import hashlib
+import functools
 import html
 import io
 import itertools
@@ -127,6 +130,23 @@ def real_number(value: str) -> float:
     return numero
 
 
+def nonnegative_int(value: str) -> int:
+    try:
+        number = int(str(value))
+    except (ValueError, TypeError):
+        raise argparse.ArgumentTypeError(f"inteiro invalido: {value!r}") from None
+    if number < 0:
+        raise argparse.ArgumentTypeError(f"valor negativo: {value!r}")
+    return number
+
+
+def personal_rating(value: str) -> float:
+    number = real_number(value)
+    if number > 10:
+        raise argparse.ArgumentTypeError("nota pessoal precisa estar entre 0 e 10")
+    return number
+
+
 def reject_future(momento: dt.datetime) -> dt.datetime:
     """Cotacao e observacao do passado. Nao existe preco coletado amanha."""
     if momento.date() > dt.date.today():
@@ -142,7 +162,7 @@ def valid_collection_date(value: Any) -> bool:
     if not texto:
         return False
     try:
-        dt.date.fromisoformat(texto[:10])
+        dt.datetime.fromisoformat(texto)
     except ValueError:
         return False
     return True
@@ -263,9 +283,31 @@ def atomic_write_text(path: Path, text: str) -> None:
         raise
 
 
+_READ_CACHE = contextvars.ContextVar("central_compras_read_cache", default=None)
+
+
+def read_session(func):
+    """Reutiliza leituras dentro de uma operacao; nunca entre requests/threads."""
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        if _READ_CACHE.get() is not None:
+            return func(*args, **kwargs)
+        token = _READ_CACHE.set({})
+        try:
+            return func(*args, **kwargs)
+        finally:
+            _READ_CACHE.reset(token)
+    return wrapped
+
+
 def read_yaml(path: Path, default: Any = None) -> Any:
     if not path.exists():
         return default
+    cache = _READ_CACHE.get()
+    stat = path.stat()
+    key = (str(path.resolve()), stat.st_mtime_ns, stat.st_size)
+    if cache is not None and key in cache:
+        return default if cache[key] is None else copy.deepcopy(cache[key])
     try:
         with path.open("r", encoding="utf-8") as f:
             loaded = yaml.safe_load(f)
@@ -275,7 +317,11 @@ def read_yaml(path: Path, default: Any = None) -> Any:
             f"YAML invalido em {path}: {detalhe}\n"
             "Abra o arquivo e conserte a indentacao ou as aspas antes de continuar."
         ) from erro
-    return default if loaded is None else loaded
+    if isinstance(default, dict) and loaded is not None and not isinstance(loaded, dict):
+        raise SystemExit(f"YAML em {path} precisa conter um mapa de campos.")
+    if cache is not None:
+        cache[key] = loaded
+    return default if loaded is None else copy.deepcopy(loaded)
 
 
 def write_yaml(path: Path, data: Any) -> None:
@@ -348,11 +394,16 @@ def load_frontmatter(path: Path) -> tuple[dict[str, Any], str]:
     text = path.read_text(encoding="utf-8")
     if not text.startswith("---"):
         return {}, text
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return {}, text
-    meta = yaml.safe_load(parts[1]) or {}
-    return meta, parts[2].lstrip()
+    match = re.match(r"\A---[ \t]*\n(.*?)^---[ \t]*(?:\n|$)", text, re.M | re.S)
+    if not match:
+        raise SystemExit(f"Frontmatter invalido em {path}: falta delimitador --- em linha propria.")
+    try:
+        meta = yaml.safe_load(match.group(1)) or {}
+    except yaml.YAMLError as error:
+        raise SystemExit(f"YAML invalido em {path}: confira o frontmatter.") from error
+    if not isinstance(meta, dict):
+        raise SystemExit(f"Frontmatter invalido em {path}: esperado mapa de campos.")
+    return meta, text[match.end():].lstrip()
 
 
 def save_frontmatter(path: Path, meta: dict[str, Any], body: str) -> None:
@@ -374,11 +425,11 @@ def project_path(value: str) -> Path:
     
     try:
         resolved_path = path.resolve()
-        dentro = resolved_path.is_relative_to(PROJETOS.resolve())
+        dentro = resolved_path.parent == PROJETOS.resolve()
     except Exception:
         dentro = False
 
-    if not dentro or not path.exists() or not path.is_dir():
+    if not dentro or not path.is_dir() or not (path / "briefing.md").is_file():
         disponiveis = ", ".join(p.name for p in project_dirs()) or "nenhum"
         raise SystemExit(f"Projeto nao encontrado: {value}. Existentes: {disponiveis}")
     return path
@@ -427,7 +478,7 @@ def quote_int(value: Any, default: int = 0) -> int:
         return default
     try:
         return int(float(str(value).replace(",", ".")))
-    except ValueError:
+    except (ValueError, OverflowError):
         return default
 
 
@@ -435,10 +486,8 @@ _PREFS_CACHE: dict[str, Any] = {}
 
 
 def preferences() -> dict[str, Any]:
-    """Le preferencias.yaml uma vez por execucao."""
-    if "data" not in _PREFS_CACHE:
-        _PREFS_CACHE["data"] = read_yaml(CONFIG / "preferencias.yaml", {}) or {}
-    return _PREFS_CACHE["data"]
+    """Atualiza entre operacoes, inclusive no painel que permanece aberto."""
+    return read_yaml(CONFIG / "preferencias.yaml", {}) or {}
 
 
 def clamp01(value: float) -> float:
@@ -576,17 +625,25 @@ def stop_rule_status(project: Path) -> dict[str, Any]:
         return {}
     rows = read_quotes(project)
     cotacoes_por_produto: dict[str, int] = {}
+    ofertas: dict[str, set[tuple[str, str, str]]] = {}
+    presenciais: set[str] = set()
     for row in rows:
         produto_id = row.get("produto_id")
-        if produto_id:
-            cotacoes_por_produto[produto_id] = cotacoes_por_produto.get(produto_id, 0) + 1
+        if produto_id and not quote_is_stale(row) and valid_collection_date(row.get("data_coleta")):
+            # Recotacao/promocao da mesma oferta nao e uma fonte independente.
+            identidade = tuple(str(row.get(field) or "").strip().casefold()
+                               for field in ("loja", "vendedor", "variacao"))
+            ofertas.setdefault(produto_id, set()).add(identidade)
+            if row.get("vendedor_tipo") == "fisica" and row.get("fonte") == "manual":
+                presenciais.add(produto_id)
+    cotacoes_por_produto = {pid: len(values) for pid, values in ofertas.items()}
     # Candidato mapeado (`novo-produto`) conta mesmo sem cotacao ainda: sem
     # isso, 10 candidatos mapeados e zero cotacoes davam zero candidatos, e o
     # teto da faixa nunca disparava aviso.
     # Cotacao legada sem produto continua contando; descartado conhecido sai
     # mesmo quando ainda tem linhas no historico de cotacoes.
     candidatos = (
-        project_candidate_ids(project) | set(cotacoes_por_produto)
+        project_candidate_ids(project) | {r["produto_id"] for r in rows if r.get("produto_id")}
     ) - project_discarded_candidate_ids(project)
     aberto_em = parse_dashboard_date(briefing.get("criado_em"))
     dias = (dt.date.today() - aberto_em).days if aberto_em else None
@@ -601,6 +658,9 @@ def stop_rule_status(project: Path) -> dict[str, Any]:
         "dias_em_pesquisa": dias,
         "candidatos_excedidos": bool(regra["candidatos"] and len(candidatos) > regra["candidatos"]),
         "produtos_sem_cotacoes_suficientes": faltando,
+        "ofertas_distintas_atuais": cotacoes_por_produto,
+        "produtos_sem_cotacao_presencial": sorted(candidatos - presenciais)
+            if "presencial" in regra["cotacoes_minimas_texto"] else [],
     }
 
 
@@ -663,7 +723,12 @@ def new_project(args: argparse.Namespace) -> None:
 
 
 def product_dir(categoria: str, produto_id: str) -> Path:
-    return PRODUTOS / slugify(categoria) / produto_id
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", produto_id):
+        raise SystemExit("produto_id invalido: use letras, numeros, hifen ou sublinhado, sem caminhos.")
+    path = PRODUTOS / slugify(categoria) / produto_id
+    if not path.resolve().is_relative_to(PRODUTOS.resolve()):
+        raise SystemExit("produto_id aponta para fora de produtos/.")
+    return path
 
 
 def new_product(args: argparse.Namespace) -> None:
@@ -798,6 +863,8 @@ def write_quotes(project: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def find_product_path(produto_id: str) -> Path | None:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", str(produto_id)):
+        return None
     matches = list(PRODUTOS.glob(f"*/{produto_id}/produto.yaml"))
     return matches[0] if matches else None
 
@@ -844,6 +911,8 @@ def project_discarded_candidate_ids(project: Path) -> set[str]:
 
 
 def set_process_state(project: Path, *, estado: str | None = None, proxima_acao: str | None = None, decisao_aberta: str | None = None) -> None:
+    if _SOURCES_FROZEN.get():
+        return
     path = project / "processo.md"
     if not path.exists():
         return
@@ -859,13 +928,15 @@ def set_process_state(project: Path, *, estado: str | None = None, proxima_acao:
         pattern = rf"(?m)^- {re.escape(label)}:.*$"
         replacement = f"- {label}: {value}"
         if re.search(pattern, text):
-            text = re.sub(pattern, replacement, text)
+            text = re.sub(pattern, lambda _: replacement, text)
         else:
             text = text.replace("## Estado atual\n", f"## Estado atual\n\n{replacement}\n", 1)
     atomic_write_text(path, text)
 
 
 def mark_steps(project: Path, steps: list[int]) -> None:
+    if _SOURCES_FROZEN.get():
+        return
     path = project / "processo.md"
     if not path.exists():
         return
@@ -1154,6 +1225,7 @@ def manipulation_alerts(rows: list[dict[str, str]], row: dict[str, str]) -> list
     return sorted(set(alerts))
 
 
+@read_session
 def validation_report(project: Path) -> tuple[list[str], list[str]]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     categoria_projeto = briefing.get("categoria") or "generico"
@@ -1222,6 +1294,9 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
 
     regra = stop_rule_status(project)
     if regra:
+        if regra["produtos_sem_cotacao_presencial"]:
+            warnings.append("Regra de parada: falta cotacao manual presencial para: "
+                            + ", ".join(regra["produtos_sem_cotacao_presencial"]))
         if regra["candidatos_excedidos"]:
             warnings.append(
                 f"Regra de parada ({regra['faixa']}): {regra['candidatos_atuais']} candidatos para um teto de "
@@ -1244,6 +1319,8 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
         )
 
     categoria_cfg = category_definition(categoria_projeto)
+    if categoria_projeto not in read_yaml(CONFIG / "categorias.yaml", {}):
+        warnings.append(f"Categoria `{categoria_projeto}` sem configuracao propria: usa regras genericas. Revise atributos e gates.")
     extras_tipicos = categoria_cfg.get("custo_extra_tipico") or []
     if extras_tipicos and rows and all(quote_float(row.get("custo_extra")) == 0 for row in rows):
         warnings.append(
@@ -1547,6 +1624,7 @@ def value_field_for(briefing: dict[str, Any]) -> tuple[str, str]:
     return ("tco_total", "TCO") if usa_tco else ("custo_total", "custo total")
 
 
+@read_session
 def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     rows = read_quotes(project)
@@ -1960,6 +2038,7 @@ def promote_quote(args: argparse.Namespace) -> None:
         campo
         for campo, valor in {
             "--preco": args.preco,
+            "--preco-promocional": args.preco_promocional,
             "--custo-total": args.custo_total,
             "--frete": args.frete,
             "--vendedor": args.vendedor,
@@ -1975,6 +2054,20 @@ def promote_quote(args: argparse.Namespace) -> None:
             "--link ou --garantia-meses.\n"
             "Se conferiu e estava tudo igual ao que ja estava registrado, "
             "use --sem-alteracao para declarar isso explicitamente."
+        )
+
+    if not args.sem_alteracao and all(
+        value is None for value in (args.preco, args.preco_promocional, args.custo_total)
+    ):
+        raise SystemExit(
+            "Confirme o preco com --preco, --preco-promocional ou --custo-total. "
+            "Conferir apenas link, vendedor ou garantia nao renova o preco. "
+            "Se conferiu tudo e continua igual, use --sem-alteracao."
+        )
+    if args.preco is not None and args.preco_promocional is None and quote_float(base.get("preco_promocional")):
+        raise SystemExit(
+            "A cotacao base tem desconto. Informe --preco-promocional com o valor confirmado "
+            "ou --preco-promocional 0 se a promocao acabou; --preco e o preco de etiqueta."
         )
 
     row = dict(base)
@@ -2233,7 +2326,9 @@ def decision_briefing(project: Path) -> str:
 def ai_prompt(args: argparse.Namespace) -> None:
     project = project_path(args.projeto)
     briefing_meta, briefing_body = load_frontmatter(project / "briefing.md")
-    quotes = read_quotes(project)
+    modelo = project / "01-definir-modelo.md"
+    modelo_texto = modelo.read_text(encoding="utf-8") if modelo.exists() else "Ainda nao definido."
+    candidatos = [find_product(pid) or {"id": pid} for pid in sorted(project_product_ids(project))]
     known = knowledge_context(project)
     known_block = f"\n\nBase de conhecimento relevante:\n{known}" if known else "\n\nBase de conhecimento relevante: nada registrado ainda."
     etapa = args.etapa
@@ -2246,6 +2341,20 @@ Preco teto: {briefing_meta.get('preco_teto')}
 
 Briefing:
 {briefing_body.strip()}
+
+Definicao de modelo registrada:
+{modelo_texto}
+
+Candidatos ja mapeados (amostra pesquisada, nao universo completo):
+{json.dumps(candidatos, ensure_ascii=False, default=str)}
+
+Protocolo de pesquisa e evidencia:
+- Compare geracoes atuais, antecessores e variantes regionais; registre data, fonte e modelo exato.
+- Procure alternativas ausentes da lista; explique inclusoes e exclusoes. O ranking nao descobre candidatos.
+- Separe fabricante, oferta observada, relato de usuario e inferencia de IA. Nao invente verificacao.
+- Relatorio de IA externa entra como fonte=web. So marque manual apos conferencia da oferta exata.
+- Confirme variacao, vendedor, estoque, preco final, frete, garantia e devolucao antes de pagar.
+- Confianca do score mede cobertura de campos, nao veracidade, cobertura do mercado ou probabilidade de acerto.
 {known_block}
 """
     if etapa == "modelo":
@@ -2258,6 +2367,7 @@ Responda com:
 3. atributos que parecem marketing;
 4. deal-breakers;
 5. perguntas que eu ainda preciso responder antes de cotar.
+6. 3 a 5 candidatos iniciais e lacunas da pesquisa, incluindo geracoes/variantes a verificar.
 """
     elif etapa == "cotacao":
         prompt = common + """
@@ -2293,9 +2403,17 @@ Tarefa: monte perguntas de veredito D+30 e D+180 para extrair aprendizado reutil
 
 def decide(args: argparse.Namespace) -> None:
     project = project_path(args.projeto)
-    quote = latest_quotes(read_quotes(project)).get(args.produto_id)
-    if not quote:
+    # Gate, confianca e snapshot precisam se referir a MESMA oferta. Selecionar
+    # de novo sem a preferencia do ranking podia fechar outra loja/preco ou
+    # exigir bypass apesar de existir uma cotacao elegivel no ranking.
+    elegiveis, cortados = compute_ranking(project)
+    ranqueado = next(
+        (item for item in [*elegiveis, *cortados] if item.produto_id == args.produto_id),
+        None,
+    )
+    if ranqueado is None:
         raise SystemExit(f"Nenhuma cotacao encontrada para {args.produto_id}")
+    quote = ranqueado.quote
     product = find_product(args.produto_id) or {"nome": args.produto_id}
     if quote.get("fonte") != "manual" and not args.permitir_web:
         raise SystemExit("A cotacao final nao e manual. Use --permitir-web se quiser registrar mesmo assim.")
@@ -2368,11 +2486,6 @@ def decide(args: argparse.Namespace) -> None:
     # Trava mais branda de todas, entao vem por ultimo: as anteriores dizem
     # respeito a regra do sistema; esta so diz que falta dado.
     minima = minimum_confidence(briefing_meta)
-    elegiveis, cortados = compute_ranking(project)
-    ranqueado = next(
-        (item for item in [*elegiveis, *cortados] if item.produto_id == args.produto_id),
-        None,
-    )
     obrigatorios = [
         eixo for eixo in (preferences().get("eixos_obrigatorios_para_decidir") or [])
         if ranqueado and eixo in ranqueado.eixos_sem_dado
@@ -2399,6 +2512,17 @@ def decide(args: argparse.Namespace) -> None:
     snapshot_dir.mkdir(parents=True, exist_ok=False)
     quote_canonical = json.dumps(quote, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
     quote_hash = hashlib.sha256(quote_canonical.encode("utf-8")).hexdigest()
+    excecoes = []
+    condicoes = {
+        "permitir_web": quote.get("fonte") != "manual",
+        "permitir_cortado": bool(cortes),
+        "permitir_vencida": quote_is_stale(quote),
+        "permitir_aguardando": bool(waiting_gap(product, quote)),
+        "permitir_incompleto": bool(obrigatorios or ranqueado.confianca < minima),
+    }
+    for flag, necessaria in condicoes.items():
+        if necessaria and getattr(args, flag, False):
+            excecoes.append("--" + flag.replace("_", "-"))
     for nome in ("ranking.md", "ranking.csv"):
         origem = project / nome
         if not origem.exists():
@@ -2413,6 +2537,14 @@ def decide(args: argparse.Namespace) -> None:
                 "produto_id": args.produto_id,
                 "cotacao_sha256": quote_hash,
                 "cotacao": quote,
+                "schema_versao": 2,
+                "categoria": briefing_meta.get("categoria"),
+                "excecoes": excecoes,
+                "justificativa": args.porque,
+                "riscos_declarados": args.risco or [],
+                "cortes": cortes,
+                "confianca": ranqueado.confianca,
+                "confianca_minima": minima,
             },
             ensure_ascii=True,
             indent=2,
@@ -2420,6 +2552,7 @@ def decide(args: argparse.Namespace) -> None:
         ) + "\n",
     )
 
+    custo_rotulo = "Custo total confirmado" if quote.get("fonte") == "manual" else "Custo total estimado (fonte=web)"
     lines = [
         "# Decisao",
         "",
@@ -2429,7 +2562,7 @@ def decide(args: argparse.Namespace) -> None:
         f"- Produto ID: {args.produto_id}",
         f"- Cotacao usada: {quote.get('loja')} / {quote.get('vendedor')}",
         f"- Data: {today()}",
-        f"- Custo total confirmado: {brl(quote.get('custo_total'))}",
+        f"- {custo_rotulo}: {brl(quote.get('custo_total'))}",
         f"- Evidencia congelada: {snapshot_rel}/ranking.md",
         f"- Cotacao SHA-256: {quote_hash}",
         "",
@@ -2451,7 +2584,9 @@ def decide(args: argparse.Namespace) -> None:
             "",
             "## Riscos aceitos",
             "",
-            *(f"- {risco}" for risco in (args.risco or ["Nenhum risco relevante registrado."])),
+            *(f"- Excecao efetiva: {flag}. Justificativa: {args.porque}" for flag in excecoes),
+            *(f"- Gate ignorado: {corte}" for corte in cortes),
+            *(f"- {risco}" for risco in (args.risco or ([] if excecoes else ["Nenhum risco relevante registrado."]))),
             "",
             "## O que conferir antes de pagar",
             "",
@@ -2470,6 +2605,30 @@ def decide(args: argparse.Namespace) -> None:
         ]
     )
     atomic_write_text((project / "decisao.md"), "\n".join(lines) + "\n")
+    # Preserva entradas e justificativa antes de atualizar estado/processo.
+    fontes = {
+        "decisao.md": project / "decisao.md",
+        "briefing.md": project / "briefing.md",
+        "modelo.md": project / "01-definir-modelo.md",
+        "cotacoes.csv": project / "cotacoes.csv",
+        "categorias.yaml": CONFIG / "categorias.yaml",
+        "preferencias.yaml": CONFIG / "preferencias.yaml",
+        "motor.py": Path(__file__),
+    }
+    for pid in sorted(project_product_ids(project)):
+        path = find_product_path(pid)
+        if path:
+            fontes[f"produtos/{pid}.yaml"] = path
+    for nome, path in fontes.items():
+        if path.exists():
+            atomic_write_text(snapshot_dir / nome, path.read_text(encoding="utf-8"))
+    atomic_write_text(snapshot_dir / "ambiente.json", json.dumps({
+        "python": sys.version, "pyyaml": yaml.__version__,
+        "argumentos": {key: value for key, value in vars(args).items() if key != "func"},
+    }, indent=2, ensure_ascii=True, default=str) + "\n")
+    manifesto = {path.relative_to(snapshot_dir).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                 for path in sorted(snapshot_dir.rglob("*")) if path.is_file()}
+    atomic_write_text(snapshot_dir / "manifesto.json", json.dumps(manifesto, indent=2, sort_keys=True) + "\n")
     append_timeline(project, "decisao", f"Escolhido {args.produto_id}", args.porque)
     mark_steps(project, [8])
     if args.comprado:
@@ -2483,6 +2642,54 @@ def decide(args: argparse.Namespace) -> None:
     print(project / "decisao.md")
     print(snapshot_dir)
     print(verdict_path)
+
+
+def audit_decisions(args: argparse.Namespace) -> None:
+    """Verifica integridade dos snapshots e contabiliza excecoes sem reescrever historico."""
+    projects = [project_path(args.projeto)] if args.projeto else project_dirs()
+    problemas, totais = [], {}
+    for project in projects:
+        for snapshot in sorted((project / "snapshots").glob("*")):
+            if not snapshot.is_dir():
+                continue
+            label = f"{project.name}/{snapshot.name}"
+            try:
+                meta = json.loads((snapshot / "metadados.json").read_text(encoding="utf-8"))
+                canonical = json.dumps(meta["cotacao"], ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+                if hashlib.sha256(canonical.encode()).hexdigest() != meta["cotacao_sha256"]:
+                    problemas.append(f"{label}: hash da cotacao diverge")
+                manifest_path = snapshot / "manifesto.json"
+                if not manifest_path.exists():
+                    if meta.get("schema_versao", 1) >= 2:
+                        problemas.append(f"{label}: manifesto obrigatorio ausente")
+                    else:
+                        print(f"LEGADO {label}: sem manifesto de entradas; nao prova reproducibilidade completa.")
+                else:
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    if not isinstance(manifest, dict) or not manifest:
+                        raise ValueError("manifesto vazio ou invalido")
+                    required = {"metadados.json", "decisao.md", "ranking.md", "ranking.csv", "cotacoes.csv",
+                                "briefing.md", "categorias.yaml", "preferencias.yaml", "motor.py", "ambiente.json"}
+                    if not required.issubset(manifest):
+                        problemas.append(f"{label}: manifesto omite entradas obrigatorias")
+                    for nome, digest in manifest.items():
+                        path = (snapshot / nome).resolve()
+                        if not path.is_relative_to(snapshot.resolve()) or not path.is_file():
+                            problemas.append(f"{label}: arquivo ausente/invalido: {nome}")
+                        elif hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                            problemas.append(f"{label}: arquivo alterado: {nome}")
+                for flag in meta.get("excecoes", []):
+                    key = f"{meta.get('categoria', '?')} {flag}"
+                    totais[key] = totais.get(key, 0) + 1
+                print(f"SNAPSHOT {label}")
+            except (OSError, ValueError, KeyError, TypeError) as erro:
+                problemas.append(f"{label}: metadados invalidos ({type(erro).__name__})")
+    for chave, total in sorted(totais.items()):
+        print(f"EXCECAO {chave}: {total}")
+    for problema in problemas:
+        print(f"ERRO {problema}")
+    if problemas and args.strict:
+        raise SystemExit(1)
 
 
 def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quote: dict[str, str], force: bool = False) -> Path:
@@ -2517,7 +2724,7 @@ def replace_or_append_bullet(text: str, label: str, value: str) -> str:
     pattern = rf"(?m)^- {re.escape(label)}:[^\n]*$"
     replacement = f"- {label}: {value}"
     if re.search(pattern, text):
-        return re.sub(pattern, replacement, text)
+        return re.sub(pattern, lambda _: replacement, text)
     return text.rstrip() + f"\n- {label}: {value}\n"
 
 
@@ -2621,7 +2828,10 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     regret = args.nota_arrependimento
     if regret is None:
         raw_regret = extract_bullet(text, f"{prefix} nota arrependimento")
-        regret = quote_float(raw_regret, 0) if raw_regret else None
+        try:
+            regret = personal_rating(raw_regret) if raw_regret else None
+        except argparse.ArgumentTypeError as erro:
+            raise SystemExit(f"Nota de arrependimento invalida no veredito: {erro}") from erro
 
     # Julgamento do PRODUTO e do VENDEDOR sao coisas diferentes. Antes, um
     # arrependimento 9 com o produto derrubava a loja para nota 1 junto, mesmo
@@ -2632,13 +2842,21 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     nota_loja = args.nota_loja
     if nota_loja is None:
         bruto = extract_bullet(text, f"{prefix} nota vendedor")
-        nota_loja = quote_float(bruto) if bruto else None
+        try:
+            nota_loja = personal_rating(bruto) if bruto else None
+        except argparse.ArgumentTypeError as erro:
+            raise SystemExit(f"Nota do vendedor invalida no veredito: {erro}") from erro
     compraria_produto = buy_again if buy_again in {"sim", "nao", "talvez"} else None
     compraria_loja = args.compraria_do_vendedor or (
         extract_bullet(text, f"{prefix} compraria do mesmo vendedor") or None
     )
     if compraria_loja not in {"sim", "nao", "talvez", None}:
         compraria_loja = None
+
+    if args.gate:
+        if not lesson:
+            raise SystemExit("--gate exige uma licao para registrar a justificativa.")
+        parse_lesson_gate(args.gate)  # antes de escrever marca/loja
 
     if marca:
         register_brand(
@@ -2908,13 +3126,37 @@ def set_category_gate(path: Path, categoria: str, field: str, value: Any) -> Non
     atomic_write_text(path, "\n".join(linhas) + "\n")
 
 
-def apply_lesson_gate(gate: str) -> str:
+def parse_lesson_gate(gate: str) -> tuple[str, str, Any]:
     if "=" not in gate or "." not in gate.split("=", 1)[0]:
         raise SystemExit("Use --gate categoria.campo=valor. Exemplo: cosmetico.exige_vendedor_oficial=true")
     left, raw_value = gate.split("=", 1)
     categoria, field = left.split(".", 1)
-    path = CONFIG / "categorias.yaml"
+    supported = {
+        "nota_minima_ajustada", "minimo_avaliacoes", "garantia_minima_meses",
+        "garantia_tipo_aceita", "exige_vendedor_oficial", "exige_rede_assistencia",
+    }
+    if field not in supported or not re.fullmatch(r"[A-Za-z0-9_-]+", categoria):
+        raise SystemExit(f"gate nao suportado: {gate}. Campos aceitos: {', '.join(sorted(supported))}.")
     valor = parse_scalar(raw_value)
+    if field.startswith("exige_"):
+        valido = isinstance(valor, bool)
+    elif field == "garantia_tipo_aceita":
+        valido = isinstance(valor, list) and bool(valor) and all(
+            item in {"nacional", "importada", "vendedor", "nenhuma"} for item in valor if isinstance(item, str)) and all(isinstance(item, str) for item in valor)
+    else:
+        valido = isinstance(valor, (int, float)) and not isinstance(valor, bool) and math.isfinite(valor) and valor >= 0
+        if field == "nota_minima_ajustada":
+            valido = valido and valor <= 5
+        else:
+            valido = valido and float(valor).is_integer()
+    if not valido:
+        raise SystemExit(f"Valor invalido para gate {categoria}.{field}: {raw_value}")
+    return categoria, field, valor
+
+
+def apply_lesson_gate(gate: str) -> str:
+    categoria, field, valor = parse_lesson_gate(gate)
+    path = CONFIG / "categorias.yaml"
     set_category_gate(path, categoria, field, valor)
     # Confere que o arquivo continua valido e que o valor chegou onde devia.
     conferencia = ((read_yaml(path, {}) or {}).get(categoria) or {}).get("gate", {})
@@ -2961,10 +3203,18 @@ def project_stores(project: Path) -> set[str]:
 def knowledge_files_for_project(project: Path) -> tuple[list[Path], list[Path]]:
     brand_files = [BASE / "marcas" / f"{slugify(name)}.md" for name in project_brands(project)]
     store_files = [BASE / "lojas" / f"{slugify(name)}.md" for name in project_stores(project)]
-    return [path for path in brand_files if path.exists()], [path for path in store_files if path.exists()]
+    briefing, _ = load_frontmatter(project / "briefing.md")
+    categoria = str(briefing.get("categoria") or "")
+    for folder, found in (("marcas", brand_files), ("lojas", store_files)):
+        for path in sorted((BASE / folder).glob("*.md")):
+            text = path.read_text(encoding="utf-8")
+            if categoria and re.search(rf"(?mi)^- Categoria:\s*{re.escape(categoria)}\s*$", text):
+                found.append(path)
+    return (sorted({path for path in brand_files if path.exists()}),
+            sorted({path for path in store_files if path.exists()}))
 
 
-def lesson_lines_for_category(categoria: str | None) -> list[str]:
+def lesson_lines_for_category(categoria: str | None, *, limit: int | None = 10) -> list[str]:
     path = BASE / "licoes.md"
     if not path.exists():
         return []
@@ -2977,26 +3227,26 @@ def lesson_lines_for_category(categoria: str | None) -> list[str]:
         lowered = clean.lower()
         if not wanted or f"- {wanted} -" in lowered or "- geral -" in lowered:
             lines.append(clean)
-    return lines[-10:]
+    return lines if limit is None else lines[-limit:]
 
 
 def knowledge_context(project: Path) -> str:
     briefing, _ = load_frontmatter(project / "briefing.md")
     categoria = briefing.get("categoria")
     brand_files, store_files = knowledge_files_for_project(project)
-    lesson_lines = lesson_lines_for_category(categoria)
+    lesson_lines = lesson_lines_for_category(categoria, limit=None)
     parts: list[str] = []
     if lesson_lines:
         parts.append("Licoes relevantes:\n" + "\n".join(f"- {line}" for line in lesson_lines))
     if brand_files:
         brand_text = []
         for path in brand_files:
-            brand_text.append(path.read_text(encoding="utf-8").strip()[-1200:])
+            brand_text.append(path.read_text(encoding="utf-8").strip())
         parts.append("Marcas ja conhecidas:\n" + "\n\n".join(brand_text))
     if store_files:
         store_text = []
         for path in store_files:
-            store_text.append(path.read_text(encoding="utf-8").strip()[-1200:])
+            store_text.append(path.read_text(encoding="utf-8").strip())
         parts.append("Lojas ja conhecidas:\n" + "\n\n".join(store_text))
     return "\n\n".join(parts)
 
@@ -3030,7 +3280,9 @@ def knowledge_predating(project: Path) -> dict[str, int]:
     lojas = sum(1 for path in store_files if any(data < aberto_em for data in entry_dates(path)))
 
     licoes = 0
-    for linha in lesson_lines_for_category(briefing.get("categoria")):
+    # O limite de contexto do prompt nao pode apagar conhecimento historico da
+    # metrica: dez licoes novas faziam uma compra antiga deixar de reaproveitar.
+    for linha in lesson_lines_for_category(briefing.get("categoria"), limit=None):
         match = re.match(r"^(\d{4}-\d{2}-\d{2})", linha.strip())
         data = parse_dashboard_date(match.group(1)) if match else None
         if data and data < aberto_em:
@@ -3147,6 +3399,7 @@ def is_technical_tie(elegiveis: list[Ranked]) -> bool:
     return len(elegiveis) > 1 and elegiveis[0].score - elegiveis[1].score <= 3
 
 
+@read_session
 def project_counts(project: Path) -> dict[str, Any]:
     briefing, _ = load_frontmatter(project / "briefing.md")
     quotes = read_quotes(project)
@@ -3740,6 +3993,7 @@ def _metricas_sheets(item: Ranked, situacao: str) -> dict[str, Any]:
     }
 
 
+@read_session
 def sheets_export_payload() -> dict[str, Any]:
     """JSON pronto pro Web App do Apps Script. So monta, nunca envia.
 
@@ -3950,8 +4204,8 @@ def sincronizar_planilha(args: argparse.Namespace) -> None:
     try:
         with urllib.request.urlopen(requisicao, timeout=120) as resposta:
             corpo_resposta = resposta.read().decode("utf-8")
-    except urllib.error.URLError as erro:
-        raise SystemExit(f"Falha ao conectar na planilha: {erro}") from erro
+    except (urllib.error.URLError, TimeoutError, UnicodeDecodeError) as erro:
+        raise SystemExit(f"Falha ao conectar na planilha: {str(erro).replace(token, '[oculto]')}") from erro
 
     try:
         resultado = json.loads(corpo_resposta)
@@ -3961,15 +4215,17 @@ def sincronizar_planilha(args: argparse.Namespace) -> None:
         # preservou o POST). Erro claro em vez de traceback cru.
         raise SystemExit(
             "A planilha nao devolveu JSON valido - a implantacao pode ter "
-            f"mudado ou o link expirou. Resposta recebida: {corpo_resposta[:300]!r}"
+            "mudado ou o link expirou. Confira a implantacao e a conta proprietaria."
         ) from erro
 
-    if not resultado.get("ok"):
+    if not isinstance(resultado, dict):
+        raise SystemExit("Resposta da planilha precisa ser um objeto JSON.")
+    if resultado.get("ok") is not True:
         mensagem = resultado.get("error") or resultado
         detalhe = resultado.get("detalhe")
         if detalhe:
             mensagem = f"{mensagem}. Detalhe: {detalhe}"
-        raise SystemExit(f"A planilha recusou os dados: {mensagem}")
+        raise SystemExit(f"A planilha recusou os dados: {str(mensagem).replace(token, '[oculto]')}")
     avisos = validar_resposta_sheets(resultado, payload)
     print(
         f"Planilha sincronizada: {len(payload['visao_geral'])} projeto(s), "
@@ -4126,6 +4382,7 @@ def generate_knowledge_page() -> Path:
     return page
 
 
+@read_session
 def generate_dashboard(args: argparse.Namespace) -> None:
     DASHBOARD.mkdir(parents=True, exist_ok=True)
     write_dashboard_asset()
@@ -4395,6 +4652,9 @@ def audit_score(args: argparse.Namespace) -> None:
         print(f"{nome}: score {item.score}")
 
 
+_SOURCES_FROZEN = contextvars.ContextVar("central_compras_sources_frozen", default=False)
+
+
 @contextlib.contextmanager
 def sources_frozen():
     """Congela as fontes: derivados podem ser refeitos, fonte nao muda.
@@ -4403,15 +4663,14 @@ def sources_frozen():
     que e fonte. Rodar `regenerar` mexia no historico decisorio enquanto
     imprimia "Nenhuma fonte foi tocada".
     """
-    originais = (globals()["mark_steps"], globals()["set_process_state"])
-    globals()["mark_steps"] = lambda *a, **k: None
-    globals()["set_process_state"] = lambda *a, **k: None
+    token = _SOURCES_FROZEN.set(True)
     try:
         yield
     finally:
-        globals()["mark_steps"], globals()["set_process_state"] = originais
+        _SOURCES_FROZEN.reset(token)
 
 
+@read_session
 def regenerate(args: argparse.Namespace) -> None:
     """Refaz todo arquivo derivado a partir das fontes.
 
@@ -4655,15 +4914,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--preco", type=real_number, required=True)
     p.add_argument("--preco-promocional", type=real_number)
     p.add_argument("--frete", type=real_number, default=0)
-    p.add_argument("--frete-prazo-dias", type=int)
+    p.add_argument("--frete-prazo-dias", type=nonnegative_int)
     p.add_argument("--custo-extra", type=real_number, default=0)
     p.add_argument("--custo-total", type=real_number)
     p.add_argument("--custo-operacional-mensal", type=real_number, default=0)
-    p.add_argument("--tco-meses", type=int)
+    p.add_argument("--tco-meses", type=nonnegative_int)
     p.add_argument("--valor-revenda-estimado", type=real_number, default=0)
     p.add_argument("--nota", type=real_number, default=0)
-    p.add_argument("--avaliacoes", type=int, default=0)
-    p.add_argument("--garantia-meses", type=int)
+    p.add_argument("--avaliacoes", type=nonnegative_int, default=0)
+    p.add_argument("--garantia-meses", type=nonnegative_int)
     p.add_argument("--garantia-tipo", choices=["nacional", "importada", "vendedor", "nenhuma"], default="nenhuma")
     p.add_argument("--link")
     p.add_argument("--flag-suspeita", choices=["", "AVAL_SUSPEITA", "ANCORA", "RECICLADO"], default="")
@@ -4727,6 +4986,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("projeto")
     p.add_argument("--produto-id")
     p.set_defaults(func=show_history)
+
+    p = sub.add_parser("auditar-decisoes", help="verifica snapshots e contabiliza excecoes por categoria")
+    p.add_argument("projeto", nargs="?")
+    p.add_argument("--strict", action="store_true")
+    p.set_defaults(func=audit_decisions)
 
     p = sub.add_parser("auditar", help="mostra a conta inteira do score, do CSV ate o numero final")
     p.add_argument("projeto")
@@ -4795,16 +5059,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--preco", type=real_number)
     p.add_argument("--preco-promocional", type=real_number)
     p.add_argument("--frete", type=real_number)
-    p.add_argument("--frete-prazo-dias", type=int)
+    p.add_argument("--frete-prazo-dias", type=nonnegative_int)
     p.add_argument("--custo-extra", type=real_number)
     p.add_argument("--custo-total", type=real_number)
     p.add_argument("--custo-operacional-mensal", type=real_number)
-    p.add_argument("--tco-meses", type=int)
+    p.add_argument("--tco-meses", type=nonnegative_int)
     p.add_argument("--valor-revenda-estimado", type=real_number)
     p.add_argument("--tco-total", type=real_number)
     p.add_argument("--nota", type=real_number)
-    p.add_argument("--avaliacoes", type=int)
-    p.add_argument("--garantia-meses", type=int)
+    p.add_argument("--avaliacoes", type=nonnegative_int)
+    p.add_argument("--garantia-meses", type=nonnegative_int)
     p.add_argument("--garantia-tipo", choices=["nacional", "importada", "vendedor", "nenhuma"])
     p.add_argument("--link")
     p.add_argument("--flag-suspeita", choices=["", "AVAL_SUSPEITA", "ANCORA", "RECICLADO"])
@@ -4848,12 +5112,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("preencher-veredito", help="preenche resumo estruturado D+30 ou D+180")
     p.add_argument("veredito")
     p.add_argument("--fase", choices=["d30", "d180"], required=True)
-    p.add_argument("--nota-arrependimento", type=float, required=True)
+    p.add_argument("--nota-arrependimento", type=personal_rating, required=True)
     p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"], required=True)
     p.add_argument("--resumo", required=True)
     p.add_argument("--problema")
     p.add_argument("--licao")
-    p.add_argument("--nota-vendedor", type=real_number, help="0 a 10 para o VENDEDOR, separado do produto")
+    p.add_argument("--nota-vendedor", type=personal_rating, help="0 a 10 para o VENDEDOR, separado do produto")
     p.add_argument("--compraria-do-vendedor", choices=["sim", "nao", "talvez"])
     p.add_argument("--chegou-no-prazo", choices=["sim", "nao", "parcial"])
     p.add_argument("--produto-conforme", choices=["sim", "nao", "parcial"])
@@ -4874,9 +5138,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--licao")
     p.add_argument("--gate")
     p.add_argument("--alerta")
-    p.add_argument("--nota-arrependimento", type=float)
+    p.add_argument("--nota-arrependimento", type=personal_rating)
     p.add_argument("--compraria-de-novo", choices=["sim", "nao", "talvez"])
-    p.add_argument("--nota-loja", type=real_number, help="nota do VENDEDOR, separada da nota do produto")
+    p.add_argument("--nota-loja", type=personal_rating, help="nota do VENDEDOR, separada da nota do produto")
     p.add_argument("--compraria-do-vendedor", choices=["sim", "nao", "talvez"])
     p.add_argument("--resumo-vendedor", help="o que a loja fez de bom ou de ruim, separado do produto")
     p.add_argument("--force", action="store_true", help="exporta de novo um veredito ja exportado")

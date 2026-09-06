@@ -14,6 +14,8 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import tempfile
+import uuid
 from pathlib import Path
 
 
@@ -26,6 +28,9 @@ AGENTES: list[tuple[str, str]] = [
 
 def instalar(origem: Path, userprofile: Path) -> list[str]:
     """Copia a skill para cada agente encontrado. Retorna linhas de log."""
+    origem = origem.resolve()
+    if not (origem / "SKILL.md").is_file():
+        raise ValueError(f"Fonte da skill invalida: {origem}")
     logs: list[str] = []
     for pasta_agente, nome in AGENTES:
         pai = userprofile / pasta_agente
@@ -33,9 +38,27 @@ def instalar(origem: Path, userprofile: Path) -> list[str]:
         if not pai.exists():
             logs.append(f"pulou {nome}: {pai} nao existe")
             continue
-        if destino.exists():
-            shutil.rmtree(destino)
-        shutil.copytree(origem, destino)
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        if destino.is_symlink() or destino.resolve().parent != destino.parent.resolve():
+            raise ValueError(f"Destino fora da pasta de skills: {destino}")
+        # Prepara completamente antes de substituir a instalacao funcional.
+        with tempfile.TemporaryDirectory(prefix=".central-compras-install-", dir=destino.parent) as temp:
+            staging = Path(temp) / "nova"
+            backup = destino.with_name(f".central-compras-backup-{uuid.uuid4().hex}")
+            shutil.copytree(origem, staging)
+            if destino.exists():
+                destino.rename(backup)
+            try:
+                staging.rename(destino)
+            except BaseException:
+                if backup.exists():
+                    backup.rename(destino)
+                raise
+            if backup.exists():
+                # Caminho unico, resolvido no mesmo pai validado do destino.
+                if backup.resolve().parent != destino.parent.resolve():
+                    raise ValueError(f"Backup fora da pasta de skills: {backup}")
+                shutil.rmtree(backup)
         logs.append(f"instalou {nome}: {destino}")
     return logs
 

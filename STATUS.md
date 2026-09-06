@@ -5,19 +5,43 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (deixado em 05/09/2026)
+## AO RETOMAR — comece por aqui (06/09/2026)
 
-Repositório sincronizado com `origin/main`, **287 testes passando**. A
-planilha premium está no ar na **Versão 9** do Apps Script, executada como
-**conta-comercial**, usando o mesmo endpoint. Duas sincronizações reais devolveram 8
-projetos e 8 comparativos. A planilha foi aberta e conferida: 9 abas sem
-órfãs, fila de atenção, KPIs, vereditos, filtros, links, números tipados e
-gráficos renderizados. Detalhes e endereços em
-`docs/infraestrutura-externa.md`.
+**Auditoria completa entregue: 321 testes passando em 138,343 s.** Relatorio:
+[`docs/auditoria-completa-2026-09-06.md`](docs/auditoria-completa-2026-09-06.md).
+Baseline da auditoria: `feae025`; os registros de sessoes anteriores abaixo sao historicos.
 
-**Relógio fechado nesta sessão** (ver bloco "Última sessão: 05/09/2026 —
-decisão do relógio" abaixo): Huawei Band 11 Pro, R$ 346, comprado. Falta só
-rodar o veredito D+30 quando chegar.
+- Decisao usa a mesma oferta do ranking. Novos snapshots congelam entradas,
+  configuracao, motor, ambiente e justificativa, com manifesto e excecoes efetivas.
+  Conferir: `python scripts/central_compras.py auditar-decisoes --strict`.
+- Promocao exige conferencia monetaria ou reconfirmacao explicita; desconto antigo
+  nao sobrevive silenciosamente a uma alteracao de preco. Regra de parada conta
+  ofertas atuais distintas e verifica presenca fisica quando exigida.
+- Prompt incorpora modelo/candidatos, geracoes e variantes; licoes antigas nao
+  desaparecem por limite de dez entradas. Recuperacao inclui historico da categoria.
+- Painel usa parser/travas do CLI, valida JSON/origem e preserva formulario no erro;
+  TCO, atualizacao automatica e candidatos sem cotacao conferidos no navegador com
+  dados sinteticos. Campos possuem labels associados.
+- Cache por operacao e isolamento por contexto substituem preferencias eternamente
+  antigas e alteracao global de funcoes. Tipos, caminhos, YAML, gates, resposta
+  Sheets e instalador receberam protecoes cobertas por testes.
+- Benchmark comparativo, mesmo catalogo de 40 projetos/120 produtos: baseline
+  15.881 interpretacoes YAML / 24,303 s; atual 5.040 / 11,124 s. Tempos indicativos
+  sob carga da maquina; reproduzir com `python tests/benchmark_pipeline.py --projetos 40`.
+- Scanner estrito e `git diff --check` passaram. CSVs historicos, fichas reais,
+  decisoes antigas, pesos e configuracoes comerciais permaneceram intactos.
+- Quatro snapshots ignorados de `.playwright-mcp/` foram preservados, com hashes
+  conferidos, em `C:\Users\josem\.central-compras\dados-privados\central-compras\auditoria-2026-09-06\playwright\`.
+  Eles causavam a falha inicial do scanner na suite de 287 testes.
+
+**Nuvem:** nao houve novo deploy ou sincronizacao real nesta auditoria. A Versao 9
+verificada em 05/09, como `conta-comercial`, continua sendo o ultimo registro confirmado.
+Enderecos e procedimento: `docs/infraestrutura-externa.md` e
+`docs/aprendizados-google-sheets.md`. O relatorio lista limites de transacoes,
+proveniencia, reutilizacao de produtos e endurecimento futuro do receptor.
+
+**Compras:** permanecem como registradas antes da auditoria. O relogio foi fechado
+na sessao de 05/09; o veredito D+30 segue pendente. Nenhuma compra foi refeita.
 
 ---
 
