@@ -27,8 +27,9 @@ relatorios-privados/
 coverage.json
 htmlcov/
 
-# Trava de escrita concorrente
+# Trava de escrita concorrente e journal de recuperacao de operacao interrompida
 .central-compras.lock
+.operacoes/
 
 # Snapshots do navegador automatizado (MCP). Guardam a pagina inteira: ja
 # capturaram token de Apps Script, CEP e numero com cara de cartao vindos das

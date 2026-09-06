@@ -5,7 +5,30 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (06/09/2026)
+## AO RETOMAR — comece por aqui (06/09/2026, sessao 2)
+
+**Implementando as pendencias da auditoria de 06/09.** Plano com estado por
+frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
+Frente 2 (recuperacao de operacoes parciais) **concluida** nesta sessao.
+Frentes 3 (receptor Sheets), 4 (proveniencia), 5 (produtos reutilizados) e 6
+(datas/veredito) **nao iniciadas** — comece pelo plano, nao redescubra o
+escopo.
+
+- **Mecanismo de recuperacao novo**: `tracked_operation()` em
+  `scripts/central_compras.py` grava um journal (`.operacoes/<op_id>.json`,
+  gitignored) antes de uma sequencia de gravacoes em varios arquivos.
+  Aplicado em `decidir` e `aprender-veredito`, que tinham bug real e
+  reproduzido: uma falha entre registrar a licao/marca/loja e escrever o
+  marcador de "exportado" duplicava a licao inteira em `licoes.md` num
+  retry; o mesmo padrao duplicava linha em `processo.md` via `decidir`.
+  Comando novo `operacoes-pendentes` lista o que ficou `em_andamento` (e
+  `--strict` falha se houver alguma). Detalhes e evidencia de reproducao no
+  plano acima, secao 2. Testes: `tests/test_operation_recovery.py` (4 novos).
+- Nao e transacao atomica entre arquivos — e recuperacao. Documentado assim
+  no docstring de `tracked_operation` para ninguem prometer o que nao foi
+  construido.
+
+## AO RETOMAR (06/09/2026, sessao 1)
 
 **Auditoria completa entregue: 321 testes passando em 138,343 s.** Relatorio:
 [`docs/auditoria-completa-2026-09-06.md`](docs/auditoria-completa-2026-09-06.md).
