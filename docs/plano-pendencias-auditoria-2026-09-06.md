@@ -22,70 +22,127 @@ Estados possíveis: `não iniciada` · `em andamento` · `concluída` · `bloque
 
 ## 2. Recuperação de operações parciais — PRIORIDADE
 
-**Estado: concluída** (sessão de 06/09/2026, tarde). Commit: ver `STATUS.md`.
+**Estado: concluída** (revisada e corrigida na sessão de 06/09/2026, noite).
+Ficou **em andamento** entre a 1ª entrega (commit `83c0901`) e esta correção
+— não declarar concluído de novo até o próximo revisor confirmar.
 
-### O que foi confirmado no código (antes de mexer)
+### 1ª entrega (commit `83c0901`) — insuficiente, revisada pelo Codex
 
-`decidir` grava, em sequência, snapshot (múltiplos arquivos), `decisao.md`,
-duas linhas de linha do tempo em `processo.md` e um arquivo de veredito.
-`aprender-veredito` grava marca, loja e lição na base de conhecimento e só
-por último acrescenta o marcador "Aprendizado exportado" no veredito. Cada
-gravação individual já era atômica (`atomic_write_text`), mas a sequência
-não era: nada impedia que uma repetição do comando, após uma falha no meio,
-repetisse passos já feitos.
+A primeira versão de `tracked_operation`/`OperationHandle` marcava um passo
+como feito **depois** de executá-lo (`if not op.concluido(x): fazer(); op.
+marcar(x)`). O Codex revisou o commit e reproduziu 3 falhas reais que os 4
+testes daquela entrega não cobriam:
 
-### Reprodução
+1. **Lição duplicada com sucesso aparente.** Se a exceção ocorresse *depois*
+   de `register_lesson` gravar e *antes* de `op.marcar("licao")` persistir, o
+   journal nunca sabia que o passo tinha sido feito. O retry não falhava —
+   terminava "com sucesso" e `licoes.md` ficava com a lição duas vezes.
+   Corrigir a ordem (marcar antes de executar) resolveria a duplicação mas
+   criaria o problema espelhado: uma falha entre marcar e executar faria o
+   journal achar que um passo foi feito quando na verdade não foi, **perdendo**
+   a gravação.
+2. **Marcador gravado deixava a recuperação presa.** Se a falha ocorresse
+   depois de escrever `## Aprendizado exportado D+30` no veredito, o retry
+   batia na guarda "já foi exportado, use --force" — que existe para impedir
+   reexportar de propósito, não para bloquear a conclusão da própria
+   tentativa que falhou.
+3. **`decidir` criava um segundo snapshot a cada retry.** `_decide_writes`
+   gerava um `instante`/diretório novo em toda chamada; uma falha depois do
+   primeiro snapshot e antes do fim deixava um diretório órfão, e o retry
+   criava outro, nunca reaproveitando o primeiro.
 
-Script de reprodução (descartável, não entrou no repositório): abre uma
-compra, fecha veredito D+30 com lição, corrompe `append_text` para falhar
-exatamente na escrita do marcador de exportado, roda `aprender-veredito`
-(falha como esperado) e roda de novo sem a falha simulada. **Resultado antes
-da correção: a lição aparecia duas vezes em `base-conhecimento/licoes.md`.**
-O mesmo padrão foi confirmado em `decidir`: falha simulada em
-`append_timeline` na escrita da linha "veredito" e reexecução duplicava a
-linha "decisao" em `processo.md`.
+O Codex também pediu: reconciliação pelo **efeito realmente persistido** (não
+só pelo journal), recusa clara quando uma retomada usa dados diferentes da
+tentativa que falhou, journal corrompido tratado como "precisa de
+conferência" (nunca como "recomeça do zero"), e testes com interrupção real
+de processo e com comandos concorrentes.
+
+### Reprodução das 3 falhas, contra o código antigo (`83c0901`)
+
+Confirmadas rodando os testes atuais (`tests/test_operation_recovery.py`)
+contra o código antigo via `git stash` — log completo descartável, resultado
+citado aqui:
+
+- **Bug 1** (`OperationHandle.marcar` patcheado para lançar exceção no passo
+  `"licao"`, exatamente como o Codex descreveu): o retry **não levanta
+  exceção** e `base-conhecimento/licoes.md` termina com a linha
+  `2026-09-06 - fone - conferir estoque antes` **duas vezes**.
+- **Bug 2** (falha simulada logo depois de `append_text` gravar o marcador):
+  o retry levanta
+  `SystemExit: Este veredito ja foi exportado na fase D+30 [...] Use --force`
+  — a operação fica presa, exigindo uma flag que não deveria ser necessária
+  para concluir a própria tentativa que falhou.
+- **Bug 3** (falha simulada em `append_timeline` na linha "veredito"): o
+  diretório `snapshots/` passa de 1 para 2 entradas depois do retry
+  (`['20260906T190320944610-candidato', '20260906T190321136703-candidato']`).
+
+Rodando os MESMOS testes contra o código corrigido: os 3 passam, mais 9
+testes adicionais (12 no total).
 
 ### Correção
 
-Mecanismo novo em `scripts/central_compras.py`: `tracked_operation()` /
-`OperationHandle` / `pending_operations()`.
+Redesenho de `tracked_operation`/`OperationHandle` em
+`scripts/central_compras.py`:
 
-- Antes de começar uma sequência de gravações, o comando grava um journal em
-  `<escopo>/.operacoes/<op_id>.json` (dentro da pasta já travada por
-  `project_lock`), com `situacao: em_andamento` e a lista de passos
-  concluídos.
-- Cada passo que pode duplicar em append-only (`register_marca`,
-  `register_loja`, `register_lesson`, as duas chamadas de
-  `append_timeline`) primeiro confere `op.concluido("nome")`; só executa e
-  marca se ainda não tiver sido feito **nesta tentativa** (mesmo `op_id`).
-- Terminou sem exceção → o journal é apagado. Não sobra rastro de operação
-  concluída.
-- Terminou com exceção → o journal fica em disco, com os passos já feitos.
-  A próxima chamada com o mesmo `op_id` (mesmo produto, mesmo veredito+fase)
-  lê esse journal e pula o que já foi feito.
-- Comando novo `operacoes-pendentes` varre `base-conhecimento/.operacoes/` e
-  `projetos/*/.operacoes/` e lista o que ficou `em_andamento` — nunca fica
-  escondido atrás de um retry que "parece ter dado certo". `--strict` sai
-  com código 1 se houver alguma pendente (para checagem em rotina).
-- `.operacoes/` entrou no `.gitignore`, ao lado de `.central-compras.lock`.
+- **`assinatura`**: impressão digital dos dados de ENTRADA da tentativa
+  (preço, justificativa, perdedores, marca/loja/lição/notas). Uma retomada
+  com o mesmo `op_id` mas `assinatura` diferente é **recusada** com
+  `SystemExit` explicando o motivo — nunca mistura passo antigo com dado
+  novo. Quem quiser recomeçar do zero apaga o journal manualmente, depois de
+  conferir com `operacoes-pendentes`.
+- **`detalhe` congelado**: dados como o caminho do snapshot são decididos na
+  1ª tentativa e devolvidos via `op.detalhe` em qualquer retomada — nunca
+  recalculados. Resolve o bug 3: `decidir` reusa o mesmo diretório de
+  snapshot num retry.
+- **`op.registrar_efeito(passo, arquivo, assinatura_efeito, executar)`**:
+  resolve o bug 1 sem trocar duplicação por perda. Grava a assinatura do
+  efeito ANTES de executar (para uma próxima chamada saber o que procurar);
+  se o passo já estava "tentando", confere se a assinatura **congelada**
+  daquela tentativa já está no arquivo de destino antes de decidir se executa
+  de novo — nunca decide pela assinatura recém-calculada, que pode diferir da
+  congelada (ex.: o título de um arquivo de marca que não existia na 1ª
+  tentativa e passou a existir depois que o efeito ocorreu).
+- **Marcador de "exportado"**: resolve o bug 2 reconhecendo, através de
+  `has_pending_operation`, quando a guarda de "já exportado" está vendo o
+  efeito da PRÓPRIA tentativa que falhou (não um reexport de propósito) — e
+  nesse caso não exige `--force`.
+- **Journal ilegível nunca reinicia sozinho**: JSON inválido OU JSON válido
+  com estrutura incompleta levanta `JournalPrecisaReconciliacao`, convertida
+  em `SystemExit` explicando o que fazer. O arquivo nunca é sobrescrito nem
+  apagado automaticamente.
+- **`operacoes-pendentes`** agora mostra passos concluídos separados de
+  passos "tentados sem confirmar".
+- **Limite entre máquinas, documentado no docstring de `tracked_operation`**:
+  `.operacoes/` é local (gitignored) e não viaja no `git pull`. A defesa não
+  é técnica, é de rotina: rodar `operacoes-pendentes --strict` antes de
+  commitar/dar push, e `git status` ao voltar numa máquina onde ficou
+  trabalho parado.
 
-Aplicado em `decidir` (journal por `produto_id`) e `aprender-veredito`
-(journal por veredito + fase). **Não é transação atômica entre arquivos** —
-isso não foi prometido. É recuperação: nenhum registro duplicado, nenhuma
-operação incompleta passa por concluída, e o que ficou pendente é visível.
+Continua **não sendo transação atômica entre arquivos** — isso nunca foi
+prometido, e está dito assim no código.
 
 ### Testes
 
-`tests/test_operation_recovery.py`, 4 testes novos:
+`tests/test_operation_recovery.py`, **12 testes**:
 
-- retry de `aprender-veredito` após falha simulada não duplica a lição, e
-  ainda assim completa o marcador que faltava;
-- retry de `decidir` após falha simulada não duplica linha na linha do
-  tempo, e completa a linha que faltava;
-- `operacoes-pendentes` relata a pendência e some depois que a operação
-  completa (inclusive o código de saída de `--strict`);
-- journal corrompido (JSON inválido) é reportado como ilegível, não trava o
-  comando nem finge que os passos anteriores são confiáveis.
+- as 3 reproduções exatas dos bugs 1, 2 e 3, com asserção explícita de que
+  não regridem;
+- retomada com justificativa diferente (decidir) e com lição diferente
+  (aprender-veredito) são recusadas com mensagem clara;
+- journal com JSON inválido e journal com JSON válido mas estrutura
+  incompleta bloqueiam a operação (não reiniciam do zero) e preservam o
+  arquivo;
+- `pending_operations` relata journal ilegível sem apagá-lo;
+- `operacoes-pendentes` relata e some depois que a operação completa
+  (incluindo código de saída `--strict`);
+- comandos concorrentes no mesmo projeto (3 threads chamando `decidir` ao
+  mesmo tempo) não corrompem `processo.md` — a trava existente
+  (`project_lock`) continua serializando;
+- **interrupção real de subprocesso**: `python scripts/central_compras.py
+  decidir ...` roda de verdade, é morto com `os._exit(70)` (sem exceção
+  Python) num ponto controlado por variável de ambiente
+  (`CENTRAL_COMPRAS_TESTE_CRASH_APOS`), e um segundo processo, limpo, recupera
+  sem duplicar snapshot nem linha de linha do tempo.
 
 Suíte completa depois da mudança: ver `STATUS.md` para o número final.
 
@@ -93,10 +150,16 @@ Suíte completa depois da mudança: ver `STATUS.md` para o número final.
 
 - Concorrência entre dois processos ao mesmo tempo continua dependendo só de
   `project_lock`/`BASE` lock; o journal em si não tem lock próprio (documentado
-  no docstring de `tracked_operation`).
+  no docstring de `tracked_operation`). O teste de concorrência cobre threads
+  no mesmo processo, que exercitam a mesma trava de arquivo do SO.
 - Falta de espaço em disco no meio da própria escrita do journal ainda pode
   deixar um estado inconsistente — é o mesmo limite que já existia em
   `atomic_write_text` para qualquer arquivo isolado.
+- Retomada que atravessa a virada do dia: a linha de linha do tempo
+  reexecutada leva a data do dia da retomada, não da tentativa original (a
+  assinatura congelada evita duplicação, mas não fixa a data de um efeito que
+  nunca chegou a acontecer). Não é duplicação, é nuance de atribuição de
+  data — registrado, não escondido.
 - Não cobre a exportação para o Google Sheets (frente 3) nem qualquer outra
   sequência multi-arquivo fora de `decidir`/`aprender-veredito`. Se uma
   sessão futura achar outro ponto candidato, o mesmo `tracked_operation` deve

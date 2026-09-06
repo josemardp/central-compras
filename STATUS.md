@@ -5,28 +5,45 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (06/09/2026, sessao 2)
+## AO RETOMAR — comece por aqui (06/09/2026, sessao 3)
 
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
-Frente 2 (recuperacao de operacoes parciais) **concluida** nesta sessao.
-Frentes 3 (receptor Sheets), 4 (proveniencia), 5 (produtos reutilizados) e 6
-(datas/veredito) **nao iniciadas** — comece pelo plano, nao redescubra o
-escopo.
+Frente 2 (recuperacao de operacoes parciais) **concluida** (revisada e
+corrigida nesta sessao). Frentes 3 (receptor Sheets), 4 (proveniencia), 5
+(produtos reutilizados) e 6 (datas/veredito) **nao iniciadas** — comece pelo
+plano, nao redescubra o escopo.
 
-- **Mecanismo de recuperacao novo**: `tracked_operation()` em
-  `scripts/central_compras.py` grava um journal (`.operacoes/<op_id>.json`,
-  gitignored) antes de uma sequencia de gravacoes em varios arquivos.
-  Aplicado em `decidir` e `aprender-veredito`, que tinham bug real e
-  reproduzido: uma falha entre registrar a licao/marca/loja e escrever o
-  marcador de "exportado" duplicava a licao inteira em `licoes.md` num
-  retry; o mesmo padrao duplicava linha em `processo.md` via `decidir`.
-  Comando novo `operacoes-pendentes` lista o que ficou `em_andamento` (e
-  `--strict` falha se houver alguma). Detalhes e evidencia de reproducao no
-  plano acima, secao 2. Testes: `tests/test_operation_recovery.py` (4 novos).
-- Nao e transacao atomica entre arquivos — e recuperacao. Documentado assim
-  no docstring de `tracked_operation` para ninguem prometer o que nao foi
-  construido.
+- **A entrega da sessao 2 (commit `83c0901`) estava incompleta.** O Codex
+  revisou o commit e reproduziu 3 falhas reais que os 4 testes daquela
+  entrega nao cobriam: (1) `aprender-veredito` podia duplicar a licao com
+  "sucesso aparente" se a falha ocorresse entre gravar e confirmar o passo
+  no journal; (2) uma falha logo apos gravar o marcador de "exportado"
+  deixava o retry preso atras da guarda de "ja exportado"; (3) `decidir`
+  criava um segundo snapshot orfao a cada retry, porque o caminho nunca era
+  congelado. As 3 foram reproduzidas contra o codigo antigo (`git stash` +
+  os testes atuais) antes de corrigir — evidencia completa na secao 2 do
+  plano.
+- **Redesenho do mecanismo**: `tracked_operation`/`OperationHandle` agora
+  congelam a `assinatura` (dados de entrada) e o `detalhe` (ex.: caminho do
+  snapshot) na 1a tentativa — uma retomada com dados diferentes e recusada
+  em vez de misturar passo antigo com dado novo, e o snapshot e reaproveitado
+  em vez de duplicado. `op.registrar_efeito()` reconcilia pelo que
+  REALMENTE esta gravado no arquivo de destino, nao so pelo que o journal
+  diz — resolve a duplicacao sem trocar por perda de gravacao. Journal
+  corrompido (JSON invalido ou estrutura incompleta) bloqueia com
+  `SystemExit` claro, nunca reinicia sozinho.
+  Comando `operacoes-pendentes` continua listando o que ficou `em_andamento`
+  (agora separando passos concluidos de passos so tentados).
+- **Testes**: `tests/test_operation_recovery.py`, 12 testes (as 3 reproducoes
+  exatas dos bugs, retomada com dado incompativel recusada, journal
+  corrompido/malformado bloqueia, interrupcao real de subprocesso
+  (`os._exit`, nao excecao Python) com recuperacao, e comandos concorrentes
+  usando a trava existente).
+- Continua **nao sendo transacao atomica entre arquivos** — isso nunca foi
+  prometido, e esta documentado assim no docstring de `tracked_operation`,
+  junto do limite de recuperacao entre maquinas (`.operacoes/` e local,
+  gitignored).
 
 ## AO RETOMAR (06/09/2026, sessao 1)
 

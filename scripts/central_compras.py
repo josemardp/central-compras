@@ -284,74 +284,213 @@ def atomic_write_text(path: Path, text: str) -> None:
 
 
 _OPERATIONS_DIRNAME = ".operacoes"
+_JOURNAL_CAMPOS_OBRIGATORIOS = {"op_id", "kind", "situacao", "passos", "assinatura_fingerprint", "detalhe"}
 
 
 def _operation_path(scope: Path, op_id: str) -> Path:
     return scope / _OPERATIONS_DIRNAME / f"{slugify(op_id)}.json"
 
 
+def _fingerprint(dados: dict[str, Any]) -> str:
+    return json.dumps(dados, ensure_ascii=True, sort_keys=True, default=str, separators=(",", ":"))
+
+
+class JournalPrecisaReconciliacao(Exception):
+    """Journal existe mas nao da para saber com seguranca o que ja foi feito.
+
+    Cobre dois casos: JSON corrompido (nao parseia) e JSON valido com
+    estrutura errada (falta campo obrigatorio, tipo errado). Nos dois casos
+    o arquivo e preservado sem alteracao - apagar ou sobrescrever destruiria
+    a unica pista de que algo ficou pela metade.
+    """
+
+
+def _ler_journal(path: Path) -> dict[str, Any] | None:
+    """None = nunca existiu. Levanta `JournalPrecisaReconciliacao` se existir
+    mas nao puder ser lido com confianca. Nunca inventa estrutura ausente."""
+    if not path.exists():
+        return None
+    try:
+        bruto = path.read_text(encoding="utf-8")
+    except OSError as erro:
+        raise JournalPrecisaReconciliacao(f"nao foi possivel ler {path}: {erro}") from erro
+    try:
+        registro = json.loads(bruto)
+    except ValueError as erro:
+        raise JournalPrecisaReconciliacao(f"{path} nao e JSON valido: {erro}") from erro
+    if not isinstance(registro, dict) or not _JOURNAL_CAMPOS_OBRIGATORIOS.issubset(registro):
+        faltando = _JOURNAL_CAMPOS_OBRIGATORIOS - (set(registro) if isinstance(registro, dict) else set())
+        raise JournalPrecisaReconciliacao(
+            f"{path} e JSON valido mas com estrutura incompleta (falta: {sorted(faltando)})"
+        )
+    if not isinstance(registro.get("passos"), dict):
+        raise JournalPrecisaReconciliacao(f"{path} tem campo 'passos' de tipo inesperado")
+    return registro
+
+
 class OperationHandle:
-    """Passos ja concluidos de uma operacao de varios arquivos, para o chamador
-    pular o que ja foi feito numa repeticao apos falha."""
+    """Estado de uma operacao de varios arquivos, com reconciliacao por efeito
+    realmente persistido - nao so pelo que o journal diz que fez."""
 
     def __init__(self, path: Path, registro: dict[str, Any]):
         self._path = path
         self._registro = registro
 
-    def concluido(self, passo: str) -> bool:
-        return passo in self._registro["passos"]
+    @property
+    def detalhe(self) -> dict[str, Any]:
+        """Dados congelados na primeira tentativa (ex.: caminho do snapshot).
 
-    def marcar(self, passo: str) -> None:
-        if passo not in self._registro["passos"]:
-            self._registro["passos"].append(passo)
+        Uma retomada usa este valor, nunca um recem-calculado: recalcular a
+        cada tentativa e o que fazia `decidir` criar um snapshot novo (e
+        orfao) a cada retry."""
+        return self._registro["detalhe"]
+
+    def concluido(self, passo: str) -> bool:
+        return self._registro["passos"].get(passo, {}).get("situacao") == "concluido"
+
+    def _persistir(self) -> None:
         self._registro["atualizado_em"] = now_iso()
         atomic_write_text(self._path, json.dumps(self._registro, ensure_ascii=True, indent=2, sort_keys=True) + "\n")
 
+    def _concluir(self, passo: str) -> None:
+        self._registro["passos"].setdefault(passo, {})["situacao"] = "concluido"
+        self._persistir()
+        _crash_de_teste_se_pedido(passo)
+
+    def registrar_efeito(self, passo: str, arquivo: Path, assinatura_efeito: str, executar) -> None:
+        """Executa um efeito nao-idempotente (append-only) com reconciliacao.
+
+        `executar` e uma funcao sem argumentos que produz o efeito quando
+        chamada. `assinatura_efeito` e o texto que aparece em `arquivo` uma
+        vez que o efeito aconteceu.
+
+        Se o passo nunca foi tentado: grava ANTES de executar qual arquivo e
+        qual assinatura sao esperados (para uma proxima chamada saber o que
+        procurar), so entao executa e confirma.
+
+        Se o passo ja estava `tentando` - a falha anterior pode ter sido
+        antes ou depois do efeito de verdade acontecer - confere se a
+        assinatura CONGELADA daquela tentativa ja esta no arquivo. So
+        executa de novo se nao estiver. Nunca decide isso pela assinatura
+        recem-calculada: ela pode diferir da congelada (por exemplo, o
+        titulo de um arquivo de marca que ainda nao existia na 1a tentativa
+        e passou a existir depois que o efeito realmente ocorreu).
+        """
+        if self.concluido(passo):
+            return
+        existente = self._registro["passos"].get(passo)
+        if existente and existente.get("situacao") == "tentando":
+            arquivo_congelado = Path(existente.get("arquivo") or str(arquivo))
+            assinatura_congelada = existente.get("assinatura_efeito", assinatura_efeito)
+            atual = arquivo_congelado.read_text(encoding="utf-8") if arquivo_congelado.exists() else ""
+            if assinatura_congelada not in atual:
+                executar()
+            self._concluir(passo)
+            return
+        self._registro["passos"][passo] = {
+            "situacao": "tentando",
+            "arquivo": str(arquivo),
+            "assinatura_efeito": assinatura_efeito,
+        }
+        self._persistir()
+        _crash_de_teste_se_pedido(f"{passo}:iniciado")
+        executar()
+        _crash_de_teste_se_pedido(f"{passo}:executado")
+        self._concluir(passo)
+
+
+def _crash_de_teste_se_pedido(ponto: str) -> None:
+    """Mata o processo de verdade (sem excecao Python) se a suite de teste
+    pedir, via variavel de ambiente, para simular interrupcao real neste
+    ponto exato. So dispara com o nome exato do ponto e nunca em uso normal:
+    a variavel nao existe fora de teste."""
+    alvo = os.environ.get("CENTRAL_COMPRAS_TESTE_CRASH_APOS")
+    if alvo and alvo == ponto:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(70)
+
 
 @contextlib.contextmanager
-def tracked_operation(scope: Path, op_id: str, kind: str, detalhe: dict[str, Any] | None = None):
+def tracked_operation(scope: Path, op_id: str, kind: str, assinatura: dict[str, Any],
+                       detalhe_inicial: dict[str, Any] | None = None):
     """Registra em disco uma operacao que grava varios arquivos, antes de comecar.
 
     Nao existe transacao entre arquivos: cada `atomic_write_text` continua
     atomico por si so, mas a sequencia inteira nao e. O que este helper da e
-    RECUPERACAO, nao atomicidade - se o processo for interrompido no meio, o
-    arquivo desta pasta continua no disco com os passos ja concluidos. Uma
-    proxima chamada com o MESMO `op_id` (a mesma chave natural: produto_id,
-    nome do veredito etc.) encontra os passos ja feitos com `.concluido()` e
-    pula-os com `.marcar()`, em vez de repetir e duplicar um registro
-    append-only como `licoes.md`.
+    RECUPERACAO, nao atomicidade.
 
-    So chega ao fim do bloco `with` sem excecao quem terminou de verdade;
-    so entao o journal e apagado. Uma excecao no meio deixa o arquivo no
-    disco, com `situacao: em_andamento` - e exatamente esse arquivo que
-    `operacoes-pendentes` encontra depois.
+    `assinatura` e a impressao digital dos DADOS de entrada desta tentativa
+    (preco, justificativa, licao...). Uma retomada com `op_id` igual mas
+    `assinatura` diferente e RECUSADA: continuar misturaria passo antigo
+    (feito com o dado velho) com passo novo (feito com o dado novo). Quem
+    quiser recomecar do zero com dado novo apaga o arquivo do journal a mao,
+    depois de conferir o que ficou pendente com `operacoes-pendentes`.
+
+    `detalhe_inicial` e congelado na primeira tentativa e devolvido via
+    `op.detalhe` em qualquer retomada - nunca recalculado.
+
+    Journal ilegivel (JSON invalido ou com estrutura incompleta) NAO reinicia
+    do zero: levanta `JournalPrecisaReconciliacao` e preserva o arquivo,
+    porque reiniciar poderia repetir um efeito ja gravado.
+
+    So chega ao fim do bloco `with` sem excecao quem terminou de verdade; so
+    entao o journal e apagado.
 
     Precisa rodar dentro da trava (`project_lock`) do proprio `scope`: o
     journal nao tem lock proprio, so evita duplicacao entre chamadas
-    sequenciais (comando, crash, comando de novo), nao entre processos
-    concorrentes escrevendo o mesmo `op_id` ao mesmo tempo.
+    SEQUENCIAIS (comando, crash, comando de novo), nao entre processos
+    concorrentes escrevendo o mesmo `op_id` ao mesmo tempo - isso continua
+    sendo papel do `project_lock`.
+
+    LIMITE ENTRE MAQUINAS: `.operacoes/` fica fora do Git de proposito (e
+    estado de execucao local, nao historia de compra). Uma operacao
+    interrompida numa maquina e INVISIVEL em outra: o journal nao viaja no
+    `git pull`, e os arquivos parcialmente gravados tambem nao, contanto que
+    ainda estejam so no working tree local (nao commitados). A defesa nao e
+    tecnica, e de rotina: rode `operacoes-pendentes --strict` antes de
+    commitar/dar push, e rode `git status` ao voltar numa maquina onde
+    ficou trabalho parado. Um commit feito com operacao pendente nesta
+    maquina viaja para as outras como se estivesse completo - o journal fica
+    para tras.
     """
     path = _operation_path(scope, op_id)
-    passos_anteriores: list[str] = []
-    if path.exists():
-        try:
-            existente = json.loads(path.read_text(encoding="utf-8"))
-            if existente.get("kind") == kind and existente.get("situacao") == "em_andamento":
-                passos_anteriores = list(existente.get("passos", []))
-        except (OSError, ValueError):
-            # Journal corrompido nao pode travar a operacao nem fingir que os
-            # passos anteriores sao confiaveis: trata como recomeco do zero.
-            passos_anteriores = []
-    registro = {
-        "op_id": op_id,
-        "kind": kind,
-        "situacao": "em_andamento",
-        "passos": passos_anteriores,
-        "detalhe": detalhe or {},
-        "iniciado_em": now_iso(),
-        "atualizado_em": now_iso(),
-        "pid": os.getpid(),
-    }
+    try:
+        existente = _ler_journal(path)
+    except JournalPrecisaReconciliacao as erro:
+        raise SystemExit(
+            f"O journal de operacao {path} existe mas nao pode ser lido com confianca: {erro}\n"
+            "Nao vou presumir que nada foi executado - isso poderia repetir uma gravacao que ja "
+            "aconteceu. Confira o arquivo e o que ele deveria ter gravado (marca, loja, licao, "
+            "linha de processo.md ou snapshot, dependendo do 'op_id' no nome do arquivo) antes de "
+            "apagar o journal manualmente e tentar de novo."
+        ) from erro
+    fingerprint_nova = _fingerprint(assinatura)
+    if existente is not None and existente.get("kind") == kind and existente.get("situacao") == "em_andamento":
+        if existente.get("assinatura_fingerprint") != fingerprint_nova:
+            raise SystemExit(
+                f"Ha uma operacao '{kind}' pendente para {op_id!r} com dados diferentes dos desta "
+                f"chamada (journal: {path}).\n"
+                "Isso normalmente significa: uma tentativa anterior falhou no meio, e esta chamada "
+                "usa preco, justificativa, licao ou outro argumento diferente daquela tentativa.\n"
+                "Continuar misturaria passo antigo com dado novo. Repita com os MESMOS argumentos "
+                "da tentativa anterior para retomar, ou apague o arquivo do journal a mao (depois de "
+                "conferir com `operacoes-pendentes` o que ficou pendente) para comecar do zero."
+            )
+        registro = existente
+        registro["situacao"] = "em_andamento"
+    else:
+        registro = {
+            "op_id": op_id,
+            "kind": kind,
+            "situacao": "em_andamento",
+            "passos": {},
+            "assinatura_fingerprint": fingerprint_nova,
+            "detalhe": detalhe_inicial or {},
+            "iniciado_em": now_iso(),
+            "atualizado_em": now_iso(),
+            "pid": os.getpid(),
+        }
     atomic_write_text(path, json.dumps(registro, ensure_ascii=True, indent=2, sort_keys=True) + "\n")
     handle = OperationHandle(path, registro)
     yield handle
@@ -363,8 +502,24 @@ def tracked_operation(scope: Path, op_id: str, kind: str, detalhe: dict[str, Any
         pass
 
 
+def has_pending_operation(scope: Path, op_id: str, kind: str) -> bool:
+    """Confere se ha journal em_andamento para este op_id exato, sem entrar nele.
+
+    Usado por guardas de "ja fiz isso antes" (como o aviso de veredito ja
+    exportado) para reconhecer quando o efeito que elas estao vendo pode ser
+    de uma tentativa PROPRIA ainda em recuperacao, em vez de um uso normal
+    anterior e concluido.
+    """
+    try:
+        registro = _ler_journal(_operation_path(scope, op_id))
+    except JournalPrecisaReconciliacao:
+        return True  # journal ilegivel: trata como pendente, nao como ausente.
+    return bool(registro and registro.get("kind") == kind and registro.get("situacao") == "em_andamento")
+
+
 def pending_operations(scopes: list[Path]) -> list[dict[str, Any]]:
-    """Varre `.operacoes/` nos escopos dados e devolve as que ficaram em_andamento."""
+    """Varre `.operacoes/` nos escopos dados e devolve as que ficaram em_andamento
+    ou cujo journal nao pode ser lido com confianca (`journal_ilegivel`)."""
     achadas = []
     for scope in scopes:
         pasta = scope / _OPERATIONS_DIRNAME
@@ -372,11 +527,13 @@ def pending_operations(scopes: list[Path]) -> list[dict[str, Any]]:
             continue
         for arquivo in sorted(pasta.glob("*.json")):
             try:
-                registro = json.loads(arquivo.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                achadas.append({"arquivo": str(arquivo), "situacao": "journal_ilegivel"})
+                registro = _ler_journal(arquivo)
+            except JournalPrecisaReconciliacao as erro:
+                achadas.append({"arquivo": str(arquivo), "escopo": str(scope), "situacao": "journal_ilegivel",
+                                 "motivo": str(erro)})
                 continue
-            if registro.get("situacao") == "em_andamento":
+            if registro is not None and registro.get("situacao") == "em_andamento":
+                registro = dict(registro)
                 registro["arquivo"] = str(arquivo)
                 registro["escopo"] = str(scope)
                 achadas.append(registro)
@@ -2606,26 +2763,48 @@ def decide(args: argparse.Namespace) -> None:
 
     # `decidir` grava snapshot, decisao.md, processo.md (duas vezes) e o
     # veredito numa unica chamada. Cada gravacao e atomica por si so, mas a
-    # sequencia nao e: uma falha no meio e uma repeticao do comando duplicava
-    # linha na linha do tempo de `processo.md` (append_timeline sempre
-    # adiciona, nunca substitui). O journal, com op_id = produto_id, lembra
-    # quais das duas chamadas de append_timeline ja rodaram nesta tentativa.
+    # sequencia nao e: uma falha no meio e uma repeticao do comando podia
+    # duplicar linha em `processo.md` ou criar um segundo snapshot orfao.
+    #
+    # `assinatura` congela os dados de ENTRADA desta tentativa: uma retomada
+    # com produto_id igual mas preco/justificativa/perdedores diferentes e
+    # recusada por `tracked_operation`, em vez de misturar passo velho com
+    # dado novo. `detalhe_inicial` congela o CAMINHO do snapshot: uma
+    # retomada reusa o mesmo diretorio, em vez de criar outro a cada retry.
+    quote_canonical = json.dumps(quote, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    quote_hash = hashlib.sha256(quote_canonical.encode("utf-8")).hexdigest()
+    assinatura = {
+        "quote_sha256": quote_hash,
+        "porque": args.porque,
+        "perdedores": sorted(perdedores),
+        "sem_perdedores": bool(args.sem_perdedores),
+        "comprado": bool(args.comprado),
+        "risco": sorted(args.risco or []),
+        "force_veredito": bool(args.force_veredito),
+        "flags": {
+            flag: bool(getattr(args, flag, False))
+            for flag in ("permitir_web", "permitir_cortado", "permitir_vencida",
+                         "permitir_aguardando", "permitir_incompleto")
+        },
+    }
+    instante = dt.datetime.now().strftime("%Y%m%dT%H%M%S%f")
+    snapshot_rel_candidato = f"snapshots/{instante}-{slugify(args.produto_id)}"
     op_id = f"decidir:{args.produto_id}"
-    with tracked_operation(project, op_id, "decidir", {"produto_id": args.produto_id}) as op:
-        _decide_writes(args, project, quote, product, cortes, ranqueado, minima,
+    with tracked_operation(project, op_id, "decidir", assinatura,
+                            {"snapshot_rel": snapshot_rel_candidato}) as op:
+        _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado, minima,
                         obrigatorios, perdedores, briefing_meta, op)
 
 
-def _decide_writes(args, project, quote, product, cortes, ranqueado, minima,
+def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado, minima,
                     obrigatorios, perdedores, briefing_meta, op: "OperationHandle") -> None:
     # O snapshot precisa nascer da mesma execucao que fecha a compra. Um
-    # ranking.md antigo nao e evidencia do que o motor calculou agora.
+    # ranking.md antigo nao e evidencia do que o motor calculou agora. O
+    # caminho vem congelado em `op.detalhe`: numa retomada e o MESMO diretorio
+    # da tentativa anterior, nunca um novo.
     build_ranking(argparse.Namespace(projeto=args.projeto))
-    instante = dt.datetime.now().strftime("%Y%m%dT%H%M%S%f")
-    snapshot_dir = project / "snapshots" / f"{instante}-{slugify(args.produto_id)}"
-    snapshot_dir.mkdir(parents=True, exist_ok=False)
-    quote_canonical = json.dumps(quote, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-    quote_hash = hashlib.sha256(quote_canonical.encode("utf-8")).hexdigest()
+    snapshot_dir = project / op.detalhe["snapshot_rel"]
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
     excecoes = []
     condicoes = {
         "permitir_web": quote.get("fonte") != "manual",
@@ -2743,11 +2922,16 @@ def _decide_writes(args, project, quote, product, cortes, ranqueado, minima,
     manifesto = {path.relative_to(snapshot_dir).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
                  for path in sorted(snapshot_dir.rglob("*")) if path.is_file()}
     atomic_write_text(snapshot_dir / "manifesto.json", json.dumps(manifesto, indent=2, sort_keys=True) + "\n")
-    # append_timeline sempre adiciona linha nova; sem a checagem do journal,
-    # uma repeticao apos falha duplicava a mesma decisao na linha do tempo.
-    if not op.concluido("timeline_decisao"):
-        append_timeline(project, "decisao", f"Escolhido {args.produto_id}", args.porque)
-        op.marcar("timeline_decisao")
+    # append_timeline sempre adiciona linha nova; uma repeticao apos falha
+    # podia duplicar a mesma linha em `processo.md`. `registrar_efeito`
+    # confere se a linha ja esta la (pela assinatura congelada na 1a
+    # tentativa) antes de decidir se escreve de novo.
+    timeline_path = project / "processo.md"
+    op.registrar_efeito(
+        "timeline_decisao", timeline_path,
+        f"| {today()} | decisao | Escolhido {args.produto_id} | {args.porque} |",
+        lambda: append_timeline(project, "decisao", f"Escolhido {args.produto_id}", args.porque),
+    )
     mark_steps(project, [8])
     if args.comprado:
         mark_steps(project, [9])
@@ -2756,9 +2940,11 @@ def _decide_writes(args, project, quote, product, cortes, ranqueado, minima,
     else:
         set_process_state(project, proxima_acao="comprar ou marcar como comprado depois da confirmacao final")
     verdict_path = create_verdict(project, args.produto_id, product, quote, force=args.force_veredito)
-    if not op.concluido("timeline_veredito"):
-        append_timeline(project, "veredito", "Arquivo de veredito criado", verdict_path.name)
-        op.marcar("timeline_veredito")
+    op.registrar_efeito(
+        "timeline_veredito", timeline_path,
+        f"| {today()} | veredito | Arquivo de veredito criado | {verdict_path.name} |",
+        lambda: append_timeline(project, "veredito", "Arquivo de veredito criado", verdict_path.name),
+    )
     print(project / "decisao.md")
     print(snapshot_dir)
     print(verdict_path)
@@ -2828,19 +3014,27 @@ def report_pending_operations(args: argparse.Namespace) -> None:
         return
     for registro in pendentes:
         if registro.get("situacao") == "journal_ilegivel":
-            print(f"ILEGIVEL {registro['arquivo']}: journal corrompido, nao da para saber o que ficou pendente.")
+            print(
+                f"ILEGIVEL {registro['arquivo']}: {registro.get('motivo', 'journal corrompido')}. "
+                "Nao da para saber com seguranca o que ja foi feito - precisa de conferencia manual, "
+                "nao apague sem olhar o arquivo e os alvos prováveis (veredito, processo.md, licoes.md)."
+            )
             continue
-        passos = ", ".join(registro.get("passos") or []) or "nenhum"
+        passos = registro.get("passos") or {}
+        concluidos = sorted(nome for nome, info in passos.items() if info.get("situacao") == "concluido")
+        tentando = sorted(nome for nome, info in passos.items() if info.get("situacao") != "concluido")
         print(
             f"PENDENTE {registro['op_id']} ({registro['kind']}): iniciada em {registro['iniciado_em']}, "
-            f"passos concluidos: {passos}. Journal: {registro['arquivo']}"
+            f"passos concluidos: {', '.join(concluidos) or 'nenhum'}; "
+            f"passos tentados sem confirmar: {', '.join(tentando) or 'nenhum'}. Journal: {registro['arquivo']}"
         )
     print(
-        f"\n{len(pendentes)} operacao(oes) pendente(s). Rode o mesmo comando que a iniciou "
-        "para retomar: os passos ja concluidos nao sao repetidos. Se a operacao nao vai ser "
-        "retomada, apague o arquivo do journal manualmente depois de conferir o que ficou "
-        "faltando - apagar sem conferir esconde um resultado incompleto como se nunca tivesse "
-        "acontecido."
+        f"\n{len(pendentes)} operacao(oes) pendente(s). Rode o MESMO comando, com os MESMOS "
+        "argumentos que a iniciou, para retomar: os passos ja concluidos nao sao repetidos, e um "
+        "passo so 'tentado' e reconciliado pelo que ja esta gravado no arquivo, nunca refeito as "
+        "cegas. Se a operacao nao vai ser retomada, apague o arquivo do journal manualmente depois "
+        "de conferir o que ficou faltando - apagar sem conferir esconde um resultado incompleto "
+        "como se nunca tivesse acontecido."
     )
     if args.strict:
         raise SystemExit(1)
@@ -2949,12 +3143,19 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     fase = args.fase or ("d180" if preenchidas["d180"] else "d30")
     prefix = "D+30" if fase == "d30" else "D+180"
     marker_heading = f"## Aprendizado exportado {prefix}"
+    op_id = f"aprender-veredito:{path.name}:{fase}"
+
+    # Uma falha logo depois de escrever o marcador (mas antes de confirmar a
+    # operacao) deixa o marcador no arquivo E um journal proprio pendente.
+    # Sem isso, a guarda abaixo bloqueava a retomada exigindo --force, mesmo
+    # sendo a MESMA tentativa que falhou, nao um reexport de verdade.
+    retomando_propria_falha = has_pending_operation(BASE, op_id, "aprender-veredito")
 
     # Cada fase e uma observacao diferente. D+30 exportado nao pode bloquear o
     # aprendizado de uso prolongado em D+180, mas repetir a mesma fase tambem
     # nao pode pesar duas vezes na base.
     legacy_export = "## Aprendizado exportado\n" in text
-    if (marker_heading in text or legacy_export) and not args.force:
+    if (marker_heading in text or legacy_export) and not args.force and not retomando_propria_falha:
         raise SystemExit(
             f"Este veredito ja foi exportado na fase {prefix} para a base de conhecimento.\n"
             f"Veja o bloco `{marker_heading}` em {path}.\n"
@@ -3007,52 +3208,67 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     if compraria_loja not in {"sim", "nao", "talvez", None}:
         compraria_loja = None
 
+    gate_note = ""
     if args.gate:
         if not lesson:
             raise SystemExit("--gate exige uma licao para registrar a justificativa.")
-        parse_lesson_gate(args.gate)  # antes de escrever marca/loja
+        # Puro: so valida e formata, nao escreve categorias.yaml. A escrita de
+        # verdade (apply_lesson_gate) fica dentro do executor da licao, para
+        # nao repetir o efeito so para calcular a assinatura de reconciliacao.
+        g_categoria, g_field, g_valor = parse_lesson_gate(args.gate)
+        gate_note = f" Gate atualizado: {g_categoria}.{g_field}={g_valor}."
 
-    # Marca, loja, licao e o marcador de exportado sao 4 gravacoes separadas.
-    # Uma falha entre elas (crash, Ctrl+C) e uma repeticao do comando ja
-    # registrou marca/loja/licao de novo, duplicando entrada num arquivo
-    # append-only. O journal lembra, pelo op_id (veredito + fase), quais
-    # passos ja foram feitos, para o retry pular exatamente esses.
-    op_id = f"aprender-veredito:{path.name}:{fase}"
-    with tracked_operation(BASE, op_id, "aprender-veredito", {"veredito": str(path), "fase": fase}) as op:
-        if marca and not op.concluido("marca"):
-            register_brand(
+    # Marca, loja e licao sao 3 gravacoes append-only separadas. Uma falha
+    # entre elas (crash, Ctrl+C) e uma repeticao do comando podia registrar de
+    # novo o que ja tinha side, duplicando entrada. `assinatura` congela os
+    # DADOS desta tentativa: uma retomada com marca/loja/licao diferentes (ex.:
+    # o Josemar editou o veredito entre as duas chamadas) e recusada, em vez
+    # de misturar passo velho com dado novo.
+    assinatura = {
+        "marca": marca, "loja": loja, "categoria": categoria, "resumo": summary,
+        "licao": lesson, "nota_produto": nota_produto, "nota_loja": nota_loja,
+        "compraria_produto": compraria_produto, "compraria_loja": compraria_loja,
+        "gate": args.gate, "alerta": args.alerta, "resumo_vendedor": args.resumo_vendedor,
+    }
+    with tracked_operation(BASE, op_id, "aprender-veredito", assinatura, {"veredito": str(path), "fase": fase}) as op:
+        if marca:
+            path_marca, entry_marca = knowledge_entry(
                 argparse.Namespace(
-                    nome=marca,
-                    categoria=categoria,
-                    projeto=project_name,
-                    nota=nota_produto,
-                    compraria_de_novo=compraria_produto,
-                    resumo=summary,
-                    alerta=args.alerta,
-                )
+                    nome=marca, categoria=categoria, projeto=project_name,
+                    nota=nota_produto, compraria_de_novo=compraria_produto,
+                    resumo=summary, alerta=args.alerta,
+                ),
+                "marca",
             )
-            op.marcar("marca")
-        if loja and not op.concluido("loja"):
-            register_store(
+            op.registrar_efeito("marca", path_marca, entry_marca, lambda: append_text(path_marca, entry_marca))
+        if loja:
+            path_loja, entry_loja = knowledge_entry(
                 argparse.Namespace(
-                    nome=loja,
-                    categoria=categoria,
-                    projeto=project_name,
-                    nota=nota_loja,
-                    compraria_de_novo=compraria_loja,
-                    resumo=args.resumo_vendedor or summary,
-                    alerta=args.alerta,
-                )
+                    nome=loja, categoria=categoria, projeto=project_name,
+                    nota=nota_loja, compraria_de_novo=compraria_loja,
+                    resumo=args.resumo_vendedor or summary, alerta=args.alerta,
+                ),
+                "loja",
             )
-            op.marcar("loja")
-        if lesson and not op.concluido("licao"):
-            register_lesson(argparse.Namespace(texto=lesson, categoria=categoria, gate=args.gate))
-            op.marcar("licao")
+            op.registrar_efeito("loja", path_loja, entry_loja, lambda: append_text(path_loja, entry_loja))
+        if lesson:
+            linha_licao = f"{today()} - {categoria} - {lesson}{gate_note}\n"
 
+            def _gravar_licao(gate=args.gate, linha=linha_licao):
+                if gate:
+                    apply_lesson_gate(gate)
+                append_text(BASE / "licoes.md", linha)
+
+            op.registrar_efeito("licao", BASE / "licoes.md", linha_licao, _gravar_licao)
+
+        # O marcador so precisa da leitura de `text` feita no topo da funcao:
+        # se ja estava la (reexport com --force, ou a propria tentativa que
+        # falhou depois de escreve-lo), nao duplica. Nao precisa de passo no
+        # journal - reconciliar pelo conteudo real e mais simples e mais
+        # confiavel do que confiar so no que o journal registrou.
         marker = f"\n{marker_heading}\n\n- Data: {today()}\n- Marca: {marca}\n- Loja: {loja}\n- Categoria: {categoria}\n- Licao: {lesson}\n"
-        if marker_heading not in text and not op.concluido("marcador"):
+        if marker_heading not in text:
             append_text(path, marker)
-            op.marcar("marcador")
     print(f"Aprendizado processado: {path}")
 
 
