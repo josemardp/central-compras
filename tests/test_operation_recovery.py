@@ -588,6 +588,179 @@ class OperationRecoveryTest(ambiente.RepoTestCase):
         saida, erro = self._cli_capturando("auditar-decisoes", str(project), "--strict")
         self.assertIsNone(erro, saida)
 
+    # ---- 5a revisao (Codex): escritores fora do exemplo original ----------
+    #
+    # A protecao das rodadas anteriores so cobria os comandos citados nos
+    # testes (decidir, aprender-veredito, registrar-*). `anotar` escreve no
+    # MESMO processo.md por fora, sem checagem nenhuma; e um journal
+    # ilegivel desativava a checagem inteira em vez de bloquear com mais
+    # cautela. A correcao passou a ser CENTRALIZADA em `main()`
+    # (RECURSOS_DIRETOS_POR_COMANDO), para nao depender de lembrar de
+    # conectar comando por comando.
+
+    def test_rev5_bug1_anotar_e_bloqueado_enquanto_decidir_esta_pendente(self):
+        project = self.project()
+        self._abrir_candidato(project)
+
+        # os._exit mataria o runner de teste in-process; aqui simulamos via
+        # excecao no mesmo ponto, igual aos outros testes deste arquivo (a
+        # interrupcao REAL de processo ja tem teste proprio, mais abaixo).
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def falha_em(ponto_alvo):
+            def _hook(ponto):
+                if ponto == ponto_alvo:
+                    raise RuntimeError(f"crash simulado em {ponto}")
+                return real_hook(ponto)
+            return _hook
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", falha_em("timeline_decisao:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self._decidir(project)
+
+        processo_antes = (project / "processo.md").read_text(encoding="utf-8")
+        self.assertNotIn("| decisao | Escolhido candidato |", processo_antes)
+
+        # `anotar` escreve no MESMO processo.md, por fora do journal de
+        # decidir. Precisa ser recusado, exatamente como reproduzido.
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("anotar", str(project), "--etapa", "decisao",
+                     "--decisao", "Escolhido candidato", "--porque", "unico candidato")
+        processo_depois = (project / "processo.md").read_text(encoding="utf-8")
+        self.assertEqual(processo_antes, processo_depois, "anotar escreveu apesar da reserva")
+
+        # Recupera decidir: completa normalmente, sem confundir nada.
+        self._decidir(project)
+        processo = (project / "processo.md").read_text(encoding="utf-8")
+        self.assertEqual(processo.count("| decisao | Escolhido candidato |"), 1)
+        self.assertEqual(cc.pending_operations([project]), [])
+        saida, erro = self._cli_capturando("auditar-decisoes", str(project), "--strict")
+        self.assertIsNone(erro, saida)
+
+        # SO agora `anotar` pode escrever.
+        self.cli("anotar", str(project), "--etapa", "decisao",
+                 "--decisao", "nota manual", "--porque", "conferencia extra")
+        processo = (project / "processo.md").read_text(encoding="utf-8")
+        self.assertIn("nota manual", processo)
+
+    def test_rev5_bug2_journal_ilegivel_bloqueia_o_escopo_inteiro_nao_libera(self):
+        veredito = self._fechar_com_veredito_generico(self.project(), licao="conferir garantia antes")
+
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def falha_em(ponto_alvo):
+            def _hook(ponto):
+                if ponto == ponto_alvo:
+                    raise RuntimeError(f"crash simulado em {ponto}")
+                return real_hook(ponto)
+            return _hook
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", falha_em("licao:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito))
+
+        # Corrompe o journal pendente de aprender-veredito.
+        arquivo_journal = next((cc.BASE / ".operacoes").glob("*.json"))
+        arquivo_journal.write_text("{isto nao e json valido", encoding="utf-8")
+
+        # `registrar-licao` tem que ser bloqueado - um journal ilegivel pode
+        # estar reivindicando qualquer coisa no escopo BASE, entao "recurso
+        # nao aparece explicitamente reivindicado" nao pode significar
+        # "livre".
+        with self.assertRaisesRegex(SystemExit, "journal ilegivel"):
+            self.cli("registrar-licao", "outra licao totalmente diferente", "--categoria", "fone")
+        self.assertEqual(
+            (cc.BASE / "licoes.md").read_text(encoding="utf-8").count("outra licao totalmente diferente"), 0
+        )
+
+        # `operacoes-pendentes` continua reportando o journal como ilegivel,
+        # sem apagar nada.
+        pendentes = cc.pending_operations([cc.BASE])
+        self.assertEqual(len(pendentes), 1)
+        self.assertEqual(pendentes[0]["situacao"], "journal_ilegivel")
+        self.assertTrue(arquivo_journal.exists())
+
+        # Resolve: apaga o journal corrompido manualmente (unica saida
+        # possivel - ele nao pode ser reconciliado automaticamente; a
+        # interrupcao simulada foi em "licao:iniciado", antes de executar,
+        # entao a propria licao original ainda nao tinha sido gravada) e
+        # reexporta do zero.
+        self.assertEqual(
+            (cc.BASE / "licoes.md").read_text(encoding="utf-8").count("conferir garantia antes"), 0
+        )
+        arquivo_journal.unlink()
+        self.cli("aprender-veredito", str(veredito))
+        self.assertEqual(
+            (cc.BASE / "licoes.md").read_text(encoding="utf-8").count("conferir garantia antes"), 1
+        )
+
+        # SO agora registrar-licao pode escrever.
+        self.cli("registrar-licao", "outra licao totalmente diferente", "--categoria", "fone")
+        self.assertIn("outra licao totalmente diferente", (cc.BASE / "licoes.md").read_text(encoding="utf-8"))
+
+    def test_rev5_preencher_veredito_e_bloqueado_enquanto_aprender_veredito_pendente(self):
+        veredito = self._fechar_com_veredito_generico(self.project(), licao="conferir garantia antes")
+
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def falha_em(ponto_alvo):
+            def _hook(ponto):
+                if ponto == ponto_alvo:
+                    raise RuntimeError(f"crash simulado em {ponto}")
+                return real_hook(ponto)
+            return _hook
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", falha_em("licao:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito))
+
+        texto_antes = veredito.read_text(encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("preencher-veredito", str(veredito), "--fase", "d30",
+                     "--resumo", "correcao", "--nota-arrependimento", "2", "--compraria-de-novo", "sim")
+        self.assertEqual(veredito.read_text(encoding="utf-8"), texto_antes)
+
+        self.cli("aprender-veredito", str(veredito))  # resolve
+
+        self.cli("preencher-veredito", str(veredito), "--fase", "d30",
+                 "--resumo", "correcao", "--nota-arrependimento", "2", "--compraria-de-novo", "sim")
+        self.assertIn("correcao", veredito.read_text(encoding="utf-8"))
+
+    def test_rev5_novo_veredito_force_e_bloqueado_enquanto_aprender_veredito_pendente(self):
+        # Usa `novo-veredito` (nao `decidir`) para criar o veredito, porque
+        # os dois comandos nomeiam o arquivo de formas diferentes
+        # (`create_verdict`, usado por `decidir`, inclui o produto_id no
+        # nome; `new_verdict`, usado por `novo-veredito`, nao) - o teste
+        # precisa que os dois `novo-veredito` mirem exatamente o mesmo
+        # arquivo que `aprender-veredito` reivindicou.
+        project = self.project()
+        self.cli("novo-veredito", str(project))
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.cli("preencher-veredito", str(veredito), "--fase", "d30",
+                 "--resumo", "foi bem", "--licao", "conferir garantia antes",
+                 "--nota-arrependimento", "1", "--compraria-de-novo", "sim")
+
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def falha_em(ponto_alvo):
+            def _hook(ponto):
+                if ponto == ponto_alvo:
+                    raise RuntimeError(f"crash simulado em {ponto}")
+                return real_hook(ponto)
+            return _hook
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", falha_em("licao:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito))
+
+        texto_antes = veredito.read_text(encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("novo-veredito", str(project), "--force")
+        self.assertEqual(veredito.read_text(encoding="utf-8"), texto_antes)
+
+        self.cli("aprender-veredito", str(veredito))  # resolve
+        self.cli("novo-veredito", str(project), "--force")
+
     # ---- Concorrencia: as travas existentes ainda serializam --------------
 
     def test_comandos_concorrentes_no_mesmo_projeto_sao_serializados(self):

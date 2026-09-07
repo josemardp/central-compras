@@ -22,12 +22,13 @@ Estados possíveis: `não iniciada` · `em andamento` · `concluída` · `bloque
 
 ## 2. Recuperação de operações parciais — PRIORIDADE
 
-**Estado: concluída** (4ª revisão corrigida na sessão de 07/09/2026 —
-commit a publicar). Ficou **em andamento** entre cada entrega e a revisão
-seguinte que achou lacuna nova — já aconteceu 3 vezes seguidas (após
-`83c0901`, após `2a682a7`, após `833c4b9`). Não declarar concluído de novo
-sem que o próximo revisor confirme contra os critérios de aceite das
-subseções abaixo, incluindo a 4ª.
+**Estado: concluída sob reserva** (5ª revisão corrigida na sessão de
+07/09/2026 — commit a publicar). Ficou **em andamento** entre cada entrega
+e a revisão seguinte que achou lacuna nova — já aconteceu 4 vezes seguidas
+(após `83c0901`, `2a682a7`, `833c4b9`, `df08fb5`). **Não declare concluída
+de novo só porque os exemplos testados passaram** — confirme contra o
+inventário da subseção 5ª abaixo, e verifique se algum comando novo foi
+adicionado ao CLI desde então sem entrar nesse inventário.
 
 ### 1ª entrega (commit `83c0901`) — insuficiente, revisada pelo Codex
 
@@ -293,6 +294,80 @@ também bloqueados. O cenário de decisão confere coerência entre
 `decisao.md`, `processo.md` (timeline), snapshot e veredito em cada etapa,
 e roda `auditar-decisoes --strict` depois de cada recuperação.
 
+### 5ª revisão (Codex, sobre o commit `df08fb5`) — proteção incompleta por construção ad-hoc
+
+Os 22 testes da 4ª revisão passaram, mas o Codex reproduziu 2 falhas que
+mostram que a proteção só cobria os comandos citados nos testes, não todos
+os que escrevem nos mesmos arquivos:
+
+1. **Escritor direto não protegido.** `anotar --etapa decisao --decisao
+   "Escolhido candidato" --porque <mesmo texto>` escreve na MESMA linha de
+   `processo.md` que `decidir` reivindica, mas `anotar` nunca tinha sido
+   conectado a `_recusar_se_recurso_pendente` (só `registrar-licao`,
+   `registrar-marca`, `registrar-loja` tinham sido, porque foram os
+   exemplos da 4ª revisão). Rodava livre, e a retomada de `decidir` confundia
+   a linha de `anotar` com o próprio efeito.
+2. **Journal ilegível desativava a proteção.** `_recursos_reivindicados_por_
+   outros` só olhava journals `em_andamento`; um journal corrompido chegava
+   como `journal_ilegivel` e era simplesmente ignorado pela checagem de
+   conflito (embora `pending_operations`/`operacoes-pendentes` já o
+   reportassem corretamente como pendência). Resultado: corromper o JSON de
+   um journal pendente **destravava** a proteção para aquele recurso, o
+   oposto do que corrupção deveria causar.
+
+**Reprodução, contra o código antigo (`df08fb5`):** os 4 `SystemExit`
+esperados (`anotar`, journal ilegível + `registrar-licao`,
+`preencher-veredito`, `novo-veredito --force`) nunca eram levantados —
+todos os quatro escreviam livremente.
+
+**Causa raiz confirmada pelo padrão repetido 4 vezes: eu conectava a
+proteção comando por comando, dentro de cada função, na medida em que um
+teste apontava a lacuna.** A correção desta rodada parou de fazer isso.
+
+**Correção — inventário completo + ponto único de checagem:**
+
+| Comando | Arquivos afetados | Trava adquirida | Verificação de conflito |
+|---|---|---|---|
+| `decidir` | `decisao.md`, `processo.md` (projeto); snapshot próprio (não compartilhado) | projeto | `tracked_operation` (recursos declarados) |
+| `aprender-veredito` | `licoes.md`, `marcas/<slug>.md`, `lojas/<slug>.md` (se aplicável), o **arquivo de veredito** | `base-conhecimento/` | `tracked_operation` (recursos declarados) |
+| `anotar` | `processo.md` (projeto) | projeto | **novo**: central (`RECURSOS_DIRETOS_POR_COMANDO`) |
+| `preencher-veredito` | arquivo de veredito (path direto do argumento) | `base-conhecimento/` (histórico; não é o escopo natural, mantido como estava) | **novo**: central |
+| `novo-veredito` (com `--force`) | arquivo de veredito (`VEREDITOS/<data>-<projeto>.md`) | projeto | **novo**: central |
+| `registrar-licao` | `licoes.md` | `base-conhecimento/` | central (antes era chamada inline dentro da função; movida para a tabela central) |
+| `registrar-marca` | `marcas/<slug>.md` | `base-conhecimento/` | central (idem) |
+| `registrar-loja` | `lojas/<slug>.md` | `base-conhecimento/` | central (idem) |
+| `novo-projeto` | briefing/processo/ranking/decisão/cotações **do projeto que está sendo criado** | `projetos/` (raiz) | não se aplica — projeto não existe antes desta chamada, não há como haver pendência prévia |
+| `novo-produto` | `produtos/<categoria>/<id>/produto.yaml` | `produtos/` | não bloqueado — ficha de produto não é recurso reivindicado por nenhuma operação; ver limitação abaixo |
+| `cotar` | `cotacoes.csv` (append-only) | projeto | não bloqueado — `cotacoes.csv` é append-only e `decidir` já recusa retomada se o hash da cotação mudar (`assinatura`); risco residual só durante uma captura ainda não concluída, ver limitação abaixo |
+| `promover-cotacao` | `cotacoes.csv` | projeto | idem `cotar` |
+| `ranking` | `ranking.md`, `ranking.csv` (projeto) | projeto | não bloqueado — recomputados deterministicamente a partir de `cotacoes.csv`+produtos; seguro de rodar a qualquer momento, inclusive dentro da própria captura de `decidir` |
+| `descartar` | `produto.yaml` | produto (`produtos/`) | não bloqueado — mesmo raciocínio de `novo-produto` |
+| `aguardar-preco` | `produto.yaml` | produto (`produtos/`) | idem |
+| `regenerar` | `ranking.md/csv`, `validacao.md`, histórico, dashboard (não toca `decisao.md`/`processo.md`/snapshots) | todos os projetos (ou um) + `base-conhecimento/` + dashboard | não bloqueado — não escreve nenhum arquivo reivindicável; testado que preserva ranking congelado (`decisao-*-ranking.md`) |
+| `categorias.yaml` (gate) | escrito só via `apply_lesson_gate`, sempre junto de uma gravação em `licoes.md` na mesma chamada | — | coberto **transitivamente**: todo caminho que grava `categorias.yaml` também grava `licoes.md` na mesma operação, que já é protegida |
+| `briefing.md` | escrito só por `set_project_state`, chamado apenas de dentro de `decidir` | — | não há comando standalone que escreva briefing.md; não se aplica |
+
+Ponto único de checagem: `_bloquear_se_recursos_conflitantes()`, chamada (a)
+dentro de `tracked_operation`, para operações com journal próprio
+(`decidir`, `aprender-veredito`), e (b) uma vez em `main()`, para os
+escritores diretos da tabela `RECURSOS_DIRETOS_POR_COMANDO`, logo após as
+travas serem adquiridas e antes de `args.func(args)` — nenhuma checagem
+solta dentro de função individual.
+
+**Journal ilegível agora bloqueia o ESCOPO inteiro (BASE ou o projeto onde
+está o journal corrompido)**, não silenciosamente nada: qualquer novo
+recurso naquele escopo é recusado até o journal ser lido com confiança ou
+apagado manualmente após conferência.
+
+### Testes
+
+`tests/test_operation_recovery.py`: 22 → **26 testes**. Os 4 novos: `anotar`
+bloqueado enquanto `decidir` pendente (com o ciclo completo bloqueio →
+recuperação → escrita permitida); journal corrompido bloqueando
+`registrar-licao` no mesmo escopo, sem apagar o journal sozinho;
+`preencher-veredito` e `novo-veredito --force` bloqueados enquanto
+`aprender-veredito` está pendente no mesmo arquivo de veredito.
+
 ### O que este mecanismo não cobre (registrado, não é lacuna escondida)
 
 - Concorrência entre dois processos ao mesmo tempo continua dependendo só de
@@ -312,6 +387,24 @@ e roda `auditar-decisoes --strict` depois de cada recuperação.
   conteúdo específico não colidisse (duas lições DIFERENTES, por exemplo).
   Escolha consciente pela simplicidade e segurança — este é um sistema de
   um único operador, crash deveria ser raro e resolvido na hora.
+- **Risco residual, aceito e documentado (não bloqueado):** `cotar`,
+  `promover-cotacao`, `novo-produto`, `descartar` e `aguardar-preco` não são
+  bloqueados por uma captura de `decidir` ainda pendente (não concluída).
+  Se o operador editar cotações/produtos nessa janela estreita entre a
+  falha e o retry, a captura retomada (que ainda não rodou
+  `executar_uma_vez`) vai ler o estado ATUAL, não o do momento da falha —
+  aceitável porque, até a captura concluir, a decisão ainda não foi tomada
+  de verdade, e o operador está livre para atualizar os dados de pesquisa.
+  Uma vez que a captura conclui, ela nunca mais é tocada
+  (`executar_uma_vez`), então esse risco só existe nessa janela inicial.
+  Se uma sessão futura quiser fechar essa janela também, o padrão a seguir
+  é o mesmo: declarar os arquivos como `recursos` do `decidir` pendente.
+- Todo comando novo que passar a escrever `processo.md`, `decisao.md`,
+  `licoes.md`, `marcas/*.md`, `lojas/*.md` ou um arquivo de veredito por
+  fora de `decidir`/`aprender-veredito` precisa ser adicionado à tabela
+  `RECURSOS_DIRETOS_POR_COMANDO` — não há checagem automática de que isso
+  foi feito. É uma responsabilidade de revisão de código, registrada aqui
+  para não se perder.
 - Não cobre a exportação para o Google Sheets (frente 3) nem qualquer outra
   sequência multi-arquivo fora de `decidir`/`aprender-veredito`. Se uma
   sessão futura achar outro ponto candidato, reaproveite

@@ -453,19 +453,10 @@ def _crash_de_teste_se_pedido(ponto: str) -> None:
 def _recursos_reivindicados_por_outros(exceto_op_id: str) -> dict[str, dict[str, Any]]:
     """Mapeia caminho de recurso (resolvido) -> registro que o reivindica,
     entre TODAS as operacoes em_andamento (qualquer escopo), exceto a
-    de `exceto_op_id`.
-
-    `project_lock`/trava de `BASE` so serializam enquanto um comando esta
-    RODANDO. Uma operacao que fica pendente depois de uma falha nao segura
-    nada: outro comando, minutos ou dias depois, pode escrever no MESMO
-    arquivo sem jamais saber que uma tentativa anterior ainda esperava
-    retomada ali - foi assim que uma retomada de `decidir` reaproveitou um
-    `decisao.md` que outro `decidir`, intercalado no meio do caminho, tinha
-    reescrito para outro produto; e uma retomada de `aprender-veredito`
-    contou uma linha em `licoes.md` que na verdade era de outra exportacao
-    legitima e independente. Presenca ou contagem de texto nunca provam
-    autoria da gravacao - por isso a defesa e impedir o conflito ANTES de
-    qualquer escrita, nao tentar distinguir depois.
+    de `exceto_op_id`. Journal ilegivel NAO entra aqui - ver
+    `_escopos_com_journal_ilegivel`, que trata disso a parte porque um
+    journal corrompido pode reivindicar qualquer arquivo do escopo dele,
+    nao um caminho especifico conhecido.
     """
     mapa: dict[str, dict[str, Any]] = {}
     for registro in pending_operations([BASE, *project_dirs()]):
@@ -476,25 +467,93 @@ def _recursos_reivindicados_por_outros(exceto_op_id: str) -> dict[str, dict[str,
     return mapa
 
 
-def _recusar_se_recurso_pendente(caminho: Path, *, exceto_op_id: str | None = None) -> None:
-    """Levanta `SystemExit` se `caminho` ja estiver reivindicado por alguma
-    operacao pendente. Usada tanto pelo inicio de `tracked_operation` quanto
-    por escritores diretos do mesmo alvo (`registrar-licao`, `registrar-
-    marca`, `registrar-loja`) que nunca passam por um journal proprio."""
-    alvo = str(caminho.resolve())
-    conflito = _recursos_reivindicados_por_outros(exceto_op_id or "").get(alvo)
-    if conflito is None:
+def _escopo_de(caminho: Path) -> Path:
+    """BASE se `caminho` estiver sob `base-conhecimento/`; senao, o projeto
+    (`projetos/<nome>/`) que o contem. Usado para saber se um journal
+    ilegivel num escopo pode estar reivindicando `caminho`."""
+    resolvido = caminho.resolve()
+    if resolvido.is_relative_to(BASE.resolve()):
+        return BASE
+    for projeto in project_dirs():
+        if resolvido.is_relative_to(projeto.resolve()):
+            return projeto
+    return resolvido.parent
+
+
+def _escopos_com_journal_ilegivel() -> dict[str, dict[str, Any]]:
+    """Escopo (str resolvido) -> primeiro registro `journal_ilegivel` nele."""
+    mapa: dict[str, dict[str, Any]] = {}
+    for registro in pending_operations([BASE, *project_dirs()]):
+        if registro.get("situacao") == "journal_ilegivel":
+            mapa.setdefault(registro["escopo"], registro)
+    return mapa
+
+
+def _bloquear_se_recursos_conflitantes(recursos: "set[Path] | list[Path]", *,
+                                        exceto_op_id: str = "", contexto: str = "") -> None:
+    """Levanta `SystemExit` se qualquer arquivo em `recursos`:
+
+    (a) estiver no mesmo escopo de um journal ILEGIVEL - um journal
+        corrompido pode estar reivindicando qualquer arquivo daquele escopo,
+        e nao ha como saber qual; tratar como "nada reivindicado" (o
+        comportamento antigo) deixava a protecao inteira desativada por
+        corrupcao, exatamente o oposto do que um journal corrompido deveria
+        causar; ou
+
+    (b) ja estiver reivindicado por outra operacao pendente (`recursos` de
+        um journal `em_andamento` com `op_id` diferente de `exceto_op_id`).
+
+    Ponto UNICO usado tanto por operacoes com journal proprio
+    (`tracked_operation`, passando o proprio `op_id` como excecao) quanto
+    por escritores diretos sem journal (`anotar`, `preencher-veredito`,
+    `novo-veredito`, `registrar-licao`, `registrar-marca`, `registrar-loja`
+    - despachados centralmente em `main()`, nao um a um dentro de cada
+    funcao). `project_lock`/trava de `BASE` so serializam enquanto um
+    comando esta RODANDO; esta checagem cobre a janela que a trava nao
+    cobre, entre uma falha e a retomada.
+    """
+    recursos = list(recursos)
+    if not recursos:
         return
-    raise SystemExit(
-        f"Nao da para escrever em {caminho}: a operacao '{conflito.get('kind')}' "
-        f"{conflito.get('op_id')!r} ja reivindica este arquivo e ainda esta pendente "
-        f"(journal: {conflito.get('arquivo')}).\n"
-        "Isso significa que uma tentativa anterior foi interrompida antes de terminar e ainda "
-        "nao foi retomada. Resolva essa pendencia primeiro: rode `operacoes-pendentes` para ver "
-        "o comando exato que a iniciou e repita-o com os MESMOS argumentos para retomar. So "
-        "depois disso concluir (ou, apos conferir com cuidado, apagar o journal dela manualmente) "
-        "esta escrita pode acontecer."
+    escopos_ilegiveis = _escopos_com_journal_ilegivel()
+    for caminho in recursos:
+        escopo = str(_escopo_de(caminho).resolve())
+        if escopo in escopos_ilegiveis:
+            registro = escopos_ilegiveis[escopo]
+            raise SystemExit(
+                f"Nao da para {contexto or f'escrever em {caminho}'}: ha um journal ilegivel em "
+                f"{registro['arquivo']} ({registro.get('motivo')}), no mesmo escopo ({escopo}).\n"
+                "Um journal corrompido pode estar reivindicando qualquer arquivo desse escopo - "
+                "nao e seguro presumir que este aqui esta livre so porque o nome dele nao aparece "
+                "explicitamente. Confira o arquivo do journal manualmente (o nome do arquivo indica "
+                "qual operacao e produto/veredito ele descrevia) antes de consertar ou apagar."
+            )
+    conflitos = _recursos_reivindicados_por_outros(exceto_op_id)
+    colisoes = {
+        str(caminho.resolve()): conflitos[str(caminho.resolve())]
+        for caminho in recursos if str(caminho.resolve()) in conflitos
+    }
+    if not colisoes:
+        return
+    detalhe_colisoes = "; ".join(
+        f"{caminho} (operacao {info.get('kind')!r} {info.get('op_id')!r}, journal: {info.get('arquivo')})"
+        for caminho, info in colisoes.items()
     )
+    raise SystemExit(
+        f"Nao da para {contexto or 'continuar'}: outra operacao pendente ja reivindica "
+        f"arquivo(s) envolvido(s) aqui - {detalhe_colisoes}.\n"
+        "Isso normalmente significa que uma tentativa anterior foi interrompida antes de terminar "
+        "e ainda nao foi retomada. Resolva essa pendencia primeiro: rode `operacoes-pendentes` "
+        "para ver o comando exato que a iniciou e repita-o com os MESMOS argumentos para retomar. "
+        "So depois disso concluir (ou, apos conferir com cuidado, apagar o journal dela "
+        "manualmente) esta operacao pode continuar."
+    )
+
+
+def _recusar_se_recurso_pendente(caminho: Path, *, exceto_op_id: str | None = None) -> None:
+    """Atalho de `_bloquear_se_recursos_conflitantes` para um unico arquivo."""
+    _bloquear_se_recursos_conflitantes({caminho}, exceto_op_id=exceto_op_id or "",
+                                        contexto=f"escrever em {caminho}")
 
 
 @contextlib.contextmanager
@@ -585,23 +644,10 @@ def tracked_operation(scope: Path, op_id: str, kind: str, assinatura: dict[str, 
         registro["situacao"] = "em_andamento"
     else:
         recursos_normalizados = sorted({str(Path(r).resolve()) for r in recursos})
-        colisoes = {r: info for r, info in _recursos_reivindicados_por_outros(op_id).items()
-                    if r in recursos_normalizados}
-        if colisoes:
-            detalhe_colisoes = "; ".join(
-                f"{caminho} (operacao {info.get('kind')!r} {info.get('op_id')!r}, journal: {info.get('arquivo')})"
-                for caminho, info in colisoes.items()
-            )
-            raise SystemExit(
-                f"Nao da para comecar '{kind}' ({op_id!r}): outra operacao pendente ja reivindica "
-                f"arquivo(s) que esta operacao tambem escreveria - {detalhe_colisoes}.\n"
-                "Isso normalmente significa que uma tentativa anterior (de outro produto ou "
-                "veredito) foi interrompida antes de terminar e ainda nao foi retomada. Resolva "
-                "essa pendencia primeiro: rode `operacoes-pendentes` para ver o comando exato que "
-                "a iniciou e repita-o com os MESMOS argumentos para retomar. So depois disso "
-                "concluir (ou, apos conferir com cuidado, apagar o journal dela manualmente) esta "
-                "operacao pode comecar."
-            )
+        _bloquear_se_recursos_conflitantes(
+            [Path(r) for r in recursos_normalizados], exceto_op_id=op_id,
+            contexto=f"comecar '{kind}' ({op_id!r})",
+        )
         registro = {
             "op_id": op_id,
             "kind": kind,
@@ -3387,7 +3433,11 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
     # MESMO lugar - sem declarar isso como recurso, uma retomada podia contar
     # a ocorrencia da OUTRA exportacao como prova do proprio efeito e nunca
     # gravar a sua. O mesmo vale para marca/loja quando o nome coincide.
-    recursos = set()
+    # O proprio arquivo de veredito tambem e reivindicado: `preencher-
+    # veredito` e `novo-veredito --force` escrevem nele por fora do journal,
+    # e podiam apagar um marcador ja gravado ou o restante do conteudo
+    # humano enquanto esta exportacao ainda estivesse pendente.
+    recursos = {path}
     if lesson:
         recursos.add(BASE / "licoes.md")
     if marca:
@@ -3598,19 +3648,15 @@ def knowledge_entry(args: argparse.Namespace, kind: str) -> tuple[Path, str]:
 
 
 def register_store(args: argparse.Namespace) -> None:
+    # A checagem de conflito com operacao pendente roda centralizada em
+    # `main()` (tabela RECURSOS_DIRETOS_POR_COMANDO), antes de chegar aqui.
     path, entry = knowledge_entry(args, "loja")
-    # Escrita direta, fora de qualquer journal: se `aprender-veredito`
-    # estiver com uma operacao pendente que ja reivindicou este mesmo
-    # arquivo, escrever aqui por fora criaria a mesma confusao de autoria
-    # que o journal existe para evitar.
-    _recusar_se_recurso_pendente(path)
     append_text(path, entry)
     print(path.relative_to(ROOT))
 
 
 def register_brand(args: argparse.Namespace) -> None:
     path, entry = knowledge_entry(args, "marca")
-    _recusar_se_recurso_pendente(path)
     append_text(path, entry)
     print(path.relative_to(ROOT))
 
@@ -3721,7 +3767,7 @@ def apply_lesson_gate(gate: str) -> str:
 
 
 def register_lesson(args: argparse.Namespace) -> None:
-    _recusar_se_recurso_pendente(BASE / "licoes.md")
+    # Checagem de conflito centralizada em `main()`.
     gate_note = ""
     if args.gate:
         applied = apply_lesson_gate(args.gate)
@@ -5706,6 +5752,52 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _recursos_diretos_anotar(args: argparse.Namespace) -> "set[Path]":
+    return {project_path(args.projeto) / "processo.md"}
+
+
+def _recursos_diretos_preencher_veredito(args: argparse.Namespace) -> "set[Path]":
+    caminho = Path(args.veredito)
+    if not caminho.is_absolute():
+        caminho = ROOT / args.veredito
+    return {caminho}
+
+
+def _recursos_diretos_novo_veredito(args: argparse.Namespace) -> "set[Path]":
+    projeto = project_path(args.projeto)
+    return {VEREDITOS / f"{today()}-{projeto.name}.md"}
+
+
+def _recursos_diretos_registrar_licao(args: argparse.Namespace) -> "set[Path]":
+    return {BASE / "licoes.md"}
+
+
+def _recursos_diretos_registrar_marca(args: argparse.Namespace) -> "set[Path]":
+    return {BASE / "marcas" / f"{slugify(args.nome)}.md"}
+
+
+def _recursos_diretos_registrar_loja(args: argparse.Namespace) -> "set[Path]":
+    return {BASE / "lojas" / f"{slugify(args.nome)}.md"}
+
+
+# Inventario completo (comando -> arquivos -> travas -> checagem de
+# conflito) em docs/plano-pendencias-auditoria-2026-09-06.md, secao 2.
+# Comandos que escrevem em arquivo que `decidir`/`aprender-veredito` podem
+# ter reivindicado, mas nunca passam pelo journal proprio
+# (`tracked_operation`). Cada resolver devolve os arquivos que o comando
+# vai escrever; `main()` checa conflito com operacao pendente UMA VEZ,
+# centralizado, antes de chamar `args.func` - nao um a um dentro de cada
+# funcao, que e como a 1a e a 2a rodada desta protecao ficaram incompletas.
+RECURSOS_DIRETOS_POR_COMANDO: dict[str, Any] = {
+    "anotar": _recursos_diretos_anotar,
+    "preencher-veredito": _recursos_diretos_preencher_veredito,
+    "novo-veredito": _recursos_diretos_novo_veredito,
+    "registrar-licao": _recursos_diretos_registrar_licao,
+    "registrar-marca": _recursos_diretos_registrar_marca,
+    "registrar-loja": _recursos_diretos_registrar_loja,
+}
+
+
 MUTATING_COMMANDS = {
     "cotar", "promover-cotacao", "decidir", "anotar", "novo-produto",
     "ranking", "validar", "auditar", "historico", "descartar", "aguardar-preco",
@@ -5759,6 +5851,15 @@ def main(argv: list[str] | None = None) -> int:
             alvos.update(project_dirs())
         for alvo in sorted(alvos, key=lambda path: str(path.resolve()).casefold()):
             travas.enter_context(project_lock(alvo))
+        # Escritores diretos (sem journal proprio) checam conflito com
+        # operacao pendente aqui, ja dentro das travas acima, antes de
+        # `args.func` fazer a 1a escrita. `decidir`/`aprender-veredito` tem
+        # a propria checagem equivalente dentro de `tracked_operation`.
+        resolver_recursos = RECURSOS_DIRETOS_POR_COMANDO.get(args.comando)
+        if resolver_recursos is not None:
+            _bloquear_se_recursos_conflitantes(
+                resolver_recursos(args), contexto=f"executar '{args.comando}'"
+            )
         args.func(args)
     return 0
 
