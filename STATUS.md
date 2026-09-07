@@ -7,6 +7,19 @@
 
 ## AO RETOMAR — comece por aqui (07/09/2026, sessao 12)
 
+**Proximo passo:** iniciar a frente 5 (produtos reutilizados em projetos
+diferentes) seguindo `docs/plano-pendencias-auditoria-2026-09-06.md` secao
+5 — nao redescubra o escopo lendo so este STATUS.
+
+**Pendencias / bloqueios:**
+- Frentes 5 (produtos reutilizados) e 6 (datas/veredito) **nao iniciadas**.
+- Frentes 2 e 3 estao "concluidas sob reserva" — ja levaram 7 e 3 rodadas de
+  revisao do Codex respectivamente, cada uma achando lacuna nova. Se pedirem
+  revisao de novo, **nao presuma que passou so porque passou antes**; leia
+  as secoes 2 e 3 do plano inteiras antes de mexer.
+- Nenhum passo manual pendente do Josemar neste momento (Code.gs V13 e
+  cotacoes.csv/proveniencia ja implantados e verificados na sessao 12).
+
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
 Frente 2 (recuperacao de operacoes parciais) **concluida sob reserva** —
