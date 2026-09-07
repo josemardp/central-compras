@@ -539,10 +539,15 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         cls.code = doc.split("```javascript", 1)[1].split("```", 1)[0]
 
     def test_deploy_ativo_esta_documentado(self):
-        self.assertIn("versão 11 ativa", self.doc)
+        # A ultima versao de fato implantada e verificada e a 11; a 12
+        # (2a rodada: propriedade de aba por sheetId, contrato de estrelas,
+        # diagnostico de aba parcial) esta corrigida no repositorio mas o
+        # redeploy ainda nao aconteceu nesta sessao - ver STATUS.md. Isso
+        # PRECISA continuar dizendo "DEPLOY PENDENTE" ate uma sessao futura
+        # publicar de verdade e atualizar este teste.
         self.assertIn("VERSÃO 9 IMPLANTADA E VERIFICADA", self.doc)
         self.assertIn("VERSÃO 11 IMPLANTADA E VERIFICADA", self.doc)
-        self.assertNotIn("DEPLOY PENDENTE", self.doc)
+        self.assertIn("Code.gs (versão 12 - DEPLOY PENDENTE)", self.doc)
 
     def test_properties_do_projeto_solto_usa_script_nao_document(self):
         # PropertiesService.getDocumentProperties() e null num projeto solto
@@ -569,19 +574,58 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         self.assertLess(pos_validacao, pos_visao)
 
     def test_limpeza_de_abas_orfas_rastreia_o_que_o_proprio_script_escreveu(self):
-        # Frente 3 / gap 2: nao pode confiar so em padrao de nome (uma aba
-        # criada a mao com nome parecido nao pode ser candidata a remocao).
+        # Frente 3 / gap 2 (1a rodada): nao pode confiar so em padrao de
+        # nome (uma aba criada a mao com nome parecido nao pode ser
+        # candidata a remocao).
         self.assertNotIn("/^20\\d\\d-/.test(nome)", self.code)
         self.assertIn("PropertiesService.getScriptProperties", self.code)
         self.assertIn("function abasGeradasRegistradas", self.code)
-        self.assertIn("function registrarAbasGeradas", self.code)
-        self.assertIn("geradaPeloScript = conhecidas[nome] === true", self.code)
+        self.assertIn("function salvarAbasGeradas", self.code)
 
     def test_falha_no_meio_da_escrita_informa_o_que_ja_foi_gravado(self):
-        # Frente 3 / gap 3: resposta de erro precisa dar ao cliente algo
-        # verificavel alem da mensagem da excecao.
+        # Frente 3 / gap 3 (1a rodada): resposta de erro precisa dar ao
+        # cliente algo verificavel alem da mensagem da excecao.
         self.assertIn("abas_escritas_antes_da_falha", self.code)
-        self.assertIn("abasEscritas.push", self.code)
+        self.assertIn("estadoAbas[nomeAba] = 'concluida'", self.code)
+
+    def test_aba_manual_nunca_e_confundida_com_aba_do_script_so_pelo_nome(self):
+        # Frente 3 (2a rodada, Codex sobre d6246b6): abaLimpa() sobrescrevia
+        # qualquer aba com o nome certo, mesmo criada a mao - reproduzido de
+        # verdade em tests/test_apps_script_execucao.py
+        # (test_aba_manual_sobrevive_a_colisao_de_nome). Propriedade agora e
+        # nome + sheetId, nunca so o nome.
+        self.assertIn("function abaEhDoScript", self.code)
+        self.assertIn("registro[aba.getName()] === aba.getSheetId()", self.code)
+        self.assertIn("function migrarRegistroLegado", self.code)
+        # abaLimpa reivindica a aba ANTES de limpar - nao so no final.
+        pos_abalimpa = self.code.index("function abaLimpa")
+        pos_registro = self.code.index("registro[nome] = aba.getSheetId()")
+        pos_clear = self.code.index("aba.clear()")
+        self.assertLess(pos_abalimpa, pos_registro)
+        self.assertLess(pos_registro, pos_clear)
+
+    def test_estrelas_fora_do_contrato_e_barrado_antes_de_qualquer_escrita(self):
+        # Frente 3 (2a rodada): estrelas: -2 no formato legado derrubava
+        # estrelas()/Array() DEPOIS que abaLimpa ja tinha rodado. Validado
+        # de verdade em test_apps_script_execucao.py (payload legado E
+        # tipado). Aqui so confere que a checagem existe e roda dentro de
+        # validarPayload (antes de qualquer abaLimpa).
+        self.assertIn("function validarEstrelas", self.code)
+        pos_validar_payload = self.code.index("function validarPayload")
+        pos_validar_estrelas_chamada = self.code.index("validarEstrelas(")
+        pos_primeiro_abalimpa_chamado = self.code.index("abaLimpa(planilha,")
+        self.assertLess(pos_validar_payload, pos_validar_estrelas_chamada)
+        self.assertLess(pos_validar_estrelas_chamada, pos_primeiro_abalimpa_chamado)
+
+    def test_aba_parcialmente_alterada_aparece_no_diagnostico(self):
+        # Frente 3 (2a rodada): abas onde abaLimpa rodou mas a escrita nao
+        # terminou ficavam de fora de abas_escritas_antes_da_falha - a
+        # resposta parecia dizer que so a 1a aba tinha sido tocada, quando a
+        # 2a tambem tinha sido limpa. Validado de verdade em
+        # test_apps_script_execucao.py
+        # (test_falha_operacional_apos_clear_identifica_aba_parcial_no_diagnostico).
+        self.assertIn("abas_parcialmente_alteradas", self.code)
+        self.assertIn("estadoAbas[nomeAba] = 'iniciada'", self.code)
 
     def test_renderizacao_e_em_lote_e_tem_lock(self):
         self.assertNotIn(".appendRow(", self.code)

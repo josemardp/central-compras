@@ -5,7 +5,7 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (07/09/2026, sessao 9)
+## AO RETOMAR — comece por aqui (07/09/2026, sessao 10)
 
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
@@ -15,11 +15,49 @@ cada vez o Codex achou lacuna nova - **nao declare concluida de novo so
 porque os exemplos testados passaram**; leia a secao 2 do plano inteira,
 incluindo o inventario comando-a-comando, antes de mexer.
 
-**Frente 3 (receptor Sheets): CONCLUIDA e verificada na nuvem (Versao 11).**
-Os 3 resultados, agora todos fechados:
+**Frente 3 (receptor Sheets): 2a rodada de revisao do Codex sobre o commit
+`d6246b6` achou 3 lacunas novas.** Mesmo padrao da frente 2 - **nao declare
+esta frente concluida de novo so porque a rodada anterior (V9→V11) passou**;
+leia a secao 3 do plano inteira antes de mexer. As 3 lacunas desta rodada:
 
-1. **Recuperacao local (frente 2): feita e verificada** (ver acima e
-   secao 2 do plano).
+1. **Aba manual podia ser sobrescrita** - `abaLimpa()` decidia propriedade
+   so pelo nome; uma aba criada a mao com o mesmo nome de um projeto
+   (ex.: `2026-a`) era limpa como se fosse do script.
+2. **`estrelas` fora de 0-5 derrubava a sincronizacao com abas ja limpas**
+   - `estrelas: -2` (formato legado) chegava direto no `Array()` de
+   `renderizarLinha()` sem checar tipo/faixa, e isso rodava DEPOIS de
+   `abaLimpa()` ja ter limpado a 2a aba.
+3. **Aba limpa mas nao reescrita ficava fora do diagnostico** -
+   `abas_escritas_antes_da_falha` so listava abas que tinham terminado de
+   verdade, escondendo qual aba ficou em branco.
+
+**Correcao local: feita e testada.** Propriedade de aba agora e
+`nome + sheetId` (nao so nome), com migracao explicita do registro legado;
+`validarPayload()` valida o contrato de `estrelas` (0-5, formatos legado E
+tipado) antes de qualquer escrita; a resposta de erro ganhou
+`abas_parcialmente_alteradas`. Desta vez os testes que provam isso sao
+PERMANENTES e commitados (a rodada anterior so tinha scripts de scratchpad
++ asserts de string, e o Codex apontou certo que isso nao prova
+comportamento): `tests/apps_script/` (fakes do runtime do Apps Script +
+harness + 5 cenarios Node) e `tests/test_apps_script_execucao.py` (7 testes
+Python que rodam o Code.gs de verdade via `subprocess`, pulam com motivo
+visivel se `node` nao existir no PATH). Suite completa: 371 testes,
+`checar-segredos --strict` limpo.
+
+**Redeploy real: ver o proximo bloco desta sessao** (ainda nao aconteceu no
+momento de escrever este paragrafo - se este texto nao foi atualizado
+depois, o redeploy NAO aconteceu e a nuvem continua na Versao 11).
+
+Frentes 4 (proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito)
+**nao iniciadas** — comece pelo plano, nao redescubra o escopo.
+
+## Sessao anterior (07/09/2026, sessao 9) — historico
+
+**Frente 3 (receptor Sheets), 1a rodada: CONCLUIDA e verificada na nuvem
+(Versao 11).** Os 3 resultados, agora todos fechados:
+
+1. **Recuperacao local (frente 2): feita e verificada** (ver secao 2 do
+   plano).
 2. **Implementacao do codigo do Sheets: feita e verificada por execucao
    real.** Corrigi 3 falhas reais da Versao 9 do `Code.gs`
    (`docs/integracao-google-sheets.md`, secao "Code.gs (versao 11 ativa)"):
@@ -57,12 +95,9 @@ Os 3 resultados, agora todos fechados:
    formatacao/veredito/cores corretos na Visao Geral e numa aba de
    comparativo.
 
-Suite Python completa (360 testes, incluindo 5 novos em
-`tests/test_sheets_export.py`) e `checar-segredos --strict` passaram com o
-codigo final (com `getScriptProperties`).
-
-Frentes 4 (proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito)
-**nao iniciadas** — comece pelo plano, nao redescubra o escopo.
+Suite Python completa (361 testes - a nota da sessao dizia 360, contagem
+errada) e `checar-segredos --strict` passaram com o codigo final (com
+`getScriptProperties`).
 
 ## Sessao anterior (07/09/2026, sessao 8) — historico
 

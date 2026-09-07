@@ -3,13 +3,20 @@
 O comando `python scripts/central_compras.py sincronizar-planilha` exporta a
 visão geral dos projetos e os comparativos de cotações para uma planilha Google.
 
-**Status externo e versionado: Versão 11 ativa e verificada.** Publicada em
-07/09/2026 pela conta `conta-comercial@exemplo.com`, editando a implantação existente
-(mesmo ID/URL do Web App, preservados). Depois do deploy, a sincronização foi
-executada duas vezes de verdade e a planilha real foi conferida: 11 abas
-(Visao Geral + 10 comparativos), sem duplicata, formatação e veredito
-corretos. Ver "VERSÃO 11 IMPLANTADA E VERIFICADA" no histórico de versões
-adiante para o relato completo, incluindo um bug real que só apareceu na
+**Status externo: Versão 11 ainda é a que está ativa na nuvem.** A Versão 12
+(código abaixo) corrige mais 3 falhas reais encontradas na 2ª rodada de
+revisão do Codex - ver "Code.gs (versão 12 - DEPLOY PENDENTE)" logo adiante -
+mas **ainda não foi publicada**. Enquanto a implantação não for atualizada
+pela conta `conta-comercial@exemplo.com`, o Web App continua rodando o código da
+Versão 11.
+
+A Versão 11 foi publicada em 07/09/2026 pela conta `conta-comercial@exemplo.com`,
+editando a implantação existente (mesmo ID/URL do Web App, preservados).
+Depois do deploy, a sincronização foi executada duas vezes de verdade e a
+planilha real foi conferida: 11 abas (Visao Geral + 10 comparativos), sem
+duplicata, formatação e veredito corretos. Ver "VERSÃO 11 IMPLANTADA E
+VERIFICADA" no histórico de versões adiante para o relato completo,
+incluindo um bug real que só apareceu na
 implantação (V10 quebrava em produção; a V11 corrigiu no mesmo dia).
 
 ## Como funciona
@@ -41,13 +48,46 @@ Projeto "Central de Compras - Sync" em https://script.google.com, conta
 conta-comercial. Editor:
 `https://script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 
-## Code.gs (versão 11 ativa)
+## Code.gs (versão 12 - DEPLOY PENDENTE)
 
-> O código abaixo corresponde à Versão 11 implantada, executada como
-> **conta-comercial**, no mesmo ID e URL do Web App desde a Versão 9. Publicada e
-> verificada em 07/09/2026 (duas sincronizações reais + inspeção visual da
-> planilha - ver "VERSÃO 11 IMPLANTADA E VERIFICADA" no histórico de versões
-> mais abaixo).
+> **O código abaixo NÃO está implantado ainda.** A nuvem continua rodando a
+> Versão 11. Esta Versão 12 corrige, em 07/09/2026, mais 3 falhas reais
+> encontradas na 2ª rodada de revisão do Codex sobre o commit `d6246b6`
+> (reproduzidas de verdade executando o próprio Code.gs sob Node, agora com
+> testes PERMANENTES em `tests/apps_script/` + `tests/test_apps_script_execucao.py`
+> - a 1ª rodada só tinha scripts de scratchpad não commitados, e o Codex
+> corretamente apontou que asserts de presença de string não provam
+> comportamento):
+>
+> 1. **Uma aba criada à mão podia ser sobrescrita.** `abaLimpa()` decidia se
+>    uma aba "era do script" só pelo NOME (`planilha.getSheetByName(nome)`);
+>    uma aba manual chamada, por exemplo, `2026-a` — igual ao slug de um
+>    projeto real — era encontrada, limpa e reescrita como se fosse a aba do
+>    projeto. Agora a propriedade é `nome + sheetId` (o id interno do Sheets,
+>    estável mesmo se a aba for renomeada e nunca reaproveitado mesmo depois
+>    de excluída): uma aba cujo sheetId não bate com o registro é tratada
+>    como estranha, e o projeto correspondente é redirecionado para outra
+>    aba (com aviso), nunca sobrescreve a manual. Registro legado (`{nome:
+>    true}`, até a V11) é migrado uma única vez para `{nome: sheetId}`
+>    adotando o sheetId atual de qualquer nome que já constava nele — só
+>    abas nunca antes registradas ficam de fora dessa adoção.
+> 2. **`estrelas: -2` (ou qualquer valor fora de 0–5) derrubava a
+>    sincronização no meio da escrita.** `renderizarLinha()` passa o campo
+>    `estrelas` (formato legado, dentro de `linha.valores[i]`) direto pro
+>    construtor `Array()` sem checar tipo ou faixa — `Array(-1)` é
+>    `RangeError: Invalid array length`, e isso rodava DEPOIS de
+>    `abaLimpa()` já ter limpo a aba. `validarPayload()` agora valida o
+>    contrato do campo `estrelas` (inteiro de 0 a 5) nos dois formatos —
+>    legado e tipado — antes de qualquer `abaLimpa`/escrita.
+> 3. **Uma aba limpa mas não reescrita ficava fora do diagnóstico de
+>    falha.** `abas_escritas_antes_da_falha` (da V10) só listava abas que
+>    tinham terminado de verdade; uma aba que `abaLimpa()` já tinha limpado,
+>    mas cuja escrita nova não chegou a terminar (por causa do bug 2, ou de
+>    uma falha operacional real da API do Sheets), não aparecia em lugar
+>    nenhum — parecia intocada quando na verdade estava em branco. Agora
+>    `abas_parcialmente_alteradas` lista exatamente essas. A sincronização
+>    nunca prometeu ser atômica por aba; agora o diagnóstico diz a verdade
+>    sobre isso.
 >
 > A V10/V11 corrigem 3 falhas reais da V9, todas reproduzidas de verdade
 > executando o próprio Code.gs sob Node com fakes do runtime do Apps Script
@@ -144,45 +184,78 @@ function doPost(e) {
     return resposta({ ok: false, error: 'outra sincronizacao esta em andamento' });
   }
 
-  const abasEscritas = [];
+  // estadoAbas distingue 3 situacoes por aba: nunca tocada (ausente),
+  // 'iniciada' (abaLimpa ja rodou - aba pode estar em branco) e 'concluida'
+  // (escrita terminou de verdade). Isso deixa o diagnostico de erro dizer
+  // qual aba ficou parcialmente alterada, nao so quais terminaram - a
+  // sincronizacao NAO e atomica por aba, e a resposta nunca deve fingir que e.
+  const estadoAbas = {};
   try {
     const avisos = coletarAvisos(dados);
-    // Valida a forma do payload inteiro ANTES de tocar qualquer aba. Uma
-    // planilha so pode ficar parcialmente escrita se algo falhar depois
-    // desse ponto - null/tipo errado em visao_geral ou dentro de
-    // comparativos tem que barrar aqui, nunca no meio de um escreverX().
+    // Valida a forma do payload inteiro E os valores que o renderizador
+    // efetivamente consome (ex.: estrelas fora do contrato 0-5) ANTES de
+    // tocar qualquer aba. Uma planilha so pode ficar parcialmente escrita
+    // se algo falhar depois desse ponto.
     validarPayload(dados);
     const pasta = pastaCentral();
     const planilha = planilhaCentral(pasta);
     const comparativos = Array.isArray(dados.comparativos) ? dados.comparativos : [];
+
+    // Propriedade de aba: nome sozinho nunca comprova que o script gerou
+    // aquela aba (uma aba manual pode ter o mesmo nome que um projeto).
+    // O registro guarda nome -> sheetId (id interno estavel do Sheets, que
+    // nao muda se a aba for renomeada e nunca se repete mesmo apos exclusao)
+    // - so uma aba com AMBOS nome e sheetId batendo e considerada do script.
+    const registro = abasGeradasRegistradas();
+    migrarRegistroLegado(planilha, registro);
+    const nomesUsados = { 'Painel': true, 'Visao Geral': true, '_Dados': true };
+    const nomesEstranhos = {};
+    planilha.getSheets().forEach(function (aba) {
+      const nome = aba.getName();
+      if (nome !== 'Visao Geral' && !abaEhDoScript(registro, aba)) {
+        nomesUsados[nome] = true;
+        nomesEstranhos[nome] = true;
+      }
+    });
+
     const camposVisao = colunasOuFallback(
       dados.visao_geral_colunas, CAMPOS_VISAO_FALLBACK, 'projeto', avisos
     );
     const camposMetricas = colunasOuFallback(
       dados.metricas_colunas, CAMPOS_METRICAS_FALLBACK, 'projeto', avisos
     );
-    const nomesUsados = { 'Painel': true, 'Visao Geral': true, '_Dados': true };
     const destinos = comparativos.map(function (comp) {
-      return nomeAbaProjeto(comp.projeto, nomesUsados);
+      const natural = String(comp.projeto || 'projeto').replace(/[\[\]:*?\/\\]/g, '-');
+      const nome = nomeAbaProjeto(comp.projeto, nomesUsados);
+      if (nome !== natural && nomesEstranhos[natural]) {
+        adicionarAviso(
+          avisos,
+          "projeto '" + String(comp.projeto) + "': a aba '" + natural +
+          "' nao pertence a este script (colisao com aba manual/estranha); usando '" + nome + "'"
+        );
+      }
+      return nome;
     });
     const abaVisao = planilha.getSheetByName('Visao Geral') || planilha.insertSheet('Visao Geral');
     const linkVisao = planilha.getUrl() + '#gid=' + abaVisao.getSheetId();
     comparativos.forEach(function (comp, indice) {
-      escreverComparativo(planilha, comp, destinos[indice], dados.gerado_em, linkVisao);
-      abasEscritas.push(destinos[indice]);
+      const nomeAba = destinos[indice];
+      estadoAbas[nomeAba] = 'iniciada';
+      escreverComparativo(planilha, comp, nomeAba, dados.gerado_em, linkVisao, registro);
+      estadoAbas[nomeAba] = 'concluida';
     });
+    estadoAbas['Visao Geral'] = 'iniciada';
     escreverVisaoGeral(
       planilha, Array.isArray(dados.visao_geral) ? dados.visao_geral : [],
-      camposVisao, dados.gerado_em, avisos, comparativos, destinos
+      camposVisao, dados.gerado_em, avisos, comparativos, destinos, registro
     );
-    abasEscritas.push('Visao Geral');
+    estadoAbas['Visao Geral'] = 'concluida';
 
     // Se o campo sumir por regressao, preservar abas e avisar e mais seguro
     // que apagar tudo. Com uma lista valida, remove so abas que o proprio
-    // script gerou em alguma sincronizacao anterior (registro persistido) -
-    // nunca por o nome parecer gerado.
+    // script gerou (registro nome+sheetId) - nunca por o nome parecer gerado.
     if (Array.isArray(dados.comparativos)) {
-      limparAbasOrfas(planilha, destinos);
+      limparAbasOrfas(planilha, destinos, registro);
     }
 
     return resposta({
@@ -196,14 +269,24 @@ function doPost(e) {
       planilha: planilha.getUrl(),
     });
   } catch (err) {
-    // abas_escritas_antes_da_falha deixa o cliente conferir exatamente o
-    // que ja foi gravado quando a sincronizacao quebra no meio - antes so
-    // tinha a mensagem do erro, sem dizer o que a planilha ficou refletindo.
+    // abas_escritas_antes_da_falha (concluidas) e abas_parcialmente_alteradas
+    // (abaLimpa ja rodou mas a escrita nao terminou - podem estar em branco)
+    // deixam o cliente conferir exatamente o que a planilha ficou
+    // refletindo. NUNCA prometemos atomicidade por aba: abaLimpa acontece
+    // antes da escrita real, entao uma falha no meio pode deixar uma aba
+    // limpa e sem o conteudo novo.
+    const concluidas = Object.keys(estadoAbas).filter(function (nome) {
+      return estadoAbas[nome] === 'concluida';
+    });
+    const parciais = Object.keys(estadoAbas).filter(function (nome) {
+      return estadoAbas[nome] === 'iniciada';
+    });
     return resposta({
       ok: false,
       error: 'falha na sincronizacao',
       detalhe: String(err),
-      abas_escritas_antes_da_falha: abasEscritas,
+      abas_escritas_antes_da_falha: concluidas,
+      abas_parcialmente_alteradas: parciais,
     });
   } finally {
     bloqueio.releaseLock();
@@ -218,9 +301,25 @@ function validarPayload(dados) {
     validarListaDeObjetos(comp.metricas, 'comparativos[' + ci + '].metricas');
     validarListaDeObjetos(comp.linhas, 'comparativos[' + ci + '].linhas');
     (Array.isArray(comp.linhas) ? comp.linhas : []).forEach(function (linha, li) {
-      validarListaDeObjetos(
-        linha.valores_tipados, 'comparativos[' + ci + '].linhas[' + li + '].valores_tipados'
-      );
+      const caminhoLinha = 'comparativos[' + ci + '].linhas[' + li + ']';
+      validarListaDeObjetos(linha.valores_tipados, caminhoLinha + '.valores_tipados');
+      // Contrato do campo `estrelas`, formato tipado E legado: e o unico
+      // valor que renderizarLinha() entrega direto pro construtor Array()
+      // (via estrelas()) sem checar tipo/faixa. Um numero fora de 0-5
+      // (negativo, fracionario ou gigante) faz Array(n) lancar RangeError -
+      // reproduzido de verdade com estrelas: -2 no formato legado. Validar
+      // aqui, antes de qualquer abaLimpa/escreverX, e o que garante zero
+      // mutacoes quando o payload tem esse defeito.
+      (Array.isArray(linha.valores_tipados) ? linha.valores_tipados : []).forEach(function (item, vi) {
+        validarEstrelas(item.estrelas, caminhoLinha + '.valores_tipados[' + vi + '].estrelas');
+      });
+      if (linha.tipo === 'estrela' && Array.isArray(linha.valores)) {
+        linha.valores.forEach(function (legado, vi) {
+          if (legado && typeof legado === 'object') {
+            validarEstrelas(legado.estrelas, caminhoLinha + '.valores[' + vi + '].estrelas');
+          }
+        });
+      }
     });
   });
 }
@@ -239,6 +338,18 @@ function validarListaDeObjetos(lista, caminho) {
   lista.forEach(function (item, indice) {
     validarObjeto(item, caminho + '[' + indice + ']');
   });
+}
+
+function validarEstrelas(valor, caminho) {
+  // Falsy (undefined/null/0/false/'') nunca chega em estrelas()/Array() -
+  // renderizarLinha so chama a funcao quando o campo e truthy. So valida o
+  // que de fato seria consumido.
+  if (!valor) return;
+  if (typeof valor !== 'number' || !Number.isInteger(valor) || valor < 0 || valor > 5) {
+    throw new Error(
+      'payload invalido em ' + caminho + ': esperava inteiro de 0 a 5, recebeu ' + JSON.stringify(valor)
+    );
+  }
 }
 
 function pastaCentral() {
@@ -295,8 +406,8 @@ function pendenciasProjeto(linha) {
   return pendencias;
 }
 
-function escreverVisaoGeral(planilha, linhas, campos, geradoEm, avisos, comparativos, destinos) {
-  const aba = abaLimpa(planilha, 'Visao Geral');
+function escreverVisaoGeral(planilha, linhas, campos, geradoEm, avisos, comparativos, destinos, registro) {
+  const aba = abaLimpa(planilha, 'Visao Geral', registro);
   const largura = Math.max(1, campos.length);
   const larguraFaixa = Math.max(10, largura);
   const ordenadas = linhas.slice().sort(function (a, b) {
@@ -542,8 +653,8 @@ function aplicarLargurasVisao(aba, campos) {
 
 // ------------------------------------------------------------- Comparativos
 
-function escreverComparativo(planilha, comp, nomeAba, geradoEm, linkVisao) {
-  const aba = abaLimpa(planilha, nomeAba);
+function escreverComparativo(planilha, comp, nomeAba, geradoEm, linkVisao, registro) {
+  const aba = abaLimpa(planilha, nomeAba, registro);
   const colunas = Array.isArray(comp.colunas) ? comp.colunas : [];
   const situacaoRecebida = Array.isArray(comp.situacao) ? comp.situacao : [];
   const situacao = colunas.map(function (_, indice) {
@@ -763,9 +874,17 @@ function vereditosProdutos(metricas, situacao) {
   });
 }
 
-function abaLimpa(planilha, nome) {
+function abaLimpa(planilha, nome, registro) {
   let aba = planilha.getSheetByName(nome);
   if (!aba) aba = planilha.insertSheet(nome);
+  // Reivindica a aba (nome + sheetId) ANTES de limpar - se a sincronizacao
+  // quebrar logo depois (formato invalido no meio da montagem da matriz,
+  // por exemplo), o registro ja reflete que essa aba e do script, entao uma
+  // retomada nao trata a propria aba (agora em branco) como estranha.
+  if (!abaEhDoScript(registro, aba)) {
+    registro[nome] = aba.getSheetId();
+    salvarAbasGeradas(registro);
+  }
   if (aba.isSheetHidden()) aba.showSheet();
   aba.getCharts().forEach(function (grafico) { aba.removeChart(grafico); });
   aba.getBandings().forEach(function (faixa) { faixa.remove(); });
@@ -1085,6 +1204,14 @@ const PROPRIEDADE_ABAS_GERADAS = 'abas_geradas_pelo_script';
 // no topo deste doc), entao getDocumentProperties() nao tem documento pra
 // se ligar e devolve null. So foi pego na V10 real (nao no fake de teste),
 // que travava com "Cannot read properties of null (reading 'getProperty')".
+//
+// Formato do registro: { [nomeDaAba]: sheetId }. Nome sozinho NUNCA prova
+// propriedade - uma aba manual pode ter o mesmo nome de um projeto (foi
+// reproduzido de verdade: aba "2026-a" criada a mao era sobrescrita porque
+// abaLimpa so olhava o nome). O sheetId e o identificador interno estavel
+// do Sheets: sobrevive a renomear a aba e nunca e reaproveitado mesmo
+// depois de excluir uma aba - so uma aba com nome E sheetId batendo no
+// registro e considerada gerada por este script.
 function abasGeradasRegistradas() {
   const bruto = PropertiesService.getScriptProperties().getProperty(PROPRIEDADE_ABAS_GERADAS);
   if (!bruto) return {};
@@ -1096,28 +1223,46 @@ function abasGeradasRegistradas() {
   }
 }
 
-function registrarAbasGeradas(nomes) {
-  const registro = {};
-  nomes.forEach(function (nome) { registro[nome] = true; });
+function salvarAbasGeradas(registro) {
   PropertiesService.getScriptProperties().setProperty(PROPRIEDADE_ABAS_GERADAS, JSON.stringify(registro));
 }
 
-function limparAbasOrfas(planilha, projetosAtuais) {
-  // Antes: uma aba "parecia gerada" so pelo nome (padrao /^20\d\d-/, etc.) -
-  // uma aba criada A MAO com nome parecido (ex.: "2026-manual") caia no
-  // mesmo padrao e era apagada. Agora so apaga o que o PROPRIO script
-  // escreveu numa sincronizacao anterior (registro persistido na planilha) -
-  // uma aba nunca escrita por ele nunca entra no registro, entao nunca e
-  // candidata a remocao so por causa do nome.
-  const manter = { 'Visao Geral': true };
-  projetosAtuais.forEach(function (nome) { manter[nome] = true; });
-  const conhecidas = abasGeradasRegistradas();
+function abaEhDoScript(registro, aba) {
+  return registro[aba.getName()] === aba.getSheetId();
+}
+
+// Registro legado (ate a V11): { [nome]: true }, sem sheetId - nao dava pra
+// distinguir "essa aba com esse nome e a mesma que o script escreveu da
+// ultima vez" de "uma aba diferente com nome igual apareceu depois". Migra
+// uma unica vez: se o nome legado bate com uma aba que existe HOJE, adota o
+// sheetId atual dela (beneficio da duvida, so pra nome que ja estava no
+// registro anterior - uma aba nova, nunca registrada antes, nunca e
+// adotada so por coincidencia de nome).
+function migrarRegistroLegado(planilha, registro) {
+  let mudou = false;
   planilha.getSheets().forEach(function (aba) {
     const nome = aba.getName();
-    const geradaPeloScript = conhecidas[nome] === true;
-    if (geradaPeloScript && !manter[nome] && planilha.getSheets().length > 1) planilha.deleteSheet(aba);
+    if (registro[nome] === true) {
+      registro[nome] = aba.getSheetId();
+      mudou = true;
+    }
   });
-  registrarAbasGeradas(projetosAtuais);
+  if (mudou) salvarAbasGeradas(registro);
+}
+
+function limparAbasOrfas(planilha, projetosAtuais, registro) {
+  const manter = { 'Visao Geral': true };
+  projetosAtuais.forEach(function (nome) { manter[nome] = true; });
+  let mudou = false;
+  planilha.getSheets().forEach(function (aba) {
+    const nome = aba.getName();
+    if (abaEhDoScript(registro, aba) && !manter[nome] && planilha.getSheets().length > 1) {
+      planilha.deleteSheet(aba);
+      delete registro[nome];
+      mudou = true;
+    }
+  });
+  if (mudou) salvarAbasGeradas(registro);
 }
 
 function linhaFormato(tamanho, valor) {
@@ -1164,6 +1309,7 @@ function resposta(obj) {
 | 8 → 9 | visão geral comparava scores relativos de compras diferentes | gráfico conceitualmente enganoso, substituído por contagens de pendências comparáveis |
 | 9 → 10 | `null` em `visao_geral`/`comparativos` não era validado antes de escrever; `limparAbasOrfas` decidia por padrão de nome; falha no meio não dizia o que já tinha sido gravado | planilha podia ficar parcialmente escrita e inconsistente; aba criada à mão com nome parecido (`2026-...`) podia ser apagada; resposta de erro sem pista do que sobreviveu |
 | 10 → 11 | `PropertiesService.getDocumentProperties()` é `null` num projeto solto (não container-bound) | `TypeError` real em produção minutos depois do deploy da V10, capturado pelo próprio `abas_escritas_antes_da_falha` que a V10 introduziu — trocado por `getScriptProperties()` |
+| 11 → 12 | propriedade de aba só pelo nome; `estrelas` fora de 0–5 não validado; aba limpa-mas-não-reescrita fora do diagnóstico | aba manual `2026-a` era sobrescrita; `estrelas: -2` derrubava a sincronização já com abas limpas; diagnóstico de falha parcial escondia qual aba tinha ficado em branco |
 
 Os bugs visuais só apareceram quando a planilha foi aberta. Vale a lição:
 resposta HTTP, execução “Concluído” no Apps Script e contagens corretas não

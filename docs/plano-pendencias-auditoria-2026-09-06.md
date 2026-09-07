@@ -506,7 +506,13 @@ subprocessos reais, sem `git stash`.
 
 ## 3. Receptor do Google Sheets
 
-**Estado: concluída e verificada na nuvem (07/09/2026, Versão 11).**
+**Estado: 2ª rodada de revisão do Codex sobre o commit `d6246b6` achou 3
+lacunas novas — código corrigido e testado localmente (07/09/2026), redeploy
+em andamento.** Mesma lição da frente 2: **não declare esta frente concluída
+de novo só porque a rodada anterior passou** — leia esta seção inteira antes
+de mexer.
+
+### 1ª rodada (commits `84ecb64` + `d6246b6`) — histórico
 
 Os 3 pontos pendentes de código foram corrigidos, implantados pela conta
 `conta-comercial@exemplo.com` e verificados com sincronização real — ver
@@ -569,11 +575,88 @@ foi aberta e conferida: exatamente 11 abas (Visão Geral + 10 comparativos,
 sem duplicata nem órfã), e capturas de tela confirmaram formatação, veredito,
 cores e link de volta corretos na Visão Geral e numa aba de comparativo.
 
-Suíte Python completa (360 testes) e `checar-segredos --strict` passaram com
-o código novo — inclui testes permanentes em `tests/test_sheets_export.py`
+Suíte Python completa (361 testes — a nota anterior dizia 360, contagem
+errada) e `checar-segredos --strict` passaram com o código novo — inclui
+testes permanentes em `tests/test_sheets_export.py`
 (`AppsScriptDocumentadoTest` para as 3 correções + o uso de
 `getScriptProperties`; `SincronizarPlanilhaTest` para o novo campo de
 diagnóstico).
+
+### 2ª rodada (Codex sobre o commit `d6246b6`) — 3 lacunas novas
+
+A 1ª rodada só provava as correções com scripts de scratchpad (não
+commitados) e com `AppsScriptDocumentadoTest` (asserts de presença de
+string) — o Codex apontou corretamente que **nenhum dos dois comprova
+comportamento de verdade**, e reproduziu 3 falhas reais rodando o próprio
+Code.gs sob Node:
+
+1. **Aba manual podia ser sobrescrita.** `abaLimpa()` decidia propriedade só
+   pelo NOME (`getSheetByName`); uma aba criada à mão com o mesmo nome de um
+   projeto (ex.: `2026-a`) era encontrada e limpa como se fosse a aba do
+   script. **Correção:** propriedade agora é `nome + sheetId` (id interno
+   estável do Sheets — sobrevive a renomear, nunca reaproveitado após
+   excluir). Uma aba cujo sheetId não bate com o registro é tratada como
+   estranha; o projeto correspondente é redirecionado para outra aba (com
+   aviso), a manual nunca é tocada. `abaLimpa()` reivindica a aba (grava o
+   sheetId) ANTES de limpar, não só no fim — uma retomada após falha não
+   trata a própria aba (agora em branco) como estranha. Registro legado
+   (`{nome: true}`, até a V11) é migrado uma única vez para
+   `{nome: sheetId}`, adotando o sheetId atual de qualquer nome que já
+   constava nele.
+2. **`estrelas` fora de 0–5 derrubava a sincronização já com abas
+   limpas.** `renderizarLinha()` passa o campo `estrelas` (formato legado)
+   direto pro construtor `Array()` sem checar tipo/faixa —
+   `estrelas: -2` → `Array(-1)` → `RangeError: Invalid array length`, e
+   isso rodava DEPOIS de `abaLimpa()` já ter limpado a 2ª aba (a 1ª já
+   tinha terminado). **Correção:** `validarPayload()` valida o contrato do
+   campo `estrelas` (inteiro de 0 a 5) nos formatos legado E tipado, antes
+   de qualquer `abaLimpa`/escrita — o payload inválido agora resulta em
+   zero mutações, não em duas abas limpas e uma delas corrompida.
+3. **Aba limpa mas não reescrita ficava fora do diagnóstico.**
+   `abas_escritas_antes_da_falha` (da V10) só listava abas que tinham
+   terminado de verdade; uma aba que `abaLimpa()` já tinha limpado mas cuja
+   escrita nova não chegou a terminar não aparecia em lugar nenhum — parecia
+   intocada quando estava em branco. **Correção:** a resposta de erro ganhou
+   `abas_parcialmente_alteradas`, preenchida a partir de um registro de
+   estado (`iniciada`/`concluída`) por aba, marcado ANTES de `abaLimpa`
+   rodar. A sincronização nunca prometeu atomicidade por aba; agora o
+   diagnóstico diz a verdade sobre isso.
+
+**Os 3 casos foram reproduzidos de verdade contra o código anterior
+(`d6246b6`, extraído do próprio doc) e passaram contra o corrigido** —
+desta vez com testes PERMANENTES e commitados, exatamente o que a rodada
+anterior não tinha:
+
+- `tests/apps_script/fakes.js` — fakes mínimos do runtime do Apps Script
+  (SpreadsheetApp/DriveApp/PropertiesService/etc.), reutilizáveis por
+  qualquer cenário futuro.
+- `tests/apps_script/harness.js` — carrega o Code.gs extraído do doc nesse
+  ambiente e expõe `doPost`.
+- `tests/apps_script/cenarios/*.js` — um script por cenário (colisão com
+  aba manual, falha operacional pós-`clear()`, duas sincronizações
+  idempotentes, migração do registro legado) mais um executor genérico de
+  payload (`rodar_payload.js`) para os casos de contrato de `estrelas`.
+- `tests/test_apps_script_execucao.py` — 7 testes Python que invocam esses
+  cenários via `subprocess` e leem o JSON estruturado que cada um imprime;
+  pula (não falha) em máquina sem `node` no PATH, com o motivo visível no
+  relatório da suíte.
+
+Cobertura confirmada com antes/depois em ambiente isolado: os 3 cenários
+falharam do jeito descrito contra `d6246b6` e passaram contra o código
+corrigido; payload inválido resulta em zero mutações (`mutacoes: 0`,
+planilha nunca chega a ser criada/aberta); colisão com aba manual preserva
+conteúdo E identidade (sheetId); falha operacional real (injetada via
+monkeypatch em `RealRange.prototype.setValues`, simulando um erro
+transiente da API do Sheets — não um payload inválido) identifica a aba
+afetada como parcial; duas sincronizações válidas seguidas continuam sem
+duplicar aba, inclusive com o registro no formato legado.
+
+Suíte Python completa (371 testes) e `checar-segredos --strict` passaram
+com o código corrigido.
+
+**Redeploy real:** ver `STATUS.md` para o resultado — esta seção é
+atualizada só depois que a implantação e as duas sincronizações reais
+acontecerem de verdade, não antes.
 
 ## 4. Proveniência das informações
 
