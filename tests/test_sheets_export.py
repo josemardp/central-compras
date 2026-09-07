@@ -310,6 +310,31 @@ class _FakeAppsScriptComDetalhe(BaseHTTPRequestHandler):
         self.wfile.write(dados)
 
 
+class _FakeAppsScriptComFalhaParcial(BaseHTTPRequestHandler):
+    """Falha no meio da escrita: a Versao 10 do Code.gs informa quais abas
+    ja tinham sido gravadas antes da excecao (docs/integracao-google-sheets.md,
+    secao "Code.gs (versao 10 - DEPLOY PENDENTE)")."""
+
+    def log_message(self, *_):
+        pass
+
+    def do_POST(self):
+        tamanho = int(self.headers.get("Content-Length", 0))
+        self.rfile.read(tamanho)
+        resposta = {
+            "ok": False,
+            "error": "falha na sincronizacao",
+            "detalhe": "RangeError: Invalid array length",
+            "abas_escritas_antes_da_falha": ["2026-primeiro"],
+        }
+        dados = json.dumps(resposta).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(dados)))
+        self.end_headers()
+        self.wfile.write(dados)
+
+
 class SincronizarPlanilhaTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-sync-"))
@@ -386,6 +411,15 @@ class SincronizarPlanilhaTest(unittest.TestCase):
         mensagem = str(ctx.exception)
         self.assertIn("falha na sincronizacao", mensagem)
         self.assertIn("Range not found", mensagem)
+
+    def test_partial_failure_reports_which_tabs_were_already_written(self):
+        url = self._sobe_servidor(_FakeAppsScriptComFalhaParcial)
+        caminho = self._config(url, "qualquer-token")
+        with self.assertRaises(SystemExit) as ctx:
+            cc.sincronizar_planilha(argparse.Namespace(config=str(caminho)))
+        mensagem = str(ctx.exception)
+        self.assertIn("falha na sincronizacao", mensagem)
+        self.assertIn("2026-primeiro", mensagem)
 
     def test_non_json_response_does_not_crash_with_a_raw_traceback(self):
         url = self._sobe_servidor(_FakeNaoJsonServer)
@@ -505,9 +539,46 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         cls.code = doc.split("```javascript", 1)[1].split("```", 1)[0]
 
     def test_deploy_ativo_esta_documentado(self):
-        self.assertIn("versão 9 ativa", self.doc)
+        # A ultima versao de fato implantada e verificada continua sendo a 9
+        # (historico preservado); a 10 (payload validado antes de escrever,
+        # abas orfas rastreadas, falha parcial reportada) esta corrigida no
+        # repositorio mas o redeploy ficou bloqueado nesta sessao (perfil de
+        # navegador conta-comercial em uso por outro processo) - ver STATUS.md.
+        # Isso PRECISA continuar dizendo "DEPLOY PENDENTE" ate uma sessao
+        # futura publicar de verdade e atualizar este teste.
         self.assertIn("VERSÃO 9 IMPLANTADA E VERIFICADA", self.doc)
-        self.assertNotIn("DEPLOY PENDENTE", self.doc)
+        self.assertIn("Code.gs (versão 10 - DEPLOY PENDENTE)", self.doc)
+
+    def test_payload_e_validado_por_inteiro_antes_de_escrever_qualquer_aba(self):
+        # Frente 3 / gap 1: null em visao_geral ou dentro de comparativos
+        # nao pode deixar a planilha parcialmente escrita.
+        self.assertIn("function validarPayload", self.code)
+        self.assertIn("function validarListaDeObjetos", self.code)
+        self.assertIn("function validarObjeto", self.code)
+        # validarPayload tem que rodar ANTES de qualquer escrita real
+        # (pastaCentral/escreverComparativo/escreverVisaoGeral).
+        pos_validacao = self.code.index("validarPayload(dados)")
+        pos_pasta = self.code.index("pastaCentral()")
+        pos_comparativo = self.code.index("escreverComparativo(planilha")
+        pos_visao = self.code.index("escreverVisaoGeral(")
+        self.assertLess(pos_validacao, pos_pasta)
+        self.assertLess(pos_validacao, pos_comparativo)
+        self.assertLess(pos_validacao, pos_visao)
+
+    def test_limpeza_de_abas_orfas_rastreia_o_que_o_proprio_script_escreveu(self):
+        # Frente 3 / gap 2: nao pode confiar so em padrao de nome (uma aba
+        # criada a mao com nome parecido nao pode ser candidata a remocao).
+        self.assertNotIn("/^20\\d\\d-/.test(nome)", self.code)
+        self.assertIn("PropertiesService.getDocumentProperties", self.code)
+        self.assertIn("function abasGeradasRegistradas", self.code)
+        self.assertIn("function registrarAbasGeradas", self.code)
+        self.assertIn("geradaPeloScript = conhecidas[nome] === true", self.code)
+
+    def test_falha_no_meio_da_escrita_informa_o_que_ja_foi_gravado(self):
+        # Frente 3 / gap 3: resposta de erro precisa dar ao cliente algo
+        # verificavel alem da mensagem da excecao.
+        self.assertIn("abas_escritas_antes_da_falha", self.code)
+        self.assertIn("abasEscritas.push", self.code)
 
     def test_renderizacao_e_em_lote_e_tem_lock(self):
         self.assertNotIn(".appendRow(", self.code)

@@ -4909,6 +4909,9 @@ def sincronizar_planilha(args: argparse.Namespace) -> None:
         detalhe = resultado.get("detalhe")
         if detalhe:
             mensagem = f"{mensagem}. Detalhe: {detalhe}"
+        abas_parciais = resultado.get("abas_escritas_antes_da_falha")
+        if abas_parciais:
+            mensagem = f"{mensagem}. Abas ja escritas antes da falha: {', '.join(str(a) for a in abas_parciais)}"
         raise SystemExit(f"A planilha recusou os dados: {str(mensagem).replace(token, '[oculto]')}")
     avisos = validar_resposta_sheets(resultado, payload)
     print(

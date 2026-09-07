@@ -5,18 +5,52 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (07/09/2026, sessao 8)
+## AO RETOMAR — comece por aqui (07/09/2026, sessao 9)
 
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
-Frente 2 (recuperacao de operacoes parciais) **concluida sob reserva** — 7a
-rodada de revisao (Codex sobre o commit `4908c02`). Ja foi declarada
-concluida 6 vezes antes e cada vez o Codex achou lacuna nova - **nao
-declare concluida de novo so porque os exemplos testados passaram**; leia a
-secao 2 do plano inteira, incluindo o inventario comando-a-comando, antes
-de mexer. Frentes 3 (receptor Sheets), 4 (proveniencia), 5 (produtos
-reutilizados) e 6 (datas/veredito) **nao iniciadas** — comece pelo plano,
-nao redescubra o escopo.
+Frente 2 (recuperacao de operacoes parciais) **concluida sob reserva** —
+commit `d49a3cd` (7a revisao). Ja foi declarada concluida 6 vezes antes e
+cada vez o Codex achou lacuna nova - **nao declare concluida de novo so
+porque os exemplos testados passaram**; leia a secao 2 do plano inteira,
+incluindo o inventario comando-a-comando, antes de mexer.
+
+**Frente 3 (receptor Sheets): codigo corrigido, implantacao BLOQUEADA
+nesta sessao.** Sao 3 resultados separados, nao declare "concluido" em
+bloco:
+
+1. **Recuperacao local (frente 2): feita e verificada** (ver acima e
+   secao 2 do plano).
+2. **Implementacao do codigo do Sheets: feita e verificada por execucao
+   real.** Corrigi 3 falhas reais da Versao 9 do `Code.gs`
+   (`docs/integracao-google-sheets.md`, secao
+   "Code.gs (versao 10 - DEPLOY PENDENTE)"): payload com `null` podia
+   deixar a planilha parcialmente escrita, `limparAbasOrfas` podia apagar
+   aba criada a mao (so por o nome bater com um padrao), e a resposta de
+   erro nao dizia o que ja tinha sido gravado antes de quebrar. Reproduzi
+   os 3 casos de verdade rodando o proprio `Code.gs` sob Node com fakes
+   minimos do runtime do Apps Script (script no scratchpad da sessao, nao
+   commitado — `apps_script_fakes.js` + `repro_gap{1,2,3}_*.js`): os 3
+   falharam do jeito descrito contra o codigo antigo e passaram contra o
+   corrigido, incluindo 2 sincronizacoes identicas seguidas sem duplicar
+   aba. Suite Python completa (360 testes, incluindo 4 novos em
+   `tests/test_sheets_export.py`) e `checar-segredos --strict` passaram.
+3. **Validacao real na nuvem: NAO FEITA, bloqueada.** Tentei navegar como
+   conta-comercial (`mcp__nav-conta-comercial__browser_navigate` para o editor do Apps
+   Script) e o MCP recusou: `Browser is already in use for
+   ...perfil-conta-comercial` — o perfil ja estava em uso por outro processo
+   nesta maquina. Nao usei `--isolated` para forcar uma segunda instancia
+   contra a mesma conta sem confirmar com o Josemar. **A nuvem continua
+   rodando a Versao 9** (com as 3 falhas) ate uma sessao futura, com o
+   perfil conta-comercial livre, fazer o redeploy (Implantar → Gerenciar
+   implantacoes → editar a existente → Nova versao, preservando URL/ID),
+   rodar `sincronizar-planilha` duas vezes e abrir a planilha real pra
+   conferir.
+
+Frentes 4 (proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito)
+**nao iniciadas** — comece pelo plano, nao redescubra o escopo.
+
+## Sessao anterior (07/09/2026, sessao 8) — historico
 
 - **A 6a correcao (commit `4908c02`) confirmou os 4 casos anteriores
   bloqueados, mas o Codex achou que `decidir` nunca declarava o proprio

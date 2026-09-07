@@ -3,10 +3,11 @@
 O comando `python scripts/central_compras.py sincronizar-planilha` exporta a
 visão geral dos projetos e os comparativos de cotações para uma planilha Google.
 
-**Status externo e versionado: Versão 9 ativa e verificada.** A implantação
-existente foi atualizada pela conta `conta-comercial@exemplo.com`, sem trocar o ID nem
-a URL do Web App. Depois do deploy, a sincronização foi executada duas vezes e
-a planilha real foi conferida no desktop e em largura de celular.
+**Status externo: Versão 9 ainda é a que está ativa na nuvem.** A Versão 10
+(código abaixo) corrige 3 falhas reais da Versão 9 - ver
+"Code.gs (versão 10 - DEPLOY PENDENTE)" logo adiante - mas **ainda não foi
+publicada**. Enquanto a implantação não for atualizada pela conta
+`conta-comercial@exemplo.com`, o Web App continua rodando o código da Versão 9.
 
 ## Como funciona
 
@@ -37,11 +38,42 @@ Projeto "Central de Compras - Sync" em https://script.google.com, conta
 conta-comercial. Editor:
 `https://script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 
-## Code.gs (versão 9 ativa)
+## Code.gs (versão 10 - DEPLOY PENDENTE)
 
-> O código abaixo corresponde à Versão 9 implantada, executada como
-> **conta-comercial**, no mesmo ID e URL do Web App. O estado foi confirmado com duas
-> sincronizações e inspeção da planilha real em 05/09/2026.
+> **O código abaixo NÃO está implantado ainda.** A nuvem continua rodando a
+> Versão 9. Esta Versão 10 corrige, em 07/09/2026, 3 falhas reais encontradas
+> nesta sessão (reproduzidas de verdade executando o próprio Code.gs sob Node
+> com fakes do runtime do Apps Script, script em
+> `docs/plano-pendencias-auditoria-2026-09-06.md` §3):
+>
+> 1. **Payload com `null`/tipo errado quebrava no meio da escrita.** Um
+>    elemento `null` em `visao_geral` (ou em `comparativos[].metricas`,
+>    `.linhas` ou `.linhas[].valores_tipados`) chegava intacto até
+>    `escreverVisaoGeral`/`renderizarLinha`, que faziam `linha.campo` sem
+>    checar null - e isso rodava DEPOIS de `escreverComparativo` já ter
+>    reescrito abas de projeto. Resultado: planilha parcialmente atualizada e
+>    inconsistente. Agora `validarPayload(dados)` percorre o payload inteiro e
+>    recusa antes de tocar qualquer aba.
+> 2. **`limparAbasOrfas` apagava aba criada à mão.** A checagem de "essa aba
+>    foi gerada pelo script" era só um padrão de nome
+>    (`/^20\d\d-/`, `'Painel'`, `'_Dados'`, ...); uma aba renomeada ou criada
+>    manualmente com nome parecido (ex.: `2026-manual`) caía no mesmo padrão e
+>    era apagada assim que o projeto correspondente saísse do payload. Agora
+>    há um registro real (`PropertiesService`, propriedade
+>    `abas_geradas_pelo_script`) das abas que o PRÓPRIO script escreveu em
+>    alguma sincronização anterior; só essas são candidatas a limpeza.
+> 3. **Falha no meio da escrita não dizia o que já tinha sido gravado.** A
+>    resposta de erro só tinha `error`/`detalhe` (a mensagem da exceção), sem
+>    dizer quais abas a sincronização já tinha escrito antes de quebrar.
+>    Agora a resposta de erro inclui `abas_escritas_antes_da_falha`, e
+>    `sincronizar_planilha()` (Python) mostra essa lista na mensagem.
+>
+> Redeploy (pela conta `conta-comercial@exemplo.com`, preservando ID/URL - ver
+> "Implantação" adiante), duas sincronizações e conferência visual da
+> planilha real ficaram **bloqueados nesta sessão**: o perfil de navegador
+> `conta-comercial` já estava em uso por outro processo
+> (`Browser is already in use for ...perfil-conta-comercial`). Fica para a próxima
+> sessão com esse perfil livre - ver `STATUS.md`.
 
 ```javascript
 const TOKEN = '...'; // cole aqui uma senha longa aleatoria. O valor real vive
@@ -97,8 +129,14 @@ function doPost(e) {
     return resposta({ ok: false, error: 'outra sincronizacao esta em andamento' });
   }
 
+  const abasEscritas = [];
   try {
     const avisos = coletarAvisos(dados);
+    // Valida a forma do payload inteiro ANTES de tocar qualquer aba. Uma
+    // planilha so pode ficar parcialmente escrita se algo falhar depois
+    // desse ponto - null/tipo errado em visao_geral ou dentro de
+    // comparativos tem que barrar aqui, nunca no meio de um escreverX().
+    validarPayload(dados);
     const pasta = pastaCentral();
     const planilha = planilhaCentral(pasta);
     const comparativos = Array.isArray(dados.comparativos) ? dados.comparativos : [];
@@ -116,14 +154,18 @@ function doPost(e) {
     const linkVisao = planilha.getUrl() + '#gid=' + abaVisao.getSheetId();
     comparativos.forEach(function (comp, indice) {
       escreverComparativo(planilha, comp, destinos[indice], dados.gerado_em, linkVisao);
+      abasEscritas.push(destinos[indice]);
     });
     escreverVisaoGeral(
       planilha, Array.isArray(dados.visao_geral) ? dados.visao_geral : [],
       camposVisao, dados.gerado_em, avisos, comparativos, destinos
     );
+    abasEscritas.push('Visao Geral');
 
     // Se o campo sumir por regressao, preservar abas e avisar e mais seguro
-    // que apagar tudo. Com uma lista valida, remove so abas geradas/orfas.
+    // que apagar tudo. Com uma lista valida, remove so abas que o proprio
+    // script gerou em alguma sincronizacao anterior (registro persistido) -
+    // nunca por o nome parecer gerado.
     if (Array.isArray(dados.comparativos)) {
       limparAbasOrfas(planilha, destinos);
     }
@@ -139,10 +181,49 @@ function doPost(e) {
       planilha: planilha.getUrl(),
     });
   } catch (err) {
-    return resposta({ ok: false, error: 'falha na sincronizacao', detalhe: String(err) });
+    // abas_escritas_antes_da_falha deixa o cliente conferir exatamente o
+    // que ja foi gravado quando a sincronizacao quebra no meio - antes so
+    // tinha a mensagem do erro, sem dizer o que a planilha ficou refletindo.
+    return resposta({
+      ok: false,
+      error: 'falha na sincronizacao',
+      detalhe: String(err),
+      abas_escritas_antes_da_falha: abasEscritas,
+    });
   } finally {
     bloqueio.releaseLock();
   }
+}
+
+function validarPayload(dados) {
+  validarListaDeObjetos(dados.visao_geral, 'visao_geral');
+  const comparativos = Array.isArray(dados.comparativos) ? dados.comparativos : [];
+  comparativos.forEach(function (comp, ci) {
+    validarObjeto(comp, 'comparativos[' + ci + ']');
+    validarListaDeObjetos(comp.metricas, 'comparativos[' + ci + '].metricas');
+    validarListaDeObjetos(comp.linhas, 'comparativos[' + ci + '].linhas');
+    (Array.isArray(comp.linhas) ? comp.linhas : []).forEach(function (linha, li) {
+      validarListaDeObjetos(
+        linha.valores_tipados, 'comparativos[' + ci + '].linhas[' + li + '].valores_tipados'
+      );
+    });
+  });
+}
+
+function validarObjeto(valor, caminho) {
+  if (valor === null || typeof valor !== 'object' || Array.isArray(valor)) {
+    throw new Error('payload invalido em ' + caminho + ': esperava objeto, recebeu ' + JSON.stringify(valor));
+  }
+}
+
+function validarListaDeObjetos(lista, caminho) {
+  if (lista === undefined) return;
+  if (!Array.isArray(lista)) {
+    throw new Error('payload invalido em ' + caminho + ': esperava lista, recebeu ' + JSON.stringify(lista));
+  }
+  lista.forEach(function (item, indice) {
+    validarObjeto(item, caminho + '[' + indice + ']');
+  });
 }
 
 function pastaCentral() {
@@ -982,15 +1063,41 @@ function nomeAbaProjeto(projeto, usados) {
   return tentativa;
 }
 
+const PROPRIEDADE_ABAS_GERADAS = 'abas_geradas_pelo_script';
+
+function abasGeradasRegistradas() {
+  const bruto = PropertiesService.getDocumentProperties().getProperty(PROPRIEDADE_ABAS_GERADAS);
+  if (!bruto) return {};
+  try {
+    const registro = JSON.parse(bruto);
+    return (registro && typeof registro === 'object' && !Array.isArray(registro)) ? registro : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function registrarAbasGeradas(nomes) {
+  const registro = {};
+  nomes.forEach(function (nome) { registro[nome] = true; });
+  PropertiesService.getDocumentProperties().setProperty(PROPRIEDADE_ABAS_GERADAS, JSON.stringify(registro));
+}
+
 function limparAbasOrfas(planilha, projetosAtuais) {
+  // Antes: uma aba "parecia gerada" so pelo nome (padrao /^20\d\d-/, etc.) -
+  // uma aba criada A MAO com nome parecido (ex.: "2026-manual") caia no
+  // mesmo padrao e era apagada. Agora so apaga o que o PROPRIO script
+  // escreveu numa sincronizacao anterior (registro persistido na planilha) -
+  // uma aba nunca escrita por ele nunca entra no registro, entao nunca e
+  // candidata a remocao so por causa do nome.
   const manter = { 'Visao Geral': true };
   projetosAtuais.forEach(function (nome) { manter[nome] = true; });
+  const conhecidas = abasGeradasRegistradas();
   planilha.getSheets().forEach(function (aba) {
     const nome = aba.getName();
-    const gerada = nome === 'Página1' || nome === 'Pagina1' || nome === 'Painel' ||
-      nome === '_Dados' || /^20\d\d-/.test(nome);
-    if (gerada && !manter[nome] && planilha.getSheets().length > 1) planilha.deleteSheet(aba);
+    const geradaPeloScript = conhecidas[nome] === true;
+    if (geradaPeloScript && !manter[nome] && planilha.getSheets().length > 1) planilha.deleteSheet(aba);
   });
+  registrarAbasGeradas(projetosAtuais);
 }
 
 function linhaFormato(tamanho, valor) {

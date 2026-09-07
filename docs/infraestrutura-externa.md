@@ -81,13 +81,23 @@ de propósito: assim não desaparece se a planilha for para a lixeira).
 - Editor: `script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 - Web App **ativo**, execução como conta-comercial, acesso "qualquer pessoa",
   protegido por token no corpo do POST.
-- A implantação ativa é a **Versão 9**, publicada em 05/09/2026 pela conta
-  **conta-comercial**, no mesmo ID e na mesma URL do Web App. O layout foi
+- A implantação ativa **ainda é a Versão 9**, publicada em 05/09/2026 pela
+  conta **conta-comercial**, no mesmo ID e na mesma URL do Web App. O layout foi
   sincronizado duas vezes com 8 projetos e 8 comparativos e conferido na
   planilha real: 9 abas, fila de atenção, vereditos, filtros, links, formatos
   numéricos e gráficos. A V9 substitui a comparação inválida de scores entre
   projetos por contagens de pendências e mantém compatibilidade com o payload
   anterior. As versões 5 a 8 foram etapas do mesmo deploy.
+- **07/09/2026 — código da Versão 10 pronto no repositório, NÃO implantado
+  ainda.** Corrige 3 falhas reais da V9 (payload com `null` podia deixar a
+  planilha parcialmente escrita; `limparAbasOrfas` podia apagar aba criada à
+  mão; falha no meio da escrita não dizia o que já tinha sido gravado) — ver
+  [`integracao-google-sheets.md`](integracao-google-sheets.md), seção
+  "Code.gs (versão 10 - DEPLOY PENDENTE)". O redeploy pela conta conta-comercial
+  ficou bloqueado nesta sessão: `mcp__nav-conta-comercial__*` recusou navegar
+  porque o perfil de navegador já estava em uso por outro processo. **Até o
+  redeploy acontecer, o Web App continua rodando o código da Versão 9** —
+  não presuma que a correção já está ativa na nuvem só porque está no git.
 - Código e procedimento de redeploy: [`integracao-google-sheets.md`](integracao-google-sheets.md).
 - Lições e checklist de validação: [`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).
 

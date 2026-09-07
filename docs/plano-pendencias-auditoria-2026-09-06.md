@@ -506,20 +506,58 @@ subprocessos reais, sem `git stash`.
 
 ## 3. Receptor do Google Sheets
 
-**Estado: não iniciada.**
+**Estado: código corrigido (07/09/2026), implantação pendente.**
 
-Pendente: validação de payload completo antes de limpar/escrever abas
-(inclusive `null`), proteção contra remoção de aba manual/estranha ao
-gerador, comunicação de falha parcial, resposta que permita ao cliente
-conferir o que foi gravado de verdade. Depois: redeploy pela conta
-`conta-comercial@exemplo.com` preservando URL/permissões, duas sincronizações,
-conferência de idempotência e aparência na planilha real, atualização de
-`docs/infraestrutura-externa.md` no mesmo commit.
+Os 3 pontos pendentes de código foram corrigidos e verificados por execução
+real (não só leitura) na sessão de 07/09/2026 — ver
+`docs/integracao-google-sheets.md`, seção
+"Code.gs (versão 10 - DEPLOY PENDENTE)":
+
+1. **Validação do payload inteiro antes de escrever qualquer aba** —
+   `validarPayload(dados)` roda logo depois de `coletarAvisos`, antes de
+   `pastaCentral()`/qualquer `escreverX()`. Reproduzido antes da correção:
+   um `null` em `visao_geral` derrubava `escreverVisaoGeral` DEPOIS de
+   `escreverComparativo` já ter reescrito a aba do projeto — planilha ficava
+   parcialmente atualizada. Depois da correção: recusa antes de qualquer
+   escrita (`abas_escritas_antes_da_falha: []` na resposta de erro).
+2. **Abas manuais não são mais candidatas a remoção por parecer geradas** —
+   `limparAbasOrfas` não usa mais padrão de nome (`/^20\d\d-/` etc.); agora
+   consulta um registro real (`PropertiesService`, propriedade
+   `abas_geradas_pelo_script`) de que abas o PRÓPRIO script escreveu em
+   sincronizações anteriores. Reproduzido antes da correção: uma aba criada
+   à mão como `2026-manual` era apagada assim que o projeto correspondente
+   saía do payload, só porque o nome batia com o padrão. Depois: só apaga o
+   que está no registro.
+3. **Falha no meio da escrita agora diz o que já foi gravado** — a resposta
+   de erro ganhou `abas_escritas_antes_da_falha`; `sincronizar_planilha()`
+   (Python) inclui essa lista na mensagem de erro.
+
+Os 3 casos foram reproduzidos de verdade: um script Node
+(`repro_gap1_payload_null.js`, `repro_gap2_aba_manual.js`,
+`repro_gap3_falha_parcial.js`, no scratchpad da sessão, não commitados)
+carrega o Code.gs de fato (extraído do doc) com fakes mínimos do runtime do
+Apps Script (`SpreadsheetApp`/`DriveApp`/`PropertiesService`/etc.) e executa
+`doPost` de ponta a ponta — os 3 falharam do jeito descrito contra o código
+antigo e passaram contra o corrigido, incluindo duas sincronizações
+idênticas seguidas sem duplicar aba. Suíte Python completa (360 testes) e
+`checar-segredos --strict` passaram com o código novo — inclui testes
+permanentes novos em `tests/test_sheets_export.py`
+(`AppsScriptDocumentadoTest` para as 3 correções + `SincronizarPlanilhaTest`
+para o novo campo de diagnóstico).
+
+**O que falta e está bloqueado nesta sessão:** redeploy pela conta
+`conta-comercial@exemplo.com` (preservando ID/URL da implantação existente), duas
+sincronizações reais e conferência visual da planilha (desktop + mobile).
+Tentativa de navegar com `mcp__nav-conta-comercial__*` em 07/09/2026 falhou com
+`Browser is already in use for ...perfil-conta-comercial` — o perfil já estava em
+uso por outro processo nesta máquina. Não usei `--isolated` para forçar uma
+segunda instância contra o mesmo perfil/conta sem confirmar com o Josemar.
+Fica para quando o perfil estiver livre — ver `STATUS.md`.
 
 Depende de sessão com acesso ao navegador autenticado como `conta-comercial`
 (`mcp__nav-conta-comercial__*` ou perfil Chrome equivalente) para o redeploy e a
-conferência visual — a parte de código (Apps Script documentado +
-`sheets_export_payload`) pode ser feita sem isso, mas não a implantação.
+conferência visual — a parte de código já foi feita sem isso, mas a
+implantação real (e a prova de que ela funciona) ainda não.
 
 ## 4. Proveniência das informações
 
