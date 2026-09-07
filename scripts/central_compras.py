@@ -4909,9 +4909,19 @@ def sincronizar_planilha(args: argparse.Namespace) -> None:
         detalhe = resultado.get("detalhe")
         if detalhe:
             mensagem = f"{mensagem}. Detalhe: {detalhe}"
-        abas_parciais = resultado.get("abas_escritas_antes_da_falha")
+        abas_concluidas = resultado.get("abas_escritas_antes_da_falha")
+        if abas_concluidas:
+            mensagem = f"{mensagem}. Abas concluidas antes da falha: {', '.join(str(a) for a in abas_concluidas)}"
+        # abas_parcialmente_alteradas (Code.gs V13+): abaLimpa ja rodou nessas
+        # abas mas a escrita nova nao terminou - podem estar em branco. E um
+        # campo distinto de abas_escritas_antes_da_falha (essas terminaram de
+        # verdade); uma resposta antiga sem o campo so nao mostra esta linha.
+        abas_parciais = resultado.get("abas_parcialmente_alteradas")
         if abas_parciais:
-            mensagem = f"{mensagem}. Abas ja escritas antes da falha: {', '.join(str(a) for a in abas_parciais)}"
+            mensagem = (
+                f"{mensagem}. Abas parcialmente alteradas (podem estar em "
+                f"branco, escrita nao terminou): {', '.join(str(a) for a in abas_parciais)}"
+            )
         raise SystemExit(f"A planilha recusou os dados: {str(mensagem).replace(token, '[oculto]')}")
     avisos = validar_resposta_sheets(resultado, payload)
     print(

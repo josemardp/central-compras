@@ -3,16 +3,23 @@
 O comando `python scripts/central_compras.py sincronizar-planilha` exporta a
 visão geral dos projetos e os comparativos de cotações para uma planilha Google.
 
-**Status externo e versionado: Versão 12 ativa e verificada.** Publicada em
-07/09/2026 pela conta `conta-comercial@exemplo.com`, editando a implantação existente
-(mesmo ID/URL do Web App desde a Versão 9). Depois do deploy, a sincronização
-foi executada duas vezes de verdade e a planilha real foi conferida: 11 abas
-(Visao Geral + 10 comparativos), sem duplicata nem órfã. Ver "VERSÃO 12
-IMPLANTADA E VERIFICADA" no histórico de versões adiante para o relato
-completo — desta vez as 3 correções (colisão com aba manual, contrato de
-`estrelas`, diagnóstico de aba parcial) tinham testes PERMANENTES e
-executáveis (`tests/apps_script/` + `tests/test_apps_script_execucao.py`)
-provando o comportamento antes do deploy, não só asserts de string.
+**Status externo: Versão 12 ainda é a que está ativa na nuvem.** A Versão 13
+(código abaixo) corrige mais 1 falha real encontrada na 3ª rodada de revisão
+do Codex - ver "Code.gs (versão 13 - DEPLOY PENDENTE)" logo adiante - mas
+**ainda não foi publicada**. Enquanto a implantação não for atualizada pela
+conta `conta-comercial@exemplo.com`, o Web App continua rodando o código da Versão
+12.
+
+A Versão 12 foi publicada em 07/09/2026 pela conta `conta-comercial@exemplo.com`,
+editando a implantação existente (mesmo ID/URL do Web App desde a Versão 9).
+Depois do deploy, a sincronização foi executada duas vezes de verdade e a
+planilha real foi conferida: 11 abas (Visao Geral + 10 comparativos), sem
+duplicata nem órfã. Ver "VERSÃO 12 IMPLANTADA E VERIFICADA" no histórico de
+versões adiante para o relato completo — desta vez as 3 correções (colisão
+com aba manual, contrato de `estrelas`, diagnóstico de aba parcial) tinham
+testes PERMANENTES e executáveis (`tests/apps_script/` +
+`tests/test_apps_script_execucao.py`) provando o comportamento antes do
+deploy, não só asserts de string.
 
 ## Como funciona
 
@@ -43,19 +50,43 @@ Projeto "Central de Compras - Sync" em https://script.google.com, conta
 conta-comercial. Editor:
 `https://script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 
-## Code.gs (versão 12 ativa)
+## Code.gs (versão 13 - DEPLOY PENDENTE)
 
-> O código abaixo corresponde à Versão 12 implantada, executada como
-> **conta-comercial**, no mesmo ID e URL do Web App desde a Versão 9. Publicada e
-> verificada em 07/09/2026 (duas sincronizações reais + inspeção visual da
-> planilha - ver "VERSÃO 12 IMPLANTADA E VERIFICADA" no histórico de versões
-> mais abaixo). Corrige, no mesmo dia, mais 3 falhas reais encontradas na 2ª
-> rodada de revisão do Codex sobre o commit `d6246b6` (reproduzidas de
-> verdade executando o próprio Code.gs sob Node, agora com testes
-> PERMANENTES em `tests/apps_script/` + `tests/test_apps_script_execucao.py`
-> - a 1ª rodada só tinha scripts de scratchpad não commitados, e o Codex
-> corretamente apontou que asserts de presença de string não provam
-> comportamento):
+> **O código abaixo NÃO está implantado ainda.** A nuvem continua rodando a
+> Versão 12. Esta Versão 13 corrige, em 07/09/2026, mais 1 falha real
+> encontrada na 3ª rodada de revisão do Codex sobre o commit `c5018dc`
+> (reproduzida de verdade, com regressão executável permanente):
+>
+> 1. **A "Visao Geral" ficou de fora da proteção de propriedade que a
+>    Versão 12 deu aos comparativos.** `doPost` excluía esse nome
+>    explicitamente da checagem de abas estranhas (`nome !== 'Visao Geral'`),
+>    e `abaLimpa()` adotava/limpava qualquer aba com esse nome sem checar
+>    sheetId. Uma aba manual chamada "Visao Geral" (criada depois de excluir
+>    a gerada pelo script) tinha o conteúdo apagado na sincronização
+>    seguinte. Agora "Visao Geral" passa pelo MESMO mecanismo de propriedade
+>    verificada (nome + sheetId) e, se o nome estiver ocupado por uma aba
+>    estranha, a Visão Geral real do script é redirecionada para um destino
+>    alternativo — estável entre sincronizações (sufixo de hash
+>    determinístico via `nomeAbaProjeto('Visao Geral', ...)`, o mesmo
+>    mecanismo que já protegia os projetos) — em vez de sobrescrever a aba
+>    manual. `migrarRegistroLegado()` ganhou um bootstrap de uma única vez
+>    (`__visao_migrada__`): até a V12, "Visao Geral" nunca entrava no
+>    registro de propriedade por nome (só os comparativos entravam), então
+>    sem esse bootstrap explícito a PRÓPRIA Visão Geral real, criada por uma
+>    versão anterior, pareceria estranha na primeira sincronização depois
+>    deste deploy e ganharia uma aba redirecionada duplicada — reproduzido
+>    de verdade em `tests/apps_script/cenarios/migracao_registro_legado.js`
+>    antes de escrever a correção.
+>
+> Testado com regressão executável permanente ANTES do deploy:
+> `tests/apps_script/cenarios/colisao_aba_visao_geral_manual.js` (aba manual
+> sobrevive, identidade e conteúdo preservados, destino redirecionado
+> estável em 3 sincronizações seguidas) e o teste de migração de registro
+> legado atualizado para também provar o bootstrap. O diagnóstico
+> `abas_parcialmente_alteradas` (V12) também tinha um bug no lado Python:
+> `sincronizar_planilha()` só mostrava `abas_escritas_antes_da_falha` e
+> omitia `abas_parcialmente_alteradas` da mensagem de erro — corrigido no
+> mesmo commit, com regressão em `tests/test_sheets_export.py`.
 >
 > 1. **Uma aba criada à mão podia ser sobrescrita.** `abaLimpa()` decidia se
 >    uma aba "era do script" só pelo NOME (`planilha.getSheetByName(nome)`);
@@ -206,11 +237,11 @@ function doPost(e) {
     // - so uma aba com AMBOS nome e sheetId batendo e considerada do script.
     const registro = abasGeradasRegistradas();
     migrarRegistroLegado(planilha, registro);
-    const nomesUsados = { 'Painel': true, 'Visao Geral': true, '_Dados': true };
+    const nomesUsados = { 'Painel': true, '_Dados': true };
     const nomesEstranhos = {};
     planilha.getSheets().forEach(function (aba) {
       const nome = aba.getName();
-      if (nome !== 'Visao Geral' && !abaEhDoScript(registro, aba)) {
+      if (!abaEhDoScript(registro, aba)) {
         nomesUsados[nome] = true;
         nomesEstranhos[nome] = true;
       }
@@ -222,6 +253,20 @@ function doPost(e) {
     const camposMetricas = colunasOuFallback(
       dados.metricas_colunas, CAMPOS_METRICAS_FALLBACK, 'projeto', avisos
     );
+    // Visao Geral tambem e propriedade verificada, nunca um nome reservado
+    // automatico: uma aba manual chamada "Visao Geral" (sheetId fora do
+    // registro) nunca e adotada nem limpa. Reaproveita o mesmo mecanismo de
+    // redirecionamento estavel dos projetos (sufixo de hash deterministico
+    // via nomeAbaProjeto) e reserva o nome escolhido em nomesUsados ANTES
+    // de resolver os comparativos, para nenhum dos dois lados roubar o nome
+    // do outro.
+    const nomeVisao = nomeAbaProjeto('Visao Geral', nomesUsados);
+    if (nomeVisao !== 'Visao Geral' && nomesEstranhos['Visao Geral']) {
+      adicionarAviso(
+        avisos,
+        "'Visao Geral' nao pertence a este script (colisao com aba manual/estranha); usando '" + nomeVisao + "'"
+      );
+    }
     const destinos = comparativos.map(function (comp) {
       const natural = String(comp.projeto || 'projeto').replace(/[\[\]:*?\/\\]/g, '-');
       const nome = nomeAbaProjeto(comp.projeto, nomesUsados);
@@ -234,7 +279,7 @@ function doPost(e) {
       }
       return nome;
     });
-    const abaVisao = planilha.getSheetByName('Visao Geral') || planilha.insertSheet('Visao Geral');
+    const abaVisao = planilha.getSheetByName(nomeVisao) || planilha.insertSheet(nomeVisao);
     const linkVisao = planilha.getUrl() + '#gid=' + abaVisao.getSheetId();
     comparativos.forEach(function (comp, indice) {
       const nomeAba = destinos[indice];
@@ -242,18 +287,18 @@ function doPost(e) {
       escreverComparativo(planilha, comp, nomeAba, dados.gerado_em, linkVisao, registro);
       estadoAbas[nomeAba] = 'concluida';
     });
-    estadoAbas['Visao Geral'] = 'iniciada';
+    estadoAbas[nomeVisao] = 'iniciada';
     escreverVisaoGeral(
       planilha, Array.isArray(dados.visao_geral) ? dados.visao_geral : [],
-      camposVisao, dados.gerado_em, avisos, comparativos, destinos, registro
+      camposVisao, dados.gerado_em, avisos, comparativos, destinos, registro, nomeVisao
     );
-    estadoAbas['Visao Geral'] = 'concluida';
+    estadoAbas[nomeVisao] = 'concluida';
 
     // Se o campo sumir por regressao, preservar abas e avisar e mais seguro
     // que apagar tudo. Com uma lista valida, remove so abas que o proprio
     // script gerou (registro nome+sheetId) - nunca por o nome parecer gerado.
     if (Array.isArray(dados.comparativos)) {
-      limparAbasOrfas(planilha, destinos, registro);
+      limparAbasOrfas(planilha, destinos, registro, nomeVisao);
     }
 
     return resposta({
@@ -404,8 +449,8 @@ function pendenciasProjeto(linha) {
   return pendencias;
 }
 
-function escreverVisaoGeral(planilha, linhas, campos, geradoEm, avisos, comparativos, destinos, registro) {
-  const aba = abaLimpa(planilha, 'Visao Geral', registro);
+function escreverVisaoGeral(planilha, linhas, campos, geradoEm, avisos, comparativos, destinos, registro, nomeVisao) {
+  const aba = abaLimpa(planilha, nomeVisao, registro);
   const largura = Math.max(1, campos.length);
   const larguraFaixa = Math.max(10, largura);
   const ordenadas = linhas.slice().sort(function (a, b) {
@@ -1245,11 +1290,28 @@ function migrarRegistroLegado(planilha, registro) {
       mudou = true;
     }
   });
+  // Bootstrap unico: ate a V12, "Visao Geral" nunca entrava no registro por
+  // nome (so os comparativos - ver registrarAbasGeradas/limparAbasOrfas das
+  // versoes anteriores). Sem isso, a primeira sincronizacao depois desta
+  // correcao trataria a Visao Geral real, criada por uma versao anterior,
+  // como estranha - e criaria uma redirecionada, duplicando a aba. So
+  // acontece uma vez (marcador __visao_migrada__); depois disso "Visao
+  // Geral" segue a mesma regra de propriedade de qualquer outra aba - nome
+  // sozinho nunca mais basta.
+  if (!registro.__visao_migrada__) {
+    const visaoExistente = planilha.getSheetByName('Visao Geral');
+    if (visaoExistente && registro['Visao Geral'] === undefined) {
+      registro['Visao Geral'] = visaoExistente.getSheetId();
+    }
+    registro.__visao_migrada__ = true;
+    mudou = true;
+  }
   if (mudou) salvarAbasGeradas(registro);
 }
 
-function limparAbasOrfas(planilha, projetosAtuais, registro) {
-  const manter = { 'Visao Geral': true };
+function limparAbasOrfas(planilha, projetosAtuais, registro, nomeVisao) {
+  const manter = {};
+  manter[nomeVisao] = true;
   projetosAtuais.forEach(function (nome) { manter[nome] = true; });
   let mudou = false;
   planilha.getSheets().forEach(function (aba) {

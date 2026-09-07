@@ -506,11 +506,12 @@ subprocessos reais, sem `git stash`.
 
 ## 3. Receptor do Google Sheets
 
-**Estado: 2ª rodada de revisão do Codex sobre o commit `d6246b6` achou 3
-lacunas novas — corrigidas, testadas e implantadas na nuvem (Versão 12,
-07/09/2026).** Mesma lição da frente 2: **não declare esta frente concluída
-"para sempre" só porque duas rodadas já passaram — a próxima revisão pode
-achar outra lacuna** — leia esta seção inteira antes de mexer.
+**Estado: 3ª rodada de revisão do Codex sobre o commit `c5018dc` achou mais 2
+ajustes (1 no Code.gs, 1 no cliente Python) — corrigidos e testados
+localmente (07/09/2026), redeploy do Code.gs em andamento.** Mesma lição da
+frente 2: **não declare esta frente concluída "para sempre" só porque
+algumas rodadas já passaram — a próxima revisão pode achar outra lacuna** —
+leia esta seção inteira antes de mexer.
 
 ### 1ª rodada (commits `84ecb64` + `d6246b6`) — histórico
 
@@ -674,6 +675,58 @@ planilha de produção — não substituem a cobertura de falha.** Os 3 cenário
 de falha (colisão com aba manual, payload inválido, falha operacional
 pós-`clear()`) foram provados ANTES do deploy, em ambiente isolado; nunca
 foram (nem deveriam ser) reproduzidos contra a planilha real.
+
+### 3ª rodada (Codex sobre o commit `c5018dc`) — 2 ajustes
+
+A 2ª rodada protegeu as abas de COMPARATIVO por propriedade verificada
+(nome + sheetId), mas deixou "Visao Geral" de fora de propósito — e o
+diagnóstico novo (`abas_parcialmente_alteradas`) nunca chegou a ser lido
+pelo cliente Python.
+
+1. **"Visao Geral" não tinha a mesma proteção de propriedade.** `doPost`
+   excluía esse nome explicitamente da checagem de abas estranhas
+   (`nome !== 'Visao Geral'`), e `abaLimpa()` adotava/limpava qualquer aba
+   com esse nome sem checar sheetId. Reproduzido antes da correção: excluir
+   a "Visao Geral" gerada, criar uma aba manual com o mesmo nome (sheetId
+   diferente) e uma anotação, sincronizar de novo — `ok:true`, mas a
+   anotação some. **Correção:** "Visao Geral" passa pelo mesmo mecanismo de
+   propriedade verificada dos projetos; se o nome estiver ocupado por uma
+   aba estranha, a Visão Geral real é redirecionada para um destino
+   alternativo estável entre sincronizações (mesmo mecanismo de sufixo de
+   hash determinístico via `nomeAbaProjeto`), preservando a aba manual
+   intacta. `migrarRegistroLegado()` ganhou um bootstrap de uma única vez
+   (`__visao_migrada__`): sem ele, a primeira sincronização depois deste
+   deploy trataria a PRÓPRIA "Visao Geral" real (criada por uma versão
+   anterior, nunca registrada por nome até a V12) como estranha — reproduzi
+   isso de verdade ao atualizar `migracao_registro_legado.js` e ver o
+   teste falhar antes de escrever o bootstrap.
+2. **`sincronizar_planilha()` só mostrava metade do diagnóstico de falha
+   parcial.** A V12 introduziu `abas_parcialmente_alteradas` na resposta do
+   Apps Script, mas o cliente Python só lia `abas_escritas_antes_da_falha`
+   — uma falha com as duas listas preenchidas ao mesmo tempo (ex.:
+   `abas_escritas_antes_da_falha: ["2026-a"]`,
+   `abas_parcialmente_alteradas: ["2026-b"]`) informava só `2026-a` e
+   escondia `2026-b`. **Correção:** as duas listas aparecem separadamente
+   na mensagem de erro, mantendo compatibilidade com respostas antigas
+   (sem o campo novo, nada extra aparece) e a ocultação do token continua
+   valendo sobre a mensagem inteira.
+
+Regressões: `tests/apps_script/cenarios/colisao_aba_visao_geral_manual.js`
+(nova) + `migracao_registro_legado.js` (atualizado, agora também prova o
+bootstrap) em `tests/test_apps_script_execucao.py`; três testes novos em
+`tests/test_sheets_export.py::SincronizarPlanilhaTest` (as duas listas
+distintas, compatibilidade com resposta antiga, token oculto mesmo com o
+campo novo presente) e um em `AppsScriptDocumentadoTest` (contrato de
+código: `nomeVisao` usado de fato em todos os pontos, não só declarado).
+Suíte Python completa: 376 testes. `checar-segredos --strict` limpo.
+
+`docs/infraestrutura-externa.md` também estava desatualizado — ainda
+anunciava a Versão 11 como ativa quando a V12 já tinha sido implantada e
+verificada na 2ª rodada. Corrigido no mesmo commit.
+
+**Redeploy real:** ver `STATUS.md` para o resultado — esta seção é
+atualizada só depois que a implantação e as duas sincronizações reais
+acontecerem de verdade, não antes.
 
 ## 4. Proveniência das informações
 

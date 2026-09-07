@@ -5,7 +5,7 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (07/09/2026, sessao 10)
+## AO RETOMAR — comece por aqui (07/09/2026, sessao 11)
 
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
@@ -15,11 +15,49 @@ cada vez o Codex achou lacuna nova - **nao declare concluida de novo so
 porque os exemplos testados passaram**; leia a secao 2 do plano inteira,
 incluindo o inventario comando-a-comando, antes de mexer.
 
-**Frente 3 (receptor Sheets): 2a rodada de revisao do Codex sobre o commit
-`d6246b6` achou 3 lacunas novas — corrigidas e implantadas (Versao 12).**
-Mesmo padrao da frente 2 - **nao declare esta frente concluida "para sempre"
-so porque duas rodadas ja passaram**; leia a secao 3 do plano inteira antes
-de mexer. As 3 lacunas desta rodada:
+**Frente 3 (receptor Sheets): 3a rodada de revisao do Codex sobre o commit
+`c5018dc` achou mais 2 ajustes — corrigidos e testados localmente, redeploy
+do Code.gs em andamento.** Mesmo padrao da frente 2 - **nao declare esta
+frente concluida "para sempre" so porque algumas rodadas ja passaram**;
+leia a secao 3 do plano inteira antes de mexer. Os 2 ajustes desta rodada:
+
+1. **"Visao Geral" ficou de fora da protecao de propriedade que a V12 deu
+   aos comparativos** - `doPost` excluia esse nome de proposito
+   (`nome !== 'Visao Geral'`) da checagem de abas estranhas, e `abaLimpa()`
+   adotava/limpava qualquer aba com esse nome sem checar sheetId. Uma aba
+   manual chamada "Visao Geral" tinha o conteudo apagado.
+2. **`sincronizar_planilha()` (Python) so mostrava metade do diagnostico
+   de falha parcial** - lia `abas_escritas_antes_da_falha` mas nunca
+   `abas_parcialmente_alteradas` (introduzido na V12), escondendo qual aba
+   ficou em branco quando as duas listas vinham preenchidas ao mesmo tempo.
+
+**Correcao local: feita e testada.** "Visao Geral" passa pelo mesmo
+mecanismo de propriedade verificada (nome + sheetId) dos projetos, com
+redirecionamento estavel entre sincronizacoes quando o nome esta ocupado
+por aba estranha, e um bootstrap de uma unica vez
+(`migrarRegistroLegado`/`__visao_migrada__`) pro upgrade V11/V12 -> V13 nao
+duplicar a Visao Geral real (nunca registrada por nome ate a V12) - achei
+esse bug no meu proprio teste antes de sequer cogitar o deploy. O cliente
+Python agora mostra as duas listas separadamente, preservando
+compatibilidade com respostas antigas (sem o campo novo) e ocultacao de
+token. Regressao executavel nova:
+`tests/apps_script/cenarios/colisao_aba_visao_geral_manual.js` +
+`migracao_registro_legado.js` atualizado (agora tambem prova o bootstrap);
+3 testes novos em `SincronizarPlanilhaTest`. Suite completa: 376 testes,
+`checar-segredos --strict` limpo. `docs/infraestrutura-externa.md` tambem
+corrigido - ainda anunciava a Versao 11 quando a V12 ja estava implantada.
+
+**Redeploy real: ver o proximo bloco desta sessao** (ainda nao aconteceu no
+momento de escrever este paragrafo - se este texto nao foi atualizado
+depois, o redeploy NAO aconteceu e a nuvem continua na Versao 12).
+
+Frentes 4 (proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito)
+**nao iniciadas** — comece pelo plano, nao redescubra o escopo.
+
+## Sessao anterior (07/09/2026, sessao 10) — historico
+
+**Frente 3 (receptor Sheets), 2a rodada: CONCLUIDA e implantada (Versao
+12).** As 3 lacunas desta rodada:
 
 1. **Aba manual podia ser sobrescrita** - `abaLimpa()` decidia propriedade
    so pelo nome; uma aba criada a mao com o mesmo nome de um projeto
@@ -63,9 +101,6 @@ aba manual, payload inválido, falha operacional pós-`clear()`) foram
 provados antes do deploy, contra o Code.gs real rodando em ambiente isolado
 (`tests/apps_script/` + `tests/test_apps_script_execucao.py`) — nunca contra
 a planilha de produção, de propósito (destrutivo só em ambiente isolado).
-
-Frentes 4 (proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito)
-**nao iniciadas** — comece pelo plano, nao redescubra o escopo.
 
 ## Sessao anterior (07/09/2026, sessao 9) — historico
 

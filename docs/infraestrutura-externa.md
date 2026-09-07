@@ -81,20 +81,31 @@ de propósito: assim não desaparece se a planilha for para a lixeira).
 - Editor: `script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 - Web App **ativo**, execução como conta-comercial, acesso "qualquer pessoa",
   protegido por token no corpo do POST.
-- A implantação ativa é a **Versão 11**, publicada em 07/09/2026 pela conta
+- A implantação ativa é a **Versão 12**, publicada em 07/09/2026 pela conta
   **conta-comercial**, no mesmo ID e na mesma URL do Web App desde a Versão 9
   (`AKfycbzrKsNDNyCEK40qvHKn9L7rOVGp3pfkjNUR9iKFk6w5qLnJhdliHLYAbWPXuKep9GZT`).
-  Corrige 3 falhas reais da V9 (payload com `null` podia deixar a planilha
-  parcialmente escrita; `limparAbasOrfas` podia apagar aba criada à mão;
-  falha no meio da escrita não dizia o que já tinha sido gravado) — ver
+  Corrige 3 falhas reais que a 2ª rodada de revisão do Codex (sobre o commit
+  `d6246b6`) reproduziu de verdade (propriedade de aba só pelo nome,
+  contrato de `estrelas` não validado, aba parcialmente alterada fora do
+  diagnóstico) — ver [`integracao-google-sheets.md`](integracao-google-sheets.md),
+  seção "Code.gs (versão 12 ativa)". Duas sincronizações reais contra a V12
+  devolveram 10 projetos e 10 comparativos nas duas (o registro de
+  propriedade migrou do formato legado da V11 sem incidente), e a planilha
+  real ficou com 11 abas (Visão Geral + 10 comparativos, sem duplicata nem
+  órfã).
+  **07/09/2026 (mais tarde, mesmo dia) — código da Versão 13 pronto no
+  repositório, NÃO implantado ainda.** Corrige mais 1 falha real: a
+  proteção de propriedade da V12 excluía "Visao Geral" de propósito
+  (`nome !== 'Visao Geral'`), então uma aba manual com esse nome ainda
+  podia ser adotada e limpa — ver
   [`integracao-google-sheets.md`](integracao-google-sheets.md), seção
-  "Code.gs (versão 11 ativa)". A Versão 10 (primeiro deploy do dia) quebrou
-  na primeira sincronização real (`PropertiesService.getDocumentProperties()`
-  é `null` num projeto solto) e foi substituída pela V11 minutos depois,
-  mesmo dia. Duas sincronizações reais contra a V11 devolveram 10 projetos e
-  10 comparativos nas duas, e a planilha real ficou com 11 abas (Visão Geral
-  + 10 comparativos, sem duplicata nem órfã) — conferida por captura de tela
-  da Visão Geral e de uma aba de comparativo.
+  "Code.gs (versão 13 - DEPLOY PENDENTE)". **Até o redeploy acontecer, o
+  Web App continua rodando o código da Versão 12** — não presuma que a
+  correção já está ativa na nuvem só porque está no git.
+  - Antes desta V12: a V9-V11 corrigiram falhas anteriores. A Versão 10
+    (primeiro deploy da 1ª rodada) quebrou na primeira sincronização real
+    (`PropertiesService.getDocumentProperties()` é `null` num projeto
+    solto) e foi substituída pela V11 minutos depois, mesmo dia.
 - O layout em si (fila de atenção, vereditos, filtros, links, formatos
   numéricos e gráficos) vem da V9, publicada em 05/09/2026, que substitui a
   comparação inválida de scores entre projetos por contagens de pendências e

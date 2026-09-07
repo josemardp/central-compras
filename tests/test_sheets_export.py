@@ -335,6 +335,33 @@ class _FakeAppsScriptComFalhaParcial(BaseHTTPRequestHandler):
         self.wfile.write(dados)
 
 
+class _FakeAppsScriptComFalhaParcialEConcluida(BaseHTTPRequestHandler):
+    """Uma sincronizacao com abas concluidas E abas so parcialmente
+    alteradas ao mesmo tempo - reproducao exata pedida pelo Codex apos o
+    commit c5018dc: sincronizar-planilha informava so 2026-a e omitia
+    2026-b (abas_parcialmente_alteradas nunca era lido)."""
+
+    def log_message(self, *_):
+        pass
+
+    def do_POST(self):
+        tamanho = int(self.headers.get("Content-Length", 0))
+        self.rfile.read(tamanho)
+        resposta = {
+            "ok": False,
+            "error": "falha na sincronizacao",
+            "detalhe": "timeout",
+            "abas_escritas_antes_da_falha": ["2026-a"],
+            "abas_parcialmente_alteradas": ["2026-b"],
+        }
+        dados = json.dumps(resposta).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(dados)))
+        self.end_headers()
+        self.wfile.write(dados)
+
+
 class SincronizarPlanilhaTest(unittest.TestCase):
     def setUp(self):
         self.tmpdir = Path(tempfile.mkdtemp(prefix="central-compras-sync-"))
@@ -420,6 +447,66 @@ class SincronizarPlanilhaTest(unittest.TestCase):
         mensagem = str(ctx.exception)
         self.assertIn("falha na sincronizacao", mensagem)
         self.assertIn("2026-primeiro", mensagem)
+
+    def test_partial_and_completed_tabs_are_both_reported_distinctly(self):
+        url = self._sobe_servidor(_FakeAppsScriptComFalhaParcialEConcluida)
+        caminho = self._config(url, "qualquer-token")
+        with self.assertRaises(SystemExit) as ctx:
+            cc.sincronizar_planilha(argparse.Namespace(config=str(caminho)))
+        mensagem = str(ctx.exception)
+        self.assertIn("2026-a", mensagem)
+        self.assertIn("2026-b", mensagem)
+        # Nao pode misturar as duas listas numa unica frase generica - tem
+        # que dar pra saber qual aba terminou de verdade e qual so foi
+        # limpa (pode estar em branco).
+        pos_a = mensagem.index("2026-a")
+        pos_b = mensagem.index("2026-b")
+        self.assertNotEqual(pos_a, pos_b)
+
+    def test_token_stays_hidden_even_with_partial_diagnostics_present(self):
+        # Ocultar o token na mensagem de erro nao pode depender de quais
+        # campos vieram na resposta - continua valendo com
+        # abas_parcialmente_alteradas presente.
+        class _FakeComTokenNoDetalhe(BaseHTTPRequestHandler):
+            def log_message(self, *_):
+                pass
+
+            def do_POST(self):
+                tamanho = int(self.headers.get("Content-Length", 0))
+                self.rfile.read(tamanho)
+                resposta = {
+                    "ok": False,
+                    "error": "falha na sincronizacao",
+                    "detalhe": "token-secreto-123 rejeitado",
+                    "abas_escritas_antes_da_falha": ["2026-a"],
+                    "abas_parcialmente_alteradas": ["2026-b"],
+                }
+                dados = json.dumps(resposta).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(dados)))
+                self.end_headers()
+                self.wfile.write(dados)
+
+        url = self._sobe_servidor(_FakeComTokenNoDetalhe)
+        caminho = self._config(url, "token-secreto-123")
+        with self.assertRaises(SystemExit) as ctx:
+            cc.sincronizar_planilha(argparse.Namespace(config=str(caminho)))
+        mensagem = str(ctx.exception)
+        self.assertNotIn("token-secreto-123", mensagem)
+        self.assertIn("[oculto]", mensagem)
+
+    def test_response_without_partial_field_stays_compatible(self):
+        # Resposta antiga (antes do Code.gs V13) nao tem
+        # abas_parcialmente_alteradas - sincronizar_planilha nao pode
+        # quebrar nem inventar a linha quando o campo simplesmente nao vem.
+        url = self._sobe_servidor(_FakeAppsScriptComFalhaParcial)
+        caminho = self._config(url, "qualquer-token")
+        with self.assertRaises(SystemExit) as ctx:
+            cc.sincronizar_planilha(argparse.Namespace(config=str(caminho)))
+        mensagem = str(ctx.exception)
+        self.assertIn("2026-primeiro", mensagem)
+        self.assertNotIn("parcialmente alteradas", mensagem)
 
     def test_non_json_response_does_not_crash_with_a_raw_traceback(self):
         url = self._sobe_servidor(_FakeNaoJsonServer)
@@ -539,11 +626,16 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         cls.code = doc.split("```javascript", 1)[1].split("```", 1)[0]
 
     def test_deploy_ativo_esta_documentado(self):
-        self.assertIn("versão 12 ativa", self.doc)
+        # A ultima versao de fato implantada e verificada e a 12; a 13
+        # (3a rodada: protecao de propriedade tambem para "Visao Geral")
+        # esta corrigida no repositorio mas o redeploy ainda nao aconteceu
+        # nesta sessao - ver STATUS.md. Isso PRECISA continuar dizendo
+        # "DEPLOY PENDENTE" ate uma sessao futura publicar de verdade e
+        # atualizar este teste.
         self.assertIn("VERSÃO 9 IMPLANTADA E VERIFICADA", self.doc)
         self.assertIn("VERSÃO 11 IMPLANTADA E VERIFICADA", self.doc)
         self.assertIn("VERSÃO 12 IMPLANTADA E VERIFICADA", self.doc)
-        self.assertNotIn("DEPLOY PENDENTE", self.doc)
+        self.assertIn("Code.gs (versão 13 - DEPLOY PENDENTE)", self.doc)
 
     def test_properties_do_projeto_solto_usa_script_nao_document(self):
         # PropertiesService.getDocumentProperties() e null num projeto solto
@@ -622,6 +714,25 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         # (test_falha_operacional_apos_clear_identifica_aba_parcial_no_diagnostico).
         self.assertIn("abas_parcialmente_alteradas", self.code)
         self.assertIn("estadoAbas[nomeAba] = 'iniciada'", self.code)
+
+    def test_visao_geral_tambem_e_propriedade_verificada(self):
+        # Frente 3 (3a rodada, Codex sobre o commit c5018dc): a 2a rodada
+        # protegeu abas de comparativo por nome+sheetId mas excluiu "Visao
+        # Geral" da checagem de propria vontade (`nome !== 'Visao Geral'`) -
+        # uma aba manual com esse nome era adotada e limpa. Validado de
+        # verdade em test_apps_script_execucao.py
+        # (test_visao_geral_manual_sobrevive_a_colisao_de_nome +
+        # test_registro_legado_sem_sheet_id_e_migrado_sem_duplicar, que
+        # tambem prova o bootstrap do upgrade V11/V12 -> V13).
+        self.assertNotIn("nome !== 'Visao Geral'", self.code)
+        self.assertIn("const nomeVisao = nomeAbaProjeto('Visao Geral', nomesUsados)", self.code)
+        self.assertIn("__visao_migrada__", self.code)
+        # abaVisao/abaLimpa/escreverVisaoGeral/limparAbasOrfas tem que usar
+        # a variavel resolvida, nao o literal fixo - senao a protecao vira
+        # so decoracao que nunca influencia o nome de verdade usado.
+        self.assertIn("planilha.getSheetByName(nomeVisao)", self.code)
+        self.assertIn("escreverVisaoGeral(\n      planilha, Array.isArray(dados.visao_geral) ? dados.visao_geral : [],\n      camposVisao, dados.gerado_em, avisos, comparativos, destinos, registro, nomeVisao\n    )", self.code)
+        self.assertIn("limparAbasOrfas(planilha, destinos, registro, nomeVisao)", self.code)
 
     def test_renderizacao_e_em_lote_e_tem_lock(self):
         self.assertNotIn(".appendRow(", self.code)

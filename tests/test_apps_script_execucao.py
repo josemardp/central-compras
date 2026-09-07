@@ -72,6 +72,20 @@ class AppsScriptExecucaoTest(unittest.TestCase):
         self.assertTrue(r["conteudo_preservado"], "conteudo da aba manual foi sobrescrito")
         self.assertTrue(r["projeto_foi_escrito_em_outra_aba"], r)
 
+    def test_visao_geral_manual_sobrevive_a_colisao_de_nome(self):
+        # A mesma protecao de propriedade (nome + sheetId) tem que valer
+        # tambem pra "Visao Geral" - nao e um nome reservado automatico.
+        # Reproduzido de verdade contra o commit c5018dc antes da correcao:
+        # doPost excluia esse nome da checagem de abas estranhas e abaLimpa
+        # adotava/limpava a aba manual.
+        r = self._rodar_cenario("colisao_aba_visao_geral_manual.js")
+        self.assertTrue(r["sync2_ok"], r)
+        self.assertTrue(r["sync3_ok"], r)
+        self.assertTrue(r["aba_manual_identidade_preservada"], "sheetId da Visao Geral manual mudou")
+        self.assertTrue(r["aba_manual_conteudo_preservado"], "conteudo da Visao Geral manual foi apagado")
+        self.assertTrue(r["script_escreveu_em_outro_lugar"], "o script nao redirecionou para outro destino")
+        self.assertTrue(r["destino_estavel_entre_syncs"], "o destino redirecionado mudou entre sincronizacoes")
+
     def test_payload_com_estrelas_negativas_formato_legado_zero_mutacoes(self):
         payload = {
             "token": "...", "schema_versao": 3, "gerado_em": "x",
@@ -147,6 +161,7 @@ class AppsScriptExecucaoTest(unittest.TestCase):
         r = self._rodar_cenario("migracao_registro_legado.js")
         self.assertTrue(r["sync2_ok"], r)
         self.assertTrue(r["sem_duplicata"], r["abas"])
+        self.assertTrue(r["visao_geral_sem_duplicata"], "Visao Geral duplicou no upgrade V11->V13")
         self.assertTrue(r["sem_aviso_de_colisao"], r["avisos_sync2"])
         self.assertTrue(r["sheetId_preservado"], r)
 

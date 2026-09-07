@@ -3,6 +3,14 @@
 // atual pra um nome ja conhecido do registro antigo (uma unica vez), sem
 // duplicar a aba nem tratar o projeto legitimo como colisao com aba
 // estranha.
+//
+// Isso TAMBEM prova o bootstrap da protecao da Visao Geral (correcao pos
+// c5018dc): o registro simulado abaixo, igual ao que a V11 real deixava
+// gravado, nunca incluia "Visao Geral" por nome (so os comparativos). Sem
+// o bootstrap explicito em migrarRegistroLegado(), a sincronizacao 2
+// trataria a Visao Geral real (criada pela V11/V12) como estranha e
+// criaria uma redirecionada - abas.length subiria pra 3 e sem_duplicata
+// falharia, mesmo o registro nao tendo nada de errado com "2026-legado".
 // Uso: node migracao_registro_legado.js <caminho-para-code.gs>
 'use strict';
 const { carregar, chamar } = require('../harness');
@@ -39,12 +47,13 @@ const abas = planilha.sheets.map(function (s) { return s.name; });
 const resultado = {
   sync2_ok: r2.ok === true,
   sem_duplicata: abas.length === 2 && abas.filter(function (n) { return n === '2026-legado'; }).length === 1,
+  visao_geral_sem_duplicata: abas.filter(function (n) { return n === 'Visao Geral'; }).length === 1,
   sem_aviso_de_colisao: !(r2.avisos || []).some(function (a) { return a.indexOf('nao pertence a este script') >= 0; }),
   sheetId_preservado: planilha.getSheetByName('2026-legado').getSheetId() === idReal,
   abas: abas,
   avisos_sync2: r2.avisos || [],
 };
-resultado.passou = resultado.sync2_ok && resultado.sem_duplicata
+resultado.passou = resultado.sync2_ok && resultado.sem_duplicata && resultado.visao_geral_sem_duplicata
   && resultado.sem_aviso_de_colisao && resultado.sheetId_preservado;
 
 console.log('RESULTADO_JSON: ' + JSON.stringify(resultado));
