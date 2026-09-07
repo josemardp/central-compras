@@ -3,23 +3,14 @@
 O comando `python scripts/central_compras.py sincronizar-planilha` exporta a
 visão geral dos projetos e os comparativos de cotações para uma planilha Google.
 
-**Status externo: Versão 12 ainda é a que está ativa na nuvem.** A Versão 13
-(código abaixo) corrige mais 1 falha real encontrada na 3ª rodada de revisão
-do Codex - ver "Code.gs (versão 13 - DEPLOY PENDENTE)" logo adiante - mas
-**ainda não foi publicada**. Enquanto a implantação não for atualizada pela
-conta `conta-comercial@exemplo.com`, o Web App continua rodando o código da Versão
-12.
-
-A Versão 12 foi publicada em 07/09/2026 pela conta `conta-comercial@exemplo.com`,
-editando a implantação existente (mesmo ID/URL do Web App desde a Versão 9).
-Depois do deploy, a sincronização foi executada duas vezes de verdade e a
-planilha real foi conferida: 11 abas (Visao Geral + 10 comparativos), sem
-duplicata nem órfã. Ver "VERSÃO 12 IMPLANTADA E VERIFICADA" no histórico de
-versões adiante para o relato completo — desta vez as 3 correções (colisão
-com aba manual, contrato de `estrelas`, diagnóstico de aba parcial) tinham
-testes PERMANENTES e executáveis (`tests/apps_script/` +
-`tests/test_apps_script_execucao.py`) provando o comportamento antes do
-deploy, não só asserts de string.
+**Status externo e versionado: Versão 13 ativa e verificada.** Publicada em
+07/09/2026 pela conta `conta-comercial@exemplo.com`, editando a implantação existente
+(mesmo ID/URL do Web App desde a Versão 9). Depois do deploy, a sincronização
+foi executada duas vezes de verdade e a planilha real foi conferida: 11 abas
+(Visao Geral + 10 comparativos), sem duplicata nem órfã — o bootstrap de
+migração (`__visao_migrada__`) adotou a Visão Geral real do upgrade V12→V13
+sem criar uma redirecionada. Ver "VERSÃO 13 IMPLANTADA E VERIFICADA" no
+histórico de versões adiante para o relato completo.
 
 ## Como funciona
 
@@ -50,12 +41,15 @@ Projeto "Central de Compras - Sync" em https://script.google.com, conta
 conta-comercial. Editor:
 `https://script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 
-## Code.gs (versão 13 - DEPLOY PENDENTE)
+## Code.gs (versão 13 ativa)
 
-> **O código abaixo NÃO está implantado ainda.** A nuvem continua rodando a
-> Versão 12. Esta Versão 13 corrige, em 07/09/2026, mais 1 falha real
-> encontrada na 3ª rodada de revisão do Codex sobre o commit `c5018dc`
-> (reproduzida de verdade, com regressão executável permanente):
+> O código abaixo corresponde à Versão 13 implantada, executada como
+> **conta-comercial**, no mesmo ID e URL do Web App desde a Versão 9. Publicada e
+> verificada em 07/09/2026 (duas sincronizações reais + inspeção visual da
+> planilha - ver "VERSÃO 13 IMPLANTADA E VERIFICADA" no histórico de versões
+> mais abaixo). Corrige, no mesmo dia, mais 1 falha real encontrada na 3ª
+> rodada de revisão do Codex sobre o commit `c5018dc` (reproduzida de
+> verdade, com regressão executável permanente):
 >
 > 1. **A "Visao Geral" ficou de fora da proteção de propriedade que a
 >    Versão 12 deu aos comparativos.** `doPost` excluía esse nome
@@ -1370,6 +1364,7 @@ function resposta(obj) {
 | 9 → 10 | `null` em `visao_geral`/`comparativos` não era validado antes de escrever; `limparAbasOrfas` decidia por padrão de nome; falha no meio não dizia o que já tinha sido gravado | planilha podia ficar parcialmente escrita e inconsistente; aba criada à mão com nome parecido (`2026-...`) podia ser apagada; resposta de erro sem pista do que sobreviveu |
 | 10 → 11 | `PropertiesService.getDocumentProperties()` é `null` num projeto solto (não container-bound) | `TypeError` real em produção minutos depois do deploy da V10, capturado pelo próprio `abas_escritas_antes_da_falha` que a V10 introduziu — trocado por `getScriptProperties()` |
 | 11 → 12 | propriedade de aba só pelo nome; `estrelas` fora de 0–5 não validado; aba limpa-mas-não-reescrita fora do diagnóstico | aba manual `2026-a` era sobrescrita; `estrelas: -2` derrubava a sincronização já com abas limpas; diagnóstico de falha parcial escondia qual aba tinha ficado em branco |
+| 12 → 13 | "Visao Geral" excluída de propósito da proteção de propriedade que a V12 deu aos comparativos | aba manual chamada "Visao Geral" tinha o conteúdo apagado; corrigido com o mesmo mecanismo de propriedade verificada + bootstrap de migração pro upgrade não duplicar a Visão Geral real |
 
 Os bugs visuais só apareceram quando a planilha foi aberta. Vale a lição:
 resposta HTTP, execução “Concluído” no Apps Script e contagens corretas não
@@ -1467,3 +1462,22 @@ Python continua com timeout de 120s; **não reduza esse valor**.
   + 10 comparativos, sem duplicata nem órfã — nenhuma aba nova criada pela
   migração do registro), conferido pela listagem de páginas visíveis e por
   captura de tela da Visão Geral.
+- **VERSÃO 13 IMPLANTADA E VERIFICADA:** publicada em 07/09/2026 pela conta
+  `conta-comercial@exemplo.com`, editando a mesma implantação (ID/URL preservados
+  desde a V9). Corrige a falha que a 3ª rodada de revisão do Codex sobre o
+  commit `c5018dc` reproduziu de verdade: "Visao Geral" ficava de fora da
+  proteção de propriedade (nome + sheetId) que a V12 deu aos comparativos.
+  Testado ANTES do deploy com regressão executável permanente
+  (`tests/apps_script/cenarios/colisao_aba_visao_geral_manual.js` +
+  `migracao_registro_legado.js` atualizado). O ponto mais delicado do
+  deploy real era o bootstrap de migração (`__visao_migrada__`): até a V12,
+  "Visao Geral" nunca tinha sido registrada por nome, então a primeira
+  sincronização depois deste deploy corria o risco de tratar a Visão Geral
+  REAL (criada pela V9-V12) como estranha e criar uma redirecionada,
+  duplicando a aba — funcionou sem incidente em produção. Duas
+  sincronizações reais devolveram
+  `Planilha sincronizada: 10 projeto(s), 10 comparativo(s).` nas duas, e a
+  planilha real continuou com exatamente 11 abas (Visao Geral + 10
+  comparativos, sem duplicata nem órfã — nenhuma aba "Visao Geral" com
+  sufixo de hash redirecionada apareceu), conferido pela listagem de
+  páginas visíveis e por captura de tela da Visão Geral.

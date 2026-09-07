@@ -724,9 +724,22 @@ Suíte Python completa: 376 testes. `checar-segredos --strict` limpo.
 anunciava a Versão 11 como ativa quando a V12 já tinha sido implantada e
 verificada na 2ª rodada. Corrigido no mesmo commit.
 
-**Redeploy real:** ver `STATUS.md` para o resultado — esta seção é
-atualizada só depois que a implantação e as duas sincronizações reais
-acontecerem de verdade, não antes.
+**Redeploy real (07/09/2026, conta `conta-comercial@exemplo.com`):** publicado como
+**Versão 13**, editando a implantação existente (mesmo ID/URL desde a V9).
+O ponto mais delicado era o bootstrap de migração (`__visao_migrada__`):
+até a V12, "Visao Geral" nunca tinha sido registrada por nome, então a
+primeira sincronização depois deste deploy corria o risco de tratar a
+Visão Geral REAL (criada pela V9-V12) como estranha e criar uma
+redirecionada, duplicando a aba — funcionou sem incidente em produção.
+Duas sincronizações reais devolveram
+`Planilha sincronizada: 10 projeto(s), 10 comparativo(s).` nas duas, e a
+planilha real
+(`docs.google.com/spreadsheets/d/1WjO_Ax9Tw6zrMFY2MCLTwbwAoK_Um1g93LWy_HMION4`)
+continua com exatamente 11 abas (Visão Geral + 10 comparativos, sem
+duplicata nem órfã, nenhuma "Visao Geral" redirecionada) — conferido pela
+listagem de páginas visíveis e por captura de tela. Ver
+`docs/integracao-google-sheets.md`, "VERSÃO 13 IMPLANTADA E VERIFICADA",
+para o relato completo.
 
 ## 4. Proveniência das informações
 

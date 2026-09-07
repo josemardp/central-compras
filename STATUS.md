@@ -16,10 +16,10 @@ porque os exemplos testados passaram**; leia a secao 2 do plano inteira,
 incluindo o inventario comando-a-comando, antes de mexer.
 
 **Frente 3 (receptor Sheets): 3a rodada de revisao do Codex sobre o commit
-`c5018dc` achou mais 2 ajustes — corrigidos e testados localmente, redeploy
-do Code.gs em andamento.** Mesmo padrao da frente 2 - **nao declare esta
-frente concluida "para sempre" so porque algumas rodadas ja passaram**;
-leia a secao 3 do plano inteira antes de mexer. Os 2 ajustes desta rodada:
+`c5018dc` achou mais 2 ajustes — corrigidos, testados e implantados
+(Versao 13).** Mesmo padrao da frente 2 - **nao declare esta frente
+concluida "para sempre" so porque algumas rodadas ja passaram**; leia a
+secao 3 do plano inteira antes de mexer. Os 2 ajustes desta rodada:
 
 1. **"Visao Geral" ficou de fora da protecao de propriedade que a V12 deu
    aos comparativos** - `doPost` excluia esse nome de proposito
@@ -47,9 +47,19 @@ token. Regressao executavel nova:
 `checar-segredos --strict` limpo. `docs/infraestrutura-externa.md` tambem
 corrigido - ainda anunciava a Versao 11 quando a V12 ja estava implantada.
 
-**Redeploy real: ver o proximo bloco desta sessao** (ainda nao aconteceu no
-momento de escrever este paragrafo - se este texto nao foi atualizado
-depois, o redeploy NAO aconteceu e a nuvem continua na Versao 12).
+**Redeploy real: FEITO.** Publicado como **Versao 13** pela conta
+`conta-comercial@exemplo.com`, editando a implantacao existente (mesmo ID/URL desde
+a V9). O ponto mais delicado era o bootstrap de migracao
+(`__visao_migrada__`): ate a V12, "Visao Geral" nunca tinha sido registrada
+por nome, entao a primeira sincronizacao depois deste deploy corria o
+risco de tratar a Visao Geral REAL (criada pela V9-V12) como estranha e
+criar uma redirecionada, duplicando a aba - funcionou sem incidente. Duas
+sincronizacoes reais devolveram `Planilha sincronizada: 10 projeto(s), 10
+comparativo(s).` nas duas, e a planilha real
+(`docs.google.com/spreadsheets/d/1WjO_Ax9Tw6zrMFY2MCLTwbwAoK_Um1g93LWy_HMION4`)
+continua com exatamente 11 abas (Visao Geral + 10 comparativos, sem
+duplicata nem orfa, nenhuma "Visao Geral" redirecionada) - conferido pela
+listagem de paginas visiveis e por captura de tela.
 
 Frentes 4 (proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito)
 **nao iniciadas** — comece pelo plano, nao redescubra o escopo.
