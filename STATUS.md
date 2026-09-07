@@ -5,7 +5,7 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (07/09/2026, sessao 11)
+## AO RETOMAR — comece por aqui (07/09/2026, sessao 12)
 
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
@@ -15,11 +15,65 @@ cada vez o Codex achou lacuna nova - **nao declare concluida de novo so
 porque os exemplos testados passaram**; leia a secao 2 do plano inteira,
 incluindo o inventario comando-a-comando, antes de mexer.
 
+**Frente 3 (receptor Sheets): 3a rodada CONCLUIDA e implantada (Versao
+13)** - "Visao Geral" ganhou a mesma protecao de propriedade
+(nome+sheetId) dos comparativos, com bootstrap de migracao pro upgrade
+V11/V12 -> V13 nao duplicar a Visao Geral real; `sincronizar_planilha()`
+(Python) passou a mostrar `abas_parcialmente_alteradas` alem de
+`abas_escritas_antes_da_falha`. Ver secao anterior desta sessao (abaixo)
+pro relato completo, ou a secao 3 do plano. **Mesmo assim, nao declare
+esta frente concluida "para sempre" so porque 3 rodadas ja passaram.**
+
+**Frente 4 (proveniencia): IMPLEMENTADA E TESTADA (07/09/2026).** Cada
+observacao de `cotacoes.csv` carrega, numa coluna nova `proveniencia`
+(JSON), origem/evidencia/data/estado para os 6 campos comerciais (preco,
+variacao, vendedor, frete, estoque, garantia) - amarrado aquela LINHA,
+nunca ao produto em geral. `fonte`/`confirmacao` continuam existindo, mas
+deixaram de ser a unica fonte da verdade sobre o que foi conferido.
+
+- **Schema**: 2 colunas novas (`estoque`, `proveniencia`) no fim de
+  `COTACOES_HEADER`, via o mecanismo de migracao ja existente
+  (`migrar-cotacoes`) - nada historico quebra, linha antiga sem a coluna
+  le como "legado sem evidencia" nos 6 campos.
+- **`cotar`**: flags novas `--estoque`/`--origem-dados`/`--evidencia`.
+- **`promover-cotacao`**: mesmas 3 flags; a proveniencia comeca HERDANDO
+  a da cotacao base e so marca "conferido" agora os campos que esta
+  chamada de fato recebeu - confirmacao parcial nunca vira "conferido"
+  pra tudo (`--sem-alteracao` e a excecao deliberada: reconfirmacao
+  total).
+- **Painel**: mesmo caminho da CLI (`cc.main(["cotar",...])`), badge de
+  proveniencia com tooltip no Ranking e em "Ultimas cotacoes", formulario
+  com os campos novos - testado de verdade no navegador com dados
+  SINTETICOS (ambiente isolado, script/config copiados pra um tmpdir,
+  nunca a arvore real do Josemar). Achei e corrigi um bug real nessa
+  verificacao: o fallback do em-dash pra Estoque vazio tava escapado duas
+  vezes (`&amp;mdash;` literal em vez de `—`).
+- **Snapshot**: nenhuma mudanca de codigo foi necessaria - `metadados.json`
+  ja embutia o dict inteiro da cotacao vencedora e `cotacoes.csv` inteiro
+  ja era copiado; a imutabilidade que ja existia (copia congelada + hash)
+  passou a cobrir proveniencia de graca. Testado explicitamente: uma
+  `promover-cotacao` DEPOIS de decisao fechada nao muda 1 byte do
+  snapshot.
+- **Testes**: `tests/test_proveniencia.py`, 18 testes cobrindo os 7
+  criterios de aceite pedidos (relatorio de IA identificado, confirmacao
+  parcial isolada, historico preservado, legado sem fabricacao, CLI=painel,
+  snapshot imutavel, sem mistura entre observacoes). Mutacao de teste
+  aplicada na linha central da heranca parcial - exatamente 1 dos 18
+  falhou, confirmando que prova comportamento.
+- **Fora do escopo, deliberadamente**: dashboard estatico
+  (`comercial_valor`, tambem usado pelo export do Sheets - frente 3) nao
+  foi tocado; pesos/gates/limites de score do ranking tambem nao.
+
+Suite completa: 394 testes, `checar-segredos --strict` limpo.
+
+Frentes 5 (produtos reutilizados) e 6 (datas/veredito) **nao iniciadas** —
+comece pelo plano, nao redescubra o escopo.
+
+## Sessao anterior (07/09/2026, sessao 11) — historico
+
 **Frente 3 (receptor Sheets): 3a rodada de revisao do Codex sobre o commit
 `c5018dc` achou mais 2 ajustes — corrigidos, testados e implantados
-(Versao 13).** Mesmo padrao da frente 2 - **nao declare esta frente
-concluida "para sempre" so porque algumas rodadas ja passaram**; leia a
-secao 3 do plano inteira antes de mexer. Os 2 ajustes desta rodada:
+(Versao 13).** Os 2 ajustes desta rodada:
 
 1. **"Visao Geral" ficou de fora da protecao de propriedade que a V12 deu
    aos comparativos** - `doPost` excluia esse nome de proposito
@@ -60,9 +114,6 @@ comparativo(s).` nas duas, e a planilha real
 continua com exatamente 11 abas (Visao Geral + 10 comparativos, sem
 duplicata nem orfa, nenhuma "Visao Geral" redirecionada) - conferido pela
 listagem de paginas visiveis e por captura de tela.
-
-Frentes 4 (proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito)
-**nao iniciadas** — comece pelo plano, nao redescubra o escopo.
 
 ## Sessao anterior (07/09/2026, sessao 10) — historico
 

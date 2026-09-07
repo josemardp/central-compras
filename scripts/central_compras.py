@@ -70,7 +70,76 @@ COTACOES_HEADER = [
     "fonte",
     "confirmacao",
     "score",
+    "estoque",
+    "proveniencia",
 ]
+
+# Proveniencia: de onde veio cada campo comercial e o que foi de fato
+# conferido - amarrado a ESTA observacao (esta linha), nunca ao produto em
+# geral. `fonte` (web/manual) sozinho nao basta: uma linha `fonte=manual`
+# pode ter so o preco conferido e o resto copiado da cotacao anterior.
+PROVENIENCIA_ORIGENS = ["observacao_direta", "relatorio_ia", "conferencia_humana", "inferencia"]
+# Origem que o registro assume quando nao ha nada gravado - nunca escolhida
+# pelo usuario, so atribuida por parse_proveniencia() para linha antiga ou
+# campo nunca preenchido.
+PROVENIENCIA_ORIGEM_LEGADO = "legado_sem_evidencia"
+PROVENIENCIA_CAMPOS = ["preco", "variacao", "vendedor", "frete", "estoque", "garantia"]
+PROVENIENCIA_ESTOQUE_OPCOES = ["", "disponivel", "indisponivel", "sob_encomenda"]
+
+
+def proveniencia_vazia() -> dict[str, Any]:
+    """O valor padrao para um campo sem evidencia registrada - legado ou
+    nunca preenchido. Nunca inventar data nem conferencia aqui."""
+    return {"origem": PROVENIENCIA_ORIGEM_LEGADO, "evidencia": "", "data": None, "estado": "nao_conferido"}
+
+
+def parse_proveniencia(row: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Le a proveniencia de UMA linha de cotacoes.csv, sempre com as 6
+    chaves de PROVENIENCIA_CAMPOS presentes. Uma linha antiga (sem a coluna
+    ou com JSON ilegivel) nunca vira evidencia fabricada - cai em
+    proveniencia_vazia() campo a campo, o que É a marca de "legado sem
+    evidencia registrada" que a frente pediu."""
+    bruto = (row.get("proveniencia") or "").strip()
+    carregado: dict[str, Any] = {}
+    if bruto:
+        try:
+            lido = json.loads(bruto)
+            if isinstance(lido, dict):
+                carregado = lido
+        except json.JSONDecodeError:
+            carregado = {}
+    resultado: dict[str, dict[str, Any]] = {}
+    for campo in PROVENIENCIA_CAMPOS:
+        entrada = carregado.get(campo)
+        if isinstance(entrada, dict) and entrada.get("origem") in PROVENIENCIA_ORIGENS:
+            resultado[campo] = {
+                "origem": entrada.get("origem"),
+                "evidencia": str(entrada.get("evidencia") or ""),
+                "data": entrada.get("data") or None,
+                "estado": entrada.get("estado") if entrada.get("estado") in ("conferido", "nao_conferido") else "nao_conferido",
+            }
+        else:
+            resultado[campo] = proveniencia_vazia()
+    return resultado
+
+
+def serializar_proveniencia(dados: dict[str, dict[str, Any]]) -> str:
+    completo = {campo: (dados.get(campo) or proveniencia_vazia()) for campo in PROVENIENCIA_CAMPOS}
+    return json.dumps(completo, ensure_ascii=False, sort_keys=True)
+
+
+def marcar_proveniencia(
+    dados: dict[str, dict[str, Any]], campo: str, origem: str, evidencia: str, data: str
+) -> None:
+    """Atualiza a proveniencia de UM campo, marcando-o como conferido agora.
+    So o campo passado muda - os outros ficam como estavam (chamador decide
+    quais campos tocar; confirmacao parcial nunca deve afetar o resto)."""
+    dados[campo] = {
+        "origem": origem,
+        "evidencia": str(evidencia or ""),
+        "data": data or None,
+        "estado": "conferido",
+    }
 
 QUOTE_REQUIRED_FIELDS = [
     "data_coleta",
@@ -1451,8 +1520,26 @@ def add_quote(args: argparse.Namespace) -> None:
     )
     nota = quote_float(args.nota)
     avaliacoes = quote_int(args.avaliacoes)
+    data_coleta = args.data or now_iso()
+    # getattr com o mesmo default do argparse: chamadores que montam
+    # Namespace na mao (comuns nos testes) nao precisam saber destes campos
+    # novos pra continuar funcionando - cai no default real da CLI.
+    origem_dados = getattr(args, "origem_dados", "observacao_direta") or "observacao_direta"
+    evidencia = getattr(args, "evidencia", "") or ""
+    # Proveniencia da coleta: preco/variacao/vendedor/frete/garantia sempre
+    # tem um valor nesta linha (mesmo que seja o default do CLI, como
+    # frete=0 ou garantia_tipo=nenhuma - isso E o que foi observado agora,
+    # nao uma lacuna). estoque so vira "conferido" se --estoque foi de fato
+    # informado; sem isso, nao ha base nenhuma pra alegar que se sabe o
+    # estoque.
+    estoque = getattr(args, "estoque", "") or ""
+    proveniencia = {}
+    for campo in ("preco", "variacao", "vendedor", "frete", "garantia"):
+        marcar_proveniencia(proveniencia, campo, origem_dados, evidencia, data_coleta)
+    if estoque:
+        marcar_proveniencia(proveniencia, "estoque", origem_dados, evidencia, data_coleta)
     row = {
-        "data_coleta": args.data or now_iso(),
+        "data_coleta": data_coleta,
         "produto_id": args.produto_id,
         "loja": args.loja,
         "vendedor": args.vendedor,
@@ -1479,6 +1566,8 @@ def add_quote(args: argparse.Namespace) -> None:
         "fonte": args.fonte,
         "confirmacao": "coleta",
         "score": "",
+        "estoque": estoque,
+        "proveniencia": serializar_proveniencia(proveniencia),
     }
     append_quote(project, row)
     append_timeline(
@@ -2531,6 +2620,17 @@ def promote_quote(args: argparse.Namespace) -> None:
         }.items()
         if valor is not None
     ]
+    # Quais dos 6 campos de proveniencia esta promocao de fato conferiu -
+    # so esses ganham proveniencia nova; o resto herda o que a cotacao base
+    # ja tinha (confirmacao parcial nao pode virar "conferido" pra tudo).
+    campos_proveniencia_confirmados = {
+        "preco": args.preco is not None or args.preco_promocional is not None or args.custo_total is not None,
+        "variacao": args.variacao is not None,
+        "vendedor": args.vendedor is not None or args.vendedor_tipo is not None,
+        "frete": args.frete is not None or args.frete_prazo_dias is not None,
+        "estoque": getattr(args, "estoque", None) is not None,
+        "garantia": args.garantia_meses is not None or args.garantia_tipo is not None,
+    }
     if not confirmados and not args.sem_alteracao:
         raise SystemExit(
             "Promover para `manual` exige dizer o que voce conferiu no site agora.\n"
@@ -2555,8 +2655,21 @@ def promote_quote(args: argparse.Namespace) -> None:
         )
 
     row = dict(base)
-    row["data_coleta"] = args.data or now_iso()
+    data_coleta = args.data or now_iso()
+    row["data_coleta"] = data_coleta
     row["fonte"] = "manual"
+    # Proveniencia: comeca herdando a da cotacao base (nao inventa nada
+    # novo pros campos nao tocados) e so marca como conferido agora o que
+    # este `promover-cotacao` de fato recebeu. --sem-alteracao e a unica
+    # excecao: e uma reconfirmacao TOTAL declarada, entao os 6 campos
+    # viram conferidos com a origem/evidencia informadas (ou o default
+    # conferencia_humana).
+    origem_dados = getattr(args, "origem_dados", None) or "conferencia_humana"
+    evidencia = getattr(args, "evidencia", "") or ""
+    proveniencia = parse_proveniencia(base)
+    for campo in PROVENIENCIA_CAMPOS:
+        if args.sem_alteracao or campos_proveniencia_confirmados.get(campo):
+            marcar_proveniencia(proveniencia, campo, origem_dados, evidencia, data_coleta)
     # Sem isto, a linha promovida sem alteracao ficava indistinguivel de uma
     # conferencia em que algo mudou: eu exigia a declaracao e nao a registrava.
     row["confirmacao"] = (
@@ -2590,6 +2703,7 @@ def promote_quote(args: argparse.Namespace) -> None:
         "garantia_tipo": args.garantia_tipo,
         "link": args.link,
         "flag_suspeita": args.flag_suspeita,
+        "estoque": getattr(args, "estoque", None),
     }.items():
         if value is not None:
             row[field] = value
@@ -2618,6 +2732,7 @@ def promote_quote(args: argparse.Namespace) -> None:
         row["tco_total"] = tco_total
     row["nota_ajustada"] = adjusted_rating(quote_float(row.get("nota")), quote_int(row.get("n_avaliacoes"))) if quote_float(row.get("nota")) else ""
     row["score"] = ""
+    row["proveniencia"] = serializar_proveniencia(proveniencia)
 
     append_quote(project, row)
     append_timeline(
@@ -5625,6 +5740,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--flag-suspeita", choices=["", "AVAL_SUSPEITA", "ANCORA", "RECICLADO"], default="")
     p.add_argument("--fonte", choices=["web", "manual"], default="manual")
     p.add_argument("--data", type=iso_datetime, help="AAAA-MM-DD ou AAAA-MM-DDTHH:MM:SS")
+    p.add_argument("--estoque", choices=PROVENIENCIA_ESTOQUE_OPCOES, default="",
+                    help="disponibilidade observada agora; sem isso, fica sem evidencia registrada")
+    p.add_argument("--origem-dados", choices=PROVENIENCIA_ORIGENS, default="observacao_direta",
+                    help="de onde vieram os valores desta cotacao (proveniencia)")
+    p.add_argument("--evidencia", default="",
+                    help="referencia livre a evidencia (URL, nome de relatorio, nota)")
     p.set_defaults(func=add_quote)
 
     p = sub.add_parser("ranking", help="gera ranking.md com gates e score aberto")
@@ -5775,6 +5896,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--flag-suspeita", choices=["", "AVAL_SUSPEITA", "ANCORA", "RECICLADO"])
     p.add_argument("--data", type=iso_datetime, help="AAAA-MM-DD ou AAAA-MM-DDTHH:MM:SS")
     p.add_argument("--sem-alteracao", action="store_true", help="conferi no site e estava tudo igual ao registrado")
+    p.add_argument("--estoque", choices=[o for o in PROVENIENCIA_ESTOQUE_OPCOES if o], default=None,
+                    help="disponibilidade que voce conferiu agora")
+    p.add_argument("--origem-dados", choices=PROVENIENCIA_ORIGENS, default=None,
+                    help="de onde veio o que foi conferido (default: conferencia_humana)")
+    p.add_argument("--evidencia", default="",
+                    help="referencia livre a evidencia (URL, nome de relatorio, nota)")
     p.set_defaults(func=promote_quote)
 
     p = sub.add_parser("descartar", help="marca candidato como descartado com motivo obrigatorio")

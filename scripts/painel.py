@@ -54,6 +54,10 @@ def _linha_ranking(item: Any, campo_valor: str, rotulo_valor: str) -> dict[str, 
         "avaliacoes": quote.get("n_avaliacoes") or "",
         "garantia_meses": quote.get("garantia_meses") or "",
         "garantia_tipo": quote.get("garantia_tipo") or "",
+        "estoque": quote.get("estoque") or "",
+        # Mesmo contrato do CLI: le a proveniencia gravada na linha, nunca
+        # inventa evidencia pra cotacao antiga sem a coluna.
+        "proveniencia": cc.parse_proveniencia(quote),
         "idade_dias": item.idade_dias,
         "vencida": item.vencida,
         "espera": cc.waiting_gap(item.product, quote),
@@ -102,6 +106,8 @@ def estado(project: Path) -> dict[str, Any]:
                 "custo": cc.brl(r.get("custo_total")),
                 "fonte": r.get("fonte", ""),
                 "confirmacao": r.get("confirmacao", ""),
+                "estoque": r.get("estoque", ""),
+                "proveniencia": cc.parse_proveniencia(r),
             }
             for r in cotacoes[-12:][::-1]
         ],
@@ -146,6 +152,7 @@ CAMPOS_COTACAO = [
     "preco", "preco_promocional", "frete", "frete_prazo_dias", "custo_extra",
     "custo_operacional_mensal", "valor_revenda_estimado",
     "nota", "avaliacoes", "garantia_meses", "garantia_tipo", "link", "fonte",
+    "estoque", "origem_dados", "evidencia",
 ]
 
 
@@ -250,6 +257,23 @@ let E = null, PROJ = new URLSearchParams(location.search).get("projeto") || "";
 const brl = v => (v||v===0) ? v : "-";
 const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
+const ORIGEM_ABREV = {observacao_direta:"obs.direta", relatorio_ia:"relat.IA", conferencia_humana:"conf.humana", inferencia:"inferencia", legado_sem_evidencia:"sem evidencia"};
+
+function provResumo(prov){
+  if(!prov) return "sem proveniencia registrada";
+  return Object.keys(prov).map(c => {
+    const p = prov[c];
+    return c+": "+(ORIGEM_ABREV[p.origem]||p.origem)+(p.estado==="conferido"?" (conferido)":" (nao conferido)")+(p.data?" em "+p.data:"")+(p.evidencia?" - "+p.evidencia:"");
+  }).join("\\n");
+}
+function provBadge(prov, campo){
+  campo = campo || "preco";
+  if(!prov || !prov[campo]) return '<span class="pill mini">sem proveniencia</span>';
+  const p = prov[campo];
+  const cls = p.estado==="conferido" ? "ok" : (p.origem==="legado_sem_evidencia" ? "" : "warn");
+  return '<span class="pill '+cls+'" title="'+esc(provResumo(prov))+'">'+esc(ORIGEM_ABREV[p.origem]||p.origem)+'</span>';
+}
+
 function barras(l){
   const ordem=["qualidade","valor","risco","aderencia","conveniencia"];
   return '<div class="bars">'+ordem.map(e=>{
@@ -272,7 +296,7 @@ function linha(l, cortado){
     +'<td class="n">'+Math.round(l.confianca*100)+'%</td>'
     +'<td class="n">'+esc(l.valor_comparado)+'</td>'
     +'<td class="n">'+(l.prazo === '' ? '&mdash;' : esc(l.prazo))+'</td>'
-    +'<td><span class="pill">'+esc(l.fonte)+'</span></td>'
+    +'<td><span class="pill">'+esc(l.fonte)+'</span> '+provBadge(l.proveniencia)+'</td>'
     +'<td>'+sit+'</td></tr>';
 }
 
@@ -324,10 +348,15 @@ function desenha(){
       <div><label for="f_garantia_tipo">Garantia</label><select id="f_garantia_tipo"><option>nacional</option><option>importada</option><option>vendedor</option><option selected>nenhuma</option></select></div>
       <div style="grid-column:span 2"><label for="f_link">Link</label><input id="f_link" placeholder="https://..."></div>
       <div><label for="f_anuncio_id">Anuncio</label><input id="f_anuncio_id" placeholder="MLB..."></div>
+      <div><label for="f_estoque">Estoque</label><select id="f_estoque"><option value="">sem evidencia</option><option value="disponivel">disponivel</option><option value="indisponivel">indisponivel</option><option value="sob_encomenda">sob encomenda</option></select></div>
+      <div><label for="f_origem_dados">Origem dos dados</label><select id="f_origem_dados"><option value="observacao_direta" selected>observacao direta</option><option value="relatorio_ia">relatorio de IA</option><option value="conferencia_humana">conferencia humana</option><option value="inferencia">inferencia</option></select></div>
+      <div style="grid-column:span 2"><label for="f_evidencia">Evidencia</label><input id="f_evidencia" placeholder="URL, nome do relatorio ou nota"></div>
       <div style="display:flex;align-items:flex-end"><button class="p" id="salvar" style="width:100%">Gravar cotacao</button></div>
     </div>
     <div class="nota"><b>Grava uma linha nova</b> no <code>cotacoes.csv</code>. Nunca sobrescreve:
-     a serie historica e o que desmascara preco ancora. Editar cotacao antiga nao existe aqui, de proposito.</div>
+     a serie historica e o que desmascara preco ancora. Editar cotacao antiga nao existe aqui, de proposito.
+     <b>Proveniencia:</b> "origem dos dados" e "evidencia" ficam gravados por campo (preco, variacao,
+     vendedor, frete, estoque, garantia) nesta observacao - nunca no produto em geral.</div>
   </div></div>
   ${(E.erros.length||E.avisos.length)? '<div class="card"><h2>Precisa da sua mao</h2><div class="in">'
     + E.erros.map(t=>'<div class="aviso e">'+esc(t)+'</div>').join("")
@@ -337,11 +366,11 @@ function desenha(){
       +r.candidatos_atuais+' candidatos, '+(r.dias_em_pesquisa==null?'?':r.dias_em_pesquisa)+' dias.</div>':'')
     + '</div></div>' : ''}
   <div class="card"><h2>Ultimas cotacoes</h2>
-    <table><thead><tr><th>Data</th><th>Produto</th><th>Loja</th><th class="n">Custo</th><th>Fonte</th><th>Confirmacao</th></tr></thead><tbody>
+    <table><thead><tr><th>Data</th><th>Produto</th><th>Loja</th><th class="n">Custo</th><th>Estoque</th><th>Fonte</th><th>Proveniencia</th><th>Confirmacao</th></tr></thead><tbody>
     ${E.ultimas.length? E.ultimas.map(u=>'<tr><td class="mini">'+esc(u.data)+'</td><td>'+esc(u.produto_id)
-      +'</td><td>'+esc(u.loja)+'</td><td class="n">'+esc(u.custo)+'</td><td><span class="pill">'+esc(u.fonte)
-      +'</span></td><td class="mini">'+esc(u.confirmacao)+'</td></tr>').join("")
-      : '<tr><td colspan="6">Sem cotacoes.</td></tr>'}
+      +'</td><td>'+esc(u.loja)+'</td><td class="n">'+esc(u.custo)+'</td><td class="mini">'+(u.estoque?esc(u.estoque):'&mdash;')+'</td><td><span class="pill">'+esc(u.fonte)
+      +'</span></td><td>'+provBadge(u.proveniencia)+'</td><td class="mini">'+esc(u.confirmacao)+'</td></tr>').join("")
+      : '<tr><td colspan="8">Sem cotacoes.</td></tr>'}
     </tbody></table></div>`;
 
   document.querySelectorAll("[id^='f_']").forEach(el=>el.dataset.inicial=el.value);
@@ -349,7 +378,8 @@ function desenha(){
   $("#salvar").onclick = e => {
     const d={};
     ["produto_id","fonte","loja","vendedor","vendedor_tipo","preco","frete","frete_prazo_dias",
-     "nota","avaliacoes","garantia_meses","garantia_tipo","link","anuncio_id"]
+     "nota","avaliacoes","garantia_meses","garantia_tipo","link","anuncio_id",
+     "estoque","origem_dados","evidencia"]
       .forEach(k => d[k] = ($("#f_"+k)||{}).value || "");
     executa("cotar", d, e.target);
   };

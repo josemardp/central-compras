@@ -743,13 +743,95 @@ para o relato completo.
 
 ## 4. Proveniência das informações
 
-**Estado: não iniciada.**
+**Estado: implementada e testada (07/09/2026).**
 
-Pendente: schema de origem/conferência por campo comercial (preço, variação,
-vendedor, frete, estoque, garantia), distinguindo relatório de IA externa,
-observação direta, conferência humana, inferência e legado sem evidência.
-Extensão do CSV ou arquivo auxiliar (não quebrar `cotacoes.csv` histórico),
-mudanças em CLI/promoção/painel/snapshot/documentação.
+Cada observação de `cotacoes.csv` carrega, na coluna nova `proveniencia`
+(JSON), origem/evidência/data/estado para os 6 campos comerciais (preço,
+variação, vendedor, frete, estoque, garantia) — amarrado àquela linha, nunca
+ao produto em geral. `fonte` (web/manual) e `confirmacao` (texto livre)
+continuam existindo, mas deixaram de ser a única fonte da verdade sobre o
+que foi conferido.
+
+**Extensão do CSV, não arquivo auxiliar:** duas colunas novas no fim de
+`COTACOES_HEADER` — `estoque` (valor livre: `disponivel`/`indisponivel`/
+`sob_encomenda`/vazio; campo novo, não existia antes) e `proveniencia`
+(JSON com as 4 chaves por campo: `origem`, `evidencia`, `data`, `estado`).
+Reaproveita o mecanismo de migração de schema já existente
+(`quotes_header()`/`migrar-cotacoes`) — colunas desconhecidas do arquivo
+são preservadas, nada histórico é quebrado; uma linha antiga sem a coluna
+lê como "legado sem evidência" nos 6 campos, nunca como fabricação.
+
+**Contrato por campo** (`parse_proveniencia`/`serializar_proveniencia`/
+`marcar_proveniencia`, `scripts/central_compras.py`):
+```json
+{"preco": {"origem": "relatorio_ia", "evidencia": "relatorio-x.md", "data": "2026-09-07T...", "estado": "conferido"}, ...}
+```
+- `origem`: `observacao_direta` | `relatorio_ia` | `conferencia_humana` |
+  `inferencia` (escolhidas pelo usuário) ou `legado_sem_evidencia`
+  (nunca escolhida — só atribuída por `parse_proveniencia` quando não há
+  nada gravado; JSON ilegível ou com origem desconhecida também cai aqui,
+  nunca vira exceção nem evidência inventada).
+- `estado`: `conferido` | `nao_conferido`.
+
+**`cotar` (coleta):** flags novas `--estoque`, `--origem-dados` (default
+`observacao_direta`), `--evidencia`. Preço/variação/vendedor/frete/garantia
+sempre ganham proveniência nesta linha (mesmo usando o default do CLI, que
+é um fato observado, não uma lacuna); `estoque` só vira `conferido` se
+`--estoque` foi de fato informado — sem ele, fica "sem evidência", nunca
+inventado.
+
+**`promover-cotacao` (confirmação):** mesmas 3 flags novas
+(`--origem-dados` default `conferencia_humana`). A proveniência começa
+**herdando a da cotação base** (`parse_proveniencia(base)`) e só marca como
+conferido AGORA os campos que esta chamada de fato recebeu — confirmação
+parcial nunca vira "conferido" para o resto. `--sem-alteracao` é a exceção
+deliberada: reconfirmação total, os 6 campos viram conferidos.
+
+**Painel (`scripts/painel.py`):** grava pelo MESMO caminho da CLI
+(`cc.main(["cotar", ...])`), então usa automaticamente o mesmo contrato —
+`CAMPOS_COTACAO` ganhou os 3 campos novos, o formulário "Nova cotação" tem
+os inputs correspondentes, e tanto o Ranking quanto "Últimas cotações"
+mostram um badge de proveniência (origem abreviada, cor conforme
+conferido/não conferido) com tooltip listando os 6 campos — testado de
+verdade no navegador com dados sintéticos (projeto/produtos/cotações
+fictícios num ambiente isolado, nunca a árvore real do Josemar): badges
+corretos no Ranking e em "Últimas cotações", formulário grava e a
+proveniência herdada aparece certa na promoção parcial. Um bug real
+apareceu nessa verificação — o fallback do em-dash para "Estoque" vazio
+estava sendo escapado duas vezes (`&amp;mdash;` literal em vez do
+caractere `—`) — corrigido no mesmo commit.
+
+**Snapshot (`decidir`):** nenhuma mudança de código foi necessária —
+`metadados.json` já embutia o dict inteiro da cotação vencedora
+(`"cotacao": quote`) e `cotacoes.csv` inteiro já era copiado pro snapshot;
+como `estoque`/`proveniencia` agora são só mais duas chaves nesse dict, a
+imutabilidade que já existia (cópia congelada + hash em `manifesto.json`)
+passou a cobrir a proveniência automaticamente. Testado explicitamente:
+uma `promover-cotacao` DEPOIS de uma decisão fechada não muda uma vírgula
+do `metadados.json` nem do `cotacoes.csv` já congelados no snapshot, e
+`auditar-decisoes --strict` continua batendo.
+
+**Testes:** `tests/test_proveniencia.py` (18 testes) cobre os 7 critérios
+de aceite pedidos — relatório de IA identificado como tal; confirmação
+parcial afeta só os campos conferidos; nova cotação preserva histórico e
+origem anterior (append-only, linha antiga bit-a-bit igual); registro
+legado nunca ganha comprovação fabricada (JSON ausente/ilegível/origem
+desconhecida, todos caem em "legado sem evidência"); CLI e painel usam o
+mesmo contrato (mesmo teste roda os dois caminhos e compara); snapshot
+conserva valores e proveniência depois de alteração posterior; e duas
+observações seguidas nunca compartilham nem misturam proveniência (dicts
+independentes, erro de validação não deixa linha parcial). Mutação de
+teste aplicada na linha central (`parse_proveniencia(base)` → `{}`):
+exatamente 1 dos 18 testes falhou, confirmando que o teste prova o
+comportamento e não só existe. Suíte completa: 394 testes,
+`checar-segredos --strict` limpo.
+
+**Fora do escopo desta frente, deliberadamente:** o dashboard estático
+(`generate_project_page`/`spec_comparison_section`/`comercial_valor`) não
+foi tocado — essa função também alimenta `sheets_export_payload` (frente
+3, endurecida em 3 rodadas nesta mesma sessão), e o pedido explícito listava
+CLI/promoção/painel/leitura de dados/snapshot, não o dashboard. Pesos,
+gates e limites de score do ranking também não foram tocados, como pedido.
 
 ## 5. Produtos reutilizados em projetos diferentes
 
