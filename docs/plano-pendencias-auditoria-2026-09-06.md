@@ -22,11 +22,12 @@ Estados possíveis: `não iniciada` · `em andamento` · `concluída` · `bloque
 
 ## 2. Recuperação de operações parciais — PRIORIDADE
 
-**Estado: concluída** (3ª revisão corrigida na sessão de 06/09/2026, noite —
+**Estado: concluída** (4ª revisão corrigida na sessão de 07/09/2026 —
 commit a publicar). Ficou **em andamento** entre cada entrega e a revisão
-seguinte que achou lacuna nova — não declarar concluído de novo sem que o
-próximo revisor confirme contra os 4 pontos do "critérios para encerrar" da
-3ª revisão, citados na subseção abaixo.
+seguinte que achou lacuna nova — já aconteceu 3 vezes seguidas (após
+`83c0901`, após `2a682a7`, após `833c4b9`). Não declarar concluído de novo
+sem que o próximo revisor confirme contra os critérios de aceite das
+subseções abaixo, incluindo a 4ª.
 
 ### 1ª entrega (commit `83c0901`) — insuficiente, revisada pelo Codex
 
@@ -218,12 +219,86 @@ que todo código de saída não-zero é exatamente o timeout de trava esperado
 (nunca corrupção), que o número de linhas de decisão bate exatamente com o
 número de sucessos, e que `auditar-decisoes --strict` passa ao final.
 
+### 4ª revisão (Codex, sobre o commit `833c4b9`) — operações intercaladas
+
+A 3ª correção resolveu a reconciliação DENTRO de uma operação sendo
+retomada, mas o Codex reproduziu 2 falhas que atravessam DUAS operações
+diferentes, intercaladas no tempo:
+
+1. **Perda de lição entre operações intercaladas.** A é interrompida em
+   `licao:iniciado`, antes de gravar. B (veredito diferente, mesma lição,
+   mesma categoria, mesmo dia) roda completo e grava a própria linha. Ao
+   retomar A, a contagem-delta (correção da 3ª revisão) via a linha de B
+   como se fosse prova de que A tinha escrito — A "concluía" sem nunca
+   gravar a própria lição, e a pendência sumia mesmo assim.
+2. **Decisão recuperada diverge do documento atual.** `decidir A` captura
+   (escreve `decisao.md` com "Produto ID: A") e é interrompido na timeline
+   "veredito". `decidir B`, do MESMO projeto, roda completo — sua própria
+   captura SOBRESCREVE `decisao.md` para "Produto ID: B". Ao retomar A,
+   `executar_uma_vez("captura", ...)` via a captura já marcada `concluída`
+   (da 1ª tentativa de A) e não tocava em nada — mas o `decisao.md` real já
+   não era mais o de A. A retomada terminava "com sucesso", imprimindo o
+   snapshot de A, enquanto `decisao.md` continuava dizendo B.
+
+**Causa raiz:** `project_lock`/trava de `BASE` só serializam enquanto um
+comando está RODANDO. Nenhum dos dois protege o período em que uma operação
+fica PENDENTE depois de uma falha — é exatamente nessa janela que uma
+segunda operação, legítima e sem relação alguma com a primeira, escreve nos
+mesmos arquivos.
+
+**Reprodução, contra o código antigo (`833c4b9`, via `git stash` + os
+testes atuais):** as 4 tentativas de bloquear B (`assertRaisesRegex(
+SystemExit, "ja reivindica")`) falharam com `SystemExit not raised` — B
+simplesmente rodava e corrompia o estado de A, exatamente como relatado.
+
+**Estratégia escolhida: bloqueio conservador, não identidade persistente
+por linha.** O relatório ofereceu duas saídas — bloquear antes de qualquer
+escrita, ou permitir intercalamento com identidade persistente do efeito e
+regra explícita de precedência. Optei pela primeira: inventar um
+identificador embutido em cada linha de `licoes.md`/`marcas/*.md` (arquivos
+pensados para leitura humana) trocaria uma lacuna por uma poluição
+permanente do histórico, e ainda deixaria em aberto a regra de precedência
+para decisões — que este repositório já trata como decisão do Josemar, não
+do código (`docs/como-conferir-auditoria.md`). Bloquear é reversível
+(basta retomar ou resolver a pendência) e não inventa fato novo.
+
+**Correção — contrato de conflito, não só os 2 exemplos:**
+
+- Cada operação declara, ao começar, os `recursos` (arquivos) que vai
+  escrever fora do próprio journal: `decidir` declara `decisao.md` e
+  `processo.md` do projeto (arquivos ÚNICOS por projeto, não por produto —
+  é por isso que `decidir A` e `decidir B` do mesmo projeto colidem);
+  `aprender-veredito` declara `licoes.md` (se houver lição — compartilhado
+  por TODA exportação, de qualquer projeto) e o arquivo de marca/loja
+  específico (se o nome coincidir com outra operação pendente).
+- Uma operação NOVA (sem journal próprio ainda) que reivindicaria um
+  recurso já reivindicado por outra `em_andamento` é RECUSADA antes de
+  escrever qualquer byte, com `SystemExit` nomeando a operação conflitante
+  e orientando a resolver a pendência primeiro (`operacoes-pendentes`).
+- Uma RETOMADA (mesmo `op_id`) nunca recalcula nem reconfere `recursos`:
+  eles já foram reivindicados pela própria operação na 1ª tentativa.
+- Escritores diretos que nunca passam por `tracked_operation`
+  (`registrar-licao`, `registrar-marca`, `registrar-loja`) também checam a
+  reivindicação antes de escrever, pela mesma função (`_recusar_se_recurso_
+  pendente`) — a lacuna não era só dentro do journal, era em qualquer
+  caminho de escrita para o mesmo arquivo.
+
+### Testes
+
+`tests/test_operation_recovery.py`: 18 → **22 testes**. Os 4 novos cobrem:
+B bloqueada e nada dela escrito, depois A recuperada e SÓ ENTÃO B rodando
+com sucesso (lição e decisão, os dois cenários); `registrar-licao` direto
+também bloqueado pela mesma pendência; `registrar-marca`/`registrar-loja`
+também bloqueados. O cenário de decisão confere coerência entre
+`decisao.md`, `processo.md` (timeline), snapshot e veredito em cada etapa,
+e roda `auditar-decisoes --strict` depois de cada recuperação.
+
 ### O que este mecanismo não cobre (registrado, não é lacuna escondida)
 
 - Concorrência entre dois processos ao mesmo tempo continua dependendo só de
   `project_lock`/`BASE` lock; o journal em si não tem lock próprio (documentado
-  no docstring de `tracked_operation`). Testado agora com processos
-  separados de verdade, não só threads.
+  no docstring de `tracked_operation`). Testado com processos separados de
+  verdade, não só threads.
 - Falta de espaço em disco no meio da própria escrita do journal ainda pode
   deixar um estado inconsistente — é o mesmo limite que já existia em
   `atomic_write_text` para qualquer arquivo isolado.
@@ -232,10 +307,15 @@ número de sucessos, e que `auditar-decisoes --strict` passa ao final.
   assinatura/contagem congeladas evitam duplicação, mas não fixam a data de
   um efeito que nunca chegou a acontecer). Não é duplicação, é nuance de
   atribuição de data — registrado, não escondido.
+- O bloqueio por `recursos` é deliberadamente GROSSO: qualquer duas
+  operações pendentes que toquem o mesmo arquivo colidem, mesmo que o
+  conteúdo específico não colidisse (duas lições DIFERENTES, por exemplo).
+  Escolha consciente pela simplicidade e segurança — este é um sistema de
+  um único operador, crash deveria ser raro e resolvido na hora.
 - Não cobre a exportação para o Google Sheets (frente 3) nem qualquer outra
   sequência multi-arquivo fora de `decidir`/`aprender-veredito`. Se uma
   sessão futura achar outro ponto candidato, reaproveite
-  `registrar_efeito`/`executar_uma_vez`, não reinvente.
+  `registrar_efeito`/`executar_uma_vez`/`recursos`, não reinvente.
 
 ## 3. Receptor do Google Sheets
 

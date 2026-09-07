@@ -414,6 +414,180 @@ class OperationRecoveryTest(ambiente.RepoTestCase):
                          "as duas fases sao exportacoes distintas; as duas devem ter gravado")
         self.assertEqual(cc.pending_operations([cc.BASE]), [])
 
+    # ---- 4a revisao (Codex), operacoes intercaladas --------------------------
+    #
+    # project_lock/trava de BASE so serializam enquanto um comando esta
+    # RODANDO, nao durante o tempo em que uma operacao fica pendente depois
+    # de uma falha. A solucao escolhida foi conservadora: bloquear, antes de
+    # qualquer escrita, uma operacao nova que reivindique um arquivo ja
+    # reivindicado por outra pendente - nunca inventar identidade por texto.
+
+    def test_rev4_bug1_operacao_b_e_bloqueada_enquanto_a_esta_pendente(self):
+        # Dois vereditos, mesma licao, mesma categoria (pid "candidato" em
+        # projetos diferentes, para nao colidir em produtos/).
+        projeto_a = self.project("compra-a")
+        veredito_a = self._fechar_com_veredito_generico(projeto_a, licao="conferir garantia antes", pid="a")
+        projeto_b = self.project("compra-b")
+        veredito_b = self._fechar_com_veredito_generico(projeto_b, licao="conferir garantia antes", pid="b")
+
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def falha_em(ponto_alvo):
+            def _hook(ponto):
+                if ponto == ponto_alvo:
+                    raise RuntimeError(f"crash simulado em {ponto}")
+                return real_hook(ponto)
+            return _hook
+
+        # A e interrompida em "licao:iniciado" - a assinatura ja persistida,
+        # antes de gravar de verdade.
+        with patch.object(cc, "_crash_de_teste_se_pedido", falha_em("licao:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito_a))
+        self.assertEqual((cc.BASE / "licoes.md").read_text(encoding="utf-8").count("conferir garantia antes"), 0)
+
+        # B e uma operacao NOVA (op_id diferente, veredito diferente) que
+        # reivindicaria o MESMO licoes.md. Precisa ser recusada, nao rodar.
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("aprender-veredito", str(veredito_b))
+
+        # Nada de B foi escrito - nem a licao, nem o marcador do veredito dele.
+        self.assertEqual((cc.BASE / "licoes.md").read_text(encoding="utf-8").count("conferir garantia antes"), 0)
+        self.assertNotIn("Aprendizado exportado", veredito_b.read_text(encoding="utf-8"))
+        # A pendencia continua sendo a de A, unica.
+        pendentes = cc.pending_operations([cc.BASE])
+        self.assertEqual(len(pendentes), 1)
+        self.assertEqual(pendentes[0]["op_id"], f"aprender-veredito:{veredito_a.name}:d30")
+
+        # Recupera A: completa, grava a PROPRIA licao.
+        self.cli("aprender-veredito", str(veredito_a))
+        licoes = (cc.BASE / "licoes.md").read_text(encoding="utf-8")
+        self.assertEqual(licoes.count("conferir garantia antes"), 1)
+        self.assertEqual(cc.pending_operations([cc.BASE]), [])
+
+        # So agora B pode rodar - e roda com sucesso, gravando a PROPRIA licao.
+        self.cli("aprender-veredito", str(veredito_b))
+        licoes = (cc.BASE / "licoes.md").read_text(encoding="utf-8")
+        self.assertEqual(licoes.count("conferir garantia antes"), 2)
+        self.assertEqual(cc.pending_operations([cc.BASE]), [])
+        self.assertIn("Aprendizado exportado D+30", veredito_a.read_text(encoding="utf-8"))
+        self.assertIn("Aprendizado exportado D+30", veredito_b.read_text(encoding="utf-8"))
+
+    def test_rev4_bug1_registrar_licao_direto_tambem_e_bloqueado(self):
+        """Escritores diretos (fora de aprender-veredito) tambem respeitam a
+        reivindicacao - nao so o proprio journal."""
+        veredito = self._fechar_com_veredito_generico(self.project(), licao="conferir garantia antes")
+
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def falha_em(ponto_alvo):
+            def _hook(ponto):
+                if ponto == ponto_alvo:
+                    raise RuntimeError(f"crash simulado em {ponto}")
+                return real_hook(ponto)
+            return _hook
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", falha_em("licao:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito))
+
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("registrar-licao", "outra licao qualquer", "--categoria", "fone")
+        self.assertEqual((cc.BASE / "licoes.md").read_text(encoding="utf-8").count("outra licao qualquer"), 0)
+
+        self.cli("aprender-veredito", str(veredito))  # resolve a pendencia
+        self.cli("registrar-licao", "outra licao qualquer", "--categoria", "fone")
+        self.assertEqual((cc.BASE / "licoes.md").read_text(encoding="utf-8").count("outra licao qualquer"), 1)
+
+    def test_rev4_bug1_registrar_marca_e_registrar_loja_tambem_bloqueiam(self):
+        veredito = self._fechar_com_veredito(self.project())
+        # Marca vem do proprio candidato ("Marca A", ver ambiente.py) e a
+        # loja vem da cotacao manual ("Amazon").
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def falha_em(ponto_alvo):
+            def _hook(ponto):
+                if ponto == ponto_alvo:
+                    raise RuntimeError(f"crash simulado em {ponto}")
+                return real_hook(ponto)
+            return _hook
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", falha_em("marca:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito))
+
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("registrar-marca", "Marca A", "--categoria", "fone", "--resumo", "boa")
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("registrar-loja", "Amazon", "--categoria", "fone", "--resumo", "ok")
+
+        self.cli("aprender-veredito", str(veredito))  # resolve
+        self.cli("registrar-marca", "Marca A", "--categoria", "fone", "--resumo", "boa")
+        self.cli("registrar-loja", "Amazon", "--categoria", "fone", "--resumo", "ok")
+
+    def test_rev4_bug2_decidir_b_e_bloqueado_enquanto_a_esta_pendente(self):
+        project = self.project()
+        self.product(project, "a")
+        self.quote(project, "a", "--fonte", "manual")
+        self.product(project, "b")
+        self.quote(project, "b", "--fonte", "manual")
+
+        real_append_timeline = cc.append_timeline
+
+        def falha_no_veredito(project_, etapa, decisao, porque):
+            if etapa == "veredito":
+                raise RuntimeError("crash simulado apos a captura, antes do veredito")
+            return real_append_timeline(project_, etapa, decisao, porque)
+
+        with patch.object(cc, "append_timeline", side_effect=falha_no_veredito):
+            with self.assertRaises(RuntimeError):
+                self.cli("decidir", str(project), "--produto-id", "a", "--porque", "prefiro a",
+                         "--perdedores", "b: pior custo-beneficio", "--comprado")
+
+        self.assertIn("Produto ID: a", (project / "decisao.md").read_text(encoding="utf-8"))
+
+        # decidir B e uma operacao NOVA (op_id diferente - produto diferente)
+        # que reivindicaria o MESMO decisao.md/processo.md do projeto.
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("decidir", str(project), "--produto-id", "b", "--porque", "mudei de ideia",
+                     "--perdedores", "a: prefiro b agora", "--comprado")
+
+        # decisao.md continua exatamente como a tentativa de A deixou -
+        # nada de B vazou para dentro dele.
+        self.assertIn("Produto ID: a", (project / "decisao.md").read_text(encoding="utf-8"))
+        self.assertNotIn("Produto ID: b", (project / "decisao.md").read_text(encoding="utf-8"))
+        pendentes = cc.pending_operations([project])
+        self.assertEqual(len(pendentes), 1)
+        self.assertEqual(pendentes[0]["op_id"], "decidir:a")
+
+        # Recupera A: decisao.md, snapshot, timeline e veredito TODOS
+        # coerentes com A, e a auditoria passa.
+        self.cli("decidir", str(project), "--produto-id", "a", "--porque", "prefiro a",
+                 "--perdedores", "b: pior custo-beneficio", "--comprado")
+        texto_decisao = (project / "decisao.md").read_text(encoding="utf-8")
+        self.assertIn("Produto ID: a", texto_decisao)
+        processo = (project / "processo.md").read_text(encoding="utf-8")
+        self.assertEqual(processo.count("| decisao | Escolhido a |"), 1)
+        self.assertEqual(processo.count("| veredito | Arquivo de veredito criado |"), 1)
+        veredito_a = next(p for p in cc.VEREDITOS.glob("*.md") if project.name in p.name and "-a.md" in p.name)
+        self.assertTrue(veredito_a.exists())
+        self.assertEqual(cc.pending_operations([project]), [])
+        saida, erro = self._cli_capturando("auditar-decisoes", str(project), "--strict")
+        self.assertIsNone(erro, saida)
+
+        # SO agora decidir B, de verdade, pode rodar - e passa a valer,
+        # seguindo a regra explicita "ultima decisao concluida vence".
+        self.cli("decidir", str(project), "--produto-id", "b", "--porque", "mudei de ideia",
+                 "--perdedores", "a: prefiro b agora", "--comprado")
+        texto_decisao = (project / "decisao.md").read_text(encoding="utf-8")
+        self.assertIn("Produto ID: b", texto_decisao)
+        self.assertNotIn("Produto ID: a", texto_decisao)
+        processo = (project / "processo.md").read_text(encoding="utf-8")
+        self.assertEqual(processo.count("| decisao | Escolhido b |"), 1)
+        self.assertEqual(cc.pending_operations([project]), [])
+        saida, erro = self._cli_capturando("auditar-decisoes", str(project), "--strict")
+        self.assertIsNone(erro, saida)
+
     # ---- Concorrencia: as travas existentes ainda serializam --------------
 
     def test_comandos_concorrentes_no_mesmo_projeto_sao_serializados(self):

@@ -284,7 +284,7 @@ def atomic_write_text(path: Path, text: str) -> None:
 
 
 _OPERATIONS_DIRNAME = ".operacoes"
-_JOURNAL_CAMPOS_OBRIGATORIOS = {"op_id", "kind", "situacao", "passos", "assinatura_fingerprint", "detalhe"}
+_JOURNAL_CAMPOS_OBRIGATORIOS = {"op_id", "kind", "situacao", "passos", "assinatura_fingerprint", "detalhe", "recursos"}
 
 
 def _operation_path(scope: Path, op_id: str) -> Path:
@@ -450,14 +450,72 @@ def _crash_de_teste_se_pedido(ponto: str) -> None:
         os._exit(70)
 
 
+def _recursos_reivindicados_por_outros(exceto_op_id: str) -> dict[str, dict[str, Any]]:
+    """Mapeia caminho de recurso (resolvido) -> registro que o reivindica,
+    entre TODAS as operacoes em_andamento (qualquer escopo), exceto a
+    de `exceto_op_id`.
+
+    `project_lock`/trava de `BASE` so serializam enquanto um comando esta
+    RODANDO. Uma operacao que fica pendente depois de uma falha nao segura
+    nada: outro comando, minutos ou dias depois, pode escrever no MESMO
+    arquivo sem jamais saber que uma tentativa anterior ainda esperava
+    retomada ali - foi assim que uma retomada de `decidir` reaproveitou um
+    `decisao.md` que outro `decidir`, intercalado no meio do caminho, tinha
+    reescrito para outro produto; e uma retomada de `aprender-veredito`
+    contou uma linha em `licoes.md` que na verdade era de outra exportacao
+    legitima e independente. Presenca ou contagem de texto nunca provam
+    autoria da gravacao - por isso a defesa e impedir o conflito ANTES de
+    qualquer escrita, nao tentar distinguir depois.
+    """
+    mapa: dict[str, dict[str, Any]] = {}
+    for registro in pending_operations([BASE, *project_dirs()]):
+        if registro.get("situacao") != "em_andamento" or registro.get("op_id") == exceto_op_id:
+            continue
+        for recurso in registro.get("recursos") or []:
+            mapa.setdefault(recurso, registro)
+    return mapa
+
+
+def _recusar_se_recurso_pendente(caminho: Path, *, exceto_op_id: str | None = None) -> None:
+    """Levanta `SystemExit` se `caminho` ja estiver reivindicado por alguma
+    operacao pendente. Usada tanto pelo inicio de `tracked_operation` quanto
+    por escritores diretos do mesmo alvo (`registrar-licao`, `registrar-
+    marca`, `registrar-loja`) que nunca passam por um journal proprio."""
+    alvo = str(caminho.resolve())
+    conflito = _recursos_reivindicados_por_outros(exceto_op_id or "").get(alvo)
+    if conflito is None:
+        return
+    raise SystemExit(
+        f"Nao da para escrever em {caminho}: a operacao '{conflito.get('kind')}' "
+        f"{conflito.get('op_id')!r} ja reivindica este arquivo e ainda esta pendente "
+        f"(journal: {conflito.get('arquivo')}).\n"
+        "Isso significa que uma tentativa anterior foi interrompida antes de terminar e ainda "
+        "nao foi retomada. Resolva essa pendencia primeiro: rode `operacoes-pendentes` para ver "
+        "o comando exato que a iniciou e repita-o com os MESMOS argumentos para retomar. So "
+        "depois disso concluir (ou, apos conferir com cuidado, apagar o journal dela manualmente) "
+        "esta escrita pode acontecer."
+    )
+
+
 @contextlib.contextmanager
 def tracked_operation(scope: Path, op_id: str, kind: str, assinatura: dict[str, Any],
-                       detalhe_inicial: dict[str, Any] | None = None):
+                       detalhe_inicial: dict[str, Any] | None = None,
+                       recursos: "set[Path] | list[Path]" = ()):
     """Registra em disco uma operacao que grava varios arquivos, antes de comecar.
 
     Nao existe transacao entre arquivos: cada `atomic_write_text` continua
     atomico por si so, mas a sequencia inteira nao e. O que este helper da e
     RECUPERACAO, nao atomicidade.
+
+    `recursos` e a lista de arquivos que esta operacao vai escrever, POR
+    FORA do proprio journal (ex.: `decisao.md`/`processo.md` para `decidir`;
+    `licoes.md`/arquivo de marca/loja para `aprender-veredito`). Numa
+    operacao NOVA (nao retomada), se qualquer um desses arquivos ja estiver
+    reivindicado por outra operacao pendente, esta chamada e RECUSADA antes
+    de escrever qualquer coisa - ver `_recursos_reivindicados_por_outros`
+    para o porque. E uma escolha conservadora, deliberada: bloquear e
+    reversivel (basta retomar ou resolver a pendencia), inventar identidade
+    por linha de texto num arquivo pensado para leitura humana nao seria.
 
     `assinatura` e a impressao digital dos DADOS de entrada desta tentativa
     (preco, justificativa, licao...). Uma retomada com `op_id` igual mas
@@ -480,7 +538,10 @@ def tracked_operation(scope: Path, op_id: str, kind: str, assinatura: dict[str, 
     journal nao tem lock proprio, so evita duplicacao entre chamadas
     SEQUENCIAIS (comando, crash, comando de novo), nao entre processos
     concorrentes escrevendo o mesmo `op_id` ao mesmo tempo - isso continua
-    sendo papel do `project_lock`.
+    sendo papel do `project_lock`. A checagem de `recursos`, por sua vez,
+    cobre exatamente a janela que a trava NAO cobre: entre uma falha e a
+    retomada, quando nenhum processo esta rodando e nenhuma trava esta
+    segurando nada.
 
     LIMITE ENTRE MAQUINAS: `.operacoes/` fica fora do Git de proposito (e
     estado de execucao local, nao historia de compra). Uma operacao
@@ -491,7 +552,8 @@ def tracked_operation(scope: Path, op_id: str, kind: str, assinatura: dict[str, 
     commitar/dar push, e rode `git status` ao voltar numa maquina onde
     ficou trabalho parado. Um commit feito com operacao pendente nesta
     maquina viaja para as outras como se estivesse completo - o journal fica
-    para tras.
+    para tras. A checagem de `recursos` tambem so enxerga o que esta
+    pendente NESTA maquina, pelo mesmo motivo.
     """
     path = _operation_path(scope, op_id)
     try:
@@ -516,9 +578,30 @@ def tracked_operation(scope: Path, op_id: str, kind: str, assinatura: dict[str, 
                 "da tentativa anterior para retomar, ou apague o arquivo do journal a mao (depois de "
                 "conferir com `operacoes-pendentes` o que ficou pendente) para comecar do zero."
             )
+        # Retomada: os recursos ja foram reivindicados por ESTA operacao na
+        # 1a tentativa (senao ela nunca teria comecado) - reusa os mesmos,
+        # nunca recalcula, e nao precisa checar conflito contra si mesma.
         registro = existente
         registro["situacao"] = "em_andamento"
     else:
+        recursos_normalizados = sorted({str(Path(r).resolve()) for r in recursos})
+        colisoes = {r: info for r, info in _recursos_reivindicados_por_outros(op_id).items()
+                    if r in recursos_normalizados}
+        if colisoes:
+            detalhe_colisoes = "; ".join(
+                f"{caminho} (operacao {info.get('kind')!r} {info.get('op_id')!r}, journal: {info.get('arquivo')})"
+                for caminho, info in colisoes.items()
+            )
+            raise SystemExit(
+                f"Nao da para comecar '{kind}' ({op_id!r}): outra operacao pendente ja reivindica "
+                f"arquivo(s) que esta operacao tambem escreveria - {detalhe_colisoes}.\n"
+                "Isso normalmente significa que uma tentativa anterior (de outro produto ou "
+                "veredito) foi interrompida antes de terminar e ainda nao foi retomada. Resolva "
+                "essa pendencia primeiro: rode `operacoes-pendentes` para ver o comando exato que "
+                "a iniciou e repita-o com os MESMOS argumentos para retomar. So depois disso "
+                "concluir (ou, apos conferir com cuidado, apagar o journal dela manualmente) esta "
+                "operacao pode comecar."
+            )
         registro = {
             "op_id": op_id,
             "kind": kind,
@@ -526,6 +609,7 @@ def tracked_operation(scope: Path, op_id: str, kind: str, assinatura: dict[str, 
             "passos": {},
             "assinatura_fingerprint": fingerprint_nova,
             "detalhe": detalhe_inicial or {},
+            "recursos": recursos_normalizados,
             "iniciado_em": now_iso(),
             "atualizado_em": now_iso(),
             "pid": os.getpid(),
@@ -2829,8 +2913,14 @@ def decide(args: argparse.Namespace) -> None:
     instante = dt.datetime.now().strftime("%Y%m%dT%H%M%S%f")
     snapshot_rel_candidato = f"snapshots/{instante}-{slugify(args.produto_id)}"
     op_id = f"decidir:{args.produto_id}"
+    # decisao.md e processo.md sao arquivos UNICOS por projeto, nao por
+    # produto: `decidir A` e `decidir B` do mesmo projeto escrevem os dois no
+    # MESMO lugar. Sem declarar isso como recurso, uma retomada de A depois
+    # de um `decidir B` intercalado reaproveitava a captura (ja concluida)
+    # sem perceber que decisao.md tinha sido reescrito por B nesse meio tempo.
     with tracked_operation(project, op_id, "decidir", assinatura,
-                            {"snapshot_rel": snapshot_rel_candidato}) as op:
+                            {"snapshot_rel": snapshot_rel_candidato},
+                            recursos={project / "decisao.md", project / "processo.md"}) as op:
         _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado, minima,
                         obrigatorios, perdedores, briefing_meta, op)
 
@@ -3291,7 +3381,21 @@ def learn_from_verdict(args: argparse.Namespace) -> None:
         "compraria_produto": compraria_produto, "compraria_loja": compraria_loja,
         "gate": args.gate, "alerta": args.alerta, "resumo_vendedor": args.resumo_vendedor,
     }
-    with tracked_operation(BASE, op_id, "aprender-veredito", assinatura, {"veredito": str(path), "fase": fase}) as op:
+    # licoes.md e UM arquivo compartilhado por TODAS as exportacoes, de
+    # qualquer projeto ou veredito. Duas exportacoes legitimas e
+    # independentes, com texto de licao identico no mesmo dia, escrevem no
+    # MESMO lugar - sem declarar isso como recurso, uma retomada podia contar
+    # a ocorrencia da OUTRA exportacao como prova do proprio efeito e nunca
+    # gravar a sua. O mesmo vale para marca/loja quando o nome coincide.
+    recursos = set()
+    if lesson:
+        recursos.add(BASE / "licoes.md")
+    if marca:
+        recursos.add(BASE / "marcas" / f"{slugify(marca)}.md")
+    if loja:
+        recursos.add(BASE / "lojas" / f"{slugify(loja)}.md")
+    with tracked_operation(BASE, op_id, "aprender-veredito", assinatura, {"veredito": str(path), "fase": fase},
+                            recursos=recursos) as op:
         if marca:
             path_marca, entry_marca = knowledge_entry(
                 argparse.Namespace(
@@ -3495,12 +3599,18 @@ def knowledge_entry(args: argparse.Namespace, kind: str) -> tuple[Path, str]:
 
 def register_store(args: argparse.Namespace) -> None:
     path, entry = knowledge_entry(args, "loja")
+    # Escrita direta, fora de qualquer journal: se `aprender-veredito`
+    # estiver com uma operacao pendente que ja reivindicou este mesmo
+    # arquivo, escrever aqui por fora criaria a mesma confusao de autoria
+    # que o journal existe para evitar.
+    _recusar_se_recurso_pendente(path)
     append_text(path, entry)
     print(path.relative_to(ROOT))
 
 
 def register_brand(args: argparse.Namespace) -> None:
     path, entry = knowledge_entry(args, "marca")
+    _recusar_se_recurso_pendente(path)
     append_text(path, entry)
     print(path.relative_to(ROOT))
 
@@ -3611,6 +3721,7 @@ def apply_lesson_gate(gate: str) -> str:
 
 
 def register_lesson(args: argparse.Namespace) -> None:
+    _recusar_se_recurso_pendente(BASE / "licoes.md")
     gate_note = ""
     if args.gate:
         applied = apply_lesson_gate(args.gate)

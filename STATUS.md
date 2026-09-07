@@ -5,14 +5,48 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (06/09/2026, sessao 4)
+## AO RETOMAR — comece por aqui (07/09/2026, sessao 5)
 
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
-Frente 2 (recuperacao de operacoes parciais) **concluida** — na 3a rodada de
-revisao (Codex sobre o commit `2a682a7`). Frentes 3 (receptor Sheets), 4
-(proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito) **nao
-iniciadas** — comece pelo plano, nao redescubra o escopo.
+Frente 2 (recuperacao de operacoes parciais) **concluida** — na 4a rodada de
+revisao (Codex sobre o commit `833c4b9`). Ja foi declarada concluida 3 vezes
+antes e cada vez o Codex achou lacuna nova - se for mexer nela nesta sessao,
+leia a secao 2 do plano inteira antes, nao so este resumo. Frentes 3
+(receptor Sheets), 4 (proveniencia), 5 (produtos reutilizados) e 6
+(datas/veredito) **nao iniciadas** — comece pelo plano, nao redescubra o
+escopo.
+
+- **A 3a correcao (commit `833c4b9`) resolvia reconciliacao DENTRO de uma
+  operacao, mas nao entre DUAS operacoes intercaladas.** O Codex reproduziu:
+  (1) A e interrompida em `licao:iniciado`; B (veredito diferente, mesma
+  licao, mesmo dia) roda completo; ao retomar A, a contagem-delta via a
+  linha de B como prova de que A tinha escrito - A "concluia" sem nunca
+  gravar a propria licao; (2) `decidir A` captura e e interrompido antes do
+  veredito; `decidir B` do MESMO projeto roda completo e sobrescreve
+  `decisao.md`; ao retomar A, a captura ja estava `concluida` (da 1a
+  tentativa) e nao tocava em nada - A terminava "com sucesso" enquanto
+  `decisao.md` continuava dizendo B. Causa raiz: `project_lock`/trava de
+  `BASE` so protegem enquanto um comando esta RODANDO, nao durante o tempo
+  em que uma operacao fica pendente. As 4 reproducoes (2 cenarios x
+  variantes) confirmadas contra o codigo antigo antes de corrigir.
+- **Estrategia escolhida: bloqueio conservador, nao identidade persistente
+  por linha.** Cada operacao declara, ao comecar, os `recursos` (arquivos)
+  que vai escrever fora do proprio journal - `decidir` declara
+  `decisao.md`+`processo.md` do PROJETO (nao do produto, por isso A e B do
+  mesmo projeto colidem); `aprender-veredito` declara `licoes.md` (se houver
+  licao) e o arquivo de marca/loja se o nome coincidir. Uma operacao nova
+  que reivindicaria recurso ja reivindicado por outra pendente e RECUSADA
+  antes de escrever qualquer byte. Escritores diretos sem journal proprio
+  (`registrar-licao`, `registrar-marca`, `registrar-loja`) tambem checam.
+- **Testes**: `tests/test_operation_recovery.py` foi de 18 para **22
+  testes** - B bloqueada (nada dela escrito) -> A recuperada -> SO ENTAO B
+  com sucesso, para licao e para decisao; escritores diretos tambem
+  bloqueados; coerencia entre decisao.md/processo.md/snapshot/veredito e
+  `auditar-decisoes --strict` conferidos apos cada recuperacao.
+- HB20S continua intocado (ver nota da sessao anterior).
+
+## Sessao anterior (06/09/2026, sessao 4) — historico
 
 - **A 2a correcao (commit `2a682a7`) tambem estava incompleta.** O Codex
   revisou de novo e reproduziu 3 falhas mais profundas, todas na mesma raiz:
