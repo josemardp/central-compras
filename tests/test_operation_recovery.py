@@ -761,6 +761,169 @@ class OperationRecoveryTest(ambiente.RepoTestCase):
         self.cli("aprender-veredito", str(veredito))  # resolve
         self.cli("novo-veredito", str(project), "--force")
 
+    # ---- 6a revisao (Codex), sobre o commit 5fb4f7c ------------------------
+    #
+    # `RECURSOS_DIRETOS_POR_COMANDO` so cobria os 6 comandos citados na 5a
+    # rodada. `append_timeline`/`mark_steps`/`set_process_state` sao
+    # chamados por bem mais comandos do que isso (direto ou via
+    # `build_ranking`), e `novo-projeto --force` nem passava pela tabela -
+    # sobrescrevia decisao.md/processo.md e truncava cotacoes.csv ao
+    # cabecalho incondicionalmente.
+
+    def _falha_em(self, ponto_alvo):
+        real_hook = cc._crash_de_teste_se_pedido
+
+        def _hook(ponto):
+            if ponto == ponto_alvo:
+                raise RuntimeError(f"crash simulado em {ponto}")
+            return real_hook(ponto)
+        return _hook
+
+    def test_rev6_bug1_novo_projeto_force_nao_destroi_dados_e_respeita_pendencia(self):
+        project = self.project()
+        self._abrir_candidato(project)
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", self._falha_em("timeline_veredito:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self._decidir(project)
+
+        pendentes = cc.pending_operations([project])
+        self.assertEqual(len(pendentes), 1)
+        self.assertEqual(pendentes[0]["passos"]["captura"]["situacao"], "concluido")
+
+        decisao_antes = (project / "decisao.md").read_text(encoding="utf-8")
+        processo_antes = (project / "processo.md").read_text(encoding="utf-8")
+        cotacoes_antes = (project / "cotacoes.csv").read_text(encoding="utf-8")
+        self.assertIn("Produto ID: candidato", decisao_antes, "pre-condicao: a captura ja gravou a decisao")
+        self.assertGreater(cotacoes_antes.count("\n"), 1, "pre-condicao: precisa haver cotacao real")
+
+        with self.assertRaisesRegex(SystemExit, "ja reivindica|progresso"):
+            self.cli("novo-projeto", project.name.split("-", 1)[1], "--force")
+
+        self.assertEqual((project / "decisao.md").read_text(encoding="utf-8"), decisao_antes)
+        self.assertEqual((project / "processo.md").read_text(encoding="utf-8"), processo_antes)
+        self.assertEqual((project / "cotacoes.csv").read_text(encoding="utf-8"), cotacoes_antes)
+
+        # Recupera decidir normalmente.
+        self._decidir(project)
+        self.assertEqual(cc.pending_operations([project]), [])
+
+        # Sem pendencia nenhuma, --force AINDA e recusado: o projeto tem
+        # progresso real (cotacao + decisao), e --force nao existe para
+        # apagar isso, so para recuperar uma criacao vazia que ficou pela
+        # metade.
+        decisao_final = (project / "decisao.md").read_text(encoding="utf-8")
+        cotacoes_final = (project / "cotacoes.csv").read_text(encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "progresso"):
+            self.cli("novo-projeto", project.name.split("-", 1)[1], "--force")
+        self.assertEqual((project / "decisao.md").read_text(encoding="utf-8"), decisao_final)
+        self.assertEqual((project / "cotacoes.csv").read_text(encoding="utf-8"), cotacoes_final)
+
+    def test_rev6_bug1_force_sem_pendencia_preserva_cotacoes_append_only(self):
+        """--force recusado por progresso real, mesmo SEM nenhuma operacao
+        pendente envolvida - cotacoes.csv e append-only por principio."""
+        project = self.project("so-cotacao")
+        self._abrir_candidato(project)  # so registra produto + 1 cotacao, nunca decide
+        cotacoes_antes = (project / "cotacoes.csv").read_text(encoding="utf-8")
+        self.assertGreater(cotacoes_antes.count("\n"), 1)
+        self.assertEqual(cc.pending_operations([project]), [])  # nada pendente
+
+        with self.assertRaisesRegex(SystemExit, "progresso|append-only"):
+            self.cli("novo-projeto", "so-cotacao", "--force")
+        self.assertEqual((project / "cotacoes.csv").read_text(encoding="utf-8"), cotacoes_antes)
+
+    def test_rev6_bug2_inventario_completo_bloqueia_todos_os_escritores_de_processo(self):
+        project = self.project()
+        self._abrir_candidato(project)
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", self._falha_em("timeline_veredito:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self._decidir(project)
+
+        processo_antes = (project / "processo.md").read_text(encoding="utf-8")
+
+        tentativas_bloqueadas = [
+            ("ranking", (str(project),)),
+            ("novo-produto", (str(project), "outro-candidato", "--produto-id", "outro-candidato",
+                              "--marca", "Marca B", "--requisito", "uso=true")),
+            ("cotar", (str(project), "--produto-id", "candidato", "--loja", "KaBuM",
+                      "--vendedor", "V2", "--vendedor-tipo", "oficial", "--preco", "180",
+                      "--nota", "4.5", "--avaliacoes", "500", "--frete-prazo-dias", "3",
+                      "--garantia-tipo", "nacional", "--garantia-meses", "12",
+                      "--link", "https://example.invalid/item2", "--fonte", "web")),
+            ("descartar", ("--produto-id", "candidato", "--porque", "teste", "--projeto", str(project))),
+            ("aguardar-preco", ("--produto-id", "candidato", "--porque", "teste",
+                                "--projeto", str(project))),
+        ]
+        for comando, args in tentativas_bloqueadas:
+            with self.subTest(comando=comando):
+                with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+                    self.cli(comando, *args)
+                self.assertEqual(
+                    (project / "processo.md").read_text(encoding="utf-8"), processo_antes,
+                    f"{comando} escreveu em processo.md apesar da reserva",
+                )
+                self.assertFalse((cc.PRODUTOS / "fone" / "outro-candidato").exists(),
+                                 f"{comando} criou produto apesar do bloqueio")
+
+        # Recupera decidir: tudo volta a funcionar.
+        self._decidir(project)
+        self.assertEqual(cc.pending_operations([project]), [])
+        self.cli("ranking", str(project))
+        self.cli("novo-produto", str(project), "outro-candidato", "--produto-id", "outro-candidato",
+                 "--marca", "Marca B", "--requisito", "uso=true")
+        self.assertTrue((cc.PRODUTOS / "fone" / "outro-candidato").exists())
+        processo_final = (project / "processo.md").read_text(encoding="utf-8")
+        self.assertIn("outro-candidato", processo_final)
+
+    def test_rev6_bug2_descartar_sem_projeto_explicito_e_bloqueado_e_travado(self):
+        """`descartar`/`aguardar-preco` resolvem o projeto implicitamente pela
+        ficha do produto quando `--projeto` nao e passado - a trava e a
+        checagem de conflito precisam usar a MESMA resolucao, nao rodar
+        destravadas."""
+        project = self.project()
+        self._abrir_candidato(project)
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", self._falha_em("timeline_veredito:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self._decidir(project)
+
+        processo_antes = (project / "processo.md").read_text(encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("descartar", "--produto-id", "candidato", "--porque", "teste")  # sem --projeto
+        self.assertEqual((project / "processo.md").read_text(encoding="utf-8"), processo_antes)
+
+        self._decidir(project)  # resolve
+
+    def test_rev6_bug3_journal_ilegivel_em_base_protege_veredito_tambem(self):
+        veredito = self._fechar_com_veredito_generico(self.project(), licao="conferir garantia antes")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", self._falha_em("licao:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito))
+
+        arquivo_journal = next((cc.BASE / ".operacoes").glob("*.json"))
+        arquivo_journal.write_text("{isto nao e json valido", encoding="utf-8")
+
+        texto_antes = veredito.read_text(encoding="utf-8")
+        # O journal fica em BASE/.operacoes/, mas a operacao que ele descreve
+        # (aprender-veredito) tambem reivindica o arquivo de VEREDITO -
+        # classificar so pela pasta fisica do journal deixava esse recurso
+        # "fora do alcance" da protecao.
+        with self.assertRaisesRegex(SystemExit, "journal ilegivel"):
+            self.cli("preencher-veredito", str(veredito), "--fase", "d30",
+                     "--resumo", "resumo alterado", "--nota-arrependimento", "3",
+                     "--compraria-de-novo", "nao")
+        self.assertEqual(veredito.read_text(encoding="utf-8"), texto_antes,
+                         "BUG: preencher-veredito alterou o veredito apesar do journal ilegivel")
+
+        arquivo_journal.unlink()
+        self.cli("aprender-veredito", str(veredito))  # reexporta do zero, resolve a pendencia
+        self.cli("preencher-veredito", str(veredito), "--fase", "d30",
+                 "--resumo", "resumo alterado", "--nota-arrependimento", "3",
+                 "--compraria-de-novo", "nao")
+        self.assertIn("resumo alterado", veredito.read_text(encoding="utf-8"))
+
     # ---- Concorrencia: as travas existentes ainda serializam --------------
 
     def test_comandos_concorrentes_no_mesmo_projeto_sao_serializados(self):

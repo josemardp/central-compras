@@ -468,24 +468,42 @@ def _recursos_reivindicados_por_outros(exceto_op_id: str) -> dict[str, dict[str,
 
 
 def _escopo_de(caminho: Path) -> Path:
-    """BASE se `caminho` estiver sob `base-conhecimento/`; senao, o projeto
-    (`projetos/<nome>/`) que o contem. Usado para saber se um journal
-    ilegivel num escopo pode estar reivindicando `caminho`."""
+    """BASE se `caminho` estiver sob `base-conhecimento/`; VEREDITOS se
+    estiver sob `vereditos/`; senao, o projeto (`projetos/<nome>/`) que o
+    contem. Usado para saber se um journal ilegivel num escopo pode estar
+    reivindicando `caminho`."""
     resolvido = caminho.resolve()
     if resolvido.is_relative_to(BASE.resolve()):
         return BASE
+    if resolvido.is_relative_to(VEREDITOS.resolve()):
+        return VEREDITOS
     for projeto in project_dirs():
         if resolvido.is_relative_to(projeto.resolve()):
             return projeto
     return resolvido.parent
 
 
+# Um journal em BASE (aprender-veredito) reivindica recursos FORA de BASE
+# tambem - o proprio arquivo de veredito, em `vereditos/`. Classificar um
+# journal ilegivel so pela pasta fisica onde o `.operacoes/` mora deixava
+# esses recursos "fora do alcance" da protecao: um journal corrompido em
+# BASE nao bloqueava escrita em VEREDITOS, embora a MESMA operacao,
+# legivel, reivindicasse os dois. A politica conservadora precisa cobrir
+# tudo que aquele TIPO de operacao pode alcancar, nao so a pasta do journal.
+def _escopos_alcancados_por(escopo_do_journal: Path) -> "set[Path]":
+    if escopo_do_journal.resolve() == BASE.resolve():
+        return {BASE, VEREDITOS}
+    return {escopo_do_journal}
+
+
 def _escopos_com_journal_ilegivel() -> dict[str, dict[str, Any]]:
-    """Escopo (str resolvido) -> primeiro registro `journal_ilegivel` nele."""
+    """Escopo (str resolvido) -> primeiro registro `journal_ilegivel` que
+    pode alcanca-lo (ver `_escopos_alcancados_por`)."""
     mapa: dict[str, dict[str, Any]] = {}
     for registro in pending_operations([BASE, *project_dirs()]):
         if registro.get("situacao") == "journal_ilegivel":
-            mapa.setdefault(registro["escopo"], registro)
+            for alcancado in _escopos_alcancados_por(Path(registro["escopo"])):
+                mapa.setdefault(str(alcancado.resolve()), registro)
     return mapa
 
 
@@ -1090,6 +1108,30 @@ def stop_rule_status(project: Path) -> dict[str, Any]:
     }
 
 
+def _projeto_com_progresso_real(path: Path) -> str | None:
+    """Devolve o motivo (texto pronto pra mensagem) se `path` ja tem
+    progresso real registrado - cotacao, decisao ou snapshot - ou `None` se
+    o projeto ainda e uma casca vazia (seguro para `--force` recriar).
+
+    `cotacoes.csv` e append-only por principio deste repositorio: nenhum
+    parametro de comando pode reduzi-lo ao cabecalho. `decisao.md` e
+    `snapshots/` sao evidencia de uma decisao ja avaliada.
+    """
+    cotacoes = path / "cotacoes.csv"
+    if cotacoes.exists():
+        with cotacoes.open("r", encoding="utf-8", newline="") as f:
+            linhas = sum(1 for _ in f)
+        if linhas > 1:
+            return f"{cotacoes} tem {linhas - 1} cotacao(oes) registrada(s), append-only"
+    decisao = path / "decisao.md"
+    if decisao.exists() and decisao.read_text(encoding="utf-8") != render_template("decisao.md"):
+        return f"{decisao} ja tem uma decisao registrada"
+    snapshots = path / "snapshots"
+    if snapshots.exists() and any(snapshots.iterdir()):
+        return f"{snapshots} tem evidencia de decisao congelada"
+    return None
+
+
 def ensure_structure(_: argparse.Namespace) -> None:
     for path in [
         CONFIG,
@@ -1107,11 +1149,25 @@ def ensure_structure(_: argparse.Namespace) -> None:
 
 def new_project(args: argparse.Namespace) -> None:
     ensure_structure(args)
-    year = dt.date.today().year
-    projeto_id = f"{year}-{slugify(args.nome)}"
+    projeto_id = _novo_projeto_id(args)
     path = PROJETOS / projeto_id
-    if path.exists() and not args.force:
-        raise SystemExit(f"Projeto ja existe: {path}")
+    if path.exists():
+        if not args.force:
+            raise SystemExit(f"Projeto ja existe: {path}")
+        # A checagem de conflito com operacao PENDENTE roda centralizada em
+        # `main()` (RECURSOS_DIRETOS_POR_COMANDO). Esta aqui e independente
+        # disso: --force nunca pode apagar progresso real, pendencia ou nao
+        # - cotacoes.csv e append-only por principio deste repositorio, e
+        # decisao.md/snapshots sao evidencia de uma compra ja avaliada.
+        razao = _projeto_com_progresso_real(path)
+        if razao:
+            raise SystemExit(
+                f"--force recusado em {path}: {razao}.\n"
+                "--force so serve para recuperar uma criacao que ficou pela metade "
+                "(nenhuma cotacao, nenhuma decisao, nenhum snapshot). Para mudar um "
+                "projeto que ja tem progresso, edite os arquivos diretamente ou "
+                "abra um projeto novo com outro nome."
+            )
     path.mkdir(parents=True, exist_ok=True)
 
     necessidade = args.necessidade or args.nome
@@ -5752,8 +5808,61 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _recursos_diretos_anotar(args: argparse.Namespace) -> "set[Path]":
-    return {project_path(args.projeto) / "processo.md"}
+def _projeto_alvo_do_comando(args: argparse.Namespace) -> Path | None:
+    """Projeto que este comando efetivamente vai tocar - usado tanto para
+    travar (`locked_project`) quanto para declarar recursos. `args.projeto`
+    quando presente; senao, resolvido a partir do produto (`descartar` e
+    `aguardar-preco` aceitam `--projeto` implicito, gravado na propria
+    ficha do produto em `produto.get("projeto")`) - a MESMA resolucao que
+    `discard_product`/`wait_price` fazem interamente, replicada aqui para
+    travar e checar ANTES delas rodarem, nao depois."""
+    alvo = getattr(args, "projeto", None)
+    if alvo:
+        try:
+            return project_path(alvo)
+        except SystemExit:
+            return None
+    produto_id = getattr(args, "produto_id", None)
+    if produto_id:
+        caminho_produto = find_product_path(produto_id)
+        if caminho_produto:
+            projeto_gravado = read_yaml(caminho_produto, {}).get("projeto")
+            if projeto_gravado:
+                try:
+                    return project_path(str(projeto_gravado))
+                except SystemExit:
+                    return None
+    return None
+
+
+def _novo_projeto_id(args: argparse.Namespace) -> str:
+    return f"{dt.date.today().year}-{slugify(args.nome)}"
+
+
+# `processo.md` de um projeto e escrito por `append_timeline`/`mark_steps`/
+# `set_process_state`, chamados de dentro de varios comandos - nao so
+# `anotar`. O inventario completo (com o que cada um escreve e por que) em
+# docs/plano-pendencias-auditoria-2026-09-06.md, secao 2.
+def _recursos_diretos_processo(args: argparse.Namespace) -> "set[Path]":
+    projeto = _projeto_alvo_do_comando(args)
+    return {projeto / "processo.md"} if projeto else set()
+
+
+def _recursos_diretos_regenerar(args: argparse.Namespace) -> "set[Path]":
+    projetos = [project_path(args.projeto)] if args.projeto else project_dirs()
+    return {projeto / "processo.md" for projeto in projetos}
+
+
+def _recursos_diretos_novo_projeto(args: argparse.Namespace) -> "set[Path]":
+    """So ha recurso a checar se `--force` mira um projeto que JA existe -
+    criar um projeto novo nao pode conflitar com nada, porque nada reivindica
+    um caminho que ainda nao existia."""
+    if not args.force:
+        return set()
+    alvo = PROJETOS / _novo_projeto_id(args)
+    if not alvo.exists():
+        return set()
+    return {alvo / "decisao.md", alvo / "processo.md"}
 
 
 def _recursos_diretos_preencher_veredito(args: argparse.Namespace) -> "set[Path]":
@@ -5787,9 +5896,20 @@ def _recursos_diretos_registrar_loja(args: argparse.Namespace) -> "set[Path]":
 # (`tracked_operation`). Cada resolver devolve os arquivos que o comando
 # vai escrever; `main()` checa conflito com operacao pendente UMA VEZ,
 # centralizado, antes de chamar `args.func` - nao um a um dentro de cada
-# funcao, que e como a 1a e a 2a rodada desta protecao ficaram incompletas.
+# funcao. `_recursos_diretos_processo` cobre TODO comando que grava
+# processo.md por fora de decidir (nao so anotar): cotar, promover-cotacao,
+# novo-produto, ranking, descartar, aguardar-preco chamam append_timeline/
+# mark_steps/set_process_state internamente, direto ou via build_ranking.
 RECURSOS_DIRETOS_POR_COMANDO: dict[str, Any] = {
-    "anotar": _recursos_diretos_anotar,
+    "novo-projeto": _recursos_diretos_novo_projeto,
+    "anotar": _recursos_diretos_processo,
+    "cotar": _recursos_diretos_processo,
+    "promover-cotacao": _recursos_diretos_processo,
+    "novo-produto": _recursos_diretos_processo,
+    "ranking": _recursos_diretos_processo,
+    "descartar": _recursos_diretos_processo,
+    "aguardar-preco": _recursos_diretos_processo,
+    "regenerar": _recursos_diretos_regenerar,
     "preencher-veredito": _recursos_diretos_preencher_veredito,
     "novo-veredito": _recursos_diretos_novo_veredito,
     "registrar-licao": _recursos_diretos_registrar_licao,
@@ -5818,14 +5938,14 @@ ALL_PROJECT_COMMANDS = {"dashboard", "regenerar", "migrar-cotacoes"}
 
 
 def locked_project(args: argparse.Namespace) -> Path | None:
-    """Projeto que este comando vai escrever, se houver um so."""
-    alvo = getattr(args, "projeto", None)
-    if not alvo:
-        return None
-    try:
-        return project_path(alvo)
-    except SystemExit:
-        return None
+    """Projeto que este comando vai escrever, se houver um so.
+
+    `descartar`/`aguardar-preco` aceitam `--projeto` implicito (resolvido a
+    partir do produto) - sem essa resolucao aqui, o comando rodava SEM
+    travar projeto nenhum quando `--projeto` era omitido, mesmo escrevendo
+    em `processo.md` daquele projeto.
+    """
+    return _projeto_alvo_do_comando(args)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -5845,6 +5965,13 @@ def main(argv: list[str] | None = None) -> int:
             alvos.add(PRODUTOS)
         if args.comando == "novo-projeto":
             alvos.add(PROJETOS)
+            # --force num projeto que JA existe escreve dentro dele: sem
+            # travar o proprio projeto (so travar a raiz `PROJETOS` nao
+            # basta), ele podia rodar concorrente com um `decidir` do mesmo
+            # projeto sem serializar com a trava dele.
+            alvo_existente = PROJETOS / _novo_projeto_id(args)
+            if alvo_existente.exists():
+                alvos.add(alvo_existente)
         if args.comando == "dashboard":
             alvos.update({BASE, DASHBOARD, PROJETOS, *project_dirs()})
         if args.comando in ALL_PROJECT_COMMANDS and not getattr(args, "projeto", None):

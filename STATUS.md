@@ -5,55 +5,64 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (07/09/2026, sessao 6)
+## AO RETOMAR — comece por aqui (07/09/2026, sessao 7)
 
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
-Frente 2 (recuperacao de operacoes parciais) **concluida sob reserva** — 5a
-rodada de revisao (Codex sobre o commit `df08fb5`). Ja foi declarada
-concluida 4 vezes antes e cada vez o Codex achou lacuna nova - **nao
+Frente 2 (recuperacao de operacoes parciais) **concluida sob reserva** — 6a
+rodada de revisao (Codex sobre o commit `5fb4f7c`). Ja foi declarada
+concluida 5 vezes antes e cada vez o Codex achou lacuna nova - **nao
 declare concluida de novo so porque os exemplos testados passaram**; leia a
-secao 2 do plano inteira, incluindo o inventario comando-a-comando, antes
-de mexer. Frentes 3 (receptor Sheets), 4 (proveniencia), 5 (produtos
-reutilizados) e 6 (datas/veredito) **nao iniciadas** — comece pelo plano,
-nao redescubra o escopo.
+secao 2 do plano inteira, incluindo o inventario comando-a-comando (o mais
+completo ate agora), antes de mexer. Frentes 3 (receptor Sheets), 4
+(proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito) **nao
+iniciadas** — comece pelo plano, nao redescubra o escopo.
 
-- **A 4a correcao (commit `df08fb5`) so cobria os comandos citados nos
-  testes dela, nao todos os que escrevem nos mesmos arquivos.** O Codex
-  reproduziu: (1) `anotar --etapa decisao --decisao "Escolhido candidato"
-  --porque <mesmo texto>` escreve na MESMA linha de `processo.md` que
-  `decidir` reivindica, mas nunca tinha sido conectado a checagem de
-  conflito - rodava livre e confundia a retomada de `decidir`; (2) um
-  journal ILEGIVEL (JSON corrompido) era ignorado pela checagem de
-  conflito (so olhava journals `em_andamento`), entao corromper um journal
-  pendente DESTRAVAVA a protecao para o recurso dele, o oposto do
-  esperado. Causa raiz confirmada pelo padrao repetido 4 vezes: a protecao
-  era conectada comando por comando, na medida em que um teste apontava.
-- **Correcao: inventario completo de todos os comandos que escrevem
-  arquivo (tabela na secao 2 do plano) + ponto UNICO de checagem.**
-  `_bloquear_se_recursos_conflitantes()` roda (a) dentro de
-  `tracked_operation` para `decidir`/`aprender-veredito`, e (b) uma vez em
-  `main()`, via tabela `RECURSOS_DIRETOS_POR_COMANDO`, para todo escritor
-  direto (`anotar`, `preencher-veredito`, `novo-veredito`, `registrar-
-  licao/marca/loja`) - nenhuma checagem solta dentro de funcao individual
-  mais. Journal ilegivel agora bloqueia o ESCOPO inteiro (BASE ou o
-  projeto onde ele esta), nao e mais ignorado.
-- **Testes**: `tests/test_operation_recovery.py` foi de 22 para **26
-  testes**. As 4 reproducoes (2 do relatorio + `preencher-veredito` e
-  `novo-veredito --force`, achados pelo proprio inventario) confirmadas
-  contra o codigo antigo antes de corrigir, com o ciclo completo bloqueio
-  -> recuperacao -> escrita permitida depois.
-- **Limitacao nova, documentada no plano**: `cotar`, `promover-cotacao`,
-  `novo-produto`, `descartar`, `aguardar-preco` NAO sao bloqueados por uma
-  captura de `decidir` ainda pendente (aceito - a decisao so e "tomada" de
-  verdade quando a captura conclui, e depois disso ela nunca mais e
-  tocada). Qualquer comando NOVO que passe a escrever processo.md/
-  decisao.md/licoes.md/marcas/lojas/veredito por fora dos dois comandos
-  principais precisa entrar na tabela `RECURSOS_DIRETOS_POR_COMANDO` -
-  nao ha checagem automatica disso, e uma responsabilidade de revisao.
-- HB20S continua intocado (ver nota das sessoes anteriores).
+- **A 5a correcao (commit `5fb4f7c`) tinha o inventario factualmente
+  incompleto.** O Codex reproduziu 3 problemas (4 casos): (1) `novo-projeto
+  --force` num projeto que ja existe sobrescrevia decisao.md/processo.md e
+  TRUNCAVA cotacoes.csv ao cabecalho, incondicionalmente - nunca passava
+  pela checagem central; retomar `decidir` depois falhava com "Nenhuma
+  cotacao encontrada"; (2) `ranking` e `novo-produto` (e tambem `cotar`,
+  `promover-cotacao`, `descartar`, `aguardar-preco`, `regenerar`) chamam
+  `append_timeline`/`mark_steps`/`set_process_state`/`build_ranking`
+  internamente e por isso TAMBEM escrevem `processo.md`, mas nenhum estava
+  na tabela de protecao - a suposicao anterior de "esse comando nao
+  escreve nada reivindicavel" era factualmente errada, nao verificada linha
+  a linha; (3) journal ilegivel em `base-conhecimento/.operacoes/`
+  (aprender-veredito) nao protegia o arquivo de veredito, que fica em
+  `vereditos/` - classificacao por pasta fisica do journal, nao pelo que a
+  operacao de fato alcanca.
+- **Correcao**: (1) `novo-projeto --force` ganhou duas camadas -
+  `_projeto_com_progresso_real()` recusa incondicionalmente se
+  `cotacoes.csv` tiver linha alem do cabecalho, `decisao.md` divergir do
+  template vazio ou `snapshots/` nao estiver vazio (independente de
+  pendencia), MAIS a checagem central contra operacao pendente; tambem
+  passou a travar o projeto existente, nao so a raiz `projetos/`. (2)
+  `_recursos_diretos_processo()`, resolver UNICO reaproveitado por
+  `anotar`/`cotar`/`promover-cotacao`/`novo-produto`/`ranking`/`descartar`/
+  `aguardar-preco` (todos escrevem o MESMO `processo.md` por baixo);
+  `regenerar` declara `processo.md` de cada projeto tocado; `descartar`/
+  `aguardar-preco` passaram tambem a travar o projeto corretamente quando
+  `--projeto` e omitido (antes rodavam destravados nesse caso). (3)
+  `_escopos_alcancados_por()`: journal em BASE agora bloqueia BASE E
+  `vereditos/`; projeto so bloqueia ele mesmo.
+- **Testes**: `tests/test_operation_recovery.py` foi de 26 para 31 (30 +
+  1 flaky de corrida de limpeza no Windows, sem relacao com o mecanismo,
+  reproduzido isolado 5x sem falhar). As 4 reproducoes confirmadas DUAS
+  vezes: como teste permanente E como script avulso com subprocessos reais
+  contra copia isolada do codigo do commit `5fb4f7c` (extraida via `git
+  show`, sem `git stash`, para nao mexer no workspace compartilhado).
+- **Limitacao residual, ainda aceita**: `cotacoes.csv` e a ficha do produto
+  (`produto.yaml`) continuam sem ser declarados como `recursos`
+  diretamente - so ficaram protegidos INDIRETAMENTE porque os mesmos
+  comandos tambem escrevem `processo.md`, que agora e protegido. Registrado
+  no plano como diferente (mais estreito) da limitacao antiga, que estava
+  errada.
+- HB20S continua intocado (nao usei `git stash` nesta sessao, conforme
+  pedido - comparacao antes/depois feita com `git show` + subprocessos).
 
-## Sessao anterior (07/09/2026, sessao 5) — historico
+## Sessao anterior (07/09/2026, sessao 6) — historico
 
 - **A 2a correcao (commit `2a682a7`) tambem estava incompleta.** O Codex
   revisou de novo e reproduziu 3 falhas mais profundas, todas na mesma raiz:

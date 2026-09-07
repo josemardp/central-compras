@@ -22,13 +22,15 @@ Estados possíveis: `não iniciada` · `em andamento` · `concluída` · `bloque
 
 ## 2. Recuperação de operações parciais — PRIORIDADE
 
-**Estado: concluída sob reserva** (5ª revisão corrigida na sessão de
+**Estado: concluída sob reserva** (6ª revisão corrigida na sessão de
 07/09/2026 — commit a publicar). Ficou **em andamento** entre cada entrega
-e a revisão seguinte que achou lacuna nova — já aconteceu 4 vezes seguidas
-(após `83c0901`, `2a682a7`, `833c4b9`, `df08fb5`). **Não declare concluída
-de novo só porque os exemplos testados passaram** — confirme contra o
-inventário da subseção 5ª abaixo, e verifique se algum comando novo foi
-adicionado ao CLI desde então sem entrar nesse inventário.
+e a revisão seguinte que achou lacuna nova — já aconteceu 5 vezes seguidas
+(após `83c0901`, `2a682a7`, `833c4b9`, `df08fb5`, `5fb4f7c`). **Não declare
+concluída de novo só porque os exemplos testados passaram** — confirme
+contra o inventário da subseção 6ª abaixo (o mais completo até agora), e
+verifique se algum comando novo foi adicionado ao CLI, ou algum comando
+existente passou a chamar `append_timeline`/`mark_steps`/`set_process_state`/
+`build_ranking`, sem entrar nesse inventário.
 
 ### 1ª entrega (commit `83c0901`) — insuficiente, revisada pelo Codex
 
@@ -326,47 +328,63 @@ teste apontava a lacuna.** A correção desta rodada parou de fazer isso.
 
 **Correção — inventário completo + ponto único de checagem:**
 
-| Comando | Arquivos afetados | Trava adquirida | Verificação de conflito |
+| Comando | Arquivos REALMENTE escritos (verificado no código) | Trava adquirida | Verificação de conflito |
 |---|---|---|---|
-| `decidir` | `decisao.md`, `processo.md` (projeto); snapshot próprio (não compartilhado) | projeto | `tracked_operation` (recursos declarados) |
-| `aprender-veredito` | `licoes.md`, `marcas/<slug>.md`, `lojas/<slug>.md` (se aplicável), o **arquivo de veredito** | `base-conhecimento/` | `tracked_operation` (recursos declarados) |
-| `anotar` | `processo.md` (projeto) | projeto | **novo**: central (`RECURSOS_DIRETOS_POR_COMANDO`) |
-| `preencher-veredito` | arquivo de veredito (path direto do argumento) | `base-conhecimento/` (histórico; não é o escopo natural, mantido como estava) | **novo**: central |
-| `novo-veredito` (com `--force`) | arquivo de veredito (`VEREDITOS/<data>-<projeto>.md`) | projeto | **novo**: central |
-| `registrar-licao` | `licoes.md` | `base-conhecimento/` | central (antes era chamada inline dentro da função; movida para a tabela central) |
-| `registrar-marca` | `marcas/<slug>.md` | `base-conhecimento/` | central (idem) |
-| `registrar-loja` | `lojas/<slug>.md` | `base-conhecimento/` | central (idem) |
-| `novo-projeto` | briefing/processo/ranking/decisão/cotações **do projeto que está sendo criado** | `projetos/` (raiz) | não se aplica — projeto não existe antes desta chamada, não há como haver pendência prévia |
-| `novo-produto` | `produtos/<categoria>/<id>/produto.yaml` | `produtos/` | não bloqueado — ficha de produto não é recurso reivindicado por nenhuma operação; ver limitação abaixo |
-| `cotar` | `cotacoes.csv` (append-only) | projeto | não bloqueado — `cotacoes.csv` é append-only e `decidir` já recusa retomada se o hash da cotação mudar (`assinatura`); risco residual só durante uma captura ainda não concluída, ver limitação abaixo |
-| `promover-cotacao` | `cotacoes.csv` | projeto | idem `cotar` |
-| `ranking` | `ranking.md`, `ranking.csv` (projeto) | projeto | não bloqueado — recomputados deterministicamente a partir de `cotacoes.csv`+produtos; seguro de rodar a qualquer momento, inclusive dentro da própria captura de `decidir` |
-| `descartar` | `produto.yaml` | produto (`produtos/`) | não bloqueado — mesmo raciocínio de `novo-produto` |
-| `aguardar-preco` | `produto.yaml` | produto (`produtos/`) | idem |
-| `regenerar` | `ranking.md/csv`, `validacao.md`, histórico, dashboard (não toca `decisao.md`/`processo.md`/snapshots) | todos os projetos (ou um) + `base-conhecimento/` + dashboard | não bloqueado — não escreve nenhum arquivo reivindicável; testado que preserva ranking congelado (`decisao-*-ranking.md`) |
-| `categorias.yaml` (gate) | escrito só via `apply_lesson_gate`, sempre junto de uma gravação em `licoes.md` na mesma chamada | — | coberto **transitivamente**: todo caminho que grava `categorias.yaml` também grava `licoes.md` na mesma operação, que já é protegida |
-| `briefing.md` | escrito só por `set_project_state`, chamado apenas de dentro de `decidir` | — | não há comando standalone que escreva briefing.md; não se aplica |
+| `decidir` | `decisao.md`, `processo.md`, snapshot próprio | projeto (+ `base-conhecimento/`, herdado de `KNOWLEDGE_COMMANDS`) | `tracked_operation` |
+| `aprender-veredito` | `licoes.md`, `marcas/<slug>.md`, `lojas/<slug>.md` (se aplicável), o arquivo de veredito | `base-conhecimento/` | `tracked_operation` |
+| `anotar` | `processo.md`, via `append_timeline` | projeto | central |
+| `cotar` | `cotacoes.csv` (`append_quote`) **e** `processo.md` (`append_timeline` + `mark_steps`) | projeto | central — cobre `processo.md`; `cotacoes.csv` continua como risco aceito (ver limitação) |
+| `promover-cotacao` | `cotacoes.csv` **e** `processo.md` (`append_timeline` + `mark_steps` + `set_process_state`) | projeto | central — idem `cotar` |
+| `novo-produto` | `produtos/<categoria>/<id>/produto.yaml`, `pesquisa.md` **e** `processo.md` (`append_timeline` + `mark_steps`) | projeto + `produtos/` | central — cobre `processo.md`; ficha do produto continua como risco aceito |
+| `ranking` | `ranking.md`, `ranking.csv` **e** `processo.md` (`mark_steps` + `set_process_state`, sempre que há cotação) | projeto | **corrigido nesta rodada** — antes não bloqueava nada, mesmo escrevendo `processo.md` |
+| `descartar` | `produto.yaml` **e** `processo.md` (`append_timeline` direto + de novo via `build_ranking` interno) | produto (`produtos/`) — **projeto não era travado quando `--projeto` era omitido, corrigido nesta rodada** | central — resolve o projeto pela ficha do produto quando `--projeto` falta, igual ao comando de verdade |
+| `aguardar-preco` | `produto.yaml` **e** `processo.md` (`append_timeline` + `set_process_state`) | produto (`produtos/`) — mesma correção de trava de `descartar` | central, mesma resolução implícita |
+| `regenerar` | `ranking.md/csv`, `validacao.md`, histórico, dashboard, **e `processo.md` de cada projeto tocado** (via `build_ranking` interno) | todos os projetos (ou um) + `base-conhecimento/` + dashboard | **corrigido nesta rodada** — declara `processo.md` de cada projeto no escopo |
+| `novo-projeto` (sem `--force`, projeto novo) | briefing/processo/ranking/decisão/cotações do projeto sendo criado | `projetos/` (raiz) | não se aplica — nada pode reivindicar um caminho que ainda não existia |
+| `novo-projeto --force` (projeto já existe) | os mesmos arquivos, **sobre um projeto que já existe** | `projetos/` (raiz) **e o próprio projeto, corrigido nesta rodada** | **corrigido nesta rodada**, em duas camadas: (1) central, contra operação pendente; (2) `_projeto_com_progresso_real()`, independente de pendência — recusa se `cotacoes.csv` tiver linha além do cabeçalho, `decisao.md` divergir do template vazio, ou `snapshots/` não estiver vazio |
+| `registrar-licao` | `licoes.md` | `base-conhecimento/` | central |
+| `registrar-marca` | `marcas/<slug>.md` | `base-conhecimento/` | central |
+| `registrar-loja` | `lojas/<slug>.md` | `base-conhecimento/` | central |
+| `preencher-veredito` | arquivo de veredito | `base-conhecimento/` (histórico, mantido) | central — **corrigido nesta rodada**: journal ilegível em BASE agora também bloqueia recursos em `vereditos/` (ver abaixo) |
+| `novo-veredito --force` | arquivo de veredito | projeto | central |
+| `categorias.yaml` (gate) | só via `apply_lesson_gate`, sempre junto de uma gravação em `licoes.md` na mesma chamada | — | coberto transitivamente: todo caminho que grava `categorias.yaml` também grava `licoes.md` na mesma operação |
+| `briefing.md` | só via `set_project_state`, chamado apenas de dentro de `decidir` | — | não há comando standalone que escreva `briefing.md` |
+| `validar`, `auditar`, `historico`, `migrar-cotacoes` | arquivos de relatório próprios (`validacao.md` etc.) ou `cotacoes.csv` só via `write_quotes` (reescreve cabeçalho, preserva linhas) | conforme já definido | verificado que **não** chamam `append_timeline`/`mark_steps`/`set_process_state`/`build_ranking` — confirmado lendo o corpo de cada função, não presumido |
 
 Ponto único de checagem: `_bloquear_se_recursos_conflitantes()`, chamada (a)
 dentro de `tracked_operation`, para operações com journal próprio
 (`decidir`, `aprender-veredito`), e (b) uma vez em `main()`, para os
 escritores diretos da tabela `RECURSOS_DIRETOS_POR_COMANDO`, logo após as
 travas serem adquiridas e antes de `args.func(args)` — nenhuma checagem
-solta dentro de função individual.
+solta dentro de função individual. `_recursos_diretos_processo()` é o
+resolver comum a `anotar`/`cotar`/`promover-cotacao`/`novo-produto`/
+`ranking`/`descartar`/`aguardar-preco`: todos escrevem `processo.md` do
+MESMO projeto por baixo, então um resolver só, reaproveitado, é mais
+confiável do que seis resolvers quase iguais divergindo com o tempo.
 
-**Journal ilegível agora bloqueia o ESCOPO inteiro (BASE ou o projeto onde
-está o journal corrompido)**, não silenciosamente nada: qualquer novo
-recurso naquele escopo é recusado até o journal ser lido com confiança ou
-apagado manualmente após conferência.
+**Journal ilegível bloqueia todo escopo que aquele TIPO de operação pode
+alcançar, não só a pasta física onde o `.operacoes/` mora.** Um journal de
+`aprender-veredito` vive em `base-conhecimento/.operacoes/`, mas a operação
+também reivindica o arquivo de veredito, em `vereditos/` — classificar só
+pela pasta do journal deixava esse recurso "fora do alcance". Corrigido com
+`_escopos_alcancados_por()`: BASE alcança BASE e `vereditos/`; qualquer
+projeto só alcança ele mesmo (`decidir` nunca reivindica nada fora do
+próprio projeto).
 
 ### Testes
 
-`tests/test_operation_recovery.py`: 22 → **26 testes**. Os 4 novos: `anotar`
-bloqueado enquanto `decidir` pendente (com o ciclo completo bloqueio →
-recuperação → escrita permitida); journal corrompido bloqueando
-`registrar-licao` no mesmo escopo, sem apagar o journal sozinho;
-`preencher-veredito` e `novo-veredito --force` bloqueados enquanto
-`aprender-veredito` está pendente no mesmo arquivo de veredito.
+`tests/test_operation_recovery.py`: 26 → **31 testes** (30 na suíte
+permanente; 1 segue flaky por corrida de limpeza de arquivo temporário do
+Windows, não relacionado a este mecanismo — reproduzido isoladamente 5x
+sem falhar, registrado como ruído conhecido, não como achado). As 4
+reproduções desta rodada foram confirmadas **duas vezes**: como teste
+permanente (via `ambiente.RepoTestCase`, contra o código atual) e como
+script avulso rodando **subprocessos reais** contra uma cópia isolada do
+código do commit `5fb4f7c` (extraída com `git show`, nunca via `git
+stash`, para não mexer no workspace compartilhado) — os 3 primeiros casos
+reproduzidos byte a byte como o relatório descreveu (cotações truncadas,
+`processo.md` alterado, veredito reescrito), depois confirmados bloqueados
+rodando o MESMO script contra o código corrigido.
 
 ### O que este mecanismo não cobre (registrado, não é lacuna escondida)
 
@@ -387,24 +405,27 @@ recuperação → escrita permitida); journal corrompido bloqueando
   conteúdo específico não colidisse (duas lições DIFERENTES, por exemplo).
   Escolha consciente pela simplicidade e segurança — este é um sistema de
   um único operador, crash deveria ser raro e resolvido na hora.
-- **Risco residual, aceito e documentado (não bloqueado):** `cotar`,
-  `promover-cotacao`, `novo-produto`, `descartar` e `aguardar-preco` não são
-  bloqueados por uma captura de `decidir` ainda pendente (não concluída).
-  Se o operador editar cotações/produtos nessa janela estreita entre a
-  falha e o retry, a captura retomada (que ainda não rodou
-  `executar_uma_vez`) vai ler o estado ATUAL, não o do momento da falha —
-  aceitável porque, até a captura concluir, a decisão ainda não foi tomada
-  de verdade, e o operador está livre para atualizar os dados de pesquisa.
-  Uma vez que a captura conclui, ela nunca mais é tocada
-  (`executar_uma_vez`), então esse risco só existe nessa janela inicial.
-  Se uma sessão futura quiser fechar essa janela também, o padrão a seguir
-  é o mesmo: declarar os arquivos como `recursos` do `decidir` pendente.
+- **Risco residual, ainda aceito nesta rodada:** `cotacoes.csv` (via
+  `cotar`/`promover-cotacao`) e a ficha do produto (`produto.yaml`, via
+  `novo-produto`/`descartar`/`aguardar-preco`) **não** são declarados como
+  `recursos` — só o `processo.md` que essas mesmas chamadas também escrevem
+  passou a ser protegido nesta rodada. Isso é diferente da justificativa
+  anterior ("não bloqueado porque o comando não escreve nada reivindicável"),
+  que a 6ª revisão mostrou ser **factualmente errada**: esses comandos SEMPRE
+  escrevem `processo.md` também, e é isso que agora os bloqueia
+  indiretamente sempre que `decidir` tem `processo.md` pendente. O risco que
+  sobra é mais estreito do que antes, mas não nulo: numa janela hipotética
+  em que `processo.md` NÃO estivesse entre os recursos pendentes mas
+  `cotacoes.csv`/`produto.yaml` fossem relevantes, nada bloquearia. Não
+  identificado nenhum cenário concreto assim até agora.
 - Todo comando novo que passar a escrever `processo.md`, `decisao.md`,
-  `licoes.md`, `marcas/*.md`, `lojas/*.md` ou um arquivo de veredito por
-  fora de `decidir`/`aprender-veredito` precisa ser adicionado à tabela
-  `RECURSOS_DIRETOS_POR_COMANDO` — não há checagem automática de que isso
-  foi feito. É uma responsabilidade de revisão de código, registrada aqui
-  para não se perder.
+  `licoes.md`, `marcas/*.md`, `lojas/*.md` ou um arquivo de veredito —
+  direto OU por meio de `append_timeline`/`mark_steps`/`set_process_state`/
+  `set_project_state`/`build_ranking` — precisa ser adicionado à tabela
+  `RECURSOS_DIRETOS_POR_COMANDO`. Não há checagem automática disso; é
+  responsabilidade de revisão de código. **Ao revisar, procure pelas 5
+  funções acima no corpo do comando, não confie em suposição sobre "o que
+  esse comando deveria escrever".**
 - Não cobre a exportação para o Google Sheets (frente 3) nem qualquer outra
   sequência multi-arquivo fora de `decidir`/`aprender-veredito`. Se uma
   sessão futura achar outro ponto candidato, reaproveite
