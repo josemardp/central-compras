@@ -81,23 +81,25 @@ de propósito: assim não desaparece se a planilha for para a lixeira).
 - Editor: `script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 - Web App **ativo**, execução como conta-comercial, acesso "qualquer pessoa",
   protegido por token no corpo do POST.
-- A implantação ativa **ainda é a Versão 9**, publicada em 05/09/2026 pela
-  conta **conta-comercial**, no mesmo ID e na mesma URL do Web App. O layout foi
-  sincronizado duas vezes com 8 projetos e 8 comparativos e conferido na
-  planilha real: 9 abas, fila de atenção, vereditos, filtros, links, formatos
-  numéricos e gráficos. A V9 substitui a comparação inválida de scores entre
-  projetos por contagens de pendências e mantém compatibilidade com o payload
-  anterior. As versões 5 a 8 foram etapas do mesmo deploy.
-- **07/09/2026 — código da Versão 10 pronto no repositório, NÃO implantado
-  ainda.** Corrige 3 falhas reais da V9 (payload com `null` podia deixar a
-  planilha parcialmente escrita; `limparAbasOrfas` podia apagar aba criada à
-  mão; falha no meio da escrita não dizia o que já tinha sido gravado) — ver
+- A implantação ativa é a **Versão 11**, publicada em 07/09/2026 pela conta
+  **conta-comercial**, no mesmo ID e na mesma URL do Web App desde a Versão 9
+  (`AKfycbzrKsNDNyCEK40qvHKn9L7rOVGp3pfkjNUR9iKFk6w5qLnJhdliHLYAbWPXuKep9GZT`).
+  Corrige 3 falhas reais da V9 (payload com `null` podia deixar a planilha
+  parcialmente escrita; `limparAbasOrfas` podia apagar aba criada à mão;
+  falha no meio da escrita não dizia o que já tinha sido gravado) — ver
   [`integracao-google-sheets.md`](integracao-google-sheets.md), seção
-  "Code.gs (versão 10 - DEPLOY PENDENTE)". O redeploy pela conta conta-comercial
-  ficou bloqueado nesta sessão: `mcp__nav-conta-comercial__*` recusou navegar
-  porque o perfil de navegador já estava em uso por outro processo. **Até o
-  redeploy acontecer, o Web App continua rodando o código da Versão 9** —
-  não presuma que a correção já está ativa na nuvem só porque está no git.
+  "Code.gs (versão 11 ativa)". A Versão 10 (primeiro deploy do dia) quebrou
+  na primeira sincronização real (`PropertiesService.getDocumentProperties()`
+  é `null` num projeto solto) e foi substituída pela V11 minutos depois,
+  mesmo dia. Duas sincronizações reais contra a V11 devolveram 10 projetos e
+  10 comparativos nas duas, e a planilha real ficou com 11 abas (Visão Geral
+  + 10 comparativos, sem duplicata nem órfã) — conferida por captura de tela
+  da Visão Geral e de uma aba de comparativo.
+- O layout em si (fila de atenção, vereditos, filtros, links, formatos
+  numéricos e gráficos) vem da V9, publicada em 05/09/2026, que substitui a
+  comparação inválida de scores entre projetos por contagens de pendências e
+  mantém compatibilidade com o payload anterior. As versões 5 a 8 foram
+  etapas do mesmo deploy.
 - Código e procedimento de redeploy: [`integracao-google-sheets.md`](integracao-google-sheets.md).
 - Lições e checklist de validação: [`aprendizados-google-sheets.md`](aprendizados-google-sheets.md).
 

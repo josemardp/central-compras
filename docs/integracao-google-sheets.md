@@ -3,11 +3,14 @@
 O comando `python scripts/central_compras.py sincronizar-planilha` exporta a
 visão geral dos projetos e os comparativos de cotações para uma planilha Google.
 
-**Status externo: Versão 9 ainda é a que está ativa na nuvem.** A Versão 10
-(código abaixo) corrige 3 falhas reais da Versão 9 - ver
-"Code.gs (versão 10 - DEPLOY PENDENTE)" logo adiante - mas **ainda não foi
-publicada**. Enquanto a implantação não for atualizada pela conta
-`conta-comercial@exemplo.com`, o Web App continua rodando o código da Versão 9.
+**Status externo e versionado: Versão 11 ativa e verificada.** Publicada em
+07/09/2026 pela conta `conta-comercial@exemplo.com`, editando a implantação existente
+(mesmo ID/URL do Web App, preservados). Depois do deploy, a sincronização foi
+executada duas vezes de verdade e a planilha real foi conferida: 11 abas
+(Visao Geral + 10 comparativos), sem duplicata, formatação e veredito
+corretos. Ver "VERSÃO 11 IMPLANTADA E VERIFICADA" no histórico de versões
+adiante para o relato completo, incluindo um bug real que só apareceu na
+implantação (V10 quebrava em produção; a V11 corrigiu no mesmo dia).
 
 ## Como funciona
 
@@ -38,13 +41,18 @@ Projeto "Central de Compras - Sync" em https://script.google.com, conta
 conta-comercial. Editor:
 `https://script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 
-## Code.gs (versão 10 - DEPLOY PENDENTE)
+## Code.gs (versão 11 ativa)
 
-> **O código abaixo NÃO está implantado ainda.** A nuvem continua rodando a
-> Versão 9. Esta Versão 10 corrige, em 07/09/2026, 3 falhas reais encontradas
-> nesta sessão (reproduzidas de verdade executando o próprio Code.gs sob Node
-> com fakes do runtime do Apps Script, script em
-> `docs/plano-pendencias-auditoria-2026-09-06.md` §3):
+> O código abaixo corresponde à Versão 11 implantada, executada como
+> **conta-comercial**, no mesmo ID e URL do Web App desde a Versão 9. Publicada e
+> verificada em 07/09/2026 (duas sincronizações reais + inspeção visual da
+> planilha - ver "VERSÃO 11 IMPLANTADA E VERIFICADA" no histórico de versões
+> mais abaixo).
+>
+> A V10/V11 corrigem 3 falhas reais da V9, todas reproduzidas de verdade
+> executando o próprio Code.gs sob Node com fakes do runtime do Apps Script
+> antes de qualquer deploy (`docs/plano-pendencias-auditoria-2026-09-06.md`
+> §3):
 >
 > 1. **Payload com `null`/tipo errado quebrava no meio da escrita.** Um
 >    elemento `null` em `visao_geral` (ou em `comparativos[].metricas`,
@@ -59,21 +67,28 @@ conta-comercial. Editor:
 >    (`/^20\d\d-/`, `'Painel'`, `'_Dados'`, ...); uma aba renomeada ou criada
 >    manualmente com nome parecido (ex.: `2026-manual`) caía no mesmo padrão e
 >    era apagada assim que o projeto correspondente saísse do payload. Agora
->    há um registro real (`PropertiesService`, propriedade
->    `abas_geradas_pelo_script`) das abas que o PRÓPRIO script escreveu em
->    alguma sincronização anterior; só essas são candidatas a limpeza.
+>    há um registro real (`PropertiesService.getScriptProperties()`,
+>    propriedade `abas_geradas_pelo_script`) das abas que o PRÓPRIO script
+>    escreveu em alguma sincronização anterior; só essas são candidatas a
+>    limpeza.
 > 3. **Falha no meio da escrita não dizia o que já tinha sido gravado.** A
 >    resposta de erro só tinha `error`/`detalhe` (a mensagem da exceção), sem
 >    dizer quais abas a sincronização já tinha escrito antes de quebrar.
 >    Agora a resposta de erro inclui `abas_escritas_antes_da_falha`, e
 >    `sincronizar_planilha()` (Python) mostra essa lista na mensagem.
 >
-> Redeploy (pela conta `conta-comercial@exemplo.com`, preservando ID/URL - ver
-> "Implantação" adiante), duas sincronizações e conferência visual da
-> planilha real ficaram **bloqueados nesta sessão**: o perfil de navegador
-> `conta-comercial` já estava em uso por outro processo
-> (`Browser is already in use for ...perfil-conta-comercial`). Fica para a próxima
-> sessão com esse perfil livre - ver `STATUS.md`.
+> **A V10 (o primeiro deploy) quebrou em produção de verdade**, algo que os
+> testes locais não pegaram: `PropertiesService.getDocumentProperties()`
+> devolve `null` neste projeto porque ele é solto (não container-bound, de
+> propósito), então `.getProperty(...)` explodia com
+> `Cannot read properties of null (reading 'getProperty')` bem no fim de
+> `doPost` (depois de já ter escrito Visão Geral + todos os comparativos - a
+> própria correção do item 3 mostrou exatamente isso, listando todas as abas
+> já gravadas na resposta de erro). A V11, publicada minutos depois no mesmo
+> dia, troca as duas chamadas para `PropertiesService.getScriptProperties()`
+> (funciona sem documento vinculado) - e o fake de teste em Node foi corrigido
+> para replicar esse `null`, para essa classe de bug não passar batido de
+> novo.
 
 ```javascript
 const TOKEN = '...'; // cole aqui uma senha longa aleatoria. O valor real vive
@@ -1065,8 +1080,13 @@ function nomeAbaProjeto(projeto, usados) {
 
 const PROPRIEDADE_ABAS_GERADAS = 'abas_geradas_pelo_script';
 
+// ScriptProperties, nao DocumentProperties: este projeto e solto (nao
+// container-bound, de proposito - ver "Onde esta o projeto do Apps Script"
+// no topo deste doc), entao getDocumentProperties() nao tem documento pra
+// se ligar e devolve null. So foi pego na V10 real (nao no fake de teste),
+// que travava com "Cannot read properties of null (reading 'getProperty')".
 function abasGeradasRegistradas() {
-  const bruto = PropertiesService.getDocumentProperties().getProperty(PROPRIEDADE_ABAS_GERADAS);
+  const bruto = PropertiesService.getScriptProperties().getProperty(PROPRIEDADE_ABAS_GERADAS);
   if (!bruto) return {};
   try {
     const registro = JSON.parse(bruto);
@@ -1079,7 +1099,7 @@ function abasGeradasRegistradas() {
 function registrarAbasGeradas(nomes) {
   const registro = {};
   nomes.forEach(function (nome) { registro[nome] = true; });
-  PropertiesService.getDocumentProperties().setProperty(PROPRIEDADE_ABAS_GERADAS, JSON.stringify(registro));
+  PropertiesService.getScriptProperties().setProperty(PROPRIEDADE_ABAS_GERADAS, JSON.stringify(registro));
 }
 
 function limparAbasOrfas(planilha, projetosAtuais) {
@@ -1142,6 +1162,8 @@ function resposta(obj) {
 | 5 → 7 | coluna congelada atravessava títulos mesclados | exceção em tempo de execução, apesar do código salvo e publicado |
 | 7 → 8 | gráficos usavam intervalos horizontais separados e transpostos | ranking vazio e eixos com rótulos misturados, sem erro de sincronização |
 | 8 → 9 | visão geral comparava scores relativos de compras diferentes | gráfico conceitualmente enganoso, substituído por contagens de pendências comparáveis |
+| 9 → 10 | `null` em `visao_geral`/`comparativos` não era validado antes de escrever; `limparAbasOrfas` decidia por padrão de nome; falha no meio não dizia o que já tinha sido gravado | planilha podia ficar parcialmente escrita e inconsistente; aba criada à mão com nome parecido (`2026-...`) podia ser apagada; resposta de erro sem pista do que sobreviveu |
+| 10 → 11 | `PropertiesService.getDocumentProperties()` é `null` num projeto solto (não container-bound) | `TypeError` real em produção minutos depois do deploy da V10, capturado pelo próprio `abas_escritas_antes_da_falha` que a V10 introduziu — trocado por `getScriptProperties()` |
 
 Os bugs visuais só apareceram quando a planilha foi aberta. Vale a lição:
 resposta HTTP, execução “Concluído” no Apps Script e contagens corretas não
@@ -1208,3 +1230,19 @@ Python continua com timeout de 120s; **não reduza esse valor**.
   consecutivas devolveram 8 projetos e 8 comparativos. A planilha ficou com 9
   abas, sem abas órfãs ou erros de célula, e os gráficos foram inspecionados no
   arquivo real no desktop e em largura de celular.
+- **VERSÃO 11 IMPLANTADA E VERIFICADA:** publicada em 07/09/2026 pela conta
+  `conta-comercial@exemplo.com`, editando a mesma implantação (ID/URL preservados
+  desde a V9). A V10 (primeiro deploy do dia) quebrou na primeira
+  sincronização real com `TypeError: Cannot read properties of null
+  (reading 'getProperty')` — `PropertiesService.getDocumentProperties()`
+  não existe num projeto solto; a resposta de erro (recurso da própria V10)
+  já mostrou que Visão Geral e os 10 comparativos tinham sido escritos antes
+  da falha, então nada de negócio foi perdido. A V11 trocou para
+  `getScriptProperties()` e foi publicada minutos depois, mesmo dia. Duas
+  sincronizações consecutivas contra a V11 devolveram
+  `Planilha sincronizada: 10 projeto(s), 10 comparativo(s).` nas duas. A
+  planilha real (`docs.google.com/spreadsheets/d/1WjO_Ax9Tw6zrMFY2MCLTwbwAoK_Um1g93LWy_HMION4`)
+  ficou com exatamente 11 abas (Visao Geral + 10 comparativos, sem duplicata
+  nem órfã) — conferido tanto pela leitura de "páginas visíveis" do leitor de
+  tela quanto por captura de tela da Visão Geral e de uma aba de comparativo
+  (formatação, veredito, cores e link de volta corretos).

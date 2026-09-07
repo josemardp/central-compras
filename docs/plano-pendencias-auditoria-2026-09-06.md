@@ -506,12 +506,11 @@ subprocessos reais, sem `git stash`.
 
 ## 3. Receptor do Google Sheets
 
-**Estado: código corrigido (07/09/2026), implantação pendente.**
+**Estado: concluída e verificada na nuvem (07/09/2026, Versão 11).**
 
-Os 3 pontos pendentes de código foram corrigidos e verificados por execução
-real (não só leitura) na sessão de 07/09/2026 — ver
-`docs/integracao-google-sheets.md`, seção
-"Code.gs (versão 10 - DEPLOY PENDENTE)":
+Os 3 pontos pendentes de código foram corrigidos, implantados pela conta
+`conta-comercial@exemplo.com` e verificados com sincronização real — ver
+`docs/integracao-google-sheets.md`, seção "Code.gs (versão 11 ativa)":
 
 1. **Validação do payload inteiro antes de escrever qualquer aba** —
    `validarPayload(dados)` roda logo depois de `coletarAvisos`, antes de
@@ -532,32 +531,49 @@ real (não só leitura) na sessão de 07/09/2026 — ver
    de erro ganhou `abas_escritas_antes_da_falha`; `sincronizar_planilha()`
    (Python) inclui essa lista na mensagem de erro.
 
-Os 3 casos foram reproduzidos de verdade: um script Node
+Os 3 casos foram reproduzidos de verdade ANTES do deploy: um script Node
 (`repro_gap1_payload_null.js`, `repro_gap2_aba_manual.js`,
 `repro_gap3_falha_parcial.js`, no scratchpad da sessão, não commitados)
 carrega o Code.gs de fato (extraído do doc) com fakes mínimos do runtime do
 Apps Script (`SpreadsheetApp`/`DriveApp`/`PropertiesService`/etc.) e executa
 `doPost` de ponta a ponta — os 3 falharam do jeito descrito contra o código
 antigo e passaram contra o corrigido, incluindo duas sincronizações
-idênticas seguidas sem duplicar aba. Suíte Python completa (360 testes) e
-`checar-segredos --strict` passaram com o código novo — inclui testes
-permanentes novos em `tests/test_sheets_export.py`
-(`AppsScriptDocumentadoTest` para as 3 correções + `SincronizarPlanilhaTest`
-para o novo campo de diagnóstico).
+idênticas seguidas sem duplicar aba.
 
-**O que falta e está bloqueado nesta sessão:** redeploy pela conta
-`conta-comercial@exemplo.com` (preservando ID/URL da implantação existente), duas
-sincronizações reais e conferência visual da planilha (desktop + mobile).
-Tentativa de navegar com `mcp__nav-conta-comercial__*` em 07/09/2026 falhou com
-`Browser is already in use for ...perfil-conta-comercial` — o perfil já estava em
-uso por outro processo nesta máquina. Não usei `--isolated` para forçar uma
-segunda instância contra o mesmo perfil/conta sem confirmar com o Josemar.
-Fica para quando o perfil estiver livre — ver `STATUS.md`.
+**Redeploy real (07/09/2026, conta `conta-comercial@exemplo.com`):** o perfil de
+navegador `conta-comercial` estava ocupado por um processo Chrome travado de uma
+sessão anterior; com autorização explícita do Josemar, o processo foi
+encerrado (`taskkill /T /F`) e o navegador voltou a funcionar — sem tocar em
+nenhum outro perfil. Editei o `Código.gs` ao vivo no editor (substituição
+cirúrgica via `monaco.editor` — só as regiões que mudaram, nunca reescrevendo
+o arquivo inteiro, para nunca precisar digitar o TOKEN real em lugar
+nenhum) e implantei como **Versão 10** via "Gerenciar implantações → Editar
+→ Nova versão", preservando o mesmo ID/URL do Web App desde a Versão 9.
 
-Depende de sessão com acesso ao navegador autenticado como `conta-comercial`
-(`mcp__nav-conta-comercial__*` ou perfil Chrome equivalente) para o redeploy e a
-conferência visual — a parte de código já foi feita sem isso, mas a
-implantação real (e a prova de que ela funciona) ainda não.
+**A Versão 10 quebrou na primeira sincronização real** — algo que os fakes
+de teste não pegaram: `PropertiesService.getDocumentProperties()` devolve
+`null` porque este projeto do Apps Script é solto (não container-bound, de
+propósito). A própria correção do item 3 (relatar `abas_escritas_antes_da_falha`)
+mostrou que Visão Geral e os 10 comparativos já tinham sido escritos antes da
+falha — nada de negócio foi perdido, só a limpeza de órfãs no fim quebrou.
+Troquei as duas chamadas para `PropertiesService.getScriptProperties()`,
+fortaleci o fake de teste em Node para replicar esse `null` de projeto solto
+(pegaria essa classe de bug numa próxima vez) e implantei a **Versão 11**
+minutos depois, mesmo dia — mesmo ID/URL preservado de novo.
+
+Duas sincronizações reais contra a Versão 11 devolveram
+`Planilha sincronizada: 10 projeto(s), 10 comparativo(s).` nas duas (prova de
+idempotência). A planilha real
+(`docs.google.com/spreadsheets/d/1WjO_Ax9Tw6zrMFY2MCLTwbwAoK_Um1g93LWy_HMION4`)
+foi aberta e conferida: exatamente 11 abas (Visão Geral + 10 comparativos,
+sem duplicata nem órfã), e capturas de tela confirmaram formatação, veredito,
+cores e link de volta corretos na Visão Geral e numa aba de comparativo.
+
+Suíte Python completa (360 testes) e `checar-segredos --strict` passaram com
+o código novo — inclui testes permanentes em `tests/test_sheets_export.py`
+(`AppsScriptDocumentadoTest` para as 3 correções + o uso de
+`getScriptProperties`; `SincronizarPlanilhaTest` para o novo campo de
+diagnóstico).
 
 ## 4. Proveniência das informações
 

@@ -539,15 +539,18 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         cls.code = doc.split("```javascript", 1)[1].split("```", 1)[0]
 
     def test_deploy_ativo_esta_documentado(self):
-        # A ultima versao de fato implantada e verificada continua sendo a 9
-        # (historico preservado); a 10 (payload validado antes de escrever,
-        # abas orfas rastreadas, falha parcial reportada) esta corrigida no
-        # repositorio mas o redeploy ficou bloqueado nesta sessao (perfil de
-        # navegador conta-comercial em uso por outro processo) - ver STATUS.md.
-        # Isso PRECISA continuar dizendo "DEPLOY PENDENTE" ate uma sessao
-        # futura publicar de verdade e atualizar este teste.
+        self.assertIn("versão 11 ativa", self.doc)
         self.assertIn("VERSÃO 9 IMPLANTADA E VERIFICADA", self.doc)
-        self.assertIn("Code.gs (versão 10 - DEPLOY PENDENTE)", self.doc)
+        self.assertIn("VERSÃO 11 IMPLANTADA E VERIFICADA", self.doc)
+        self.assertNotIn("DEPLOY PENDENTE", self.doc)
+
+    def test_properties_do_projeto_solto_usa_script_nao_document(self):
+        # PropertiesService.getDocumentProperties() e null num projeto solto
+        # (nao container-bound) - quebrou de verdade em producao na V10. O
+        # nome pode aparecer em comentario explicando a licao, mas nunca
+        # como chamada de verdade.
+        self.assertNotIn("PropertiesService.getDocumentProperties(", self.code)
+        self.assertIn("PropertiesService.getScriptProperties()", self.code)
 
     def test_payload_e_validado_por_inteiro_antes_de_escrever_qualquer_aba(self):
         # Frente 3 / gap 1: null em visao_geral ou dentro de comparativos
@@ -569,7 +572,7 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         # Frente 3 / gap 2: nao pode confiar so em padrao de nome (uma aba
         # criada a mao com nome parecido nao pode ser candidata a remocao).
         self.assertNotIn("/^20\\d\\d-/.test(nome)", self.code)
-        self.assertIn("PropertiesService.getDocumentProperties", self.code)
+        self.assertIn("PropertiesService.getScriptProperties", self.code)
         self.assertIn("function abasGeradasRegistradas", self.code)
         self.assertIn("function registrarAbasGeradas", self.code)
         self.assertIn("geradaPeloScript = conhecidas[nome] === true", self.code)
