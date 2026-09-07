@@ -539,15 +539,11 @@ class AppsScriptDocumentadoTest(unittest.TestCase):
         cls.code = doc.split("```javascript", 1)[1].split("```", 1)[0]
 
     def test_deploy_ativo_esta_documentado(self):
-        # A ultima versao de fato implantada e verificada e a 11; a 12
-        # (2a rodada: propriedade de aba por sheetId, contrato de estrelas,
-        # diagnostico de aba parcial) esta corrigida no repositorio mas o
-        # redeploy ainda nao aconteceu nesta sessao - ver STATUS.md. Isso
-        # PRECISA continuar dizendo "DEPLOY PENDENTE" ate uma sessao futura
-        # publicar de verdade e atualizar este teste.
+        self.assertIn("versão 12 ativa", self.doc)
         self.assertIn("VERSÃO 9 IMPLANTADA E VERIFICADA", self.doc)
         self.assertIn("VERSÃO 11 IMPLANTADA E VERIFICADA", self.doc)
-        self.assertIn("Code.gs (versão 12 - DEPLOY PENDENTE)", self.doc)
+        self.assertIn("VERSÃO 12 IMPLANTADA E VERIFICADA", self.doc)
+        self.assertNotIn("DEPLOY PENDENTE", self.doc)
 
     def test_properties_do_projeto_solto_usa_script_nao_document(self):
         # PropertiesService.getDocumentProperties() e null num projeto solto

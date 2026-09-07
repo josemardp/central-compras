@@ -3,21 +3,16 @@
 O comando `python scripts/central_compras.py sincronizar-planilha` exporta a
 visão geral dos projetos e os comparativos de cotações para uma planilha Google.
 
-**Status externo: Versão 11 ainda é a que está ativa na nuvem.** A Versão 12
-(código abaixo) corrige mais 3 falhas reais encontradas na 2ª rodada de
-revisão do Codex - ver "Code.gs (versão 12 - DEPLOY PENDENTE)" logo adiante -
-mas **ainda não foi publicada**. Enquanto a implantação não for atualizada
-pela conta `conta-comercial@exemplo.com`, o Web App continua rodando o código da
-Versão 11.
-
-A Versão 11 foi publicada em 07/09/2026 pela conta `conta-comercial@exemplo.com`,
-editando a implantação existente (mesmo ID/URL do Web App, preservados).
-Depois do deploy, a sincronização foi executada duas vezes de verdade e a
-planilha real foi conferida: 11 abas (Visao Geral + 10 comparativos), sem
-duplicata, formatação e veredito corretos. Ver "VERSÃO 11 IMPLANTADA E
-VERIFICADA" no histórico de versões adiante para o relato completo,
-incluindo um bug real que só apareceu na
-implantação (V10 quebrava em produção; a V11 corrigiu no mesmo dia).
+**Status externo e versionado: Versão 12 ativa e verificada.** Publicada em
+07/09/2026 pela conta `conta-comercial@exemplo.com`, editando a implantação existente
+(mesmo ID/URL do Web App desde a Versão 9). Depois do deploy, a sincronização
+foi executada duas vezes de verdade e a planilha real foi conferida: 11 abas
+(Visao Geral + 10 comparativos), sem duplicata nem órfã. Ver "VERSÃO 12
+IMPLANTADA E VERIFICADA" no histórico de versões adiante para o relato
+completo — desta vez as 3 correções (colisão com aba manual, contrato de
+`estrelas`, diagnóstico de aba parcial) tinham testes PERMANENTES e
+executáveis (`tests/apps_script/` + `tests/test_apps_script_execucao.py`)
+provando o comportamento antes do deploy, não só asserts de string.
 
 ## Como funciona
 
@@ -48,13 +43,16 @@ Projeto "Central de Compras - Sync" em https://script.google.com, conta
 conta-comercial. Editor:
 `https://script.google.com/home/projects/1m-BuWuaktiFJ7zWYsLyCI_L6EesZB9SaSCsvScc9IQv5g5L5i3BFiiaz/edit`
 
-## Code.gs (versão 12 - DEPLOY PENDENTE)
+## Code.gs (versão 12 ativa)
 
-> **O código abaixo NÃO está implantado ainda.** A nuvem continua rodando a
-> Versão 11. Esta Versão 12 corrige, em 07/09/2026, mais 3 falhas reais
-> encontradas na 2ª rodada de revisão do Codex sobre o commit `d6246b6`
-> (reproduzidas de verdade executando o próprio Code.gs sob Node, agora com
-> testes PERMANENTES em `tests/apps_script/` + `tests/test_apps_script_execucao.py`
+> O código abaixo corresponde à Versão 12 implantada, executada como
+> **conta-comercial**, no mesmo ID e URL do Web App desde a Versão 9. Publicada e
+> verificada em 07/09/2026 (duas sincronizações reais + inspeção visual da
+> planilha - ver "VERSÃO 12 IMPLANTADA E VERIFICADA" no histórico de versões
+> mais abaixo). Corrige, no mesmo dia, mais 3 falhas reais encontradas na 2ª
+> rodada de revisão do Codex sobre o commit `d6246b6` (reproduzidas de
+> verdade executando o próprio Code.gs sob Node, agora com testes
+> PERMANENTES em `tests/apps_script/` + `tests/test_apps_script_execucao.py`
 > - a 1ª rodada só tinha scripts de scratchpad não commitados, e o Codex
 > corretamente apontou que asserts de presença de string não provam
 > comportamento):
@@ -1392,3 +1390,18 @@ Python continua com timeout de 120s; **não reduza esse valor**.
   nem órfã) — conferido tanto pela leitura de "páginas visíveis" do leitor de
   tela quanto por captura de tela da Visão Geral e de uma aba de comparativo
   (formatação, veredito, cores e link de volta corretos).
+- **VERSÃO 12 IMPLANTADA E VERIFICADA:** publicada em 07/09/2026 pela conta
+  `conta-comercial@exemplo.com`, editando a mesma implantação (ID/URL preservados
+  desde a V9). Corrige 3 falhas que a 2ª rodada de revisão do Codex sobre o
+  commit `d6246b6` reproduziu de verdade (propriedade de aba só pelo nome,
+  contrato de `estrelas` não validado, aba parcialmente alterada fora do
+  diagnóstico) — desta vez com testes PERMANENTES em `tests/apps_script/` +
+  `tests/test_apps_script_execucao.py` provando as 3 correções antes do
+  deploy, e não só string presente no doc. O registro de propriedade migrou
+  em produção do formato legado (`{nome: true}`, da V11) para o novo
+  (`{nome: sheetId}`) sem incidente: duas sincronizações consecutivas contra
+  a V12 devolveram `Planilha sincronizada: 10 projeto(s), 10 comparativo(s).`
+  nas duas, e a planilha real continuou com exatamente 11 abas (Visao Geral
+  + 10 comparativos, sem duplicata nem órfã — nenhuma aba nova criada pela
+  migração do registro), conferido pela listagem de páginas visíveis e por
+  captura de tela da Visão Geral.

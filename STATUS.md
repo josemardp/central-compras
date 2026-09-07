@@ -16,9 +16,10 @@ porque os exemplos testados passaram**; leia a secao 2 do plano inteira,
 incluindo o inventario comando-a-comando, antes de mexer.
 
 **Frente 3 (receptor Sheets): 2a rodada de revisao do Codex sobre o commit
-`d6246b6` achou 3 lacunas novas.** Mesmo padrao da frente 2 - **nao declare
-esta frente concluida de novo so porque a rodada anterior (V9→V11) passou**;
-leia a secao 3 do plano inteira antes de mexer. As 3 lacunas desta rodada:
+`d6246b6` achou 3 lacunas novas — corrigidas e implantadas (Versao 12).**
+Mesmo padrao da frente 2 - **nao declare esta frente concluida "para sempre"
+so porque duas rodadas ja passaram**; leia a secao 3 do plano inteira antes
+de mexer. As 3 lacunas desta rodada:
 
 1. **Aba manual podia ser sobrescrita** - `abaLimpa()` decidia propriedade
    so pelo nome; uma aba criada a mao com o mesmo nome de um projeto
@@ -44,9 +45,24 @@ Python que rodam o Code.gs de verdade via `subprocess`, pulam com motivo
 visivel se `node` nao existir no PATH). Suite completa: 371 testes,
 `checar-segredos --strict` limpo.
 
-**Redeploy real: ver o proximo bloco desta sessao** (ainda nao aconteceu no
-momento de escrever este paragrafo - se este texto nao foi atualizado
-depois, o redeploy NAO aconteceu e a nuvem continua na Versao 11).
+**Redeploy real: FEITO.** Publicado como **Versao 12** pela conta
+`conta-comercial@exemplo.com`, editando a implantacao existente (mesmo ID/URL desde
+a V9). Duas sincronizacoes reais devolveram `Planilha sincronizada: 10
+projeto(s), 10 comparativo(s).` nas duas. O registro de propriedade migrou
+em producao do formato legado da V11 (`{nome: true}`) para o novo (`{nome:
+sheetId}`) sem incidente - nao criou aba duplicada nem tratou os 10 projetos
+reais como estranhos. A planilha real
+(`docs.google.com/spreadsheets/d/1WjO_Ax9Tw6zrMFY2MCLTwbwAoK_Um1g93LWy_HMION4`)
+continua com exatamente 11 abas (Visao Geral + 10 comparativos, sem
+duplicata nem orfa) - conferido pela listagem de paginas visiveis e por
+captura de tela da Visao Geral.
+
+**Importante: os 2 syncs reais só provam o caminho feliz (deploy +
+idempotência) na planilha de produção.** Os 3 cenários de FALHA (colisão com
+aba manual, payload inválido, falha operacional pós-`clear()`) foram
+provados antes do deploy, contra o Code.gs real rodando em ambiente isolado
+(`tests/apps_script/` + `tests/test_apps_script_execucao.py`) — nunca contra
+a planilha de produção, de propósito (destrutivo só em ambiente isolado).
 
 Frentes 4 (proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito)
 **nao iniciadas** — comece pelo plano, nao redescubra o escopo.

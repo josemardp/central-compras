@@ -507,10 +507,10 @@ subprocessos reais, sem `git stash`.
 ## 3. Receptor do Google Sheets
 
 **Estado: 2ª rodada de revisão do Codex sobre o commit `d6246b6` achou 3
-lacunas novas — código corrigido e testado localmente (07/09/2026), redeploy
-em andamento.** Mesma lição da frente 2: **não declare esta frente concluída
-de novo só porque a rodada anterior passou** — leia esta seção inteira antes
-de mexer.
+lacunas novas — corrigidas, testadas e implantadas na nuvem (Versão 12,
+07/09/2026).** Mesma lição da frente 2: **não declare esta frente concluída
+"para sempre" só porque duas rodadas já passaram — a próxima revisão pode
+achar outra lacuna** — leia esta seção inteira antes de mexer.
 
 ### 1ª rodada (commits `84ecb64` + `d6246b6`) — histórico
 
@@ -654,9 +654,26 @@ duplicar aba, inclusive com o registro no formato legado.
 Suíte Python completa (371 testes) e `checar-segredos --strict` passaram
 com o código corrigido.
 
-**Redeploy real:** ver `STATUS.md` para o resultado — esta seção é
-atualizada só depois que a implantação e as duas sincronizações reais
-acontecerem de verdade, não antes.
+**Redeploy real (07/09/2026, conta `conta-comercial@exemplo.com`):** publicado como
+**Versão 12**, editando a implantação existente (mesmo ID/URL desde a V9).
+Duas sincronizações reais devolveram
+`Planilha sincronizada: 10 projeto(s), 10 comparativo(s).` nas duas. O
+registro de propriedade migrou em produção do formato legado da V11
+(`{nome: true}`) para o novo (`{nome: sheetId}`) sem incidente — não criou
+aba duplicada nem tratou os 10 projetos reais como estranhos (o que teria
+acontecido sem a migração explícita — exatamente o cenário que
+`migracao_registro_legado.js` prova em ambiente isolado). A planilha real
+(`docs.google.com/spreadsheets/d/1WjO_Ax9Tw6zrMFY2MCLTwbwAoK_Um1g93LWy_HMION4`)
+continua com exatamente 11 abas (Visão Geral + 10 comparativos, sem
+duplicata nem órfã) — conferido pela listagem de páginas visíveis e por
+captura de tela da Visão Geral. Ver `docs/integracao-google-sheets.md`,
+"VERSÃO 12 IMPLANTADA E VERIFICADA", para o relato completo.
+
+**Os 2 syncs reais só provam o caminho feliz (deploy + idempotência) na
+planilha de produção — não substituem a cobertura de falha.** Os 3 cenários
+de falha (colisão com aba manual, payload inválido, falha operacional
+pós-`clear()`) foram provados ANTES do deploy, em ambiente isolado; nunca
+foram (nem deveriam ser) reproduzidos contra a planilha real.
 
 ## 4. Proveniência das informações
 
