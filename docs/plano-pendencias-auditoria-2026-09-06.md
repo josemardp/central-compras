@@ -22,14 +22,14 @@ Estados possíveis: `não iniciada` · `em andamento` · `concluída` · `bloque
 
 ## 2. Recuperação de operações parciais — PRIORIDADE
 
-**Estado: concluída sob reserva** (6ª revisão corrigida na sessão de
+**Estado: concluída sob reserva** (7ª revisão corrigida na sessão de
 07/09/2026 — commit a publicar). Ficou **em andamento** entre cada entrega
-e a revisão seguinte que achou lacuna nova — já aconteceu 5 vezes seguidas
-(após `83c0901`, `2a682a7`, `833c4b9`, `df08fb5`, `5fb4f7c`). **Não declare
-concluída de novo só porque os exemplos testados passaram** — confirme
-contra o inventário da subseção 6ª abaixo (o mais completo até agora), e
-verifique se algum comando novo foi adicionado ao CLI, ou algum comando
-existente passou a chamar `append_timeline`/`mark_steps`/`set_process_state`/
+e a revisão seguinte que achou lacuna nova — já aconteceu 6 vezes seguidas
+(após `83c0901`, `2a682a7`, `833c4b9`, `df08fb5`, `5fb4f7c`, `4908c02`).
+**Não declare concluída de novo só porque os exemplos testados passaram** —
+confirme contra o inventário da subseção 7ª abaixo (o mais completo até
+agora), e verifique se algum comando novo foi adicionado ao CLI, ou algum
+comando existente passou a chamar `append_timeline`/`mark_steps`/`set_process_state`/
 `build_ranking`, sem entrar nesse inventário.
 
 ### 1ª entrega (commit `83c0901`) — insuficiente, revisada pelo Codex
@@ -330,7 +330,7 @@ teste apontava a lacuna.** A correção desta rodada parou de fazer isso.
 
 | Comando | Arquivos REALMENTE escritos (verificado no código) | Trava adquirida | Verificação de conflito |
 |---|---|---|---|
-| `decidir` | `decisao.md`, `processo.md`, snapshot próprio | projeto (+ `base-conhecimento/`, herdado de `KNOWLEDGE_COMMANDS`) | `tracked_operation` |
+| `decidir` | `decisao.md`, `processo.md`, snapshot próprio, **e o arquivo de veredito** (`vereditos/<data>-<projeto>-<produto>.md`, via `create_verdict`) — corrigido na 7ª revisão, faltava | projeto (+ `base-conhecimento/`, herdado de `KNOWLEDGE_COMMANDS`) | `tracked_operation`; veredito congelado em `op.detalhe["veredito_nome"]` e criado dentro de `executar_uma_vez("veredito", ...)` |
 | `aprender-veredito` | `licoes.md`, `marcas/<slug>.md`, `lojas/<slug>.md` (se aplicável), o arquivo de veredito | `base-conhecimento/` | `tracked_operation` |
 | `anotar` | `processo.md`, via `append_timeline` | projeto | central |
 | `cotar` | `cotacoes.csv` (`append_quote`) **e** `processo.md` (`append_timeline` + `mark_steps`) | projeto | central — cobre `processo.md`; `cotacoes.csv` continua como risco aceito (ver limitação) |
@@ -367,9 +367,10 @@ alcançar, não só a pasta física onde o `.operacoes/` mora.** Um journal de
 `aprender-veredito` vive em `base-conhecimento/.operacoes/`, mas a operação
 também reivindica o arquivo de veredito, em `vereditos/` — classificar só
 pela pasta do journal deixava esse recurso "fora do alcance". Corrigido com
-`_escopos_alcancados_por()`: BASE alcança BASE e `vereditos/`; qualquer
-projeto só alcança ele mesmo (`decidir` nunca reivindica nada fora do
-próprio projeto).
+`_escopos_alcancados_por()`, ANTES da 7ª revisão: BASE alcançava BASE e
+`vereditos/`; qualquer projeto só alcançava ele mesmo (`decidir` nunca
+reivindicava nada fora do próprio projeto — o que a 7ª revisão mostrou
+estar errado, ver abaixo).
 
 ### Testes
 
@@ -385,6 +386,78 @@ stash`, para não mexer no workspace compartilhado) — os 3 primeiros casos
 reproduzidos byte a byte como o relatório descreveu (cotações truncadas,
 `processo.md` alterado, veredito reescrito), depois confirmados bloqueados
 rodando o MESMO script contra o código corrigido.
+
+### 7ª revisão (Codex, sobre o commit `4908c02`) — `decidir` nunca declarava o veredito
+
+O Codex confirmou os 4 casos da 6ª revisão bloqueados e a retomada
+funcional, mas achou uma omissão nova: `decidir` escreve no arquivo de
+veredito (via `create_verdict`, dentro de `_decide_writes`), mas só
+declarava `decisao.md` e `processo.md` como `recursos` — nunca o próprio
+veredito. Dois sentidos de conflito, os dois reais:
+
+**A. Aprendizagem pendente → decisão sobrescreve veredito.** Uma decisão
+já fechada e completa (sem nada pendente dela mesma); D+30 preenchido;
+`aprender-veredito` interrompido em `licao:iniciado` (pendente, já
+reivindicando o arquivo de veredito desde a 5ª revisão). Um `decidir
+--force-veredito` NOVO (não é retomada de nada — a decisão original já
+tinha terminado) nunca via essa pendência, porque nunca declarava o
+veredito como recurso próprio: rodava livre, `create_verdict(force=True)`
+sobrescrevia o arquivo com o template em branco, apagando o D+30. A
+retomada de `aprender-veredito` então falhava com "Fase D+30 ainda em
+branco" — a lição, marca e loja já tinham sido extraídas para a base de
+conhecimento antes do crash simulado, mas o marcador de exportado nunca
+foi gravado, então a pendência ficava presa sem solução automática.
+
+**B. Decisão pendente → preenchimento perdido na própria retomada.**
+`decidir --comprado --force-veredito` interrompido em
+`timeline_veredito:iniciado` — ou seja, DEPOIS que `create_verdict` já
+tinha rodado uma vez nesta própria tentativa, criando o veredito. Human
+preenche D+30 na janela. Retomar o MESMO comando `decidir`: como
+`create_verdict` nunca era protegido por `executar_uma_vez` (diferente da
+captura), a retomada chamava `create_verdict(force=True)` de novo,
+incondicionalmente — apagando o preenchimento, mesmo sem qualquer segunda
+operação envolvida.
+
+**Reprodução, contra o código antigo (`4908c02`, via `git show` +
+subprocessos reais, sem `git stash`):** caso A — `decidir --force-veredito`
+roda com `returncode 0`, D+30 some do veredito, retomar
+`aprender-veredito` falha com "Fase D+30 ainda em branco"; caso B —
+`preencher-veredito` roda livre na janela de pendência (`returncode 0`),
+D+30 é preenchido, e a retomada de `decidir` o apaga de novo.
+
+**Correção:**
+
+- `decide()` agora congela `veredito_nome` em `op.detalhe` (mesmo princípio
+  do `snapshot_rel`: calculado com `today()` só na 1ª tentativa, nunca
+  recalculado numa retomada) e declara `VEREDITOS / veredito_nome` como
+  `recursos`, junto de `decisao.md`/`processo.md`. Isso sozinho fecha o
+  caso A: um `decidir --force-veredito` novo agora é recusado enquanto
+  `aprender-veredito` (ou qualquer operação) tiver aquele veredito
+  reivindicado — e, como efeito direto, `preencher-veredito` também passou
+  a ser bloqueado enquanto o próprio `decidir` está pendente no mesmo
+  arquivo, o que evita a intercalação do caso B antes mesmo dela começar.
+- `create_verdict()` ganhou parâmetro opcional `path` (evita recalcular
+  `today()` a cada chamada) e a chamada dentro de `_decide_writes` passou a
+  rodar dentro de `op.executar_uma_vez("veredito", ...)` — defesa adicional
+  para a retomada da PRÓPRIA operação nunca recriar um veredito já criado,
+  mesmo num cenário hipotético em que o bloqueio por `recursos` não
+  estivesse ativo.
+- `_escopos_alcancados_por()`: qualquer projeto agora também alcança
+  `vereditos/` (antes só BASE alcançava). Um journal ilegível de `decidir`
+  (que vive na pasta do projeto) passou a bloquear também o arquivo de
+  veredito fora dela.
+
+### Testes (7ª revisão)
+
+`tests/test_operation_recovery.py`: 31 → **35 testes**. Os 4 novos: caso A
+(bloqueio, depois recuperação da aprendizagem pendente, só então
+`--force-veredito` permitido); caso B (a retomada de `decidir`, sozinha,
+não chama `create_verdict` de novo — contado via patch — e preserva um
+marcador escrito manualmente no arquivo); bloqueio de `preencher-veredito`
+enquanto `decidir` está pendente no mesmo veredito; journal ilegível de
+`decidir` bloqueando o veredito fora da pasta do projeto. Reproduções
+confirmadas contra o código antigo (`4908c02`) via `git show` + script com
+subprocessos reais, sem `git stash`.
 
 ### O que este mecanismo não cobre (registrado, não é lacuna escondida)
 

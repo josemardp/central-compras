@@ -5,62 +5,46 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (07/09/2026, sessao 7)
+## AO RETOMAR — comece por aqui (07/09/2026, sessao 8)
 
 **Implementando as pendencias da auditoria de 06/09.** Plano com estado por
 frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
-Frente 2 (recuperacao de operacoes parciais) **concluida sob reserva** — 6a
-rodada de revisao (Codex sobre o commit `5fb4f7c`). Ja foi declarada
-concluida 5 vezes antes e cada vez o Codex achou lacuna nova - **nao
+Frente 2 (recuperacao de operacoes parciais) **concluida sob reserva** — 7a
+rodada de revisao (Codex sobre o commit `4908c02`). Ja foi declarada
+concluida 6 vezes antes e cada vez o Codex achou lacuna nova - **nao
 declare concluida de novo so porque os exemplos testados passaram**; leia a
-secao 2 do plano inteira, incluindo o inventario comando-a-comando (o mais
-completo ate agora), antes de mexer. Frentes 3 (receptor Sheets), 4
-(proveniencia), 5 (produtos reutilizados) e 6 (datas/veredito) **nao
-iniciadas** — comece pelo plano, nao redescubra o escopo.
+secao 2 do plano inteira, incluindo o inventario comando-a-comando, antes
+de mexer. Frentes 3 (receptor Sheets), 4 (proveniencia), 5 (produtos
+reutilizados) e 6 (datas/veredito) **nao iniciadas** — comece pelo plano,
+nao redescubra o escopo.
 
-- **A 5a correcao (commit `5fb4f7c`) tinha o inventario factualmente
-  incompleto.** O Codex reproduziu 3 problemas (4 casos): (1) `novo-projeto
-  --force` num projeto que ja existe sobrescrevia decisao.md/processo.md e
-  TRUNCAVA cotacoes.csv ao cabecalho, incondicionalmente - nunca passava
-  pela checagem central; retomar `decidir` depois falhava com "Nenhuma
-  cotacao encontrada"; (2) `ranking` e `novo-produto` (e tambem `cotar`,
-  `promover-cotacao`, `descartar`, `aguardar-preco`, `regenerar`) chamam
-  `append_timeline`/`mark_steps`/`set_process_state`/`build_ranking`
-  internamente e por isso TAMBEM escrevem `processo.md`, mas nenhum estava
-  na tabela de protecao - a suposicao anterior de "esse comando nao
-  escreve nada reivindicavel" era factualmente errada, nao verificada linha
-  a linha; (3) journal ilegivel em `base-conhecimento/.operacoes/`
-  (aprender-veredito) nao protegia o arquivo de veredito, que fica em
-  `vereditos/` - classificacao por pasta fisica do journal, nao pelo que a
-  operacao de fato alcanca.
-- **Correcao**: (1) `novo-projeto --force` ganhou duas camadas -
-  `_projeto_com_progresso_real()` recusa incondicionalmente se
-  `cotacoes.csv` tiver linha alem do cabecalho, `decisao.md` divergir do
-  template vazio ou `snapshots/` nao estiver vazio (independente de
-  pendencia), MAIS a checagem central contra operacao pendente; tambem
-  passou a travar o projeto existente, nao so a raiz `projetos/`. (2)
-  `_recursos_diretos_processo()`, resolver UNICO reaproveitado por
-  `anotar`/`cotar`/`promover-cotacao`/`novo-produto`/`ranking`/`descartar`/
-  `aguardar-preco` (todos escrevem o MESMO `processo.md` por baixo);
-  `regenerar` declara `processo.md` de cada projeto tocado; `descartar`/
-  `aguardar-preco` passaram tambem a travar o projeto corretamente quando
-  `--projeto` e omitido (antes rodavam destravados nesse caso). (3)
-  `_escopos_alcancados_por()`: journal em BASE agora bloqueia BASE E
-  `vereditos/`; projeto so bloqueia ele mesmo.
-- **Testes**: `tests/test_operation_recovery.py` foi de 26 para 31 (30 +
-  1 flaky de corrida de limpeza no Windows, sem relacao com o mecanismo,
-  reproduzido isolado 5x sem falhar). As 4 reproducoes confirmadas DUAS
-  vezes: como teste permanente E como script avulso com subprocessos reais
-  contra copia isolada do codigo do commit `5fb4f7c` (extraida via `git
-  show`, sem `git stash`, para nao mexer no workspace compartilhado).
-- **Limitacao residual, ainda aceita**: `cotacoes.csv` e a ficha do produto
-  (`produto.yaml`) continuam sem ser declarados como `recursos`
-  diretamente - so ficaram protegidos INDIRETAMENTE porque os mesmos
-  comandos tambem escrevem `processo.md`, que agora e protegido. Registrado
-  no plano como diferente (mais estreito) da limitacao antiga, que estava
-  errada.
-- HB20S continua intocado (nao usei `git stash` nesta sessao, conforme
-  pedido - comparacao antes/depois feita com `git show` + subprocessos).
+- **A 6a correcao (commit `4908c02`) confirmou os 4 casos anteriores
+  bloqueados, mas o Codex achou que `decidir` nunca declarava o proprio
+  arquivo de VEREDITO como recurso** - so `decisao.md`/`processo.md`.
+  Dois sentidos de conflito: (A) uma decisao ja fechada, com D+30
+  preenchido e `aprender-veredito` pendente (reivindicando o veredito
+  desde a 5a revisao); um `decidir --force-veredito` NOVO nunca via essa
+  pendencia e sobrescrevia o veredito com o template em branco, apagando
+  o D+30 - a retomada de `aprender-veredito` falhava com "Fase D+30 ainda
+  em branco"; (B) `decidir --force-veredito` interrompido DEPOIS de criar
+  o veredito nesta mesma tentativa; preenchimento manual de D+30 na
+  janela; a PROPRIA retomada de `decidir` chamava `create_verdict` de novo
+  (nunca protegido por `executar_uma_vez`, diferente da captura) e apagava
+  o preenchimento. As 2 reproduzidas contra o codigo antigo (`git show` +
+  subprocessos reais, sem `git stash`).
+- **Correcao**: `decide()` congela `veredito_nome` em `op.detalhe` (mesmo
+  principio do `snapshot_rel`) e declara o arquivo como `recursos` -
+  fecha o caso A, e como efeito colateral direto tambem passou a bloquear
+  `preencher-veredito` enquanto `decidir` esta pendente no mesmo veredito
+  (o que impede a intercalacao do caso B antes dela comecar).
+  `create_verdict()` ganhou parametro `path` opcional e a chamada dentro de
+  `_decide_writes` passou a rodar em `executar_uma_vez("veredito", ...)` -
+  defesa adicional para a propria retomada nunca recriar um veredito ja
+  criado. `_escopos_alcancados_por()`: qualquer projeto agora tambem
+  alcanca `vereditos/` (antes so BASE alcancava) - journal ilegivel de
+  `decidir` passou a bloquear o veredito tambem.
+- **Testes**: `tests/test_operation_recovery.py` foi de 31 para 35.
+- HB20S continua intocado (sem `git stash` nesta sessao tambem).
 
 ## Sessao anterior (07/09/2026, sessao 6) — historico
 

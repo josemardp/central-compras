@@ -924,6 +924,152 @@ class OperationRecoveryTest(ambiente.RepoTestCase):
                  "--compraria-de-novo", "nao")
         self.assertIn("resumo alterado", veredito.read_text(encoding="utf-8"))
 
+    # ---- 7a revisao (Codex), sobre o commit 4908c02 ------------------------
+    #
+    # `decidir` escreve no arquivo de veredito (via `create_verdict`), mas
+    # nunca tinha declarado isso como recurso proprio - so decisao.md e
+    # processo.md. Faltava nos dois sentidos: `aprender-veredito` pendente
+    # nao impedia um `decidir --force-veredito` novo de sobrescrever o
+    # veredito (caso A), e a propria retomada de `decidir` reexecutava
+    # `create_verdict` a cada tentativa, apagando um D+30 preenchido na
+    # janela entre a falha e a retomada (caso B).
+
+    def test_rev7_bugA_decidir_force_veredito_e_bloqueado_com_aprendizagem_pendente(self):
+        project = self.project()
+        veredito = self._fechar_com_veredito_generico(project, licao="conferir garantia antes")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", self._falha_em("licao:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("aprender-veredito", str(veredito))
+
+        texto_antes = veredito.read_text(encoding="utf-8")
+        self.assertIn("D+30 resumo", texto_antes)
+
+        # decidir --force-veredito e uma operacao NOVA (a 1a decisao ja
+        # completou antes deste teste comecar a interromper coisa nenhuma
+        # dela) - mas reivindicaria o MESMO arquivo de veredito que
+        # aprender-veredito ja reivindicou.
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                     "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+
+        self.assertEqual(veredito.read_text(encoding="utf-8"), texto_antes,
+                         "BUG: decidir --force-veredito alterou o veredito apesar da aprendizagem pendente")
+
+        # Recupera aprender-veredito: completa normalmente, licao gravada,
+        # nada foi perdido.
+        self.cli("aprender-veredito", str(veredito))
+        self.assertEqual((cc.BASE / "licoes.md").read_text(encoding="utf-8").count("conferir garantia antes"), 1)
+        self.assertIn("Aprendizado exportado D+30", veredito.read_text(encoding="utf-8"))
+        self.assertEqual(cc.pending_operations([cc.BASE]), [])
+
+        # SO agora decidir --force-veredito pode rodar (e legitimamente
+        # recria o veredito, que e o proposito declarado da flag).
+        self.cli("decidir", str(project), "--produto-id", "candidato",
+                 "--porque", "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+
+    def test_rev7_bugB_retomada_de_decidir_nao_recria_veredito_ja_criado(self):
+        project = self.project()
+        self._abrir_candidato(project)
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", self._falha_em("timeline_veredito:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                         "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        pendentes = cc.pending_operations([project])
+        self.assertEqual(len(pendentes), 1)
+        self.assertEqual(pendentes[0]["passos"]["veredito"]["situacao"], "concluido",
+                         "pre-condicao: o veredito ja devia ter sido criado antes do crash simulado")
+
+        # `preencher-veredito` de verdade, na janela entre a falha e a
+        # retomada, agora e corretamente BLOQUEADO - decidir tambem
+        # reivindica este arquivo (correcao desta rodada), entao a
+        # interlacao que causava o bug 2 relatado nem chega a acontecer
+        # mais (ver o teste de bloqueio acima). Para provar a garantia
+        # complementar - que a PROPRIA retomada de decidir tambem nao
+        # recria o veredito - simula o preenchimento escrevendo direto no
+        # arquivo (contornando de proposito o bloqueio, so para este teste)
+        # e confere que a retomada de decidir preserva esse conteudo.
+        texto_com_marcador = veredito.read_text(encoding="utf-8") + "\nMARCADOR_TESTE_PREENCHIMENTO_D30\n"
+        veredito.write_text(texto_com_marcador, encoding="utf-8")
+
+        real_create_verdict = cc.create_verdict
+        chamadas = {"n": 0}
+
+        def create_verdict_contando(*a, **kw):
+            chamadas["n"] += 1
+            return real_create_verdict(*a, **kw)
+
+        with patch.object(cc, "create_verdict", side_effect=create_verdict_contando):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                     "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+
+        self.assertEqual(chamadas["n"], 0,
+                         "BUG: a retomada de decidir chamou create_verdict de novo")
+        self.assertIn("MARCADOR_TESTE_PREENCHIMENTO_D30", veredito.read_text(encoding="utf-8"),
+                      "BUG: a retomada de decidir apagou o conteudo preenchido durante a pendencia")
+        self.assertEqual(cc.pending_operations([project]), [])
+
+        # aprender-veredito continua funcionando normalmente depois.
+        self.cli("preencher-veredito", str(veredito), "--fase", "d30", "--resumo", "foi bem",
+                 "--licao", "conferir garantia antes", "--nota-arrependimento", "1",
+                 "--compraria-de-novo", "sim")
+        self.cli("aprender-veredito", str(veredito))
+        self.assertIn("Aprendizado exportado D+30", veredito.read_text(encoding="utf-8"))
+
+    def test_rev7_preencher_veredito_bloqueado_enquanto_decidir_pendente_no_mesmo_arquivo(self):
+        """Efeito direto de decidir tambem reivindicar o veredito: nao e so
+        a retomada de decidir que fica idempotente, escritores externos
+        (preencher-veredito) tambem sao barrados enquanto ele esta pendente
+        - o que impede a intercalacao que causava o bug relatado."""
+        project = self.project()
+        self._abrir_candidato(project)
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", self._falha_em("timeline_veredito:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                         "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        texto_antes = veredito.read_text(encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("preencher-veredito", str(veredito), "--fase", "d30", "--resumo", "foi bem",
+                     "--nota-arrependimento", "1", "--compraria-de-novo", "sim")
+        self.assertEqual(veredito.read_text(encoding="utf-8"), texto_antes)
+
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                 "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+        self.cli("preencher-veredito", str(veredito), "--fase", "d30", "--resumo", "foi bem",
+                 "--nota-arrependimento", "1", "--compraria-de-novo", "sim")
+
+    def test_rev7_journal_ilegivel_de_decidir_tambem_protege_o_veredito(self):
+        project = self.project()
+        self._abrir_candidato(project)
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", self._falha_em("timeline_veredito:iniciado")):
+            with self.assertRaises(RuntimeError):
+                self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                         "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        arquivo_journal = next((project / ".operacoes").glob("*.json"))
+        arquivo_journal.write_text("{isto nao e json valido", encoding="utf-8")
+
+        texto_antes = veredito.read_text(encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "journal ilegivel"):
+            self.cli("preencher-veredito", str(veredito), "--fase", "d30", "--resumo", "foi bem",
+                     "--nota-arrependimento", "1", "--compraria-de-novo", "sim")
+        self.assertEqual(veredito.read_text(encoding="utf-8"), texto_antes)
+
+        arquivo_journal.unlink()
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                 "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+        self.assertEqual(cc.pending_operations([project]), [])
+        self.cli("preencher-veredito", str(veredito), "--fase", "d30", "--resumo", "foi bem",
+                 "--nota-arrependimento", "1", "--compraria-de-novo", "sim")
+
     # ---- Concorrencia: as travas existentes ainda serializam --------------
 
     def test_comandos_concorrentes_no_mesmo_projeto_sao_serializados(self):

@@ -483,17 +483,19 @@ def _escopo_de(caminho: Path) -> Path:
     return resolvido.parent
 
 
-# Um journal em BASE (aprender-veredito) reivindica recursos FORA de BASE
-# tambem - o proprio arquivo de veredito, em `vereditos/`. Classificar um
-# journal ilegivel so pela pasta fisica onde o `.operacoes/` mora deixava
-# esses recursos "fora do alcance" da protecao: um journal corrompido em
-# BASE nao bloqueava escrita em VEREDITOS, embora a MESMA operacao,
-# legivel, reivindicasse os dois. A politica conservadora precisa cobrir
-# tudo que aquele TIPO de operacao pode alcancar, nao so a pasta do journal.
+# Journal em BASE (aprender-veredito) ou num projeto (decidir) reivindica
+# recursos FORA da propria pasta tambem - o arquivo de veredito, em
+# `vereditos/`. Classificar um journal ilegivel so pela pasta fisica onde o
+# `.operacoes/` mora deixava esses recursos "fora do alcance" da protecao:
+# um journal corrompido nao bloqueava escrita em VEREDITOS, embora a MESMA
+# operacao, legivel, reivindicasse os dois. A politica conservadora precisa
+# cobrir tudo que aquele TIPO de operacao pode alcancar, nao so a pasta do
+# journal - vale tanto para aprender-veredito (journal em BASE) quanto para
+# decidir (journal no projeto, mas tambem reivindica o proprio veredito).
 def _escopos_alcancados_por(escopo_do_journal: Path) -> "set[Path]":
     if escopo_do_journal.resolve() == BASE.resolve():
         return {BASE, VEREDITOS}
-    return {escopo_do_journal}
+    return {escopo_do_journal, VEREDITOS}
 
 
 def _escopos_com_journal_ilegivel() -> dict[str, dict[str, Any]]:
@@ -3014,15 +3016,29 @@ def decide(args: argparse.Namespace) -> None:
     }
     instante = dt.datetime.now().strftime("%Y%m%dT%H%M%S%f")
     snapshot_rel_candidato = f"snapshots/{instante}-{slugify(args.produto_id)}"
+    # O nome do veredito e congelado AQUI (nao recalculado dentro de
+    # `_decide_writes`) pelo mesmo motivo do snapshot: numa retomada, tem
+    # que ser o MESMO arquivo da tentativa que falhou, nao um recalculado
+    # com `today()` de um dia diferente.
+    veredito_nome_candidato = f"{today()}-{project.name}-{args.produto_id}.md"
     op_id = f"decidir:{args.produto_id}"
     # decisao.md e processo.md sao arquivos UNICOS por projeto, nao por
     # produto: `decidir A` e `decidir B` do mesmo projeto escrevem os dois no
     # MESMO lugar. Sem declarar isso como recurso, uma retomada de A depois
     # de um `decidir B` intercalado reaproveitava a captura (ja concluida)
     # sem perceber que decisao.md tinha sido reescrito por B nesse meio tempo.
+    #
+    # O arquivo de VEREDITO tambem e escrito por `decidir` (via
+    # `create_verdict`), mas fora do proprio projeto, em `vereditos/`.
+    # `aprender-veredito` ja reivindica esse mesmo arquivo (rodada anterior);
+    # sem `decidir` tambem declara-lo, um `decidir --force-veredito` novo
+    # rodava livre enquanto uma exportacao estava pendente naquele veredito
+    # e apagava o D+30/D+180 preenchido - a mesma classe de bug que motivou
+    # `recursos`, so que decidir nunca tinha declarado esse terceiro arquivo.
     with tracked_operation(project, op_id, "decidir", assinatura,
-                            {"snapshot_rel": snapshot_rel_candidato},
-                            recursos={project / "decisao.md", project / "processo.md"}) as op:
+                            {"snapshot_rel": snapshot_rel_candidato, "veredito_nome": veredito_nome_candidato},
+                            recursos={project / "decisao.md", project / "processo.md",
+                                      VEREDITOS / veredito_nome_candidato}) as op:
         _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado, minima,
                         obrigatorios, perdedores, briefing_meta, op)
 
@@ -3192,7 +3208,18 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
         set_process_state(project, estado="comprado", proxima_acao="acompanhar entrega e preencher veredito D+30")
     else:
         set_process_state(project, proxima_acao="comprar ou marcar como comprado depois da confirmacao final")
-    verdict_path = create_verdict(project, args.produto_id, product, quote, force=args.force_veredito)
+    # O caminho vem congelado em `op.detalhe`, igual ao snapshot: precisa
+    # ser o MESMO arquivo em qualquer retomada. A CRIACAO em si roda dentro
+    # de `executar_uma_vez`: sem isso, uma retomada de `decidir` chamava
+    # `create_verdict` de novo, e com `--force-veredito` isso SOBRESCREVIA
+    # o veredito com o template em branco - apagando um D+30 que o Josemar
+    # tivesse preenchido na janela entre a falha e a retomada.
+    verdict_path = VEREDITOS / op.detalhe["veredito_nome"]
+    op.executar_uma_vez(
+        "veredito",
+        lambda: create_verdict(project, args.produto_id, product, quote,
+                                force=args.force_veredito, path=verdict_path),
+    )
     op.registrar_efeito(
         "timeline_veredito", timeline_path,
         f"| {today()} | veredito | Arquivo de veredito criado | {verdict_path.name} |",
@@ -3293,8 +3320,10 @@ def report_pending_operations(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
-def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quote: dict[str, str], force: bool = False) -> Path:
-    path = VEREDITOS / f"{today()}-{project.name}-{produto_id}.md"
+def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quote: dict[str, str],
+                    force: bool = False, path: Path | None = None) -> Path:
+    if path is None:
+        path = VEREDITOS / f"{today()}-{project.name}-{produto_id}.md"
     if path.exists() and not force:
         return path
     d30 = dt.date.today() + dt.timedelta(days=30)
