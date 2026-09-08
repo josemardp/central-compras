@@ -4640,11 +4640,11 @@ def atributo_valor(categoria: str, item: Ranked, chave: str) -> tuple[str, int |
     Mesmo principio de `comercial_valor`: fonte unica pro HTML e pro export.
     """
     texto = str((item.product.get("atributos") or {}).get(chave) or "-")
-    if texto == "-" or item.eliminations:
+    if texto == "-" or item.eliminations or item.sem_cotacao:
         # Estrela e a etapa final da cotacao, so pra quem chega elegivel na
-        # mesa de decisao - cortado pelo gate mostra o valor bruto, nunca a
-        # classificacao (nao vale gastar essa conta em quem ja saiu da
-        # disputa).
+        # mesa de decisao - cortado pelo gate ou ainda sem cotacao mostra o
+        # valor bruto, nunca a classificacao (nao vale gastar essa conta em
+        # quem ainda nem tem preco, muito menos em quem ja saiu da disputa).
         return texto, None
     classificacao = (item.product.get("atributos_classificacao") or {}).get(chave)
     return texto, stars_for_attribute(categoria, chave, classificacao)

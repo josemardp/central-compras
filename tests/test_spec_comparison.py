@@ -157,6 +157,36 @@ class SpecComparisonTest(unittest.TestCase):
         self.assertNotIn("★", _linha_da_tabela(html, "Nota"))
         self.assertNotIn("★", _linha_da_tabela(html, "Garantia"))
 
+    def test_candidate_without_any_quote_appears_with_dashes_not_missing(self):
+        # cam-a tem cotacao; cam-b foi mapeado (novo-produto) mas ninguem
+        # cotou ainda - pesquisa em andamento, nao pode sumir da tabela.
+        self._novo_produto("cam-a", resolucao_display="1080p", resolucao_classificacao=2)
+        self._cotar("cam-a", preco=200, nota=4.5, avaliacoes=500)
+        self._novo_produto("cam-b", resolucao_display="4K", resolucao_classificacao=8)
+
+        html = cc.spec_comparison_section(self.projeto)
+
+        self.assertIn("cam-b", html)
+        self.assertIn("sem cotacao", html)
+        linha_preco = _linha_da_tabela(html, "Preco")
+        self.assertEqual(linha_preco.count("<td>-</td>"), 1, "cam-b sem cotacao tem que mostrar preco como -, nunca inventado")
+        linha_resolucao = _linha_da_tabela(html, "Resolucao")
+        self.assertIn("<td>4K</td>", linha_resolucao, "atributo ja conhecido fica visivel, mas sem estrela, mesmo sem cotacao")
+
+    def test_discarded_candidate_without_quote_never_appears(self):
+        # cam-b foi mapeado e descartado antes de qualquer cotacao (ex.:
+        # nao atende um requisito obrigatorio). Diferente de cam-c (sem
+        # cotacao mas ainda ativo), esse nao deve aparecer no comparativo.
+        self._novo_produto("cam-a", resolucao_display="1080p", resolucao_classificacao=2)
+        self._cotar("cam-a", preco=200, nota=4.5, avaliacoes=500)
+        self._novo_produto("cam-b", resolucao_display="4K", resolucao_classificacao=8)
+        cc.discard_product(argparse.Namespace(
+            produto_id="cam-b", projeto=str(self.projeto), porque="nao atende requisito obrigatorio",
+        ))
+
+        html = cc.spec_comparison_section(self.projeto)
+        self.assertNotIn("cam-b", html)
+
     def test_tied_absolute_values_render_the_same_stars(self):
         self._novo_produto("cam-a", resolucao_display="1080p", resolucao_classificacao=2)
         self._novo_produto("cam-b", resolucao_display="1080p (outra marca)", resolucao_classificacao=2)
