@@ -417,6 +417,27 @@ class OperationHandle:
     def concluido(self, passo: str) -> bool:
         return self._registro["passos"].get(passo, {}).get("situacao") == "concluido"
 
+    def efeito_congelado(self, passo: str) -> str | None:
+        """Assinatura ja persistida para este `passo` via `registrar_efeito`,
+        se alguma tentativa anterior (desta operacao, em QUALQUER versao do
+        codigo que a comecou) ja chegou a registra-lo. `None` quando o passo
+        nunca foi tentado - nesse caso e seguro montar o conteudo com dado
+        ATUAL, porque nao ha nenhum efeito parcial (nem gravacao, nem
+        assinatura congelada) que dependa de bater com um texto antigo.
+
+        Existe pra permitir reaproveitar evidencia ja persistida mesmo
+        quando `detalhe` (campo de uso livre, por operacao) nao tem as
+        chaves que a versao ATUAL do codigo esperaria - journal comecado
+        por uma versao anterior do comando, antes de um campo novo existir.
+        `registrar_efeito` grava `assinatura_efeito` no disco ANTES de
+        chamar `executar()` (ver docstring dele) - por isso, uma vez que o
+        passo apareceu aqui, essa e a fonte da verdade, nunca o que uma
+        chamada nova recalcularia."""
+        existente = self._registro["passos"].get(passo)
+        if existente and existente.get("situacao") in ("tentando", "concluido"):
+            return existente.get("assinatura_efeito")
+        return None
+
     def _persistir(self) -> None:
         self._registro["atualizado_em"] = now_iso()
         atomic_write_text(self._path, json.dumps(self._registro, ensure_ascii=True, indent=2, sort_keys=True) + "\n")
@@ -1392,26 +1413,46 @@ def link_product(args: argparse.Namespace) -> None:
 
     with tracked_operation(
         project, op_id, "vincular_produto", assinatura,
-        # `data_evento` congelada na 1a tentativa (mesmo principio do
-        # `snapshot_rel` de `decidir`): uma retomada em outro dia precisa
-        # escrever a MESMA data que a assinatura do efeito de timeline
-        # procura, senao `registrar_efeito` nunca reconhece a linha gravada
-        # e duplica a cada retomada.
-        detalhe_inicial={"data_evento": today()},
+        # `data_evento`/`nome_produto` congelados na 1a tentativa (mesmo
+        # principio do `snapshot_rel` de `decidir`): uma retomada precisa
+        # escrever exatamente o mesmo conteudo que a assinatura do efeito de
+        # timeline esta procurando, senao `registrar_efeito` nunca reconhece
+        # a linha ja gravada e duplica. `nome_produto` vem da FICHA
+        # compartilhada (nao da participacao desta operacao) - um
+        # `novo-produto --force` rodado em OUTRO projeto entre a falha e a
+        # retomada muda o nome ali, e recalcula-lo aqui teria o mesmo efeito
+        # da data nao congelada: a linha escrita nunca bateria com o que foi
+        # registrado como "tentando".
+        detalhe_inicial={"data_evento": today(), "nome_produto": nome_produto},
         recursos={project / "processo.md", participation_path(project, args.produto_id)},
     ) as op:
-        data_evento = op.detalhe["data_evento"]
-        linha_timeline = f"| {data_evento} | produto | Produto reaproveitado: {nome_produto} | id={args.produto_id} |"
+        # Compatibilidade de journal: um journal `em_andamento` comecado por
+        # uma versao ANTERIOR do comando pode nao ter `data_evento`/
+        # `nome_produto` em `detalhe` (campos novos), ou pode nem ter
+        # tentado o passo "timeline" ainda. `efeito_congelado` e a fonte da
+        # verdade quando existe - reaproveita o texto EXATO que uma
+        # tentativa anterior (desta versao ou de uma antiga) ja persistiu
+        # antes de escrever, em vez de reconstruir com dado atual (que
+        # poderia divergir e nunca ser reconhecido como o mesmo efeito). So
+        # cai para dado atual (`op.detalhe`, com fallback pro valor desta
+        # chamada se a chave nao existir num journal antigo) quando o passo
+        # nunca foi tentado por ninguem - nesse caso nao ha efeito parcial
+        # nenhum que dependa de bater com texto antigo, entao e seguro.
+        linha_timeline = op.efeito_congelado("timeline")
+        if linha_timeline is None:
+            data_evento = op.detalhe.get("data_evento") or today()
+            nome_timeline = op.detalhe.get("nome_produto") or nome_produto
+            linha_timeline = (
+                f"| {data_evento} | produto | Produto reaproveitado: {nome_timeline} | "
+                f"id={args.produto_id} |"
+            )
         # Sobrescrita cega, nao append-only: se interrompida no meio, a
         # proxima tentativa reescreve o arquivo inteiro do zero com os
         # MESMOS dados (a assinatura ja garante isso) - nunca duplica.
         op.executar_uma_vez("participacao", _gravar_participacao)
         op.registrar_efeito(
             "timeline", project / "processo.md", linha_timeline,
-            lambda: append_timeline(
-                project, "produto", f"Produto reaproveitado: {nome_produto}", f"id={args.produto_id}",
-                data=data_evento,
-            ),
+            lambda: append_timeline(project, linha=linha_timeline),
         )
         # Dentro do bloco `with`: uma interrupcao antes desta linha deixa o
         # journal `em_andamento` (nao apagado), entao a retomada ve a
@@ -1570,6 +1611,11 @@ _PARTICIPATION_LEGACY_KEYS = (
     "descartado_porque", "aguardando_preco_porque", "aguardando_preco_desde",
 )
 
+# Vocabulario fechado de `estado` - qualquer coisa fora daqui (typo,
+# migracao de outra ferramenta, edicao manual malfeita) nao e um estado que
+# o motor sabe interpretar.
+ESTADOS_PARTICIPACAO = ("pesquisando", "aguardando_preco", "descartado")
+
 
 def participations_dir(project: Path) -> Path:
     return project / "participacoes"
@@ -1592,6 +1638,36 @@ def default_participation(produto_id: str) -> dict[str, Any]:
     }
 
 
+def _participacao_invalida(dados: Any, produto_id: str) -> str | None:
+    """Contrato minimo de uma participacao no formato novo - o mesmo usado
+    por `read_participation` (decidir se o arquivo em disco e autoridade
+    sobre o estado) e por `migrate_products` (decidir se pode limpar a
+    ficha legada por cima dele). "O arquivo existe" nunca basta.
+
+    So exige os dois campos que provam IDENTIDADE (`produto_id`, tem que
+    bater com o proprio arquivo que o contem - nunca o de outro produto) e
+    ESTADO (dentro do vocabulario conhecido, `ESTADOS_PARTICIPACAO`). Os
+    demais campos (preco-alvo/teto, requisitos, motivo de descarte...) sao
+    opcionais por natureza - uma participacao recem-criada por
+    `vincular-produto` nao tem nenhum deles ainda, e isso e valido. Campo
+    desconhecido (schema futuro) tambem nunca invalida por si so - so o que
+    falta ou diverge nos dois campos exigidos.
+
+    Devolve `None` quando valida, ou o motivo (texto curto, pra diagnostico)
+    quando nao.
+    """
+    if not isinstance(dados, dict) or not dados:
+        return "vazio ou nao e um mapa YAML"
+    if dados.get("produto_id") != produto_id:
+        return f"produto_id gravado ({dados.get('produto_id')!r}) diverge do arquivo ({produto_id!r})"
+    if dados.get("estado") not in ESTADOS_PARTICIPACAO:
+        return (
+            f"estado {dados.get('estado')!r} fora do vocabulario conhecido "
+            f"({', '.join(ESTADOS_PARTICIPACAO)})"
+        )
+    return None
+
+
 def _participation_from_legacy_ficha(produto_id: str, ficha: dict[str, Any]) -> dict[str, Any]:
     base = default_participation(produto_id)
     for key in _PARTICIPATION_LEGACY_KEYS:
@@ -1603,12 +1679,18 @@ def _participation_from_legacy_ficha(produto_id: str, ficha: dict[str, Any]) -> 
 def read_participation(project: Path, produto_id: str) -> dict[str, Any]:
     """Participacao deste produto NESTE projeto - nunca None.
 
-    Formato novo (arquivo proprio) sempre vence quando existe. Sem ele, cai
-    para os campos legados da ficha, so se a ficha ainda aponta pra ESTE
-    projeto (nunca para um projeto diferente do pedido).
+    Formato novo (arquivo proprio) sempre vence quando existe E passa no
+    contrato minimo (`_participacao_invalida`: identidade e estado
+    coerentes). Um arquivo existente mas incompleto ou incoerente (so uma
+    anotacao solta, `produto_id` de outro produto, `estado` desconhecido)
+    NAO e autoridade - cai no mesmo caminho de "sem participacao no formato
+    novo": os campos legados da ficha (so se ela ainda aponta pra ESTE
+    projeto, nunca para outro) ou o default neutro (`pesquisando`). Nunca um
+    estado CONFIRMADO (`descartado`, por exemplo) fabricado a partir de dado
+    ausente ou invalido - o default e sempre o neutro.
     """
     dados = read_yaml(participation_path(project, produto_id), None)
-    if dados is not None:
+    if dados is not None and _participacao_invalida(dados, produto_id) is None:
         base = default_participation(produto_id)
         base.update(dados)
         return base
@@ -1827,18 +1909,27 @@ def add_quote(args: argparse.Namespace) -> None:
     print(f"Cotacao adicionada: {args.produto_id} - {brl(row['custo_total'])}")
 
 
-def append_timeline(project: Path, etapa: str, decisao: str, porque: str, *, data: str | None = None) -> None:
+def append_timeline(project: Path, etapa: str = "", decisao: str = "", porque: str = "", *,
+                     data: str | None = None, linha: str | None = None) -> None:
     """`data` default e `today()` no momento da chamada - suficiente pra
     quem grava e conclui na mesma tentativa. Quem participa de recuperacao
     entre tentativas (`registrar_efeito`) precisa congelar a data e passar
     explicitamente aqui, senao uma retomada em outro dia escreve uma linha
     com data diferente da que a assinatura do efeito esta procurando, e
-    nunca reconhece o efeito como ja feito - duplicando a cada retomada."""
+    nunca reconhece o efeito como ja feito - duplicando a cada retomada.
+
+    `linha`, se informado, e o conteudo INTEIRO da linha da tabela (com os
+    pipes das pontas, sem quebra de linha) - ignora `etapa`/`decisao`/
+    `porque`/`data` e e escrito literalmente. Existe pra quem precisa
+    reaproveitar um texto JA CONGELADO (`OperationHandle.efeito_congelado`)
+    em vez de reconstrui-lo com dado atual - ver `link_product`. Congelar
+    so a data (`data=`) nao basta quando outro ingrediente da linha (o nome
+    do produto, por exemplo) tambem pode mudar entre tentativas."""
     path = project / "processo.md"
     if not path.exists():
         return
     text = path.read_text(encoding="utf-8")
-    line = f"| {data or today()} | {etapa} | {decisao} | {porque} |\n"
+    line = (linha if linha is not None else f"| {data or today()} | {etapa} | {decisao} | {porque} |") + "\n"
     lines = text.splitlines(keepends=True)
     insert_at = None
     for index, existing in enumerate(lines):
@@ -5848,6 +5939,7 @@ def migrate_products(args: argparse.Namespace) -> None:
     ja_limpos = 0
     ambiguos: list[str] = []
     bloqueados: list[str] = []
+    invalidos: list[str] = []
 
     for ficha_path in sorted(PRODUTOS.glob("*/*/produto.yaml")):
         produto_id = ficha_path.parent.name
@@ -5912,18 +6004,33 @@ def migrate_products(args: argparse.Namespace) -> None:
             continue
 
         # A EXISTENCIA do arquivo de participacao nao prova que ele preserva
-        # dado nenhum - um arquivo vazio (`write_text("")`) ou com conteudo
-        # que nao e um mapa YAML nao tem estado pra ser "mais recente que a
-        # ficha"; tratar so a existencia como suficiente limpava a ficha por
-        # cima de um arquivo sem NENHUM dado recuperavel, perdendo o unico
-        # registro do descarte (ficha e participacao vazia, os dois sem
-        # estado depois da limpeza). Participacao valida (mapa YAML nao
-        # vazio) e sempre quem manda e nunca e sobrescrita pelo legado; sem
-        # isso, e como se a participacao nao existisse ainda.
+        # dado nenhum, nem que o dado que ele tem e confiavel. Tres casos,
+        # tratamento diferente pra cada um:
+        #   (a) vazio/ilegivel (0 bytes, ou nao e um mapa YAML) - nao ha
+        #       NENHUM dado ali pra "ser mais recente que a ficha"; seguro
+        #       recuperar do legado, exatamente como se o arquivo nao
+        #       existisse.
+        #   (b) mapa com conteudo, mas que nao passa no contrato minimo de
+        #       participacao (`_participacao_invalida` - identidade ou
+        #       estado incoerente: so uma anotacao solta, produto_id de
+        #       OUTRO produto, estado fora do vocabulario) - dado
+        #       incompleto ou incoerente NAO autoriza apagar a ficha legada
+        #       (unica evidencia confiavel restante). Recusa preservando os
+        #       dois arquivos, relata o motivo, decisao fica com o Josemar.
+        #   (c) mapa valido (passa no contrato) - e sempre quem manda,
+        #       nunca sobrescrito pelo legado; so a ficha e limpa.
         participacao_bruta = read_yaml(participacao_alvo, None)
-        participacao_valida = isinstance(participacao_bruta, dict) and bool(participacao_bruta)
-        participacao_existe = participacao_alvo.exists()
-        if not participacao_valida:
+        participacao_vazia = not (isinstance(participacao_bruta, dict) and bool(participacao_bruta))
+        motivo_invalido = None if participacao_vazia else _participacao_invalida(participacao_bruta, produto_id)
+        if motivo_invalido:
+            invalidos.append(
+                f"{produto_id}: participacao existente em `{participacao_alvo}` nao passa no contrato "
+                f"minimo de participacao ({motivo_invalido}) - nao decido sozinho se e dado real "
+                "incompleto ou lixo. Ficha legada preservada; confira o arquivo a mao (corrija ou "
+                "apague, se for lixo) e rode `migrar-produtos` de novo."
+            )
+            continue
+        if participacao_vazia:
             participacao = _participation_from_legacy_ficha(produto_id, ficha)
             if args.aplicar:
                 write_participation(caminho_projeto, produto_id, participacao)
@@ -5933,9 +6040,9 @@ def migrate_products(args: argparse.Namespace) -> None:
         }
         if args.aplicar:
             write_yaml(ficha_path, ficha_limpa)
-        if participacao_valida:
+        if not participacao_vazia:
             acao = "participacao ja existia, so a ficha foi limpa"
-        elif participacao_existe:
+        elif participacao_alvo.exists():
             acao = f"participacao existente estava vazia/invalida - recuperada do legado em `{legado_projeto}`"
         else:
             acao = f"participacao criada em `{legado_projeto}`"
@@ -5955,16 +6062,23 @@ def migrate_products(args: argparse.Namespace) -> None:
               "o mesmo arquivo (participacao ou ficha):")
         for linha in bloqueados:
             print(f"  - {linha}")
+    if invalidos:
+        print(f"\nINVALIDO(S) - {len(invalidos)} caso(s) com participacao existente que nao passa "
+              "no contrato minimo (identidade/estado); ficha legada preservada, decida manualmente:")
+        for linha in invalidos:
+            print(f"  - {linha}")
     print(
         f"\nTotal: {len(migrados)} migravel(is), {ja_limpos} ja limpo(s), "
-        f"{len(ambiguos)} ambiguo(s), {len(bloqueados)} bloqueado(s)."
+        f"{len(ambiguos)} ambiguo(s), {len(invalidos)} invalido(s), {len(bloqueados)} bloqueado(s)."
     )
-    if args.aplicar and bloqueados:
+    if args.aplicar and (bloqueados or invalidos):
         raise SystemExit(
             f"{len(bloqueados)} produto(s) nao foram migrados por causa de operacao pendente "
-            "reivindicando o mesmo arquivo - ver lista acima. Nada foi escrito para eles. "
-            "Rode `operacoes-pendentes` para identificar a pendencia, resolva-a (retome ou apague "
-            "o journal, com cuidado) e rode `migrar-produtos --aplicar` de novo."
+            f"reivindicando o mesmo arquivo e {len(invalidos)} por participacao existente que nao "
+            "passa no contrato minimo - ver listas acima. Nada foi escrito para eles. Resolva a "
+            "pendencia (bloqueados - rode `operacoes-pendentes` e retome ou apague o journal, com "
+            "cuidado) ou corrija/apague a mao a participacao invalida (invalidos), e rode "
+            "`migrar-produtos --aplicar` de novo."
         )
 
 

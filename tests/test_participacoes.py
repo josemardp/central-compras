@@ -10,6 +10,7 @@ teto, requisitos atendidos) mora em `projetos/<projeto>/participacoes/
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import unittest
@@ -755,6 +756,173 @@ class SegundaRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
         after = {str(p.relative_to(snap)): p.read_bytes() for p in snap.rglob("*") if p.is_file()}
         self.assertEqual(frozen, after)
         self.cli("auditar-decisoes", "--strict")
+
+
+class TerceiraRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
+    """Regressao dos 3 achados da 3a revisao independente (Astra) sobre o
+    commit `6669b9d` - cada teste aqui reproduziu uma falha real contra
+    aquele codigo antes da correcao. Ver STATUS.md e
+    docs/como-conferir-auditoria.md."""
+
+    def _setup_vinculo(self):
+        a = self.project("origem")
+        b = self.project("destino")
+        self.product(a)
+        return a, b, ["vincular-produto", "--produto-id", "candidato", "--projeto", str(b)]
+
+    def test_mapas_incompletos_ou_incoerentes_nao_autorizam_limpar_legado(self):
+        """Achado 1: `isinstance(dados, dict) and bool(dados)` so provava
+        que o arquivo tinha ALGUM conteudo, nunca que esse conteudo era uma
+        participacao de verdade - um mapa so com `produto_id`, so com uma
+        anotacao solta, com o `produto_id` de OUTRO produto, ou com `estado`
+        fora do vocabulario conhecido, todos "passavam" e autorizavam a
+        migracao a apagar o campo legado da ficha (unica evidencia real)
+        por cima de lixo."""
+        a = self.project()
+        for index, kind in enumerate(["so_id", "so_anotacao", "id_divergente", "estado_desconhecido"]):
+            with self.subTest(kind=kind):
+                pid = f"legado-{index}"
+                ficha = cc.product_dir("fone", pid) / "produto.yaml"
+                original = dict(
+                    id=pid, categoria="fone", nome="Legado", marca="Marca", projeto=a.name,
+                    estado="descartado", descartado_porque="nao atende", preco_alvo=100, preco_teto=300,
+                    requisitos_atendidos={"uso": True},
+                )
+                cc.write_yaml(ficha, original)
+                part = cc.participation_path(a, pid)
+                invalid = {
+                    "so_id": {"produto_id": pid},
+                    "so_anotacao": {"anotacao": "DADO_A_PRESERVAR"},
+                    "id_divergente": cc.default_participation("outro-produto"),
+                    "estado_desconhecido": dict(cc.default_participation(pid), estado="descartdao"),
+                }[kind]
+                cc.write_yaml(part, invalid)
+                before = (ficha.read_bytes(), part.read_bytes())
+
+                with self.assertRaises(SystemExit):
+                    self.cli("migrar-produtos", "--projeto", str(a), "--aplicar")
+
+                self.assertEqual(
+                    (ficha.read_bytes(), part.read_bytes()), before,
+                    f"{kind}: migracao aceitou participacao sem contrato valido e limpou/sobrescreveu arquivo",
+                )
+
+    def test_nome_do_produto_tambem_precisa_ser_estavel_na_retomada(self):
+        """Achado 2: a data foi congelada na correcao anterior, mas
+        `nome_produto` continuava sendo relido da ficha compartilhada a cada
+        tentativa - um `novo-produto --force` rodado em OUTRO projeto entre
+        a falha e a retomada muda o nome ali, e a retomada escrevia a linha
+        com o nome NOVO, que nunca batia com a assinatura congelada (nome
+        antigo), duplicando a cada retomada."""
+        a, b, args = self._setup_vinculo()
+        original_append = cc.append_timeline
+        with patch.object(cc, "append_timeline", side_effect=OSError("antes de gravar timeline")):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        # Alteracao permitida pelo CLI em OUTRO projeto, na ficha compartilhada.
+        self.cli("novo-produto", str(a), "Nome atualizado", "--produto-id", "candidato", "--force")
+
+        def write_then_fail(*args_, **kwargs):
+            original_append(*args_, **kwargs)
+            raise OSError("depois de gravar timeline, antes de confirmar")
+
+        with patch.object(cc, "append_timeline", side_effect=write_then_fail):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        self.cli(*args)
+
+        text = (b / "processo.md").read_text(encoding="utf-8")
+        self.assertEqual(
+            text.count("Produto reaproveitado:"), 1,
+            "Data foi congelada, mas nome foi recalculado: a assinatura antiga nao reconhece a linha nova",
+        )
+
+    def test_journal_real_da_versao_anterior_continua_retomavel(self):
+        """Achado 3: `link_product` passou a exigir
+        `op.detalhe["data_evento"]` (e depois tambem `nome_produto`), mas um
+        journal `em_andamento` comecado por uma versao anterior do comando
+        (antes desses campos existirem) nao tem essas chaves - a retomada
+        quebrava com `KeyError` em vez de reconciliar. Reproduzido com o
+        codigo real do commit `fcdb6f9` (versao anterior a esta correcao)
+        via subprocesso, criando uma pendencia de verdade antes de trocar
+        para o codigo atual."""
+        a, b, args = self._setup_vinculo()
+        sandbox_code = self.root / "scripts" / "central_compras.py"
+        current = sandbox_code.read_bytes()
+        old = subprocess.run(
+            ["git", "show", "fcdb6f9:scripts/central_compras.py"],
+            cwd=ambiente.ROOT, capture_output=True, check=True,
+        ).stdout
+        sandbox_code.write_bytes(old)
+        codigo_injetado = (
+            "import sys, os\n"
+            "from scripts import central_compras as cc\n"
+            "cc.append_timeline = lambda *a, **k: os._exit(70)\n"
+            "cc.main(sys.argv[1:])\n"
+        )
+        crash = subprocess.run(
+            [sys.executable, "-c", codigo_injetado, *args], cwd=self.root, capture_output=True, text=True,
+        )
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+        journal = next((b / cc._OPERATIONS_DIRNAME).glob("*.json"))
+        self.assertNotIn(
+            "data_evento", json.loads(journal.read_text(encoding="utf-8"))["detalhe"],
+            "journal antigo deveria mesmo estar sem a chave nova - senao o teste nao reproduz nada",
+        )
+
+        sandbox_code.write_bytes(current)
+        retry = subprocess.run(
+            [sys.executable, "scripts/central_compras.py", *args], cwd=self.root, capture_output=True, text=True,
+        )
+
+        self.assertEqual(retry.returncode, 0, retry.stderr)
+        self.assertFalse(cc.pending_operations([b]))
+        self.assertEqual(
+            (b / "processo.md").read_text(encoding="utf-8").count("Produto reaproveitado:"), 1,
+        )
+
+    def test_nome_congelado_mesmo_quando_timeline_nunca_foi_tentada(self):
+        """Achado 2, janela que `efeito_congelado` (achado 3) NAO cobre: se
+        o processo cai logo depois de concluir a participacao mas ANTES de
+        sequer tentar o passo da timeline pela primeira vez, nao ha nenhum
+        `assinatura_efeito` persistido ainda pra reaproveitar - a retomada
+        cai no ramo que monta a linha com dado atual. Esse ramo precisa usar
+        o nome CONGELADO em `op.detalhe` na 1a tentativa, nao o nome atual
+        da ficha (que pode ter mudado nesse meio-tempo via `novo-produto
+        --force` em outro projeto) - senao a linha escrita e a errada (nao
+        duplica, mas atribui o vinculo ao nome novo, que nao era o nome no
+        momento em que a operacao comecou)."""
+        a, b, args = self._setup_vinculo()
+        env = dict(os.environ)
+        env["CENTRAL_COMPRAS_TESTE_CRASH_APOS"] = "participacao"
+        primeira = subprocess.run(
+            [sys.executable, "scripts/central_compras.py", *args],
+            cwd=self.root, env=env, capture_output=True, text=True,
+        )
+        self.assertEqual(primeira.returncode, 70, primeira.stderr)
+        self.assertTrue(cc.participation_path(b, "candidato").exists())
+        self.assertNotIn("Produto reaproveitado", (b / "processo.md").read_text(encoding="utf-8"))
+
+        self.cli("novo-produto", str(a), "Nome atualizado", "--produto-id", "candidato", "--force")
+
+        env.pop("CENTRAL_COMPRAS_TESTE_CRASH_APOS", None)
+        retomada = subprocess.run(
+            [sys.executable, "scripts/central_compras.py", *args],
+            cwd=self.root, env=env, capture_output=True, text=True,
+        )
+        self.assertEqual(retomada.returncode, 0, retomada.stderr)
+
+        texto = (b / "processo.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "Produto reaproveitado: candidato", texto,
+            "nome congelado na 1a tentativa deveria ter sido usado",
+        )
+        self.assertNotIn(
+            "Produto reaproveitado: Nome atualizado", texto,
+            "retomada usou o nome ATUAL da ficha em vez do nome congelado na 1a tentativa",
+        )
 
 
 if __name__ == "__main__":

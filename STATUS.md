@@ -5,27 +5,123 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (08/09/2026, sessao 15)
+## AO RETOMAR — comece por aqui (08/09/2026, sessao 16)
 
-**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (3a
+**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (4a
 rodada) desta correcao antes de iniciar a frente 6. So depois dessa revisao
 passar limpa, va para `docs/plano-pendencias-auditoria-2026-09-06.md`
 secao 6.
 
 **Pendencias / bloqueios:**
 - Frente 6 (datas/veredito) **nao iniciada**.
-- Frente 5 (produtos reutilizados): a correcao da sessao 14 (6 falhas)
-  **tinha mais 3 lacunas**, achadas pela 2a revisao independente (Astra)
-  sobre o commit `fcdb6f9`. **As 3 foram corrigidas e testadas nesta sessao
-  (15)** - ver bloco abaixo. Continua precisando de UMA rodada de revisao
+- Frente 5 (produtos reutilizados): a correcao da sessao 15 (3 falhas)
+  **tinha mais 3 lacunas**, achadas pela 3a revisao independente (Astra)
+  sobre o commit `6669b9d`. **As 3 foram corrigidas e testadas nesta sessao
+  (16)** - ver bloco abaixo. Continua precisando de UMA rodada de revisao
   que passe limpa antes de declarar "concluida"; **ja foi declarada pronta
-  duas vezes e as duas vezes apareceu lacuna nova** - nao presuma que esta
-  e a ultima rodada so porque os testes passam localmente.
+  TRES vezes e as tres vezes apareceu lacuna nova** - nao presuma que esta
+  e a ultima rodada so porque os testes passam localmente. Padrao que se
+  repete: cada rodada acha problema mais profundo no MESMO par de
+  mecanismos (`link_product`/`migrate_products` + `tracked_operation`) -
+  antes de mexer de novo, leia o contrato inteiro (nao so o diff da ultima
+  correcao).
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 5, 3a correcao da revisao independente (08/09/2026, sessao 16).**
+A Astra reproduziu 3 falhas reais contra o commit `6669b9d` (sessao 15, que
+tinha corrigido as 3 anteriores), com o script
+`astra_review_6669b9d.py` (3 testes, um por achado, todos reproduzidos
+ANTES de corrigir). As 3 viraram teste permanente em
+`tests/test_participacoes.py` (`TerceiraRevisaoIndependenteFrente5Test`: os
+3 testes da Astra + 1 teste adicional que escrevi pra cobrir uma janela que
+o teste dela nao forcava - ver achado 2 abaixo).
+
+1. **Contrato de participacao insuficiente na migracao.**
+   `isinstance(dados, dict) and bool(dados)` so provava que o arquivo tinha
+   ALGUM conteudo - um mapa so com `produto_id`, so com uma anotacao solta,
+   com `produto_id` de OUTRO produto, ou com `estado` fora do vocabulario
+   conhecido, todos "passavam" e autorizavam `migrar-produtos` a apagar o
+   campo legado da ficha (unica evidencia real) por cima de lixo. Corrigido:
+   funcao nova `_participacao_invalida(dados, produto_id)` define o
+   contrato minimo - IDENTIDADE (`produto_id` tem que bater com o proprio
+   arquivo) e ESTADO (dentro de `ESTADOS_PARTICIPACAO`, vocabulario fechado
+   novo: `pesquisando`/`aguardando_preco`/`descartado`); os demais campos
+   continuam opcionais (uma participacao recem-criada nao tem preco/
+   requisitos ainda, e isso e valido). Usado nos DOIS lugares que precisam
+   do mesmo criterio: `read_participation` (participacao invalida deixa de
+   ser autoridade, cai pro legado/default, nunca fabrica estado confirmado)
+   e `migrate_products` (participacao que nao passa no contrato vira
+   categoria nova, `INVALIDO(S)`, que RECUSA a migracao daquele candidato -
+   ficha E participacao preservadas intactas, `--aplicar` termina em
+   `SystemExit` como ja acontecia pra `BLOQUEADO(S)`). O caso "vazio" (0
+   bytes) da correcao anterior continua recuperando do legado normalmente -
+   so o caso "tem conteudo mas nao faz sentido" passou a recusar em vez de
+   aceitar.
+2. **`nome_produto` nao estava congelado, so a data.** A correcao da sessao
+   15 congelou `data_evento` mas `nome_produto` continuava sendo relido da
+   FICHA compartilhada a cada tentativa - um `novo-produto --force` rodado
+   em OUTRO projeto entre a falha e a retomada muda o nome ali, e a
+   retomada escrevia a linha da timeline com o nome NOVO, nunca reconhecida
+   como o mesmo efeito da assinatura congelada (nome antigo) - duplicava a
+   cada retomada. Corrigido: `nome_produto` entrou em `op.detalhe` junto da
+   data (mesmo mecanismo). Escrevi um teste adicional
+   (`test_nome_congelado_mesmo_quando_timeline_nunca_foi_tentada`) pra uma
+   janela que o teste da Astra nao forcava - interrupcao ENTRE concluir a
+   participacao e sequer tentar a timeline pela primeira vez (via
+   `CENTRAL_COMPRAS_TESTE_CRASH_APOS=participacao`, hook de teste real do
+   proprio motor) - onde o mecanismo do achado 3 (abaixo) ainda nao tem
+   nada persistido pra reaproveitar.
+3. **Journal de versao anterior quebrava a retomada com `KeyError`.**
+   `link_product` passou a exigir `op.detalhe["data_evento"]` (sessao 15) e
+   depois tambem `["nome_produto"]` (achado 2 acima), mas um journal
+   `em_andamento` comecado por uma versao ANTERIOR do comando (antes desses
+   campos existirem) nao tem essas chaves - a retomada quebrava com
+   traceback cru de `KeyError` em vez de reconciliar. Corrigido com um
+   metodo novo em `OperationHandle`: `efeito_congelado(passo)`, que devolve
+   a `assinatura_efeito` JA persistida por `registrar_efeito` pra aquele
+   passo (de QUALQUER versao do codigo que a comecou), se alguma tentativa
+   ja chegou a registra-la - reaproveita esse texto exato em vez de
+   reconstruir. So cai pro dado atual de `op.detalhe` (com `.get(...)` e
+   fallback pro valor desta chamada, nunca indexacao direta) quando o passo
+   nunca foi tentado por ninguem - nesse caso nao ha nenhum efeito parcial
+   que dependa de bater com texto antigo, entao e seguro. `append_timeline`
+   ganhou parametro `linha` (o texto INTEIRO ja pronto, ignora
+   `etapa`/`decisao`/`porque`/`data`) pra escrever exatamente o que foi
+   reaproveitado, sem reconstruir. Testado com o CODIGO REAL do commit
+   `fcdb6f9` (2 correcoes atras) via `git show` + subprocesso, criando uma
+   pendencia de verdade com aquele codigo antigo antes de trocar pro codigo
+   atual e confirmar retomada limpa, sem duplicacao.
+
+**Verificacao (sessao 16):**
+- Baseline ANTES de tocar em qualquer coisa: 434 testes, 0 falhas -
+  confirmado rodando a suite antes de editar (a Astra ja tinha relatado o
+  mesmo numero).
+- As 3 falhas: reproduzidas com o script da Astra contra o codigo do commit
+  `6669b9d` (rodou os 3 testes dela direto, os 3 falharam do jeito descrito
+  contra o codigo antigo), corrigidas, e cobertas por teste permanente com
+  **mutacao aplicada em cada correcao** - desfiz cada correcao de proposito,
+  uma de cada vez, rodei so `tests/test_participacoes.py` e confirmei que
+  SO o(s) teste(s)-armadilha daquele achado falharam (os outros continuaram
+  passando). A mutacao do achado 2 revelou que meu primeiro teste (copiado
+  da Astra) na verdade nao cobria aquele ramo do codigo especificamente -
+  por isso o teste adicional citado acima.
+- Suite completa depois de tudo: **438 testes, 0 falhas** (434 + 4 novos).
+- `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+  `checar-segredos --strict` e `git diff --check` limpos, contra a arvore
+  real do repositorio.
+- **Fora do escopo desta correcao, deliberadamente**: nao reabri julgamento
+  de produto (pesos, gates, calibragem); nao toquei infraestrutura externa
+  (Sheets/Apps Script); frente 6 nao iniciada; nao estendi o contrato novo
+  de participacao (`_participacao_invalida`) para `project_candidate_ids`/
+  `project_discarded_candidate_ids` (leem `estado` direto do YAML sem
+  passar por `read_participation`) - a Astra nao apontou esses dois como
+  achado, e mexer neles agora seria escopo alem do pedido.
+
+## Sessao anterior (08/09/2026, sessao 15) — historico
 
 **Frente 5, 2a correcao da revisao independente (08/09/2026, sessao 15).**
 A Astra reproduziu 3 falhas reais contra o commit `fcdb6f9` (sessao 14, que

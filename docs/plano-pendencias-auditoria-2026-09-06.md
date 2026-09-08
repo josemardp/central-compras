@@ -835,11 +835,15 @@ gates e limites de score do ranking também não foram tocados, como pedido.
 
 ## 5. Produtos reutilizados em projetos diferentes
 
-**Estado: implementada (sessão 13), corrigida em duas rodadas de revisão
-independente da Astra (sessões 14 e 15 — 6 achados + 3 achados). Ainda
+**Estado: implementada (sessão 13), corrigida em três rodadas de revisão
+independente da Astra (sessões 14, 15 e 16 — 6 + 3 + 3 achados). Ainda
 falta UMA rodada de revisão que passe limpa antes de declarar "concluída
-sob reserva" — já foi dada como pronta duas vezes e as duas vezes apareceu
-lacuna nova; não presuma que a 3ª rodada não vai achar mais nada.**
+sob reserva" — já foi dada como pronta TRÊS vezes e as três vezes apareceu
+lacuna nova; não presuma que a 4ª rodada não vai achar mais nada. Padrão
+que se repete: cada rodada acha problema mais profundo no MESMO par de
+mecanismos (`link_product`/`migrate_products` + `tracked_operation`) — a
+próxima revisão (ou correção) deveria ler o contrato inteiro dessas duas
+áreas, não só o diff da última rodada.**
 
 **Contrato:** `produto.yaml` (ficha) passou a guardar só identidade e dado
 técnico — `id`, `categoria`, `nome`, `marca`, `atributos`,
@@ -1035,6 +1039,85 @@ correção: **434 testes, 0 falhas** (428 + 6 novos).
 `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
 `checar-segredos --strict` e `git diff --check` limpos contra a árvore real.
 
+### 3ª revisão independente (Astra, sessão 16, sobre o commit `6669b9d`) — 3 falhas
+
+A correção da 2ª revisão tinha mais 3 lacunas, cada uma um nível mais
+profundo no mesmo par de mecanismos:
+
+1. **Contrato de participação insuficiente na migração.**
+   `isinstance(dados, dict) and bool(dados)` só provava que o arquivo tinha
+   ALGUM conteúdo, nunca que esse conteúdo era uma participação de
+   verdade — um mapa só com `produto_id`, só com uma anotação solta, com
+   `produto_id` de OUTRO produto, ou com `estado` fora do vocabulário
+   conhecido, todos "passavam" e autorizavam `migrar-produtos` a apagar o
+   campo legado da ficha (única evidência real) por cima de lixo.
+   Corrigido: função nova `_participacao_invalida(dados, produto_id)`
+   define o contrato mínimo — IDENTIDADE (`produto_id` bate com o próprio
+   arquivo) e ESTADO (dentro de `ESTADOS_PARTICIPACAO`, vocabulário fechado
+   novo: `pesquisando`/`aguardando_preco`/`descartado`); os demais campos
+   continuam opcionais. Usado nos dois lugares que precisam do mesmo
+   critério: `read_participation` (participação inválida deixa de ser
+   autoridade, cai pro legado/default, nunca fabrica estado confirmado) e
+   `migrate_products` (participação que não passa no contrato vira
+   categoria nova `INVALIDO(S)`, que recusa a migração daquele candidato —
+   ficha E participação preservadas, `--aplicar` termina em `SystemExit`
+   como já acontecia para `BLOQUEADO(S)`). O caso "vazio" (0 bytes) da
+   correção anterior continua recuperando do legado normalmente — só o caso
+   "tem conteúdo mas não faz sentido" passou a recusar em vez de aceitar.
+2. **`nome_produto` não estava congelado, só a data.** A correção anterior
+   congelou `data_evento` mas `nome_produto` continuava sendo relido da
+   FICHA compartilhada a cada tentativa — um `novo-produto --force` rodado
+   em OUTRO projeto entre a falha e a retomada muda o nome ali, e a
+   retomada escrevia a linha da timeline com o nome NOVO, nunca reconhecida
+   como o mesmo efeito da assinatura congelada (nome antigo) — duplicava a
+   cada retomada. Corrigido: `nome_produto` entrou em `op.detalhe` junto da
+   data.
+3. **Journal de versão anterior quebrava a retomada com `KeyError`.**
+   `link_product` passou a exigir `op.detalhe["data_evento"]` e depois
+   também `["nome_produto"]`, mas um journal `em_andamento` começado por
+   uma versão ANTERIOR do comando (antes desses campos existirem) não tem
+   essas chaves — a retomada quebrava com traceback cru de `KeyError` em
+   vez de reconciliar. Corrigido com um método novo em `OperationHandle`:
+   `efeito_congelado(passo)`, que devolve a `assinatura_efeito` já
+   persistida por `registrar_efeito` para aquele passo (de QUALQUER versão
+   do código que a começou), se alguma tentativa já chegou a registrá-la —
+   reaproveita esse texto exato em vez de reconstruir. Só cai pro dado
+   atual de `op.detalhe` (com `.get(...)` e fallback, nunca indexação
+   direta) quando o passo nunca foi tentado por ninguém — nesse caso não há
+   efeito parcial nenhum que dependa de bater com texto antigo, então é
+   seguro. `append_timeline` ganhou parâmetro `linha` (texto inteiro já
+   pronto) para escrever exatamente o que foi reaproveitado, sem
+   reconstruir. Testado com o CÓDIGO REAL do commit `fcdb6f9` via
+   `git show` + subprocesso, criando uma pendência de verdade com aquele
+   código antigo antes de trocar pro código atual e confirmar retomada
+   limpa, sem duplicação.
+
+### Testes (3ª revisão)
+
+`tests/test_participacoes.py`, `TerceiraRevisaoIndependenteFrente5Test`: os
+3 testes-armadilha da Astra (reprodução real de cada achado contra o código
+antigo, confirmada ANTES da correção) + 1 teste adicional
+(`test_nome_congelado_mesmo_quando_timeline_nunca_foi_tentada`) para uma
+janela que o teste da Astra não forçava — interrupção ENTRE concluir a
+participação e sequer tentar a timeline pela primeira vez (via
+`CENTRAL_COMPRAS_TESTE_CRASH_APOS=participacao`, hook de teste real do
+próprio motor), onde o mecanismo do achado 3 ainda não tem nada persistido
+para reaproveitar. A mutação de teste do achado 2 revelou esse ponto cego:
+desfazer a correção de `nome_produto` não quebrou o teste copiado da Astra
+(porque o mecanismo do achado 3 já cobria aquele cenário específico
+"por baixo"), só o teste adicional detectou. Mutação aplicada nas 3
+correções, uma de cada vez: só o(s) teste(s)-armadilha daquele achado
+falharam. Suíte completa depois da correção: **438 testes, 0 falhas**
+(434 + 4 novos). `auditar-decisoes --strict`, `operacoes-pendentes
+--strict`, `checar-segredos --strict` e `git diff --check` limpos contra a
+árvore real.
+
+**Fora do escopo desta correção, deliberadamente:** o contrato novo de
+participação (`_participacao_invalida`) não foi estendido para
+`project_candidate_ids`/`project_discarded_candidate_ids` (leem `estado`
+direto do YAML sem passar por `read_participation`) — a Astra não apontou
+esses dois como achado, e mexer neles agora seria escopo além do pedido.
+
 ## 6. Datas e vereditos
 
 **Estado: não iniciada.**
@@ -1067,13 +1150,13 @@ revisado, fluxos testados no navegador quando aplicável, push para
   na planilha real, ver seção 3.
 - **Frente 4** (proveniência): feito, 18 testes, verificado no painel com
   dados sintéticos, ver seção 4.
-- **Frente 5** (produtos reutilizados): implementada (sessão 13); duas
-  rodadas de revisão independente da Astra acharam 6 e depois mais 3
-  lacunas reais, ambas corrigidas com teste permanente + mutação (sessões
-  14 e 15) — suíte completa, `checar-segredos --strict`,
+- **Frente 5** (produtos reutilizados): implementada (sessão 13); três
+  rodadas de revisão independente da Astra acharam 6, depois 3 e depois
+  mais 3 lacunas reais, as três corrigidas com teste permanente + mutação
+  (sessões 14, 15 e 16) — suíte completa, `checar-segredos --strict`,
   `operacoes-pendentes --strict`, `auditar-decisoes --strict` e
-  `git diff --check` limpos nas duas rodadas, ver seção 5. **Ainda falta uma
+  `git diff --check` limpos nas três rodadas, ver seção 5. **Ainda falta uma
   rodada de revisão independente que passe limpa** — já foi dada como
-  pronta duas vezes e as duas vezes apareceu lacuna nova; não presumir
+  pronta TRÊS vezes e as três vezes apareceu lacuna nova; não presumir
   "concluída sob reserva" até isso acontecer de verdade.
 - **Frente 6** (datas/veredito): não iniciada.
