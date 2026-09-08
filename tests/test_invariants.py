@@ -75,6 +75,12 @@ class RankingInvariantsTest(unittest.TestCase):
                     "categoria": "fone",
                     "nome": rnd.choice(TEXTOS) if patologico else f"Produto {i}",
                     "marca": "M",
+                    # Formato LEGADO (frente 5): estado/preco/requisitos direto na
+                    # ficha, com `projeto` apontando pra este projeto - e o que faz
+                    # `find_product(produto_id, projeto)` puxar esses campos via
+                    # fallback. Sem `projeto` aqui a fuzzagem destas chaves vira
+                    # letra morta (o merge nunca as enxerga).
+                    "projeto": projeto.name,
                     "estado": rnd.choice(["pesquisando", "pesquisando", "aguardando_preco", "descartado"]),
                     "descartado_porque": "motivo registrado",
                     "preco_alvo": rnd.choice([None, 0, -1, 300]),

@@ -17,23 +17,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ProductTemplateTest(unittest.TestCase):
     def test_template_documents_every_field_the_cli_writes(self):
+        """`produto.yaml` (ficha): so identidade e dado tecnico (frente 5) -
+        estado/preco/requisitos moraram aqui antes, agora sao participacao."""
         template = yaml.safe_load((ROOT / "templates" / "produto.yaml").read_text(encoding="utf-8"))
-        escritos = {
-            "id",
-            "categoria",
-            "nome",
-            "marca",
-            "estado",
-            "projeto",
-            "preco_alvo",
-            "preco_teto",
-            "atributos",
-            "requisitos_atendidos",
-            "proveniencia",
-            "descartado_porque",
-            "aguardando_preco_desde",
-            "aguardando_preco_porque",
-        }
+        escritos = {"id", "categoria", "nome", "marca", "atributos", "proveniencia"}
+        faltando = escritos - set(template)
+        self.assertFalse(faltando, f"template desatualizado, faltam campos: {sorted(faltando)}")
+
+
+class ParticipationTemplateTest(unittest.TestCase):
+    def test_template_documents_every_field_the_cli_writes(self):
+        """`participacoes/<produto_id>.yaml`: estado desta compra especifica -
+        nunca a identidade do produto, que fica na ficha."""
+        template = yaml.safe_load((ROOT / "templates" / "participacao.yaml").read_text(encoding="utf-8"))
+        escritos = set(cc.default_participation("x"))
         faltando = escritos - set(template)
         self.assertFalse(faltando, f"template desatualizado, faltam campos: {sorted(faltando)}")
 

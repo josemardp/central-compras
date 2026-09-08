@@ -2,16 +2,7 @@ id: "{{produto_id}}"
 categoria: "{{categoria}}"
 nome: "{{nome}}"
 marca: "{{marca}}"
-estado: pesquisando
-projeto: "{{projeto_id}}"
-preco_alvo: null
-preco_teto: null
-aguardando_preco_desde: null
-aguardando_preco_porque: null
 
 atributos: {}
 
-requisitos_atendidos: {}
-
 proveniencia: null
-descartado_porque: null

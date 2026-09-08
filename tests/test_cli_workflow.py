@@ -607,10 +607,15 @@ class CliWorkflowTest(unittest.TestCase):
         waiting = self.run_cli("listar-aguardando-preco", "--categoria", "fone")
         waiting_md = (self.tmpdir / "base-conhecimento" / "aguardando-preco.md").read_text(encoding="utf-8")
         product_yaml = (self.tmpdir / "produtos" / "fone" / "qcy-h3" / "produto.yaml").read_text(encoding="utf-8")
+        # Estado/preco-alvo/motivo sao PARTICIPACAO (frente 5): moram em
+        # `participacoes/<produto_id>.yaml` dentro do projeto, nunca na ficha
+        # compartilhada - a ficha so guarda identidade e dado tecnico.
+        participacao_yaml = (self.tmpdir / project / "participacoes" / "qcy-h3.yaml").read_text(encoding="utf-8")
 
         self.assertIn("Itens: 1", waiting.stdout)
         self.assertIn("Produto aprovado", waiting_md)
-        self.assertIn("estado: aguardando_preco", product_yaml)
+        self.assertNotIn("estado:", product_yaml)
+        self.assertIn("estado: aguardando_preco", participacao_yaml)
 
         self.run_cli(
             "decidir",

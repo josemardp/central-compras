@@ -5,23 +5,106 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (07/09/2026, sessao 12)
+## AO RETOMAR — comece por aqui (08/09/2026, sessao 13)
 
-**Proximo passo:** iniciar a frente 5 (produtos reutilizados em projetos
-diferentes) seguindo `docs/plano-pendencias-auditoria-2026-09-06.md` secao
-5 — nao redescubra o escopo lendo so este STATUS.
+**Proximo passo:** iniciar a frente 6 (datas e vereditos) seguindo
+`docs/plano-pendencias-auditoria-2026-09-06.md` secao 6 — nao redescubra o
+escopo lendo so este STATUS.
 
 **Pendencias / bloqueios:**
-- Frentes 5 (produtos reutilizados) e 6 (datas/veredito) **nao iniciadas**.
-- Frentes 2 e 3 estao "concluidas sob reserva" — ja levaram 7 e 3 rodadas de
-  revisao do Codex respectivamente, cada uma achando lacuna nova. Se pedirem
-  revisao de novo, **nao presuma que passou so porque passou antes**; leia
-  as secoes 2 e 3 do plano inteiras antes de mexer.
-- Nenhum passo manual pendente do Josemar neste momento (Code.gs V13 e
-  cotacoes.csv/proveniencia ja implantados e verificados na sessao 12).
+- Frente 6 (datas/veredito) **nao iniciada**.
+- Frente 5 (produtos reutilizados) **implementada e testada nesta sessao**,
+  mas **ainda sem revisao independente** (a Astra vai revisar depois) — nao
+  declare "concluida sob reserva" nem "revisada" ate essa revisao acontecer
+  e ficar registrada aqui.
+- Frentes 2 e 3 continuam "concluidas sob reserva" — ja levaram 7 e 3
+  rodadas de revisao do Codex respectivamente, cada uma achando lacuna
+  nova. Se pedirem revisao de novo, **nao presuma que passou so porque
+  passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
+- Nenhum passo manual pendente do Josemar neste momento.
 
-**Implementando as pendencias da auditoria de 06/09.** Plano com estado por
-frente: [`docs/plano-pendencias-auditoria-2026-09-06.md`](docs/plano-pendencias-auditoria-2026-09-06.md).
+**Frente 5 (produtos reutilizados em projetos diferentes): IMPLEMENTADA E
+TESTADA (08/09/2026).** `produto.yaml` (ficha) agora guarda so identidade e
+dado tecnico (`id`, `categoria`, `nome`, `marca`, `atributos`,
+`atributos_classificacao`, `proveniencia`); estado de pesquisa, descarte
+(com motivo), preco-alvo/teto, aguardando-preco e `requisitos_atendidos`
+viraram **participacao** — um arquivo por produto DENTRO de cada projeto
+(`projetos/<projeto>/participacoes/<produto_id>.yaml`). O mesmo produto_id
+pode participar de projetos diferentes com estados totalmente
+independentes; descartar/aguardar-preco num projeto nunca toca o outro.
+
+- **Leitura unica**: `find_product(produto_id, project=None)` e a UNICA
+  funcao que mescla ficha+participacao; sem `project` devolve so identidade
+  (compat com chamadas antigas que so precisam de nome/marca). Ranking,
+  gate, regra de parada, painel, dashboard e o payload do Sheets passaram a
+  chamar com `project` — nenhum consumidor le a ficha crua pra decidir
+  estado.
+- **CLI novo**: `vincular-produto --produto-id X --projeto Y` reaproveita
+  ficha existente noutro projeto sem recriar nada nem sobrescrever
+  participacao ja existente. `novo-produto` sobre ficha existente (sem
+  `--force`) agora orienta pra `vincular-produto` em vez de so recusar.
+  `migrar-produtos [--projeto] [--aplicar]` migra o formato legado em lote
+  — so o caso inequivoco (ficha aponta pra um unico projeto existente, sem
+  cotacao em projeto diferente); resto e RELATADO, nunca adivinhado; sem
+  `--aplicar` so mostra previa; idempotente (roda quantas vezes quiser).
+- **Ambiguidade sempre recusa antes de escrever**: `descartar`/
+  `aguardar-preco` sem `--projeto` com o produto participando de 2+
+  projetos e recusado, listando os projetos, zero alteracao — testado via
+  CLI real (nao so unittest).
+- **Recuperacao de operacoes (frente 2)**: arquivo de participacao entrou
+  no mesmo mecanismo central de recursos pendentes que ja protege
+  decisao.md/veredito (`_recursos_diretos_participacao`); testado plantando
+  journal `em_andamento` reivindicando a participacao e confirmando recusa.
+- **Testes**: `tests/test_participacoes.py`, 18 testes, cobrindo os 9
+  criterios de aceite do pedido (isolamento nos dois sentidos com e sem
+  cotacao, `vincular-produto` seguro/idempotente, ambiguidade recusada sem
+  escrita, migracao com previa/idempotencia/uso-cruzado-relatado, protecao
+  de operacao pendente). Mutacao de teste no coracao do merge
+  (`find_product` ignorando participacao): 2 dos 18 falharam, confirmando
+  deteccao real. Dois testes existentes ajustados por mudanca de contrato
+  (nao eram bugs deles): `test_waiting_price_and_verdict_learning_flow`
+  checava `estado:` dentro da ficha (campo mudou de arquivo);
+  `test_invariants_hold_on_pathological_data` (fuzzer) precisou do campo
+  `projeto` na ficha legada pra fuzzagem continuar alcancando o motor.
+- **Validado ponta a ponta num sandbox isolado** (copia de
+  config/templates/scripts, nunca a arvore real): mesmo produto vinculado a
+  2 projetos, cotado e descartado só num deles — `ranking.md` de cada
+  projeto com o corte certo; `decidir` fechado, `auditar-decisoes --strict`
+  e `operacoes-pendentes --strict` passando; alteracao de participacao em
+  OUTRO projeto depois da decisao nao mudou 1 byte do snapshot (hash
+  SHA-256 identico). Painel aberto nos dois projetos ao mesmo tempo (portas
+  diferentes), screenshot confirmando "elegivel" num e "aguardando preco"
+  no outro pro MESMO produto.
+- **Fora do escopo, deliberadamente**: frente 6 nao tocada; pesos/gates/
+  comparabilidade do score intocados; nenhuma infraestrutura externa
+  criada — o Sheets reflete participacao por projeto de graca, sem mudar
+  Code.gs nem novo deploy.
+
+Suite completa: **415 testes** (414 passando + 1 falha PRE-EXISTENTE e
+NAO relacionada — ver nota abaixo), `checar-segredos --strict` e
+`git diff --check` limpos. Detalhe completo, com o contrato inteiro:
+`docs/plano-pendencias-auditoria-2026-09-06.md`, secao 5.
+
+**Nota sobre a suite (nao e da frente 5, registrar pra nao confundir com
+regressao futura):** o baseline limpo (antes desta sessao, commit
+`6b48a51`) ja reprovava em `test_decision_engine.py::
+RankingGateAwareQuoteSelectionTest::
+test_same_day_quote_without_accepted_warranty_does_not_hide_valid_quote`.
+Causa: o teste fixa `data="2026-08-31"` esperando cotacao "do mesmo dia"
+(dentro da janela de 7 dias de `fonte=manual`); com o calendario real ja em
+2026-09-08 (8 dias depois), as duas cotacoes do teste ficam "vencidas" e
+`latest_quotes` cai no fallback "tudo vencido" (ultima gravada, ignora
+gate) — apodrecimento de data fixa no fixture, nao bug de codigo. Nao
+corrigido nesta sessao (fora do escopo pedido).
+
+**Commit avulso de hoje, ainda nao registrado no STATUS quando esta sessao
+comecou:** `6b48a51` — `atributo_valor` passou a tratar candidato SEM
+cotacao igual a eliminado pelo gate (nunca mostra estrela pra nenhum dos
+dois, so o valor bruto). Preservado e coberto de novo por
+`test_candidato_sem_cotacao_sem_estrela_respeita_projeto` nesta sessao.
+
+## Sessao anterior (07/09/2026, sessao 12) — historico
+
 Frente 2 (recuperacao de operacoes parciais) **concluida sob reserva** —
 commit `d49a3cd` (7a revisao). Ja foi declarada concluida 6 vezes antes e
 cada vez o Codex achou lacuna nova - **nao declare concluida de novo so
@@ -79,8 +162,9 @@ deixaram de ser a unica fonte da verdade sobre o que foi conferido.
 
 Suite completa: 394 testes, `checar-segredos --strict` limpo.
 
-Frentes 5 (produtos reutilizados) e 6 (datas/veredito) **nao iniciadas** —
-comece pelo plano, nao redescubra o escopo.
+Frentes 5 (produtos reutilizados) e 6 (datas/veredito) **nao iniciadas** ao
+fim desta sessao — comece pelo plano, nao redescubra o escopo. (Frente 5
+foi implementada na sessao seguinte, 13; ver bloco "AO RETOMAR" no topo.)
 
 ## Sessao anterior (07/09/2026, sessao 11) — historico
 

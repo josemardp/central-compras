@@ -1291,28 +1291,81 @@ def new_product(args: argparse.Namespace) -> None:
     produto_id = args.produto_id or slugify(args.nome)
     path = product_dir(categoria, produto_id)
     if path.exists() and not args.force:
-        raise SystemExit(f"Produto ja existe: {path}")
+        raise SystemExit(
+            f"Produto ja existe: {path}\n"
+            f"Para usar esta MESMA ficha em outro projeto (a pesquisa e os atributos ja "
+            f"levantados continuam valendo), use:\n"
+            f"  python scripts/central_compras.py vincular-produto --produto-id {produto_id} "
+            f"--projeto {project.name}\n"
+            "--force recria a ficha do zero; nao serve para reaproveitar produto em projeto novo."
+        )
     path.mkdir(parents=True, exist_ok=True)
 
+    # So identidade e dado tecnico do produto moram na ficha. Estado, preco-alvo/teto
+    # e requisitos sao PARTICIPACAO nesta compra especifica - gravados a parte, em
+    # `projetos/<projeto>/participacoes/`, para o mesmo produto poder participar de
+    # dois projetos com estados independentes (frente 5).
     data = {
         "id": produto_id,
         "categoria": categoria,
         "nome": args.nome,
         "marca": args.marca,
-        "estado": "pesquisando",
-        "projeto": project.name,
-        "preco_alvo": args.preco_alvo,
-        "preco_teto": args.preco_teto if args.preco_teto is not None else meta.get("preco_teto"),
         "atributos": parse_pairs(args.atributo or []),
-        "requisitos_atendidos": parse_pairs(args.requisito or []),
         "proveniencia": None,
-        "descartado_porque": None,
     }
     write_yaml(path / "produto.yaml", data)
     atomic_write_text((path / "pesquisa.md"), render_template("pesquisa.md"))
+
+    participacao = default_participation(produto_id)
+    participacao["preco_alvo"] = args.preco_alvo
+    participacao["preco_teto"] = args.preco_teto if args.preco_teto is not None else meta.get("preco_teto")
+    participacao["requisitos_atendidos"] = parse_pairs(args.requisito or [])
+    write_participation(project, produto_id, participacao)
+
     append_timeline(project, "produto", f"Candidato registrado: {args.nome}", f"id={produto_id}")
     mark_steps(project, [3])
     print(path.relative_to(ROOT))
+
+
+def link_product(args: argparse.Namespace) -> None:
+    """Vincula uma ficha JA EXISTENTE a outro projeto, com participacao propria.
+
+    Caminho explicito para reaproveitar produto entre projetos (frente 5):
+    nunca recria a ficha (preserva atributos e `pesquisa.md`) e nunca sobrescreve
+    participacao existente - vincular de novo o mesmo par produto/projeto e
+    seguro e nao apaga nada.
+    """
+    ficha_path = find_product_path(args.produto_id)
+    if not ficha_path:
+        raise SystemExit(
+            f"Produto nao encontrado: {args.produto_id}. Use `novo-produto` para criar a ficha primeiro."
+        )
+    project = project_path(args.projeto)
+    if participation_path(project, args.produto_id).exists():
+        raise SystemExit(
+            f"{args.produto_id} ja tem participacao registrada em {project.name}. "
+            "Nada foi alterado. Para mudar o estado dela use `descartar`/`aguardar-preco` "
+            "normalmente - nao repita `vincular-produto`."
+        )
+    ficha = read_yaml(ficha_path, {})
+    if ficha.get("projeto") == project.name:
+        raise SystemExit(
+            f"{args.produto_id} ja participa de {project.name} (registro legado, ainda nao "
+            "migrado para o formato novo). Nada foi alterado; `descartar`/`aguardar-preco` ja "
+            "funcionam nesse formato, ou rode `migrar-produtos --aplicar` para atualizar."
+        )
+    participacao = default_participation(args.produto_id)
+    participacao["preco_alvo"] = args.preco_alvo
+    participacao["preco_teto"] = args.preco_teto
+    participacao["requisitos_atendidos"] = parse_pairs(args.requisito or [])
+    write_participation(project, args.produto_id, participacao)
+    append_timeline(
+        project, "produto",
+        f"Produto reaproveitado: {ficha.get('nome') or args.produto_id}",
+        f"id={args.produto_id}",
+    )
+    mark_steps(project, [3])
+    print(f"Vinculado: {args.produto_id} -> {project.name}")
 
 
 EXTRA_COLUMNS_KEY = "__extras__"
@@ -1438,28 +1491,164 @@ def product_id_conflicts() -> list[str]:
     ]
 
 
-def project_candidate_ids(project: Path) -> set[str]:
-    """Todo produto_id ativo mapeado para este projeto, com ou sem cotacao.
+# --- Participacao: estado do produto NESTE projeto (frente 5) ---------------
+#
+# A ficha (`produto.yaml`) so guarda identidade e dado tecnico (nome, marca,
+# categoria, atributos, proveniencia). Estado de pesquisa, motivo de
+# descarte, preco-alvo/teto e requisitos atendidos sao PARTICIPACAO: dizem
+# respeito a UMA compra especifica, nao ao produto em si. O mesmo produto_id
+# pode estar descartado no projeto A e pesquisando no B - por isso cada
+# projeto guarda a propria participacao, em `projetos/<projeto>/participacoes/
+# <produto_id>.yaml`, nunca dentro da ficha compartilhada.
+#
+# Registro ANTIGO (antes desta frente) gravava estado/preco/requisitos direto
+# na ficha, junto de um campo `projeto` unico - um produto so podia participar
+# de UM projeto por vez. `read_participation` preserva leitura desses
+# registros: se nao existe participacao no formato novo para este projeto,
+# cai para os campos legados da ficha, MAS SO quando `ficha["projeto"]` e
+# exatamente este projeto - nunca herda o estado gravado para outro projeto.
+# Assim que qualquer comando grava participacao nova para este par, ela passa
+# a valer sozinha (precedencia: novo formato sempre vence quando existe).
 
-    `novo-produto` grava `projeto` no `produto.yaml`. Antes disso, a regra de
-    parada so via candidato quando a primeira cotacao chegava: com 10
-    candidatos mapeados e zero cotacoes, ela contava zero.
+_PARTICIPATION_LEGACY_KEYS = (
+    "estado", "preco_alvo", "preco_teto", "requisitos_atendidos",
+    "descartado_porque", "aguardando_preco_porque", "aguardando_preco_desde",
+)
+
+
+def participations_dir(project: Path) -> Path:
+    return project / "participacoes"
+
+
+def participation_path(project: Path, produto_id: str) -> Path:
+    return participations_dir(project) / f"{produto_id}.yaml"
+
+
+def default_participation(produto_id: str) -> dict[str, Any]:
+    return {
+        "produto_id": produto_id,
+        "estado": "pesquisando",
+        "preco_alvo": None,
+        "preco_teto": None,
+        "requisitos_atendidos": {},
+        "descartado_porque": None,
+        "aguardando_preco_porque": None,
+        "aguardando_preco_desde": None,
+    }
+
+
+def _participation_from_legacy_ficha(produto_id: str, ficha: dict[str, Any]) -> dict[str, Any]:
+    base = default_participation(produto_id)
+    for key in _PARTICIPATION_LEGACY_KEYS:
+        if key in ficha and ficha[key] is not None:
+            base[key] = ficha[key]
+    return base
+
+
+def read_participation(project: Path, produto_id: str) -> dict[str, Any]:
+    """Participacao deste produto NESTE projeto - nunca None.
+
+    Formato novo (arquivo proprio) sempre vence quando existe. Sem ele, cai
+    para os campos legados da ficha, so se a ficha ainda aponta pra ESTE
+    projeto (nunca para um projeto diferente do pedido).
+    """
+    dados = read_yaml(participation_path(project, produto_id), None)
+    if dados is not None:
+        base = default_participation(produto_id)
+        base.update(dados)
+        return base
+    ficha_path = find_product_path(produto_id)
+    ficha = read_yaml(ficha_path, {}) if ficha_path else {}
+    if ficha.get("projeto") == project.name:
+        return _participation_from_legacy_ficha(produto_id, ficha)
+    return default_participation(produto_id)
+
+
+def write_participation(project: Path, produto_id: str, dados: dict[str, Any]) -> None:
+    path = participation_path(project, produto_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    completo = default_participation(produto_id)
+    completo.update(dados)
+    write_yaml(path, completo)
+
+
+def projetos_participantes(produto_id: str) -> set[str]:
+    """Nomes dos projetos onde este produto_id tem participacao (novo formato
+    ou legado). Usado para resolver `--projeto` implicito sem ambiguidade."""
+    nomes: set[str] = set()
+    for projeto in project_dirs():
+        if participation_path(projeto, produto_id).exists():
+            nomes.add(projeto.name)
+    ficha_path = find_product_path(produto_id)
+    if ficha_path:
+        legado = read_yaml(ficha_path, {}).get("projeto")
+        if legado and (PROJETOS / str(legado)).exists():
+            nomes.add(str(legado))
+    return nomes
+
+
+def resolve_participation_project(produto_id: str, projeto_arg: str | None) -> Path:
+    """Projeto que um comando de participacao (descartar/aguardar-preco) vai
+    tocar. `--projeto` explicito sempre vence. Sem ele, exige EXATAMENTE um
+    projeto participante - ambiguo ou ausente e recusado, sem escrever nada.
+    """
+    if projeto_arg:
+        return project_path(projeto_arg)
+    candidatos = sorted(projetos_participantes(produto_id))
+    if len(candidatos) == 1:
+        return project_path(candidatos[0])
+    if not candidatos:
+        raise SystemExit(
+            f"{produto_id} nao tem participacao registrada em nenhum projeto. Use --projeto."
+        )
+    raise SystemExit(
+        f"{produto_id} participa de mais de um projeto ({', '.join(candidatos)}) - "
+        "use --projeto para dizer qual participacao alterar. Nada foi alterado."
+    )
+
+
+def project_candidate_ids(project: Path) -> set[str]:
+    """Todo produto_id ativo (nao descartado) com participacao neste projeto,
+    com ou sem cotacao - novo formato tem precedencia; fichas antigas nao
+    migradas (campo `projeto` na propria ficha) continuam contando enquanto
+    nao tiverem participacao gravada aqui.
     """
     ids: set[str] = set()
+    migrados: set[str] = set()
+    pasta = participations_dir(project)
+    if pasta.exists():
+        for path in pasta.glob("*.yaml"):
+            migrados.add(path.stem)
+            if read_yaml(path, {}).get("estado") != "descartado":
+                ids.add(path.stem)
     for path in PRODUTOS.glob("*/*/produto.yaml"):
+        produto_id = path.parent.name
+        if produto_id in migrados:
+            continue
         dados = read_yaml(path, {})
         if dados.get("projeto") == project.name and dados.get("estado") != "descartado":
-            ids.add(path.parent.name)
+            ids.add(produto_id)
     return ids
 
 
 def project_discarded_candidate_ids(project: Path) -> set[str]:
-    """Descartados conhecidos, inclusive os que ainda aparecem em cotacoes."""
+    """Descartados conhecidos neste projeto, inclusive os que ainda aparecem
+    em cotacoes. Mesma precedencia novo-formato-primeiro de `project_candidate_ids`."""
     ids: set[str] = set()
+    migrados: set[str] = set()
+    pasta = participations_dir(project)
+    if pasta.exists():
+        for path in pasta.glob("*.yaml"):
+            migrados.add(path.stem)
+            if read_yaml(path, {}).get("estado") == "descartado":
+                ids.add(path.stem)
     for path in PRODUTOS.glob("*/*/produto.yaml"):
+        produto_id = path.parent.name
+        if produto_id in migrados:
+            continue
         dados = read_yaml(path, {})
         if dados.get("projeto") == project.name and dados.get("estado") == "descartado":
-            ids.add(path.parent.name)
+            ids.add(produto_id)
     return ids
 
 
@@ -1604,11 +1793,27 @@ def append_timeline(project: Path, etapa: str, decisao: str, porque: str) -> Non
     atomic_write_text(path, text)
 
 
-def find_product(produto_id: str) -> dict[str, Any] | None:
+def find_product(produto_id: str, project: Path | None = None) -> dict[str, Any] | None:
+    """Ficha do produto - identidade e dado tecnico, sempre.
+
+    `project` e opcional de proposito (identidade nao depende de projeto: nome,
+    marca e atributos sao os mesmos em qualquer compra). Quando informado, o
+    dict devolvido tambem inclui a PARTICIPACAO deste produto NAQUELE projeto
+    (estado, descarte, preco-alvo/teto, requisitos atendidos) - esta e a UNICA
+    funcao que faz essa juncao; todo consumidor que precisa saber "descartado
+    ou nao", "aguardando preco" etc. passa `project` em vez de ler a ficha
+    crua, para nunca misturar participacao de um projeto com a de outro.
+    """
     path = find_product_path(produto_id)
     if not path:
         return None
-    return read_yaml(path, {})
+    ficha = read_yaml(path, {})
+    if project is None:
+        return ficha
+    participacao = read_participation(project, produto_id)
+    merged = dict(ficha)
+    merged.update({key: value for key, value in participacao.items() if key != "produto_id"})
+    return merged
 
 
 def latest_quotes(
@@ -2204,14 +2409,14 @@ def compute_ranking(project: Path) -> tuple[list[Ranked], list[Ranked]]:
 
     def passes_gate(row: dict[str, str]) -> bool:
         produto_id = row.get("produto_id", "")
-        product = find_product(produto_id) or {"id": produto_id, "categoria": briefing.get("categoria"), "marca": ""}
+        product = find_product(produto_id, project) or {"id": produto_id, "categoria": briefing.get("categoria"), "marca": ""}
         return not gate_eliminations(row, product, briefing)
 
     latest = latest_quotes(rows, prefer=passes_gate)
     weights = preferences().get("score", {})
     pre_candidates: list[tuple[str, dict[str, str], dict[str, Any], list[str], list[str]]] = []
     for produto_id, row in latest.items():
-        product = find_product(produto_id) or {"id": produto_id, "categoria": briefing.get("categoria"), "marca": ""}
+        product = find_product(produto_id, project) or {"id": produto_id, "categoria": briefing.get("categoria"), "marca": ""}
         eliminations = gate_eliminations(row, product, briefing)
         alerts = manipulation_alerts(rows, row)
         pre_candidates.append((produto_id, row, product, eliminations, alerts))
@@ -2303,7 +2508,7 @@ def sem_cotacao_candidates(project: Path, categoria: str, known: list[Ranked]) -
     faltando = sorted(project_candidate_ids(project) - conhecidos)
     itens: list[Ranked] = []
     for produto_id in faltando:
-        product = find_product(produto_id) or {"id": produto_id, "categoria": categoria, "marca": ""}
+        product = find_product(produto_id, project) or {"id": produto_id, "categoria": categoria, "marca": ""}
         itens.append(
             Ranked(
                 produto_id,
@@ -2749,66 +2954,71 @@ def promote_quote(args: argparse.Namespace) -> None:
 def discard_product(args: argparse.Namespace) -> None:
     if not args.porque.strip():
         raise SystemExit("Descarte exige motivo em --porque.")
-    path = find_product_path(args.produto_id)
-    if not path:
+    if not find_product_path(args.produto_id):
         raise SystemExit(f"Produto nao encontrado: {args.produto_id}")
-    product = read_yaml(path, {})
-    product["estado"] = "descartado"
-    product["descartado_porque"] = args.porque
-    write_yaml(path, product)
-    project = project_path(args.projeto or product.get("projeto"))
+    # Projeto resolvido e a operacao recusada ANTES de qualquer escrita se for
+    # ambigua (produto participando de mais de um projeto sem --projeto): a
+    # participacao e por projeto, nunca um estado global do produto.
+    project = resolve_participation_project(args.produto_id, args.projeto)
+    participacao = read_participation(project, args.produto_id)
+    participacao["estado"] = "descartado"
+    participacao["descartado_porque"] = args.porque
+    write_participation(project, args.produto_id, participacao)
     append_timeline(project, "descarte", f"Descartado {args.produto_id}", args.porque)
-    build_ranking(argparse.Namespace(projeto=args.projeto or str(project)))
+    build_ranking(argparse.Namespace(projeto=str(project)))
     elegiveis, _ = compute_ranking(project)
     if not elegiveis:
         print("Proxima acao mantida: nenhum candidato elegivel apos descarte.")
-    print(f"Descartado: {args.produto_id}")
+    print(f"Descartado: {args.produto_id} em {project.name}")
 
 
 def wait_price(args: argparse.Namespace) -> None:
-    path = find_product_path(args.produto_id)
-    if not path:
+    if not find_product_path(args.produto_id):
         raise SystemExit(f"Produto nao encontrado: {args.produto_id}")
-    product = read_yaml(path, {})
-    project = project_path(args.projeto or product.get("projeto"))
-    product["estado"] = "aguardando_preco"
+    project = resolve_participation_project(args.produto_id, args.projeto)
+    participacao = read_participation(project, args.produto_id)
+    participacao["estado"] = "aguardando_preco"
     if args.preco_alvo is not None:
-        product["preco_alvo"] = args.preco_alvo
+        participacao["preco_alvo"] = args.preco_alvo
     if args.preco_teto is not None:
-        product["preco_teto"] = args.preco_teto
-    product["aguardando_preco_porque"] = args.porque
-    product["aguardando_preco_desde"] = today()
-    write_yaml(path, product)
+        participacao["preco_teto"] = args.preco_teto
+    participacao["aguardando_preco_porque"] = args.porque
+    participacao["aguardando_preco_desde"] = today()
+    write_participation(project, args.produto_id, participacao)
     append_timeline(project, "aguardando_preco", f"{args.produto_id} aguardando preco", args.porque)
     set_process_state(project, proxima_acao="reconsultar itens em aguardando_preco antes de decidir")
-    print(f"Aguardando preco: {args.produto_id}")
+    print(f"Aguardando preco: {args.produto_id} em {project.name}")
 
 
 def waiting_price_rows() -> list[dict[str, Any]]:
+    """Um item por (projeto, produto) em `aguardando_preco` - nunca por
+    produto sozinho: o mesmo produto pode estar aguardando preco num projeto
+    e nem participar de outro. Le pela juncao unica ficha+participacao
+    (`find_product` com `project`), nunca pela ficha crua."""
     rows: list[dict[str, Any]] = []
-    for product_file in PRODUTOS.glob("*/**/produto.yaml"):
-        product = read_yaml(product_file, {})
-        if product.get("estado") != "aguardando_preco":
-            continue
-        project = PROJETOS / str(product.get("projeto"))
-        quote = latest_quotes(read_quotes(project)).get(product.get("id")) if project.exists() else None
-        atual = quote_float(quote.get("custo_total")) if quote else 0
-        alvo = quote_float(product.get("preco_alvo"))
-        teto = quote_float(product.get("preco_teto"))
-        rows.append(
-            {
-                "produto_id": product.get("id"),
-                "nome": product.get("nome"),
-                "categoria": product.get("categoria"),
-                "projeto": product.get("projeto"),
-                "preco_atual": atual or "",
-                "preco_alvo": alvo or "",
-                "preco_teto": teto or "",
-                "distancia_ate_alvo": round(atual - alvo, 2) if atual and alvo else "",
-                "desde": product.get("aguardando_preco_desde", ""),
-                "porque": product.get("aguardando_preco_porque", ""),
-            }
-        )
+    for project in project_dirs():
+        for produto_id in project_candidate_ids(project):
+            product = find_product(produto_id, project)
+            if not product or product.get("estado") != "aguardando_preco":
+                continue
+            quote = latest_quotes(read_quotes(project)).get(produto_id)
+            atual = quote_float(quote.get("custo_total")) if quote else 0
+            alvo = quote_float(product.get("preco_alvo"))
+            teto = quote_float(product.get("preco_teto"))
+            rows.append(
+                {
+                    "produto_id": produto_id,
+                    "nome": product.get("nome"),
+                    "categoria": product.get("categoria"),
+                    "projeto": project.name,
+                    "preco_atual": atual or "",
+                    "preco_alvo": alvo or "",
+                    "preco_teto": teto or "",
+                    "distancia_ate_alvo": round(atual - alvo, 2) if atual and alvo else "",
+                    "desde": product.get("aguardando_preco_desde", ""),
+                    "porque": product.get("aguardando_preco_porque", ""),
+                }
+            )
     return sorted(rows, key=lambda row: (str(row["categoria"]), str(row["produto_id"])))
 
 
@@ -3013,7 +3223,11 @@ def decide(args: argparse.Namespace) -> None:
     if ranqueado is None:
         raise SystemExit(f"Nenhuma cotacao encontrada para {args.produto_id}")
     quote = ranqueado.quote
-    product = find_product(args.produto_id) or {"nome": args.produto_id}
+    # Reaproveita o MESMO dict que o ranking usou para este projeto (ja
+    # mescla ficha + participacao) em vez de reler a ficha crua - evita
+    # decidir com base num estado de OUTRO projeto se o produto participar
+    # de mais de um.
+    product = ranqueado.product or {"nome": args.produto_id}
     if quote.get("fonte") != "manual" and not args.permitir_web:
         raise SystemExit("A cotacao final nao e manual. Use --permitir-web se quiser registrar mesmo assim.")
 
@@ -3979,10 +4193,8 @@ def register_lesson(args: argparse.Namespace) -> None:
 
 def project_product_ids(project: Path) -> set[str]:
     ids = {row.get("produto_id") for row in read_quotes(project) if row.get("produto_id")}
-    for product_file in PRODUTOS.glob("*/**/produto.yaml"):
-        product = read_yaml(product_file, {})
-        if product.get("projeto") == project.name and product.get("id"):
-            ids.add(product["id"])
+    ids |= project_candidate_ids(project)
+    ids |= project_discarded_candidate_ids(project)
     return ids
 
 
@@ -5532,6 +5744,102 @@ def migrate_quotes(args: argparse.Namespace) -> None:
             print(f"{project.name}: ja no schema atual ({len(rows)} linhas).")
 
 
+def migrate_products(args: argparse.Namespace) -> None:
+    """Extrai estado/preco-alvo/preco-teto/requisitos/motivo-de-descarte
+    LEGADOS (gravados direto na ficha, junto de um campo `projeto` unico) para
+    um arquivo de participacao por projeto (frente 5).
+
+    Idempotente: ficha ja limpa (sem nenhum campo legado) e ignorada
+    silenciosamente numa segunda passada. So migra o caso INEQUIVOCO -
+    ficha aponta para exatamente um projeto (via `projeto`), esse projeto
+    existe, e nenhuma cotacao do mesmo produto_id aparece num projeto
+    DIFERENTE - qualquer outra combinacao e relatada, nunca resolvida
+    adivinhando. Participacao ja existente para aquele par nunca e
+    sobrescrita (pode ser mais recente que a ficha, gravada por um
+    `descartar`/`aguardar-preco` já rodado sobre o registro legado); a ficha
+    ainda assim e limpa nesse caso, porque a participacao ja e quem manda.
+
+    Sem `--aplicar`, so mostra a previa (nenhuma escrita). Seguro rodar
+    quantas vezes quiser: cada ficha e reavaliada do zero a cada chamada, sem
+    depender de progresso anterior gravado em disco - por isso nao precisa de
+    journal proprio (`tracked_operation`); a trava de projeto/`produtos/` ja
+    herdada de `main()` basta para serializar contra outros comandos.
+    """
+    projeto_alvo = project_path(args.projeto) if args.projeto else None
+    todos_projetos = project_dirs()
+    cotacoes_por_produto: dict[str, set[str]] = {}
+    for projeto in todos_projetos:
+        for row in read_quotes(projeto):
+            pid = row.get("produto_id")
+            if pid:
+                cotacoes_por_produto.setdefault(pid, set()).add(projeto.name)
+
+    migrados: list[str] = []
+    ja_limpos = 0
+    ambiguos: list[str] = []
+
+    for ficha_path in sorted(PRODUTOS.glob("*/*/produto.yaml")):
+        produto_id = ficha_path.parent.name
+        ficha = read_yaml(ficha_path, {})
+        legado_projeto = ficha.get("projeto")
+        tem_campo_legado = legado_projeto or any(
+            key in ficha for key in _PARTICIPATION_LEGACY_KEYS
+        )
+        if not tem_campo_legado:
+            ja_limpos += 1
+            continue
+        if not legado_projeto:
+            ambiguos.append(
+                f"{produto_id}: tem campo legado de participacao mas nenhum `projeto` gravado na "
+                "ficha - nao da pra saber a qual compra pertencia. Confira e vincule manualmente "
+                "com `vincular-produto`, ou edite a ficha a mao."
+            )
+            continue
+        if projeto_alvo and legado_projeto != projeto_alvo.name:
+            continue  # fora do escopo desta chamada (--projeto filtrou), nao e pendencia
+        caminho_projeto = PROJETOS / str(legado_projeto)
+        if not caminho_projeto.exists():
+            ambiguos.append(
+                f"{produto_id}: ficha aponta para o projeto `{legado_projeto}`, que nao existe mais. "
+                "Nao migrado; confira se o projeto foi renomeado ou removido."
+            )
+            continue
+        outros_projetos_com_cotacao = cotacoes_por_produto.get(produto_id, set()) - {legado_projeto}
+        if outros_projetos_com_cotacao:
+            ambiguos.append(
+                f"{produto_id}: ficha aponta para `{legado_projeto}`, mas ha cotacao(oes) tambem em "
+                f"{', '.join(sorted(outros_projetos_com_cotacao))}. Uso cruzado de verdade - vincule "
+                "cada projeto manualmente com `vincular-produto` e confira a participacao de cada um "
+                "antes de migrar; nao presumo qual delas e a legada."
+            )
+            continue
+
+        ja_tinha_participacao = participation_path(caminho_projeto, produto_id).exists()
+        if not ja_tinha_participacao:
+            participacao = _participation_from_legacy_ficha(produto_id, ficha)
+            if args.aplicar:
+                write_participation(caminho_projeto, produto_id, participacao)
+        ficha_limpa = {
+            key: value for key, value in ficha.items()
+            if key != "projeto" and key not in _PARTICIPATION_LEGACY_KEYS
+        }
+        if args.aplicar:
+            write_yaml(ficha_path, ficha_limpa)
+        acao = "participacao ja existia, so a ficha foi limpa" if ja_tinha_participacao else f"participacao criada em `{legado_projeto}`"
+        migrados.append(f"{produto_id}: {acao}")
+
+    verbo = "Migrado" if args.aplicar else "SERIA migrado (rode com --aplicar para gravar)"
+    for linha in migrados:
+        print(f"{verbo}: {linha}")
+    if ja_limpos:
+        print(f"Ja no formato novo (sem campo legado): {ja_limpos} ficha(s).")
+    if ambiguos:
+        print(f"\nNAO migrado(s) - {len(ambiguos)} caso(s) ambiguo(s), decida manualmente:")
+        for linha in ambiguos:
+            print(f"  - {linha}")
+    print(f"\nTotal: {len(migrados)} migravel(is), {ja_limpos} ja limpo(s), {len(ambiguos)} ambiguo(s).")
+
+
 def private_data_dir(_: argparse.Namespace) -> None:
     """Cria a pasta de dados pessoais FORA da arvore do repositorio.
 
@@ -5715,6 +6023,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=new_product)
 
+    p = sub.add_parser(
+        "vincular-produto",
+        help="vincula ficha de produto ja existente a outro projeto, com participacao propria (reaproveitamento)",
+    )
+    p.add_argument("--produto-id", required=True)
+    p.add_argument("--projeto", required=True)
+    p.add_argument("--preco-alvo", type=real_number)
+    p.add_argument("--preco-teto", type=real_number)
+    p.add_argument("--requisito", action="append", default=[])
+    p.set_defaults(func=link_product)
+
     p = sub.add_parser("cotar", help="adiciona uma cotacao append-only")
     p.add_argument("projeto")
     p.add_argument("--produto-id", required=True)
@@ -5826,6 +6145,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("migrar-cotacoes", help="atualiza o cabecalho do cotacoes.csv preservando linhas e colunas extras")
     p.add_argument("--projeto", help="um projeto especifico; sem isso, migra todos")
     p.set_defaults(func=migrate_quotes)
+
+    p = sub.add_parser(
+        "migrar-produtos",
+        help="extrai estado/preco/requisitos legados da ficha para participacao por projeto (frente 5); sem --aplicar so mostra previa",
+    )
+    p.add_argument("--projeto", help="um projeto especifico; sem isso, considera todos")
+    p.add_argument("--aplicar", action="store_true", help="grava de verdade; sem isso so mostra o que seria feito")
+    p.set_defaults(func=migrate_products)
 
     p = sub.add_parser("dados-privados", help="cria a pasta de dados pessoais fora do repositorio")
     p.set_defaults(func=private_data_dir)
@@ -5980,28 +6307,21 @@ def build_parser() -> argparse.ArgumentParser:
 def _projeto_alvo_do_comando(args: argparse.Namespace) -> Path | None:
     """Projeto que este comando efetivamente vai tocar - usado tanto para
     travar (`locked_project`) quanto para declarar recursos. `args.projeto`
-    quando presente; senao, resolvido a partir do produto (`descartar` e
-    `aguardar-preco` aceitam `--projeto` implicito, gravado na propria
-    ficha do produto em `produto.get("projeto")`) - a MESMA resolucao que
-    `discard_product`/`wait_price` fazem interamente, replicada aqui para
-    travar e checar ANTES delas rodarem, nao depois."""
+    quando presente; senao, resolvido a partir da PARTICIPACAO do produto
+    (`descartar` e `aguardar-preco` aceitam `--projeto` implicito) - a MESMA
+    resolucao que `discard_product`/`wait_price` fazem inteiramente
+    (`resolve_participation_project`), replicada aqui para travar e checar
+    ANTES delas rodarem, nao depois. Ambiguo (produto participando de mais
+    de um projeto) devolve None aqui, sem travar nada - a funcao real recusa
+    a operacao antes de escrever, entao nao ha nada a proteger."""
     alvo = getattr(args, "projeto", None)
-    if alvo:
-        try:
-            return project_path(alvo)
-        except SystemExit:
-            return None
     produto_id = getattr(args, "produto_id", None)
-    if produto_id:
-        caminho_produto = find_product_path(produto_id)
-        if caminho_produto:
-            projeto_gravado = read_yaml(caminho_produto, {}).get("projeto")
-            if projeto_gravado:
-                try:
-                    return project_path(str(projeto_gravado))
-                except SystemExit:
-                    return None
-    return None
+    if not alvo and not produto_id:
+        return None
+    try:
+        return resolve_participation_project(produto_id or "", alvo)
+    except SystemExit:
+        return None
 
 
 def _novo_projeto_id(args: argparse.Namespace) -> str:
@@ -6015,6 +6335,22 @@ def _novo_projeto_id(args: argparse.Namespace) -> str:
 def _recursos_diretos_processo(args: argparse.Namespace) -> "set[Path]":
     projeto = _projeto_alvo_do_comando(args)
     return {projeto / "processo.md"} if projeto else set()
+
+
+def _recursos_diretos_participacao(args: argparse.Namespace) -> "set[Path]":
+    """`descartar`/`aguardar-preco`/`vincular-produto` escrevem `processo.md`
+    do projeto E o arquivo de participacao (frente 5) - nunca a ficha
+    compartilhada em `produtos/`. Ambiguo (sem projeto resolvivel) devolve
+    conjunto vazio: a funcao real recusa a operacao antes de escrever, entao
+    nao ha recurso a proteger contra outra operacao pendente."""
+    projeto = _projeto_alvo_do_comando(args)
+    if not projeto:
+        return set()
+    recursos = {projeto / "processo.md"}
+    produto_id = getattr(args, "produto_id", None)
+    if produto_id:
+        recursos.add(participation_path(projeto, produto_id))
+    return recursos
 
 
 def _recursos_diretos_regenerar(args: argparse.Namespace) -> "set[Path]":
@@ -6076,8 +6412,9 @@ RECURSOS_DIRETOS_POR_COMANDO: dict[str, Any] = {
     "promover-cotacao": _recursos_diretos_processo,
     "novo-produto": _recursos_diretos_processo,
     "ranking": _recursos_diretos_processo,
-    "descartar": _recursos_diretos_processo,
-    "aguardar-preco": _recursos_diretos_processo,
+    "descartar": _recursos_diretos_participacao,
+    "aguardar-preco": _recursos_diretos_participacao,
+    "vincular-produto": _recursos_diretos_participacao,
     "regenerar": _recursos_diretos_regenerar,
     "preencher-veredito": _recursos_diretos_preencher_veredito,
     "novo-veredito": _recursos_diretos_novo_veredito,
@@ -6090,7 +6427,7 @@ RECURSOS_DIRETOS_POR_COMANDO: dict[str, Any] = {
 MUTATING_COMMANDS = {
     "cotar", "promover-cotacao", "decidir", "anotar", "novo-produto",
     "ranking", "validar", "auditar", "historico", "descartar", "aguardar-preco",
-    "novo-veredito", "regenerar", "migrar-cotacoes",
+    "novo-veredito", "regenerar", "migrar-cotacoes", "vincular-produto", "migrar-produtos",
 }
 
 # Comandos que escrevem em `base-conhecimento/`. No Windows o O_APPEND e
@@ -6102,8 +6439,8 @@ KNOWLEDGE_COMMANDS = {
     "preencher-veredito",
 }
 
-PRODUCT_COMMANDS = {"novo-produto", "descartar", "aguardar-preco"}
-ALL_PROJECT_COMMANDS = {"dashboard", "regenerar", "migrar-cotacoes"}
+PRODUCT_COMMANDS = {"novo-produto", "descartar", "aguardar-preco", "vincular-produto", "migrar-produtos"}
+ALL_PROJECT_COMMANDS = {"dashboard", "regenerar", "migrar-cotacoes", "migrar-produtos"}
 
 
 def locked_project(args: argparse.Namespace) -> Path | None:

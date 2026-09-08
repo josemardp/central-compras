@@ -835,13 +835,143 @@ gates e limites de score do ranking também não foram tocados, como pedido.
 
 ## 5. Produtos reutilizados em projetos diferentes
 
-**Estado: não iniciada.**
+**Estado: implementada e testada (08/09/2026, sessão 13). Revisão
+independente (Astra) ainda pendente — não declarar "concluída sob reserva"
+nem "revisada" até isso acontecer.**
 
-Pendente: separar dado próprio do produto (ficha) do dado de participação
-numa compra específica (estado de pesquisa, descarte, motivo, preço-alvo).
-Migração explícita e verificável, compatível com registros antigos. Teste
-âncora: mesmo produto em dois projetos com estados diferentes não pode
-vazar de um para o outro.
+**Contrato:** `produto.yaml` (ficha) passou a guardar só identidade e dado
+técnico — `id`, `categoria`, `nome`, `marca`, `atributos`,
+`atributos_classificacao`, `proveniencia`. Estado de pesquisa, descarte
+(com motivo), preço-alvo/teto, aguardando-preço (motivo+data) e
+`requisitos_atendidos` viraram **participação**: um arquivo por produto
+dentro de CADA projeto, `projetos/<projeto>/participacoes/<produto_id>.yaml`
+— nunca mais um campo `projeto` único na ficha. O mesmo produto_id pode ter
+uma participação em cada projeto, com estado, motivo e requisitos
+totalmente independentes.
+
+Ponto único de leitura (o "cache" citado no pedido original):
+`find_product(produto_id, project=None)`, em `scripts/central_compras.py`.
+Sem `project`, devolve só a ficha (identidade) — usado onde só nome/marca
+importam. Com `project`, mescla ficha + participação DAQUELE projeto
+(`read_participation`) e é a única função que faz essa junção; todo
+consumidor que precisa saber "descartado ou não", "aguardando preço",
+`preco_alvo/teto` ou `requisitos_atendidos` passa a chamar com `project` —
+`compute_ranking`, `sem_cotacao_candidates`, `decide()` (via
+`ranqueado.product`, já mesclado), `waiting_price_rows()`. Isso é o que
+alimenta ranking, gate, regra de parada, painel, dashboard e o payload do
+Sheets a partir do MESMO cálculo (`compute_ranking`/`spec_comparison_rows`,
+já reaproveitados desde a frente 3/4) — nenhum consumidor lê a ficha crua
+para decidir estado.
+
+**CLI:**
+- `vincular-produto --produto-id X --projeto Y [--preco-alvo] [--preco-teto]
+  [--requisito chave=valor]`: caminho explícito para reaproveitar uma ficha
+  já existente em outro projeto, sem recriar nada (`pesquisa.md` e
+  `atributos` preservados). Recusa se a ficha não existe (orienta
+  `novo-produto`), ou se já existe participação para aquele par
+  produto/projeto (novo formato OU legado) — nunca sobrescreve.
+- `novo-produto` sobre um `produto_id` que já tem ficha (sem `--force`)
+  agora recusa apontando para `vincular-produto` no lugar — `--force`
+  continua existindo, mas só para recriar a MESMA ficha do zero, nunca como
+  atalho de reaproveitamento (pedido explícito).
+- `descartar`/`aguardar-preco`: `--projeto` continua opcional, mas a
+  resolução implícita mudou de "o único campo `projeto` da ficha" para "o
+  único projeto onde este produto participa" (`resolve_participation_project`).
+  Produto participando de 2+ projetos sem `--projeto` é RECUSADO antes de
+  qualquer escrita, listando os projetos e pedindo para escolher — critério
+  de aceite 5, testado via CLI real no sandbox (`descartar --produto-id
+  fone-comum --porque ...` sem `--projeto`, com o produto vinculado a 2
+  projetos, devolveu erro e `git status`/participação de nenhum dos dois
+  mudou 1 byte).
+- `migrar-produtos [--projeto X] [--aplicar]`: migração em lote do formato
+  legado. Sem `--aplicar`, só mostra a prévia (nenhuma escrita). Migra
+  **só o caso inequívoco**: ficha com `projeto` gravado, esse projeto existe,
+  e nenhuma cotação do mesmo produto_id aparece em outro projeto diferente —
+  qualquer outra combinação (campo legado sem `projeto`, projeto referenciado
+  que não existe mais, ou cotação em projeto diferente do `projeto` da
+  ficha — "uso cruzado") é RELATADA, nunca decidida sozinha. Participação já
+  existente para aquele par (ex.: `descartar` já rodou sobre o registro
+  legado antes da migração em lote) nunca é sobrescrita pelo dado mais velho
+  da ficha — só a ficha é limpa nesse caso. Idempotente por construção: cada
+  ficha é reavaliada do zero a cada chamada (sem depender de progresso
+  gravado), então não precisa de journal próprio — a trava de
+  projeto/`produtos/` já herdada de `main()` basta.
+
+**Migração e compatibilidade:** `read_participation` cai para os campos
+legados da ficha quando não há participação no formato novo E a ficha
+ainda aponta (`projeto`) para o projeto pedido — nunca para outro. Isso
+significa que um registro nunca migrado continua funcionando sem rodar
+`migrar-produtos` (a leitura já é compatível); a migração em lote só limpa
+a ficha e formaliza o arquivo de participação. `descartar`/`aguardar-preco`
+já escrevem sempre no formato novo, mesmo sobre um registro ainda legado —
+por isso a ordem de precedência importa e foi testada explicitamente
+(`test_participacao_mais_fresca_nunca_e_sobrescrita_pela_ficha_legada`).
+
+**Recuperação de operações (frente 2):** `descartar`/`aguardar-preco`/
+`vincular-produto` passaram a declarar o arquivo de participação como
+recurso direto (`_recursos_diretos_participacao`, ao lado de `processo.md`),
+pelo mesmo mecanismo central (`_bloquear_se_recursos_conflitantes`) que já
+protege `decisao.md`/veredito — testado plantando um journal `em_andamento`
+que reivindica a participação e confirmando que `descartar` é recusado
+(zero escrita) até a pendência ser resolvida. Nenhum comando hoje cria esse
+tipo de pendência sobre participação (nem `decidir` a reivindica — risco já
+aceito e documentado na seção 2, subseção "risco residual"), então esta é
+proteção estrutural para o futuro, não uma lacuna fechada retroativamente.
+
+**Testes:** `tests/test_participacoes.py`, 18 testes cobrindo os 9 critérios
+de aceite pedidos: isolamento nos dois sentidos (com e sem cotação, cenário
+âncora com `compute_ranking` cortando só no projeto certo), `vincular-produto`
+seguro e idempotente, ambiguidade recusada sem escrita, migração (prévia,
+aplicação, idempotência, participação mais fresca preservada, uso cruzado
+relatado), e proteção de operação pendente. Mutação de teste aplicada no
+coração do merge (`find_product` devolvendo só a ficha, ignorando
+participação): 2 dos 18 falharam — o teste do cenário âncora com cotação
+(`test_descartado_com_cotacao_e_cortado_pelo_gate_so_no_proprio_projeto`) e o
+de migração que compara leitura antes/depois — confirmando que os testes
+detectam a classe de bug que a frente existe para prevenir, não só os
+exemplos escritos. Dois testes existentes precisaram de ajuste, não por bug
+deles: `test_waiting_price_and_verdict_learning_flow` verificava
+`estado: aguardando_preco` dentro do `produto.yaml` (campo que mudou de
+arquivo); o fuzzer `test_invariants_hold_on_pathological_data` gravava ficha
+legada sem o campo `projeto`, o que — sem o ajuste — faria a fuzzagem de
+estado/descarte/requisitos parar de alcançar o motor silenciosamente (sem
+falhar, só sem testar o que dizia testar).
+
+**Validado end-to-end no sandbox isolado** (cópia de
+`config`/`templates`/`scripts`, nunca a árvore real): mesmo produto_id
+vinculado a dois projetos com cotações e requisitos diferentes, descartado
+só num deles — `ranking.md` de cada projeto confirmado com o corte certo
+em cada lugar; `decidir` fechado no projeto elegível, `auditar-decisoes
+--strict` e `operacoes-pendentes --strict` passando; alteração de
+participação em OUTRO projeto depois da decisão não mudou 1 byte do
+`ranking.md` congelado no snapshot (hash SHA-256 idêntico antes/depois) —
+critério de aceite 9. Painel aberto nos dois projetos ao mesmo tempo
+(portas diferentes), com screenshot confirmando "elegível" num e
+"aguardando preço" no outro para o MESMO produto, ao mesmo tempo real.
+
+Suíte completa: 415 testes (414 passando + 1 falha pré-existente e
+não-relacionada, ver nota abaixo), `checar-segredos --strict` e
+`git diff --check` limpos.
+
+**Nota sobre a suíte, não é desta frente:** o baseline limpo (antes de
+qualquer mudança desta sessão, commit `6b48a51`) já reprovava em
+`test_decision_engine.py::RankingGateAwareQuoteSelectionTest::
+test_same_day_quote_without_accepted_warranty_does_not_hide_valid_quote`.
+Causa raiz diagnosticada: o teste fixa `data="2026-08-31"` como cotação
+"do mesmo dia" e depende de `quote_is_stale` ser `False` (janela de 7 dias
+para `fonte=manual`) para exercitar o desempate por gate em `latest_quotes`;
+com o calendário real já em 2026-09-08 (8 dias depois), as duas cotações do
+teste ficam "vencidas" e caem no fallback "tudo vencido" de `latest_quotes`
+(pega a última gravada, sem olhar gate) — apodrecimento de data-fixa no
+fixture, não um bug de participação/produto. Fora do escopo desta frente;
+registrado aqui para não ser confundido com regressão.
+
+**Fora do escopo, deliberadamente:** frente 6 (datas/veredito) não foi
+tocada. Pesos, gates e comparabilidade do score não foram alterados. Não foi
+criada infraestrutura externa nem tocado o Apps Script/Sheets — o payload do
+Sheets passou a refletir participação por projeto de graça, só por
+reaproveitar `spec_comparison_rows`/`compute_ranking` (já `find_product`
+consciente de projeto), sem nenhuma mudança no `Code.gs` nem novo deploy.
 
 ## 6. Datas e vereditos
 
@@ -853,11 +983,31 @@ presumir compra realizada só por haver decisão ou cotação manual.
 
 ## 7. Validação e publicação
 
-**Estado: parcial — feita integralmente para a frente 2; as frentes 3-6
-ainda não chegaram a este passo.**
+**Estado (08/09/2026, sessão 13, reconciliado): feita integralmente para as
+frentes 2, 3, 4 e 5. Frente 6 não iniciada, sem checklist ainda.**
+
+Esta seção estava desatualizada desde a sessão 9-12: as frentes 3 (receptor
+Sheets, 3 rodadas de revisão + redeploy verificado na nuvem) e 4
+(proveniência, 18 testes + verificação no painel) já tinham completado o
+checklist inteiro nas próprias seções acima, mas nunca foi marcado aqui.
+Corrigido agora, sem reescrever o histórico de cada seção — só a marca
+desta.
 
 Checklist por frente, quando implementada: problema reproduzido → correção →
 teste direcionado → doc/STATUS.md atualizados → commit coerente → (no fim de
 todas as frentes de uma sessão) suíte completa, scanner de segredos, diff
 revisado, fluxos testados no navegador quando aplicável, push para
 `origin/main`.
+
+- **Frente 2** (recuperação de operações): feito, 7 rodadas de revisão, ver
+  seção 2.
+- **Frente 3** (receptor Sheets): feito, Versão 13 implantada e verificada
+  na planilha real, ver seção 3.
+- **Frente 4** (proveniência): feito, 18 testes, verificado no painel com
+  dados sintéticos, ver seção 4.
+- **Frente 5** (produtos reutilizados): feito nesta sessão — suíte completa,
+  `checar-segredos --strict`, `git diff --check`, fluxo ponta a ponta num
+  sandbox isolado (CLI real + painel com screenshot), ver seção 5. **Revisão
+  independente (Astra) ainda não aconteceu** — não presumir "concluída sob
+  reserva" até isso ser registrado aqui.
+- **Frente 6** (datas/veredito): não iniciada.
