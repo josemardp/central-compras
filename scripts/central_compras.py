@@ -1382,7 +1382,6 @@ def link_product(args: argparse.Namespace) -> None:
         "preco_teto": args.preco_teto,
         "requisitos_atendidos": requisitos,
     }
-    linha_timeline = f"| {today()} | produto | Produto reaproveitado: {nome_produto} | id={args.produto_id} |"
 
     def _gravar_participacao() -> None:
         participacao = default_participation(args.produto_id)
@@ -1393,8 +1392,16 @@ def link_product(args: argparse.Namespace) -> None:
 
     with tracked_operation(
         project, op_id, "vincular_produto", assinatura,
+        # `data_evento` congelada na 1a tentativa (mesmo principio do
+        # `snapshot_rel` de `decidir`): uma retomada em outro dia precisa
+        # escrever a MESMA data que a assinatura do efeito de timeline
+        # procura, senao `registrar_efeito` nunca reconhece a linha gravada
+        # e duplica a cada retomada.
+        detalhe_inicial={"data_evento": today()},
         recursos={project / "processo.md", participation_path(project, args.produto_id)},
     ) as op:
+        data_evento = op.detalhe["data_evento"]
+        linha_timeline = f"| {data_evento} | produto | Produto reaproveitado: {nome_produto} | id={args.produto_id} |"
         # Sobrescrita cega, nao append-only: se interrompida no meio, a
         # proxima tentativa reescreve o arquivo inteiro do zero com os
         # MESMOS dados (a assinatura ja garante isso) - nunca duplica.
@@ -1403,9 +1410,16 @@ def link_product(args: argparse.Namespace) -> None:
             "timeline", project / "processo.md", linha_timeline,
             lambda: append_timeline(
                 project, "produto", f"Produto reaproveitado: {nome_produto}", f"id={args.produto_id}",
+                data=data_evento,
             ),
         )
-    mark_steps(project, [3])
+        # Dentro do bloco `with`: uma interrupcao antes desta linha deixa o
+        # journal `em_andamento` (nao apagado), entao a retomada ve a
+        # pendencia e completa a etapa 3 - fora do bloco, a operacao ja
+        # tinha sido dada como concluida (journal apagado) e uma falha bem
+        # aqui deixava o checkbox preso sem nenhuma pendencia visivel para
+        # retomar.
+        mark_steps(project, [3])
     print(f"Vinculado: {args.produto_id} -> {project.name}")
 
 
@@ -1813,12 +1827,18 @@ def add_quote(args: argparse.Namespace) -> None:
     print(f"Cotacao adicionada: {args.produto_id} - {brl(row['custo_total'])}")
 
 
-def append_timeline(project: Path, etapa: str, decisao: str, porque: str) -> None:
+def append_timeline(project: Path, etapa: str, decisao: str, porque: str, *, data: str | None = None) -> None:
+    """`data` default e `today()` no momento da chamada - suficiente pra
+    quem grava e conclui na mesma tentativa. Quem participa de recuperacao
+    entre tentativas (`registrar_efeito`) precisa congelar a data e passar
+    explicitamente aqui, senao uma retomada em outro dia escreve uma linha
+    com data diferente da que a assinatura do efeito esta procurando, e
+    nunca reconhece o efeito como ja feito - duplicando a cada retomada."""
     path = project / "processo.md"
     if not path.exists():
         return
     text = path.read_text(encoding="utf-8")
-    line = f"| {today()} | {etapa} | {decisao} | {porque} |\n"
+    line = f"| {data or today()} | {etapa} | {decisao} | {porque} |\n"
     lines = text.splitlines(keepends=True)
     insert_at = None
     for index, existing in enumerate(lines):
@@ -5891,8 +5911,19 @@ def migrate_products(args: argparse.Namespace) -> None:
             bloqueados.append(f"{produto_id}: {erro}")
             continue
 
-        ja_tinha_participacao = participation_path(caminho_projeto, produto_id).exists()
-        if not ja_tinha_participacao:
+        # A EXISTENCIA do arquivo de participacao nao prova que ele preserva
+        # dado nenhum - um arquivo vazio (`write_text("")`) ou com conteudo
+        # que nao e um mapa YAML nao tem estado pra ser "mais recente que a
+        # ficha"; tratar so a existencia como suficiente limpava a ficha por
+        # cima de um arquivo sem NENHUM dado recuperavel, perdendo o unico
+        # registro do descarte (ficha e participacao vazia, os dois sem
+        # estado depois da limpeza). Participacao valida (mapa YAML nao
+        # vazio) e sempre quem manda e nunca e sobrescrita pelo legado; sem
+        # isso, e como se a participacao nao existisse ainda.
+        participacao_bruta = read_yaml(participacao_alvo, None)
+        participacao_valida = isinstance(participacao_bruta, dict) and bool(participacao_bruta)
+        participacao_existe = participacao_alvo.exists()
+        if not participacao_valida:
             participacao = _participation_from_legacy_ficha(produto_id, ficha)
             if args.aplicar:
                 write_participation(caminho_projeto, produto_id, participacao)
@@ -5902,7 +5933,12 @@ def migrate_products(args: argparse.Namespace) -> None:
         }
         if args.aplicar:
             write_yaml(ficha_path, ficha_limpa)
-        acao = "participacao ja existia, so a ficha foi limpa" if ja_tinha_participacao else f"participacao criada em `{legado_projeto}`"
+        if participacao_valida:
+            acao = "participacao ja existia, so a ficha foi limpa"
+        elif participacao_existe:
+            acao = f"participacao existente estava vazia/invalida - recuperada do legado em `{legado_projeto}`"
+        else:
+            acao = f"participacao criada em `{legado_projeto}`"
         migrados.append(f"{produto_id}: {acao}")
 
     verbo = "Migrado" if args.aplicar else "SERIA migrado (rode com --aplicar para gravar)"

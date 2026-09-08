@@ -604,5 +604,158 @@ class RevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
         self.assertEqual(cc.read_participation(a, "invalido")["requisitos_atendidos"], {"uso": True})
 
 
+class SegundaRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
+    """Regressao dos 3 achados da 2a revisao independente (Astra) sobre o
+    commit `fcdb6f9` - cada teste aqui reproduziu uma falha real contra
+    aquele codigo antes da correcao. Ver STATUS.md e
+    docs/como-conferir-auditoria.md. Os 3 primeiros sao as falhas; os 3
+    seguintes sao controles que ja passavam e continuam passando."""
+
+    def _legado(self, project, **extra):
+        path = cc.product_dir("fone", "legado") / "produto.yaml"
+        data = dict(id="legado", categoria="fone", nome="Legado", marca="Marca", projeto=project.name,
+                    estado="descartado", descartado_porque="nao atende", preco_alvo=100, preco_teto=300,
+                    requisitos_atendidos={"uso": True})
+        data.update(extra)
+        cc.write_yaml(path, data)
+        return path
+
+    def _setup_vinculo(self):
+        a = self.project("origem")
+        b = self.project("destino")
+        self.product(a)
+        return a, b, ["vincular-produto", "--produto-id", "candidato", "--projeto", str(b)]
+
+    def test_migracao_nao_perde_descarte_com_participacao_vazia(self):
+        """Achado 1: um arquivo de participacao EXISTENTE mas vazio (0 bytes)
+        era tratado como "ja tinha participacao" - a migracao limpava a
+        ficha legada (unica fonte real do descarte) por cima de um arquivo
+        sem nenhum dado recuperavel, e o candidato voltava a `pesquisando`."""
+        a = self.project()
+        ficha = self._legado(a)
+        p = cc.participation_path(a, "legado")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("", encoding="utf-8")
+        self.assertEqual(cc.read_participation(a, "legado")["estado"], "descartado")
+
+        self.cli("migrar-produtos", "--aplicar")
+
+        self.assertEqual(
+            cc.read_participation(a, "legado")["estado"], "descartado",
+            "Migracao limpou o unico estado recuperavel da ficha e o candidato voltou a pesquisando",
+        )
+
+    def test_falha_na_etapa_final_deixa_vinculo_recuperavel(self):
+        """Achado 2: `mark_steps(project, [3])` rodava FORA do
+        `tracked_operation` de `link_product`. Uma interrupcao depois da
+        participacao/timeline gravadas mas antes de marcar a etapa 3 dava
+        journal ja apagado (operacao "concluida") - nenhuma pendencia
+        visivel para retomar, e a etapa 3 ficava presa sem marcar para
+        sempre (retomada recusada por "ja tem participacao")."""
+        a, b, args = self._setup_vinculo()
+        with patch.object(cc, "mark_steps", side_effect=OSError("falha antes de marcar etapa 3")):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        self.assertIn("- [ ] 3.", (b / "processo.md").read_text(encoding="utf-8"))
+        self.assertTrue(
+            cc.pending_operations([b]),
+            "Journal apagado antes da ultima escrita: pendencia da etapa 3 ficou invisivel",
+        )
+
+        self.cli(*args)
+
+        self.assertIn("- [x] 3.", (b / "processo.md").read_text(encoding="utf-8"))
+
+    def test_retry_em_outro_dia_nao_duplica_timeline(self):
+        """Achado 3: a assinatura do efeito de timeline era congelada com a
+        data do dia em que a tentativa comecou, mas o `executar()` chamava
+        `append_timeline` sem passar essa data - a linha realmente gravada
+        saia com a data ATUAL, nunca batendo com a assinatura congelada.
+        Cada retomada em outro dia reconciliava como "nunca aconteceu" e
+        escrevia outra linha nova."""
+        a, b, args = self._setup_vinculo()
+        real_append = cc.append_timeline
+        with patch.object(cc, "today", return_value="2026-09-08"):
+            with patch.object(cc, "append_timeline", side_effect=OSError("antes de escrever timeline")):
+                with self.assertRaises(OSError):
+                    self.cli(*args)
+
+        def append_then_crash(*args_, **kwargs):
+            real_append(*args_, **kwargs)
+            raise OSError("depois de escrever timeline, antes de confirmar")
+
+        with patch.object(cc, "today", return_value="2026-09-09"):
+            with patch.object(cc, "append_timeline", side_effect=append_then_crash):
+                with self.assertRaises(OSError):
+                    self.cli(*args)
+
+        with patch.object(cc, "today", return_value="2026-09-10"):
+            self.cli(*args)
+
+        timeline = (b / "processo.md").read_text(encoding="utf-8")
+        self.assertEqual(
+            timeline.count("Produto reaproveitado:"), 1,
+            "Retomadas em dias diferentes duplicaram a mesma operacao na timeline",
+        )
+
+    def test_retomada_com_argumentos_diferentes_recusa(self):
+        """Controle: retomar `vincular-produto` com dado diferente da
+        tentativa original continua recusado, sem tocar na participacao ja
+        gravada pela tentativa interrompida."""
+        a, b, args = self._setup_vinculo()
+        with patch.object(cc, "append_timeline", side_effect=OSError("crash")):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+        before = cc.participation_path(b, "candidato").read_bytes()
+
+        with self.assertRaises(SystemExit):
+            self.cli(*args, "--preco-alvo", "75")
+        self.assertEqual(cc.participation_path(b, "candidato").read_bytes(), before)
+
+        self.cli(*args)
+
+    def test_migracao_retomada_entre_duas_escritas_preserva_estado(self):
+        """Controle: uma falha entre gravar a participacao e limpar a ficha
+        legada nao perde o estado - a retomada nao sobrescreve a
+        participacao ja valida com o dado legado de novo, so termina de
+        limpar a ficha."""
+        a = self.project()
+        ficha = self._legado(a)
+        real_write = cc.write_yaml
+
+        def fail_cleanup(path, data):
+            if path == ficha:
+                raise OSError("falha antes de limpar ficha")
+            return real_write(path, data)
+
+        with patch.object(cc, "write_yaml", side_effect=fail_cleanup):
+            with self.assertRaises(OSError):
+                self.cli("migrar-produtos", "--aplicar")
+
+        self.cli("migrar-produtos", "--aplicar")
+
+        self.assertEqual(cc.read_participation(a, "legado")["estado"], "descartado")
+        self.assertNotIn("estado", cc.read_yaml(ficha, {}))
+
+    def test_snapshot_preserva_mesmo_produto_apos_alteracao_no_mesmo_projeto(self):
+        """Controle: descartar o MESMO produto no mesmo projeto depois de
+        uma decisao fechada nao muda 1 byte da evidencia ja congelada no
+        snapshot, e `auditar-decisoes --strict` continua limpo."""
+        a = self.project()
+        self.product(a)
+        self.quote(a, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(a), "--produto-id", "candidato", "--porque", "unico",
+                  "--sem-perdedores", "--comprado")
+        snap = next((a / "snapshots").iterdir())
+        frozen = {str(p.relative_to(snap)): p.read_bytes() for p in snap.rglob("*") if p.is_file()}
+
+        self.cli("descartar", "--produto-id", "candidato", "--projeto", str(a), "--porque", "mudou depois")
+
+        after = {str(p.relative_to(snap)): p.read_bytes() for p in snap.rglob("*") if p.is_file()}
+        self.assertEqual(frozen, after)
+        self.cli("auditar-decisoes", "--strict")
+
+
 if __name__ == "__main__":
     unittest.main()

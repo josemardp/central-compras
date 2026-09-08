@@ -5,26 +5,106 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (08/09/2026, sessao 14)
+## AO RETOMAR — comece por aqui (08/09/2026, sessao 15)
 
-**Proximo passo:** o Josemar pediu para REVISAR esta correcao (revisao
-independente de novo, provavelmente Astra) antes de iniciar a frente 6. So
-depois dessa revisao passar, va para
-`docs/plano-pendencias-auditoria-2026-09-06.md` secao 6.
+**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (3a
+rodada) desta correcao antes de iniciar a frente 6. So depois dessa revisao
+passar limpa, va para `docs/plano-pendencias-auditoria-2026-09-06.md`
+secao 6.
 
 **Pendencias / bloqueios:**
 - Frente 6 (datas/veredito) **nao iniciada**.
-- Frente 5 (produtos reutilizados): implementacao da sessao 13 **tinha 6
-  falhas reais**, achadas por revisao independente (Astra) sobre o commit
-  `e29c45c`. **As 6 foram corrigidas e testadas nesta sessao (14)** — ver
-  bloco abaixo. Continua precisando de UMA rodada de revisao que passe
-  limpa antes de declarar "concluida"; nao presuma que esta correcao
-  encerra o assunto so porque os testes passam localmente.
-- Frentes 2 e 3 continuam "concluidas sob reserva" — ja levaram 7 e 3
+- Frente 5 (produtos reutilizados): a correcao da sessao 14 (6 falhas)
+  **tinha mais 3 lacunas**, achadas pela 2a revisao independente (Astra)
+  sobre o commit `fcdb6f9`. **As 3 foram corrigidas e testadas nesta sessao
+  (15)** - ver bloco abaixo. Continua precisando de UMA rodada de revisao
+  que passe limpa antes de declarar "concluida"; **ja foi declarada pronta
+  duas vezes e as duas vezes apareceu lacuna nova** - nao presuma que esta
+  e a ultima rodada so porque os testes passam localmente.
+- Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 5, 2a correcao da revisao independente (08/09/2026, sessao 15).**
+A Astra reproduziu 3 falhas reais contra o commit `fcdb6f9` (sessao 14, que
+tinha corrigido as 6 anteriores), com dois scripts de reproducao locais:
+`astra_review_fcdb6f9.py` (6 testes: 3 regressoes + 3 controles que ja
+passavam) e `astra_review_fcdb6f9_details.py` (evidencia detalhada via
+subprocesso real e `compute_ranking`). As 3 foram reproduzidas ANTES de
+corrigir, seguindo `docs/como-conferir-auditoria.md`, e viraram teste
+permanente em `tests/test_participacoes.py`
+(`SegundaRevisaoIndependenteFrente5Test`: 3 testes-armadilha + os 3
+controles que a Astra confirmou que ja passavam, agora protegidos contra
+regressao futura tambem).
+
+1. **`migrar-produtos` perdia o descarte quando a participacao existia mas
+   estava vazia ou invalida.** `ja_tinha_participacao =
+   participation_path(...).exists()` so checava EXISTENCIA do arquivo, nao
+   se ele tinha dado de verdade - um `participacoes/<id>.yaml` de 0 bytes
+   (existente mas sem conteudo legivel) contava como "ja tinha
+   participacao", entao a migracao limpava a ficha legada (unica fonte real
+   do descarte, motivo, limites e requisitos) por cima do arquivo vazio. O
+   candidato voltava a `pesquisando` e reaparecia elegivel no ranking -
+   confirmado com `compute_ranking` antes/depois no script de detalhe.
+   Corrigido: `migrate_products` agora le o conteudo
+   (`read_yaml(participacao_alvo, None)`) e so trata como "participacao
+   valida" um mapa YAML nao vazio; arquivo vazio ou com conteudo invalido
+   (nao e mapa, ou mapa vazio) e tratado como SEM participacao recuperavel -
+   a migracao recupera o dado do legado pra dentro dele, do jeito que ja
+   fazia quando o arquivo simplesmente nao existia. Participacao valida
+   continua NUNCA sendo sobrescrita pelo legado (comportamento antigo
+   preservado, testado pelo controle
+   `test_migracao_retomada_entre_duas_escritas_preserva_estado`).
+2. **`vincular-produto` podia concluir sem marcar a etapa 3, sem deixar
+   pendencia visivel.** `mark_steps(project, [3])` rodava DEPOIS do bloco
+   `with tracked_operation(...)`, ou seja, fora da recuperacao - uma
+   interrupcao bem ali (participacao e timeline ja gravadas, journal ja
+   apagado porque o `with` tinha terminado sem excecao) deixava a etapa 3
+   sem marcar, sem NENHUMA operacao pendente pra `operacoes-pendentes`
+   mostrar, e a retomada era recusada por "ja tem participacao" (a mesma
+   guarda que protege contra vincular de novo depois de concluido).
+   Corrigido: `mark_steps(project, [3])` passou pra dentro do `with`, como
+   ultima linha do bloco - agora uma falha ali mantem o journal
+   `em_andamento` (visivel, retomavel), e uma retomada real so termina de
+   marcar a etapa (as outras duas ja concluidas nao repetem nada).
+3. **A linha da timeline podia duplicar numa retomada em outro dia.** A
+   assinatura do efeito (`linha_timeline`, usada por `registrar_efeito` pra
+   reconhecer "essa linha ja foi escrita") era montada com `today()` no
+   INICIO da chamada, mas o `executar()` que de fato grava chamava
+   `append_timeline(...)` sem passar essa data - `append_timeline` calculava
+   `today()` de novo, na hora de escrever. Numa retomada no dia seguinte (ou
+   depois), a linha realmente gravada saia com a data NOVA, que nunca batia
+   com a assinatura congelada (data velha) - toda retomada via "efeito nunca
+   aconteceu" e escrevia outra linha. Corrigido: `append_timeline` ganhou
+   parametro `data` opcional (default `today()`, comportamento antigo
+   preservado pros outros chamadores); `link_product` agora congela
+   `data_evento` em `op.detalhe` (mesmo mecanismo ja usado por `decidir` pro
+   caminho do snapshot - nunca recalculado numa retomada) e passa essa MESMA
+   data pra `append_timeline`, garantindo que a linha gravada bate
+   exatamente com o que a reconciliacao esta procurando.
+
+**Verificacao (sessao 15):**
+- Baseline ANTES de tocar em qualquer coisa: 428 testes, 0 falhas -
+  confirmado rodando a suite antes de editar (a Astra ja tinha relatado o
+  mesmo numero).
+- As 3 falhas: reproduzidas contra o codigo do commit `fcdb6f9` (os scripts
+  da Astra), corrigidas, e cobertas por teste permanente com **mutacao
+  aplicada em cada correcao** - desfiz cada correcao de proposito, uma de
+  cada vez, rodei so `tests/test_participacoes.py` e confirmei que SO o
+  teste-armadilha daquele achado falhou (os outros 36, incluindo os 3
+  controles, continuaram passando).
+- Suite completa depois de tudo: **434 testes, 0 falhas** (428 + 6 testes
+  novos: 3 regressoes + 3 controles).
+- `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+  `checar-segredos --strict` e `git diff --check` limpos, contra a arvore
+  real do repositorio.
+- **Fora do escopo desta correcao, deliberadamente**: nao reabri julgamento
+  de produto (pesos, gates, calibragem); nao toquei infraestrutura externa
+  (Sheets/Apps Script); frente 6 nao iniciada.
+
+## Sessao anterior (08/09/2026, sessao 14) — historico
 
 **Frente 5, correcao da revisao independente (08/09/2026, sessao 14).** A
 Astra reproduziu 6 falhas reais contra o commit `e29c45c` (sessao 13), com

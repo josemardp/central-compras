@@ -835,9 +835,11 @@ gates e limites de score do ranking também não foram tocados, como pedido.
 
 ## 5. Produtos reutilizados em projetos diferentes
 
-**Estado: implementada e testada (08/09/2026, sessão 13). Revisão
-independente (Astra) ainda pendente — não declarar "concluída sob reserva"
-nem "revisada" até isso acontecer.**
+**Estado: implementada (sessão 13), corrigida em duas rodadas de revisão
+independente da Astra (sessões 14 e 15 — 6 achados + 3 achados). Ainda
+falta UMA rodada de revisão que passe limpa antes de declarar "concluída
+sob reserva" — já foi dada como pronta duas vezes e as duas vezes apareceu
+lacuna nova; não presuma que a 3ª rodada não vai achar mais nada.**
 
 **Contrato:** `produto.yaml` (ficha) passou a guardar só identidade e dado
 técnico — `id`, `categoria`, `nome`, `marca`, `atributos`,
@@ -973,6 +975,66 @@ Sheets passou a refletir participação por projeto de graça, só por
 reaproveitar `spec_comparison_rows`/`compute_ranking` (já `find_product`
 consciente de projeto), sem nenhuma mudança no `Code.gs` nem novo deploy.
 
+### 1ª revisão independente (Astra, sessão 14, sobre o commit `e29c45c`) — 6 falhas
+
+Contexto/inventário/correção detalhada dos 6 achados (vazamento de contexto
+de IA entre projetos, mesmo vazamento na validação, snapshot sem congelar
+participação, `vincular-produto` sem recuperação, `migrar-produtos` sem
+checar recurso pendente, ficha órfã com `--requisito` inválido) ficaram
+registrados só em `STATUS.md` (sessão 14) quando foram corrigidos — não
+duplico aqui, ver lá. Testes: `tests/test_participacoes.py`,
+`RevisaoIndependenteFrente5Test` (13 testes). Suíte depois da correção: 428
+testes, 0 falhas.
+
+### 2ª revisão independente (Astra, sessão 15, sobre o commit `fcdb6f9`) — 3 falhas
+
+A correção da 1ª revisão tinha mais 3 lacunas, todas no mesmo par de
+mecanismos (`link_product`/`migrate_products` + `tracked_operation`):
+
+1. **`migrar-produtos` perdia o descarte com participação existente mas
+   vazia/inválida.** A checagem de "já tinha participação" era só
+   `Path.exists()` — um arquivo de 0 bytes contava como "válido" e a
+   migração limpava a ficha legada (única fonte real do descarte) por cima
+   dele, sem nenhum dado sobrevivendo em nenhum dos dois lugares. Corrigido:
+   a checagem agora lê o conteúdo (`read_yaml`) e só considera "participação
+   válida" um mapa YAML não vazio; vazio/inválido é tratado como "sem
+   participação recuperável" — a migração recupera do legado pra dentro
+   dele, mesmo caminho já usado quando o arquivo simplesmente não existia.
+2. **`vincular-produto` podia concluir sem marcar a etapa 3 do processo, sem
+   deixar pendência visível.** `mark_steps(project, [3])` rodava DEPOIS do
+   `with tracked_operation(...)` — fora da recuperação. Uma interrupção ali
+   (dado já gravado, journal já apagado porque o `with` tinha terminado sem
+   exceção) deixava o checkbox preso, sem nenhuma pendência para
+   `operacoes-pendentes` mostrar, e a retomada normal era recusada por "já
+   tem participação". Corrigido: `mark_steps` passou para dentro do `with`,
+   como última linha — uma falha ali agora mantém o journal `em_andamento`
+   (visível, retomável).
+3. **A linha da timeline podia duplicar numa retomada em outro dia.** A
+   assinatura do efeito (usada por `registrar_efeito` para reconhecer "isso
+   já foi escrito") era montada com a data do início da tentativa, mas
+   `append_timeline` recalculava `today()` de novo na hora de escrever de
+   verdade — numa retomada em outro dia, a linha gravada saía com data NOVA,
+   nunca batendo com a assinatura congelada (data velha), e cada retomada
+   escrevia outra linha. Corrigido: `append_timeline` ganhou parâmetro
+   `data` opcional; `link_product` congela `data_evento` em `op.detalhe`
+   (mesmo princípio do `snapshot_rel` de `decidir` — nunca recalculado numa
+   retomada) e passa essa mesma data para `append_timeline`.
+
+### Testes (2ª revisão)
+
+`tests/test_participacoes.py`, `SegundaRevisaoIndependenteFrente5Test`: 3
+testes-armadilha (uma reprodução real de cada achado contra o código antigo,
+confirmada ANTES da correção) + 3 controles que a Astra confirmou que já
+passavam (retomada com argumento diferente recusa, migração retomada entre
+duas escritas preserva estado, snapshot imutável após descarte no mesmo
+projeto) — protegidos contra regressão futura também. Mutação de teste
+aplicada em cada uma das 3 correções (desfeita uma de cada vez): só o
+teste-armadilha daquele achado falhou, os outros 36 testes do arquivo
+(inclusive os 3 controles) continuaram passando. Suíte completa depois da
+correção: **434 testes, 0 falhas** (428 + 6 novos).
+`auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a árvore real.
+
 ## 6. Datas e vereditos
 
 **Estado: não iniciada.**
@@ -1005,9 +1067,13 @@ revisado, fluxos testados no navegador quando aplicável, push para
   na planilha real, ver seção 3.
 - **Frente 4** (proveniência): feito, 18 testes, verificado no painel com
   dados sintéticos, ver seção 4.
-- **Frente 5** (produtos reutilizados): feito nesta sessão — suíte completa,
-  `checar-segredos --strict`, `git diff --check`, fluxo ponta a ponta num
-  sandbox isolado (CLI real + painel com screenshot), ver seção 5. **Revisão
-  independente (Astra) ainda não aconteceu** — não presumir "concluída sob
-  reserva" até isso ser registrado aqui.
+- **Frente 5** (produtos reutilizados): implementada (sessão 13); duas
+  rodadas de revisão independente da Astra acharam 6 e depois mais 3
+  lacunas reais, ambas corrigidas com teste permanente + mutação (sessões
+  14 e 15) — suíte completa, `checar-segredos --strict`,
+  `operacoes-pendentes --strict`, `auditar-decisoes --strict` e
+  `git diff --check` limpos nas duas rodadas, ver seção 5. **Ainda falta uma
+  rodada de revisão independente que passe limpa** — já foi dada como
+  pronta duas vezes e as duas vezes apareceu lacuna nova; não presumir
+  "concluída sob reserva" até isso acontecer de verdade.
 - **Frente 6** (datas/veredito): não iniciada.
