@@ -10,7 +10,10 @@ teto, requisitos atendidos) mora em `projetos/<projeto>/participacoes/
 
 import argparse
 import json
+import subprocess
+import sys
 import unittest
+from unittest.mock import patch
 
 import ambiente
 from scripts import central_compras as cc
@@ -279,6 +282,74 @@ class MigracaoParticipacaoTest(ambiente.RepoTestCase):
         ficha = cc.read_yaml(cc.find_product_path("legado"), {})
         self.assertEqual(ficha.get("projeto"), projeto_a.name)
 
+    def _plantar_operacao_pendente_sobre_participacao(self, projeto, produto_id, op_id="decidir:outro"):
+        """Journal `em_andamento`, de outra operacao (nunca a da migracao,
+        que nao tem journal proprio), reivindicando o arquivo de
+        participacao que a migracao criaria para `produto_id`."""
+        journal_dir = projeto / cc._OPERATIONS_DIRNAME
+        journal_dir.mkdir(parents=True, exist_ok=True)
+        registro = {
+            "op_id": op_id, "kind": "decidir", "situacao": "em_andamento", "passos": {},
+            "assinatura_fingerprint": "x", "detalhe": {},
+            "recursos": [str(cc.participation_path(projeto, produto_id).resolve())],
+            "iniciado_em": cc.now_iso(), "atualizado_em": cc.now_iso(), "pid": 999999,
+        }
+        (journal_dir / f"{cc.slugify(op_id)}.json").write_text(
+            json.dumps(registro, ensure_ascii=True, indent=2), encoding="utf-8"
+        )
+
+    def test_migracao_recusada_com_participacao_reivindicada(self):
+        """Um journal valido (de OUTRA operacao) reivindicando o arquivo de
+        participacao que a migracao criaria bloqueia a migracao: ela nao
+        pode criar esse arquivo nem limpar a ficha por baixo dessa operacao
+        pendente."""
+        projeto = self.project()
+        ficha_path = self._gravar_ficha_legada(projeto)
+        antes = ficha_path.read_bytes()
+        self._plantar_operacao_pendente_sobre_participacao(projeto, "legado")
+
+        with self.assertRaises(SystemExit):
+            self.cli("migrar-produtos", "--aplicar")
+
+        self.assertEqual(ficha_path.read_bytes(), antes, "migracao escreveu a ficha apesar do journal pendente")
+        self.assertFalse(
+            cc.participation_path(projeto, "legado").exists(),
+            "migracao criou a participacao reivindicada por outra operacao pendente",
+        )
+
+    def test_migracao_libera_apos_pendencia_resolvida(self):
+        """Assim que o journal que reivindicava o arquivo e removido (a
+        operacao concluiu ou foi resolvida a mao), a migracao volta a
+        funcionar normalmente - a checagem le o estado ATUAL, nao guarda
+        bloqueio permanente."""
+        projeto = self.project()
+        self._gravar_ficha_legada(projeto)
+        self._plantar_operacao_pendente_sobre_participacao(projeto, "legado")
+        for arquivo in (projeto / cc._OPERATIONS_DIRNAME).glob("*.json"):
+            arquivo.unlink()
+
+        self.cli("migrar-produtos", "--aplicar")
+
+        self.assertTrue(cc.participation_path(projeto, "legado").exists())
+        self.assertEqual(cc.read_participation(projeto, "legado")["estado"], "pesquisando")
+
+    def test_migracao_bloqueia_so_o_candidato_reivindicado_no_lote(self):
+        """Num lote com dois produtos legados, so o que tem operacao pendente
+        reivindicando a propria participacao fica bloqueado - o outro migra
+        normalmente. `--aplicar` ainda assim termina em erro (ha bloqueado),
+        para o Josemar nao presumir que tudo passou."""
+        projeto = self.project()
+        self._gravar_ficha_legada(projeto, produto_id="legado-livre")
+        self._gravar_ficha_legada(projeto, produto_id="legado-preso")
+        self._plantar_operacao_pendente_sobre_participacao(projeto, "legado-preso")
+
+        with self.assertRaises(SystemExit):
+            self.cli("migrar-produtos", "--aplicar")
+
+        self.assertTrue(cc.participation_path(projeto, "legado-livre").exists(),
+                         "candidato sem conflito deveria ter migrado mesmo com outro bloqueado")
+        self.assertFalse(cc.participation_path(projeto, "legado-preso").exists())
+
 
 class ProtecaoDeOperacaoPendenteTest(ambiente.RepoTestCase):
     """Criterio 7: arquivo de participacao entra no mesmo mecanismo de
@@ -319,6 +390,218 @@ class ProtecaoDeOperacaoPendenteTest(ambiente.RepoTestCase):
 
         self.cli("descartar", "--produto-id", "candidato", "--porque", "liberado", "--projeto", str(projeto))
         self.assertEqual(cc.read_participation(projeto, "candidato")["estado"], "descartado")
+
+
+class RevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
+    """Regressao dos 6 achados da revisao independente (Astra) sobre o
+    commit `e29c45c` - cada teste aqui reproduziu uma falha real contra o
+    codigo daquele commit antes da correcao. Ver STATUS.md e
+    docs/como-conferir-auditoria.md."""
+
+    def _legado(self, project, **extra):
+        path = cc.product_dir("fone", "legado") / "produto.yaml"
+        data = dict(id="legado", categoria="fone", nome="Legado", marca="Marca", projeto=project.name,
+                    estado="pesquisando", preco_alvo=100, preco_teto=300, requisitos_atendidos={"uso": True})
+        data.update(extra)
+        cc.write_yaml(path, data)
+        return path
+
+    def test_prompt_de_b_nao_pode_herdar_descarte_de_a(self):
+        """Achado 1: `ai_prompt` chamava `find_product(pid)` sem projeto -
+        o motivo de descarte de A vazava pro prompt-ia de B."""
+        a = self.project("origem")
+        b = self.project("destino")
+        self._legado(a, estado="descartado", descartado_porque="EXCLUSAO_EXCLUSIVA_A")
+        self.cli("vincular-produto", "--produto-id", "legado", "--projeto", str(b))
+
+        prompt = self.cli("prompt-ia", str(b), "--etapa", "cotacao")
+
+        self.assertNotIn("EXCLUSAO_EXCLUSIVA_A", prompt)
+
+    def test_prompt_mostra_estado_de_produto_novo(self):
+        """A mesma correcao do achado 1 tambem parou de omitir o estado de
+        um produto recem-cadastrado (sem descarte, so `pesquisando`) do
+        contexto do prompt - antes, `find_product(pid)` sem projeto nunca
+        trazia NENHUM campo de participacao, nem para o proprio projeto."""
+        a = self.project()
+        self.product(a, pid="novo")
+
+        prompt = self.cli("prompt-ia", str(a), "--etapa", "cotacao")
+
+        self.assertIn("pesquisando", prompt)
+
+    def test_validacao_de_b_nao_pode_herdar_descarte_de_a(self):
+        """Achado 2: `validation_report` tinha o mesmo `find_product(pid)`
+        sem projeto - produto ativo e cotado em B era acusado de "descartado
+        sem motivo" por causa de um descarte (sem motivo) so em A."""
+        a = self.project("origem")
+        b = self.project("destino")
+        self._legado(a, estado="descartado", descartado_porque=None)
+        self.cli("vincular-produto", "--produto-id", "legado", "--projeto", str(b))
+        self.quote(b, "legado")
+
+        errors, _ = cc.validation_report(b)
+
+        self.assertNotIn("legado: produto descartado sem motivo.", errors)
+
+    def test_snapshot_congela_evidencia_da_participacao(self):
+        """Achado 3: `_decide_writes` congelava a ficha mas nunca a
+        participacao - um requisito gravado so na participacao passava por
+        `auditar-decisoes --strict` sem aparecer em nenhum arquivo do
+        snapshot, quebrando a rastreabilidade que a decisao promete."""
+        a = self.project()
+        self.product(a)
+        p = cc.read_participation(a, "candidato")
+        p["requisitos_atendidos"]["REQUISITO_EXCLUSIVO_DESTA_COMPRA"] = True
+        cc.write_participation(a, "candidato", p)
+        self.quote(a, "candidato", "--fonte", "manual")
+
+        self.cli("decidir", str(a), "--produto-id", "candidato", "--porque", "unico",
+                  "--sem-perdedores", "--comprado")
+        snapshot = next((a / "snapshots").iterdir())
+        self.cli("auditar-decisoes", "--strict")
+
+        files = [f for f in snapshot.rglob("*") if f.is_file()]
+        frozen = "\n".join(f.read_text(encoding="utf-8") for f in files)
+        self.assertIn(
+            "REQUISITO_EXCLUSIVO_DESTA_COMPRA", frozen,
+            "Auditoria passa, mas o snapshot nao contem a evidencia de requisitos usada no score",
+        )
+
+    def test_snapshot_participacao_imutavel_apos_alteracao_posterior(self):
+        """A evidencia congelada da participacao nao pode mudar se o mesmo
+        produto for descartado, no MESMO projeto, depois da decisao fechada -
+        mesmo principio ja valido para ranking.md/cotacoes.csv."""
+        a = self.project()
+        self.product(a)
+        self.quote(a, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(a), "--produto-id", "candidato", "--porque", "unico",
+                  "--sem-perdedores", "--comprado")
+        snapshot = next((a / "snapshots").iterdir())
+        participacao_congelada_antes = (snapshot / "participacoes" / "candidato.yaml").read_bytes()
+
+        self.cli("novo-produto", str(a), "Outro", "--produto-id", "outro-produto")
+        self.cli("descartar", "--produto-id", "outro-produto", "--porque", "mudanca depois da decisao")
+
+        self.assertEqual(
+            (snapshot / "participacoes" / "candidato.yaml").read_bytes(),
+            participacao_congelada_antes,
+        )
+
+    def test_vinculo_interrompido_consegue_retomar(self):
+        """Achado 4: `vincular-produto` gravava a participacao e so depois
+        chamava `append_timeline`, sem journal proprio. Uma interrupcao entre
+        os dois passos deixava a participacao gravada e a operacao
+        incompleta; a retomada era recusada por "ja tem participacao",
+        embora a operacao original nunca tivesse terminado."""
+        a = self.project("origem")
+        b = self.project("destino")
+        self.product(a)
+        args = ["vincular-produto", "--produto-id", "candidato", "--projeto", str(b)]
+        before = (b / "processo.md").read_bytes()
+
+        with patch.object(cc, "append_timeline", side_effect=RuntimeError("interrupcao antes da timeline")):
+            with self.assertRaises(RuntimeError):
+                self.cli(*args)
+
+        self.assertTrue(cc.participation_path(b, "candidato").exists())
+        self.assertEqual(before, (b / "processo.md").read_bytes())
+
+        self.cli(*args)
+
+        self.assertIn("Produto reaproveitado", (b / "processo.md").read_text(encoding="utf-8"))
+        # A retomada nao duplicou a participacao nem reescreveu com outro
+        # requisito - so completou o que faltava.
+        self.assertEqual(cc.read_participation(b, "candidato")["requisitos_atendidos"], {})
+
+    def test_vinculo_interrompido_por_crash_real_recupera_via_subprocesso(self):
+        """Mesmo achado 4, mas com interrupcao dura (`os._exit`, sem
+        excecao Python) num subprocesso real - nao so uma excecao mockada no
+        mesmo processo. Confirma que a recuperacao tambem funciona quando o
+        processo morre de verdade entre gravar a participacao e a timeline,
+        e que `operacoes-pendentes --strict` fica limpo depois da retomada."""
+        a = self.project("origem")
+        b = self.project("destino")
+        self.product(a)
+        argv = ["vincular-produto", "--produto-id", "candidato", "--projeto", str(b)]
+        injetado = (
+            "import sys, os\n"
+            "from scripts import central_compras as cc\n"
+            "cc.append_timeline = lambda *a, **k: os._exit(70)\n"
+            "cc.main(sys.argv[1:])\n"
+        )
+        primeira = subprocess.run(
+            [sys.executable, "-c", injetado, *argv], cwd=self.root, capture_output=True, text=True,
+        )
+        self.assertEqual(primeira.returncode, 70, primeira.stderr)
+
+        retomada = subprocess.run(
+            [sys.executable, "scripts/central_compras.py", *argv], cwd=self.root, capture_output=True, text=True,
+        )
+        self.assertEqual(retomada.returncode, 0, retomada.stderr)
+
+        pendencias = subprocess.run(
+            [sys.executable, "scripts/central_compras.py", "operacoes-pendentes", "--strict"],
+            cwd=self.root, capture_output=True, text=True,
+        )
+        self.assertEqual(pendencias.returncode, 0, pendencias.stdout + pendencias.stderr)
+        self.assertTrue(cc.participation_path(b, "candidato").exists())
+        self.assertIn("Produto reaproveitado", (b / "processo.md").read_text(encoding="utf-8"))
+
+    def test_migracao_respeita_participacao_reivindicada(self):
+        """Achado 5: `migrar-produtos` nao checava a checagem central de
+        recursos conflitantes - um journal valido reivindicando o arquivo de
+        participacao nao impedia a migracao de cria-lo e limpar a ficha."""
+        a = self.project()
+        ficha = self._legado(a)
+        opid = "decidir:outro"
+        journal = a / cc._OPERATIONS_DIRNAME / (cc.slugify(opid) + ".json")
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        registro = dict(
+            op_id=opid, kind="decidir", situacao="em_andamento", passos={},
+            assinatura_fingerprint="x", detalhe={},
+            recursos=[str(cc.participation_path(a, "legado").resolve())],
+            iniciado_em=cc.now_iso(), atualizado_em=cc.now_iso(), pid=999999,
+        )
+        journal.write_text(json.dumps(registro), encoding="utf-8")
+        before = ficha.read_bytes()
+
+        self.assertEqual(len(cc.pending_operations([a])), 1)
+        rejeitado = False
+        try:
+            self.cli("migrar-produtos", "--aplicar")
+        except SystemExit:
+            rejeitado = True
+
+        self.assertTrue(
+            rejeitado and ficha.read_bytes() == before and not cc.participation_path(a, "legado").exists(),
+            "migrar-produtos escreveu recurso reivindicado e limpou ficha apesar do journal pendente",
+        )
+
+    def test_requisito_invalido_nao_deixa_ficha_orfa(self):
+        """Achado 6: `novo-produto --requisito sem-separador` lancava
+        `SystemExit` DEPOIS de gravar produto.yaml/pesquisa.md - a ficha
+        ficava orfa, sem participacao, e sem caminho limpo de retomada."""
+        a = self.project()
+        with self.assertRaises(SystemExit):
+            self.cli("novo-produto", str(a), "Invalido", "--produto-id", "invalido", "--requisito", "sem-separador")
+
+        self.assertIsNone(
+            cc.find_product_path("invalido"), "Entrada rejeitada deixou produto.yaml e pesquisa.md no disco",
+        )
+
+    def test_requisito_corrigido_apos_falha_funciona_normalmente(self):
+        """Depois da entrada invalida ser rejeitada sem deixar rastro, a
+        MESMA chamada com o requisito corrigido tem que funcionar - nada
+        ficou preso pela tentativa anterior."""
+        a = self.project()
+        with self.assertRaises(SystemExit):
+            self.cli("novo-produto", str(a), "Invalido", "--produto-id", "invalido", "--requisito", "sem-separador")
+
+        self.cli("novo-produto", str(a), "Invalido", "--produto-id", "invalido", "--requisito", "uso=true")
+
+        self.assertIsNotNone(cc.find_product_path("invalido"))
+        self.assertEqual(cc.read_participation(a, "invalido")["requisitos_atendidos"], {"uso": True})
 
 
 if __name__ == "__main__":

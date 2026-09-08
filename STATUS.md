@@ -5,26 +5,132 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (08/09/2026, sessao 13)
+## AO RETOMAR — comece por aqui (08/09/2026, sessao 14)
 
-**Proximo passo:** iniciar a frente 6 (datas e vereditos) seguindo
-`docs/plano-pendencias-auditoria-2026-09-06.md` secao 6 — nao redescubra o
-escopo lendo so este STATUS.
+**Proximo passo:** o Josemar pediu para REVISAR esta correcao (revisao
+independente de novo, provavelmente Astra) antes de iniciar a frente 6. So
+depois dessa revisao passar, va para
+`docs/plano-pendencias-auditoria-2026-09-06.md` secao 6.
 
 **Pendencias / bloqueios:**
 - Frente 6 (datas/veredito) **nao iniciada**.
-- Frente 5 (produtos reutilizados) **implementada e testada nesta sessao**,
-  mas **ainda sem revisao independente** (a Astra vai revisar depois) — nao
-  declare "concluida sob reserva" nem "revisada" ate essa revisao acontecer
-  e ficar registrada aqui.
+- Frente 5 (produtos reutilizados): implementacao da sessao 13 **tinha 6
+  falhas reais**, achadas por revisao independente (Astra) sobre o commit
+  `e29c45c`. **As 6 foram corrigidas e testadas nesta sessao (14)** — ver
+  bloco abaixo. Continua precisando de UMA rodada de revisao que passe
+  limpa antes de declarar "concluida"; nao presuma que esta correcao
+  encerra o assunto so porque os testes passam localmente.
 - Frentes 2 e 3 continuam "concluidas sob reserva" — ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
 
+**Frente 5, correcao da revisao independente (08/09/2026, sessao 14).** A
+Astra reproduziu 6 falhas reais contra o commit `e29c45c` (sessao 13), com
+dois scripts de reproducao (dados sinteticos, sem tocar a arvore real):
+`astra_review_frente5.py` (6 cenarios) e `astra_crash_vinculo_frente5.py`
+(interrupcao dura via `os._exit`). Todas as 6 foram reproduzidas ANTES de
+corrigir, seguindo `docs/como-conferir-auditoria.md`, e viraram teste
+permanente em `tests/test_participacoes.py`
+(`RevisaoIndependenteFrente5Test` + 3 testes novos em
+`MigracaoParticipacaoTest`).
+
+1. **Contexto de IA vazava participacao entre projetos.** `ai_prompt`
+   chamava `find_product(pid)` SEM `project` - o motivo de descarte de um
+   produto no projeto A aparecia no `prompt-ia` do projeto B, e o estado de
+   um produto novo (so `pesquisando`) ficava omitido do contexto em
+   qualquer projeto. Corrigido: `find_product(pid, project)`.
+2. **Validacao tinha o mesmo vazamento.** `validation_report` chamava
+   `find_product(produto_id)` sem projeto - produto ativo e cotado em B
+   podia ser acusado de "descartado sem motivo" por causa de um descarte
+   (sem motivo) so em A. Mesma correcao. Os demais consumidores de
+   `find_product` foram conferidos um a um: os que so usam `nome`/`marca`/
+   `categoria` (identidade, nunca participacao) ficaram como estavam de
+   proposito.
+3. **Snapshot da decisao nao congelava a participacao.** `_decide_writes`
+   copiava a ficha (`produtos/<id>.yaml`) para o snapshot mas nunca o
+   arquivo de participacao - um requisito exclusivo daquela compra, gravado
+   so na participacao, passava por `auditar-decisoes --strict` sem aparecer
+   em NENHUM arquivo congelado. Corrigido: `_capturar()` agora grava
+   `snapshots/<id>/participacoes/<produto_id>.yaml` (efetivo, via
+   `read_participation` - cobre tambem fallback legado) para todo produto
+   do projeto. Testado tambem que a evidencia congelada nao muda com
+   alteracao POSTERIOR no mesmo projeto (mesmo principio ja valido para
+   ranking.md/cotacoes.csv).
+4. **`vincular-produto` sem recuperacao.** Gravava a participacao e SO
+   DEPOIS chamava `append_timeline`, sem journal proprio - uma interrupcao
+   entre os dois passos deixava a participacao gravada e a timeline
+   incompleta, e a retomada era recusada por "ja tem participacao" (a
+   propria guarda contra sobrescrever um vinculo concluido bloqueava a
+   retomada do vinculo INCOMPLETO). Corrigido: `link_product` agora usa
+   `tracked_operation` (mesmo mecanismo de `decidir`/`aprender-veredito`);
+   a guarda de "ja existe" e liberada so quando ha journal `em_andamento`
+   com o MESMO op_id (retomada legitima), continua recusando uma segunda
+   chamada normal depois de concluida. `vincular-produto` saiu de
+   `RECURSOS_DIRETOS_POR_COMANDO` (a checagem generica de `main()`, sem
+   excecao de op_id, bloquearia a propria retomada). Testado com excecao
+   mockada E com interrupcao dura (`os._exit(70)`) num subprocesso real,
+   confirmando `operacoes-pendentes --strict` limpo depois da retomada.
+5. **`migrar-produtos` nao respeitava operacao pendente.** Escrevia
+   participacao e limpava a ficha sem checar a checagem central de recursos
+   conflitantes - um journal valido (`decidir`, `vincular-produto` ou
+   qualquer outro escritor) reivindicando o arquivo de participacao nao
+   impedia a migracao de cria-lo e apagar o campo legado da ficha por
+   baixo. Corrigido: cada candidato do lote passa por
+   `_bloquear_se_recursos_conflitantes` antes de escrever; se bloqueado,
+   fica de fora (relatado, ficha e participacao intocadas) e o resto do
+   lote continua migrando normalmente; com `--aplicar` e pelo menos um
+   bloqueado, o comando termina em `SystemExit` (nunca silencioso). Testado
+   recusa-antes-de-escrita, liberacao apos o journal ser removido, e que so
+   o candidato reivindicado fica de fora num lote com mais de um.
+6. **`novo-produto --requisito` invalido deixava ficha orfa.** `parse_pairs`
+   em `--requisito` (sem `chave=valor`) levantava `SystemExit` DEPOIS de
+   `produto.yaml`/`pesquisa.md` ja gravados - ficha ficava no disco sem
+   participacao, sem caminho limpo de retomada (`novo-produto` de novo
+   recusa por ja existir; `vincular-produto` tambem recusa por causa do
+   campo `projeto` legado que nunca foi setado). Corrigido: `--atributo` e
+   `--requisito` sao validados (parse completo) ANTES de qualquer escrita.
+   Testado tambem que a entrada corrigida, chamada de novo com os MESMOS
+   argumentos exceto o requisito, funciona normalmente.
+
+**Suite tambem corrigida: 1 falha PRE-EXISTENTE (nao relacionada a frente
+5, ja documentada nas sessoes anteriores) eliminada.**
+`test_same_day_quote_without_accepted_warranty_does_not_hide_valid_quote`
+fixava `data="2026-08-31"` para simular "cotacao do mesmo dia"; o
+calendario real passou dessa data e as duas cotacoes do teste caiam no
+fallback "tudo vencido" do motor (ignora gate), fazendo o teste passar por
+motivo errado ou falhar dependendo do dia. Corrigido usando
+`dt.date.today().isoformat()` nas duas cotacoes do fixture - preserva o
+cenario real (duas ofertas do MESMO dia, uma sem garantia aceita) sem
+depender de quando o teste roda. **Motor e asserçao intocados**, so a
+fixture deixou de apodrecer.
+
+**Verificacao (sessao 14):**
+- Baseline ANTES de tocar em qualquer coisa: 415 testes, 1 falha (a do
+  calendario acima) — confirmado rodando a suite antes de editar.
+- Os 6 achados: reproduzidos contra o codigo do commit `e29c45c` (os 2
+  scripts da Astra rodaram limpo so DEPOIS da correcao), corrigidos, e
+  cobertos por teste permanente com mutacao aplicada em CADA correcao
+  (desfiz a correcao de proposito, um mutante por vez, e confirmei que so
+  o(s) teste(s)-armadilha daquele achado falharam - nenhum efeito
+  colateral em teste de outra frente).
+- Suite completa depois de tudo: **428 testes, 0 falhas** (415 + 13 testes
+  novos; a falha pre-existente do calendario foi eliminada, nao so
+  escondida).
+- `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+  `checar-segredos --strict` e `git diff --check` limpos, contra a arvore
+  real do repositorio (nao so sandbox de teste).
+- **Fora do escopo desta correcao, deliberadamente**: nao reabri
+  julgamento de produto (pesos, gates, calibragem); nao toquei
+  infraestrutura externa (Sheets/Apps Script); frente 6 nao iniciada.
+
+## Sessao anterior (08/09/2026, sessao 13) — historico
+
 **Frente 5 (produtos reutilizados em projetos diferentes): IMPLEMENTADA E
-TESTADA (08/09/2026).** `produto.yaml` (ficha) agora guarda so identidade e
+TESTADA (08/09/2026), depois corrigida na sessao 14 (ver bloco acima - 6
+falhas achadas por revisao independente).** `produto.yaml` (ficha) agora
+guarda so identidade e
 dado tecnico (`id`, `categoria`, `nome`, `marca`, `atributos`,
 `atributos_classificacao`, `proveniencia`); estado de pesquisa, descarte
 (com motivo), preco-alvo/teto, aguardando-preco e `requisitos_atendidos`

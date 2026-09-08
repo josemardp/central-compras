@@ -1299,6 +1299,16 @@ def new_product(args: argparse.Namespace) -> None:
             f"--projeto {project.name}\n"
             "--force recria a ficha do zero; nao serve para reaproveitar produto em projeto novo."
         )
+    # Toda a entrada e validada ANTES da primeira escrita: `parse_pairs` pode
+    # recusar `--atributo`/`--requisito` mal formado (sem `chave=valor`), e
+    # isso precisa acontecer antes de criar qualquer arquivo em disco - senao
+    # uma entrada invalida deixava produto.yaml/pesquisa.md gravados e a
+    # ficha orfa, sem participacao, sem chance de retomar por `vincular-produto`
+    # (que recusa ficha ja existente apontando pro mesmo projeto so em formato
+    # legado) nem por `novo-produto` de novo (recusa por ja existir, sem --force).
+    atributos = parse_pairs(args.atributo or [])
+    requisitos = parse_pairs(args.requisito or [])
+
     path.mkdir(parents=True, exist_ok=True)
 
     # So identidade e dado tecnico do produto moram na ficha. Estado, preco-alvo/teto
@@ -1310,7 +1320,7 @@ def new_product(args: argparse.Namespace) -> None:
         "categoria": categoria,
         "nome": args.nome,
         "marca": args.marca,
-        "atributos": parse_pairs(args.atributo or []),
+        "atributos": atributos,
         "proveniencia": None,
     }
     write_yaml(path / "produto.yaml", data)
@@ -1319,7 +1329,7 @@ def new_product(args: argparse.Namespace) -> None:
     participacao = default_participation(produto_id)
     participacao["preco_alvo"] = args.preco_alvo
     participacao["preco_teto"] = args.preco_teto if args.preco_teto is not None else meta.get("preco_teto")
-    participacao["requisitos_atendidos"] = parse_pairs(args.requisito or [])
+    participacao["requisitos_atendidos"] = requisitos
     write_participation(project, produto_id, participacao)
 
     append_timeline(project, "produto", f"Candidato registrado: {args.nome}", f"id={produto_id}")
@@ -1341,7 +1351,17 @@ def link_product(args: argparse.Namespace) -> None:
             f"Produto nao encontrado: {args.produto_id}. Use `novo-produto` para criar a ficha primeiro."
         )
     project = project_path(args.projeto)
-    if participation_path(project, args.produto_id).exists():
+    op_id = f"vincular-produto:{args.produto_id}"
+    # Uma interrupcao entre gravar a participacao e registrar a linha na
+    # timeline deixava a participacao no disco e o processo incompleto; a
+    # guarda abaixo (participacao ja existe) recusava QUALQUER retomada,
+    # inclusive a da propria tentativa interrompida. Journal `em_andamento`
+    # com este op_id exato e o sinal de que a participacao encontrada pode
+    # ser a desta mesma operacao, ainda incompleta - nesse caso a recusa
+    # nao se aplica, e `tracked_operation` decide (aceita retomada com os
+    # MESMOS argumentos, recusa com argumentos diferentes).
+    retomando = has_pending_operation(project, op_id, "vincular_produto")
+    if participation_path(project, args.produto_id).exists() and not retomando:
         raise SystemExit(
             f"{args.produto_id} ja tem participacao registrada em {project.name}. "
             "Nada foi alterado. Para mudar o estado dela use `descartar`/`aguardar-preco` "
@@ -1354,16 +1374,37 @@ def link_product(args: argparse.Namespace) -> None:
             "migrado para o formato novo). Nada foi alterado; `descartar`/`aguardar-preco` ja "
             "funcionam nesse formato, ou rode `migrar-produtos --aplicar` para atualizar."
         )
-    participacao = default_participation(args.produto_id)
-    participacao["preco_alvo"] = args.preco_alvo
-    participacao["preco_teto"] = args.preco_teto
-    participacao["requisitos_atendidos"] = parse_pairs(args.requisito or [])
-    write_participation(project, args.produto_id, participacao)
-    append_timeline(
-        project, "produto",
-        f"Produto reaproveitado: {ficha.get('nome') or args.produto_id}",
-        f"id={args.produto_id}",
-    )
+    requisitos = parse_pairs(args.requisito or [])
+    nome_produto = ficha.get("nome") or args.produto_id
+    assinatura = {
+        "produto_id": args.produto_id,
+        "preco_alvo": args.preco_alvo,
+        "preco_teto": args.preco_teto,
+        "requisitos_atendidos": requisitos,
+    }
+    linha_timeline = f"| {today()} | produto | Produto reaproveitado: {nome_produto} | id={args.produto_id} |"
+
+    def _gravar_participacao() -> None:
+        participacao = default_participation(args.produto_id)
+        participacao["preco_alvo"] = args.preco_alvo
+        participacao["preco_teto"] = args.preco_teto
+        participacao["requisitos_atendidos"] = requisitos
+        write_participation(project, args.produto_id, participacao)
+
+    with tracked_operation(
+        project, op_id, "vincular_produto", assinatura,
+        recursos={project / "processo.md", participation_path(project, args.produto_id)},
+    ) as op:
+        # Sobrescrita cega, nao append-only: se interrompida no meio, a
+        # proxima tentativa reescreve o arquivo inteiro do zero com os
+        # MESMOS dados (a assinatura ja garante isso) - nunca duplica.
+        op.executar_uma_vez("participacao", _gravar_participacao)
+        op.registrar_efeito(
+            "timeline", project / "processo.md", linha_timeline,
+            lambda: append_timeline(
+                project, "produto", f"Produto reaproveitado: {nome_produto}", f"id={args.produto_id}",
+            ),
+        )
     mark_steps(project, [3])
     print(f"Vinculado: {args.produto_id} -> {project.name}")
 
@@ -2017,7 +2058,7 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
         warnings.append("Projeto ainda nao tem cotacoes.")
 
     for produto_id in sorted(latest):
-        product = find_product(produto_id)
+        product = find_product(produto_id, project)
         if not product:
             errors.append(f"Produto citado em cotacao nao existe em `produtos/`: {produto_id}")
             continue
@@ -3137,7 +3178,7 @@ def ai_prompt(args: argparse.Namespace) -> None:
     briefing_meta, briefing_body = load_frontmatter(project / "briefing.md")
     modelo = project / "01-definir-modelo.md"
     modelo_texto = modelo.read_text(encoding="utf-8") if modelo.exists() else "Ainda nao definido."
-    candidatos = [find_product(pid) or {"id": pid} for pid in sorted(project_product_ids(project))]
+    candidatos = [find_product(pid, project) or {"id": pid} for pid in sorted(project_product_ids(project))]
     known = knowledge_context(project)
     known_block = f"\n\nBase de conhecimento relevante:\n{known}" if known else "\n\nBase de conhecimento relevante: nada registrado ainda."
     etapa = args.etapa
@@ -3504,6 +3545,15 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
         for nome, path in fontes.items():
             if path.exists():
                 atomic_write_text(snapshot_dir / nome, path.read_text(encoding="utf-8"))
+        # A participacao (estado, requisitos_atendidos, descartado_porque etc.)
+        # e a que o score de fato usou - inclusive quando vem de fallback legado
+        # (ficha antiga sem arquivo de participacao proprio). Congelar so a ficha
+        # deixava um requisito exclusivo desta compra fora da evidencia: um
+        # requisito gravado so na participacao passava no `auditar-decisoes
+        # --strict` sem nunca aparecer em nenhum arquivo congelado.
+        (snapshot_dir / "participacoes").mkdir(parents=True, exist_ok=True)
+        for pid in sorted(project_product_ids(project)):
+            write_yaml(snapshot_dir / "participacoes" / f"{pid}.yaml", read_participation(project, pid))
         atomic_write_text(snapshot_dir / "ambiente.json", json.dumps({
             "python": sys.version, "pyyaml": yaml.__version__,
             "argumentos": {key: value for key, value in vars(args).items() if key != "func"},
@@ -5777,6 +5827,7 @@ def migrate_products(args: argparse.Namespace) -> None:
     migrados: list[str] = []
     ja_limpos = 0
     ambiguos: list[str] = []
+    bloqueados: list[str] = []
 
     for ficha_path in sorted(PRODUTOS.glob("*/*/produto.yaml")):
         produto_id = ficha_path.parent.name
@@ -5814,6 +5865,32 @@ def migrate_products(args: argparse.Namespace) -> None:
             )
             continue
 
+        # `write_participation`/`write_yaml` abaixo escrevem por fora do
+        # journal proprio da migracao (ela nao tem um - e idempotente por
+        # ficha). Sem esta checagem, um `decidir`/`vincular-produto`/
+        # `aprender-veredito` interrompido, com journal ainda reivindicando
+        # este MESMO arquivo de participacao, podia ser pisado por uma
+        # migracao rodando por cima - a migracao criava o arquivo e limpava
+        # a ficha antes da retomada daquela outra operacao terminar de ler
+        # o dado que ela esperava encontrar.
+        # `write_participation`/`write_yaml` abaixo escrevem por fora do
+        # journal proprio da migracao (ela nao tem um - e idempotente por
+        # ficha). Sem esta checagem, um `decidir`/`vincular-produto`/
+        # `aprender-veredito` interrompido, com journal ainda reivindicando
+        # este MESMO arquivo de participacao, podia ser pisado por uma
+        # migracao rodando por cima - a migracao criava o arquivo e limpava
+        # a ficha antes da retomada daquela outra operacao terminar de ler
+        # o dado que ela esperava encontrar.
+        participacao_alvo = participation_path(caminho_projeto, produto_id)
+        try:
+            _bloquear_se_recursos_conflitantes(
+                {ficha_path, participacao_alvo},
+                contexto=f"migrar `{produto_id}` para `{legado_projeto}`",
+            )
+        except SystemExit as erro:
+            bloqueados.append(f"{produto_id}: {erro}")
+            continue
+
         ja_tinha_participacao = participation_path(caminho_projeto, produto_id).exists()
         if not ja_tinha_participacao:
             participacao = _participation_from_legacy_ficha(produto_id, ficha)
@@ -5837,7 +5914,22 @@ def migrate_products(args: argparse.Namespace) -> None:
         print(f"\nNAO migrado(s) - {len(ambiguos)} caso(s) ambiguo(s), decida manualmente:")
         for linha in ambiguos:
             print(f"  - {linha}")
-    print(f"\nTotal: {len(migrados)} migravel(is), {ja_limpos} ja limpo(s), {len(ambiguos)} ambiguo(s).")
+    if bloqueados:
+        print(f"\nBLOQUEADO(S) - {len(bloqueados)} caso(s) com operacao pendente reivindicando "
+              "o mesmo arquivo (participacao ou ficha):")
+        for linha in bloqueados:
+            print(f"  - {linha}")
+    print(
+        f"\nTotal: {len(migrados)} migravel(is), {ja_limpos} ja limpo(s), "
+        f"{len(ambiguos)} ambiguo(s), {len(bloqueados)} bloqueado(s)."
+    )
+    if args.aplicar and bloqueados:
+        raise SystemExit(
+            f"{len(bloqueados)} produto(s) nao foram migrados por causa de operacao pendente "
+            "reivindicando o mesmo arquivo - ver lista acima. Nada foi escrito para eles. "
+            "Rode `operacoes-pendentes` para identificar a pendencia, resolva-a (retome ou apague "
+            "o journal, com cuidado) e rode `migrar-produtos --aplicar` de novo."
+        )
 
 
 def private_data_dir(_: argparse.Namespace) -> None:
@@ -6338,11 +6430,17 @@ def _recursos_diretos_processo(args: argparse.Namespace) -> "set[Path]":
 
 
 def _recursos_diretos_participacao(args: argparse.Namespace) -> "set[Path]":
-    """`descartar`/`aguardar-preco`/`vincular-produto` escrevem `processo.md`
-    do projeto E o arquivo de participacao (frente 5) - nunca a ficha
-    compartilhada em `produtos/`. Ambiguo (sem projeto resolvivel) devolve
-    conjunto vazio: a funcao real recusa a operacao antes de escrever, entao
-    nao ha recurso a proteger contra outra operacao pendente."""
+    """`descartar`/`aguardar-preco` escrevem `processo.md` do projeto E o
+    arquivo de participacao (frente 5) - nunca a ficha compartilhada em
+    `produtos/`. Ambiguo (sem projeto resolvivel) devolve conjunto vazio: a
+    funcao real recusa a operacao antes de escrever, entao nao ha recurso a
+    proteger contra outra operacao pendente.
+
+    `vincular-produto` NAO esta nesta tabela: ele tem journal proprio
+    (`tracked_operation`), entao a checagem de conflito dele acontece por
+    dentro, com `exceto_op_id` da propria operacao - listar aqui tambem
+    faria este pre-checa generico (sem excecao de op_id) recusar a propria
+    retomada de um `vincular-produto` interrompido."""
     projeto = _projeto_alvo_do_comando(args)
     if not projeto:
         return set()
@@ -6414,7 +6512,6 @@ RECURSOS_DIRETOS_POR_COMANDO: dict[str, Any] = {
     "ranking": _recursos_diretos_processo,
     "descartar": _recursos_diretos_participacao,
     "aguardar-preco": _recursos_diretos_participacao,
-    "vincular-produto": _recursos_diretos_participacao,
     "regenerar": _recursos_diretos_regenerar,
     "preencher-veredito": _recursos_diretos_preencher_veredito,
     "novo-veredito": _recursos_diretos_novo_veredito,

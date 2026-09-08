@@ -179,7 +179,13 @@ class RankingGateAwareQuoteSelectionTest(unittest.TestCase):
             custo_total=None, custo_operacional_mensal=0.0, tco_meses=None,
             valor_revenda_estimado=0.0, nota=nota, avaliacoes=avaliacoes, garantia_meses=12,
             garantia_tipo=garantia_tipo, link=f"https://example.com/{loja}", flag_suspeita="",
-            fonte="manual", data="2026-08-31",
+            # Data fixa apodrece: uma cotacao "manual" vence em 7 dias, entao um
+            # dia fixo distante do calendario real derruba as duas para o
+            # fallback "tudo vencido" (que ignora o gate) em vez de exercitar o
+            # cenario real deste teste (duas ofertas do MESMO dia, uma delas
+            # sem garantia aceita). `today()` preserva "mesmo dia" sem depender
+            # de quando o teste roda.
+            fonte="manual", data=dt.date.today().isoformat(),
         ))
 
     def test_same_day_quote_without_accepted_warranty_does_not_hide_valid_quote(self):
