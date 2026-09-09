@@ -835,19 +835,22 @@ gates e limites de score do ranking também não foram tocados, como pedido.
 
 ## 5. Produtos reutilizados em projetos diferentes
 
-**Estado: implementada (sessão 13), corrigida em quatro rodadas de revisão
-independente da Astra (sessões 14, 15, 16 e 17 — 6 + 3 + 3 + 4 achados).
-Ainda falta UMA rodada de revisão que passe limpa antes de declarar
-"concluída sob reserva" — já foi dada como pronta QUATRO vezes e as quatro
-vezes apareceu lacuna nova; não presuma que a 5ª rodada não vai achar mais
-nada. Padrão que se repete: cada rodada acha problema mais profundo no
-MESMO conjunto de mecanismos — as 3 primeiras em `link_product`/
-`migrate_products` + `tracked_operation`, a 4ª no contrato de participação
-(`_participacao_invalida`/`read_participation`) e nos consumidores que
-ainda liam `estado` bruto do YAML em vez de passar por ele
-(`project_candidate_ids`/`project_discarded_candidate_ids`) — a próxima
-revisão (ou correção) deveria ler o contrato inteiro dessas áreas, não só
-o diff da última rodada.**
+**Estado: implementada (sessão 13), corrigida em cinco rodadas de revisão
+independente da Astra (sessões 14, 15, 16, 17 e 18 — 6 + 3 + 3 + 4 + 2
+achados). Ainda falta UMA rodada de revisão que passe limpa antes de
+declarar "concluída sob reserva" — já foi dada como pronta CINCO vezes e
+as cinco vezes apareceu lacuna nova; não presuma que a 6ª rodada não vai
+achar mais nada. Padrão que se repete: cada rodada acha problema mais
+profundo no MESMO conjunto de mecanismos — as 3 primeiras em
+`link_product`/`migrate_products` + `tracked_operation`, a 4ª no contrato
+de participação (`_participacao_invalida`/`read_participation`) e nos
+consumidores que ainda liam `estado` bruto do YAML
+(`project_candidate_ids`/`project_discarded_candidate_ids`), a 5ª nos
+lugares que tratam `read_participation` como DADO A MUTAR/PRESERVAR
+(`descartar`/`aguardar-preco`, snapshot de decisão) em vez de sinal de
+corte — a próxima revisão (ou correção) deveria ler o contrato inteiro
+dessas áreas, e perguntar "quem mais chama `read_participation` e o que
+faz com o resultado", não só o diff da última rodada.**
 
 **Contrato:** `produto.yaml` (ficha) passou a guardar só identidade e dado
 técnico — `id`, `categoria`, `nome`, `marca`, `atributos`,
@@ -1214,6 +1217,100 @@ preview idêntico ao anterior, 0 inválido).
 nenhuma infraestrutura externa tocada; `migrar-produtos --aplicar` não foi
 rodado contra a árvore real (seria aplicar uma migração de 46 produtos sem
 pedido explícito para isso — só o preview, read-only, foi conferido).
+**Essa omissão foi exatamente o gancho da 5ª revisão, abaixo: o estado
+sintético criado aqui só protegia os consumidores de LEITURA, não os
+lugares que tratam `read_participation` como dado a mutar/preservar.**
+
+### 5ª revisão independente (Astra, sessão 18, sobre o commit `70c3df8`) — 2 falhas (perda de dados)
+
+A correção da 4ª revisão criou um dict sintético (`estado=invalido`, só
+defaults) para `read_participation` devolver quando o arquivo tem conteúdo
+incoerente — pensado para os consumidores de leitura (`gate_eliminations`,
+`validation_report`) saberem "não decido sozinho". Mas dois outros lugares
+também chamam `read_participation` e tratam o resultado como DADO REAL a
+mutar ou preservar, não como sinal de corte:
+
+1. **Comandos de estado apagavam evidência real.** `descartar`/
+   `aguardar-preco` liam a participação via `read_participation`, mudavam
+   só o campo de estado no dict devolvido e regravavam TUDO com
+   `write_participation`. Para participação inválida, o dict devolvido é
+   sintético — a regravação apagava `preco_alvo`/`preco_teto`,
+   `requisitos_atendidos` e qualquer campo desconhecido que só existia no
+   arquivo real. Efeito concreto, reproduzido: uma participação com
+   `preco_teto=100` e `requisitos_atendidos={uso: false}` (os dois
+   deveriam cortar a oferta pelo gate) perdia os dois campos ao rodar
+   `aguardar-preco` — uma oferta de R$200 passava a ELEGÍVEL logo depois
+   do comando, mesmo ele só tendo pedido para esperar preço melhor.
+   Corrigido: `_recusar_se_participacao_invalida(project, produto_id)` roda
+   ANTES de qualquer leitura/escrita nos dois comandos — participação
+   inválida recusa com `SystemExit`, nomeando o arquivo e o motivo,
+   preservando os dois arquivos intactos. Defesa em profundidade:
+   `write_participation` (único lugar que efetivamente grava um arquivo de
+   participação) também passou a recusar gravar o próprio estado sintético
+   `invalido`, mesmo se chamada direto — o diagnóstico nunca pode virar
+   dado persistente por nenhum caminho, nem um chamador futuro que esqueça
+   de checar antes.
+2. **Snapshot de decisão substituía a fonte pelo diagnóstico.** `_decide_writes`
+   gravava, para CADA produto do projeto (inclusive perdedores), o
+   resultado INTERPRETADO de `read_participation` no snapshot — para um
+   concorrente com participação inválida isso é o dict sintético, nunca o
+   conteúdo real do arquivo. `auditar-decisoes --strict` passava, mas a
+   decisão deixava de ser reconstruível: nenhum arquivo congelado
+   preservava preço-alvo/teto, requisito ou campo desconhecido do
+   concorrente perdedor — a única cópia do dado real ficava perdida assim
+   que o snapshot sobrescrevia. Corrigido: o loop de captura de
+   participações agora classifica cada arquivo com `_classificar_participacao`
+   (mesma função central do contrato) e, só quando o status é "invalida",
+   copia o arquivo BRUTO tal como está em disco — a fonte, não a
+   interpretação. Participação "vazia" (ausente/0 bytes) continua gravando
+   o resultado interpretado (recuperação do legado, comportamento
+   estabelecido desde a 2ª revisão, preservado sem mudança). O manifesto
+   (`manifesto.json`) inclui o arquivo automaticamente, sem tratamento
+   especial — ele itera sobre tudo que existe no diretório do snapshot no
+   momento da captura.
+
+**Achado colateral do próprio pacote, corrigido no mesmo commit:** o teste
+`test_motivo_invalido_nunca_vaza_para_disco` da 4ª revisão tratava
+`descartar` sobre arquivo inválido como "caminho normal de reconciliação"
+e só checava a ausência de `_motivo_invalido` no resultado — nunca a
+perda dos demais campos, e por isso não pegou esta lacuna. Reescrito para
+testar a filtragem de `_motivo_invalido` diretamente em
+`write_participation` (defesa em profundidade, independente de
+`descartar` agora recusar); o cenário de "reconciliação automática via
+descartar" saiu do teste porque deixou de existir como comportamento —
+reconciliação de participação inválida é sempre manual agora.
+
+### Testes (5ª revisão)
+
+`tests/test_participacoes.py`, `QuintaRevisaoIndependenteFrente5Test`: os
+2 testes-armadilha da Astra (reprodução real de cada achado contra o
+commit `70c3df8`, confirmada ANTES da correção — scripts
+`astra_review_70c3df8.py`/`astra_review_70c3df8_details.py`) + 3 testes de
+controle/efeito colateral (`test_participacao_valida_continua_preservando_campos_ao_alterar_estado`
+— a recusa é só para participação inválida, uma válida continua aceitando
+`aguardar-preco`/`descartar` normalmente incluindo campo desconhecido;
+`test_snapshot_participacao_invalida_imutavel_apos_alteracao_posterior` —
+a evidência bruta congelada não muda se o arquivo original for alterado
+depois; mais o `test_write_participation_recusa_estado_sintetico`,
+reescrito em `QuartaRevisaoIndependenteFrente5Test`). Mutação aplicada nas
+3 correções de fundo, uma de cada vez, desfeita e restaurada em seguida: a
+recusa nos dois comandos derrubou exatamente os 3 testes-armadilha daquele
+achado (2 subTests do teste combinado + o teste do requisito negativo),
+nenhum outro; o snapshot voltando a gravar a interpretação sintética
+derrubou só o teste do arquivo bruto, nenhum outro; a guarda de
+`write_participation` desligada derrubou só o teste da guarda, nenhum
+outro. Confirmação manual adicional (fora dos testes automatizados),
+reproduzindo os 2 cenários da Astra ponta a ponta: arquivo inalterado após
+a recusa (bytes idênticos antes/depois), participação congelada no
+snapshot byte-idêntica à original com o marcador exclusivo preservado.
+Suíte completa depois da correção: **451 testes, 0 falhas** (445 + 6
+novos). `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a árvore
+real.
+
+**Fora do escopo desta correção, deliberadamente:** frente 6 não iniciada;
+pesos/gates/calibragem do score intocados; nenhuma infraestrutura externa
+tocada; `migrar-produtos --aplicar` não foi rodado contra a árvore real.
 
 ## 6. Datas e vereditos
 
@@ -1247,14 +1344,14 @@ revisado, fluxos testados no navegador quando aplicável, push para
   na planilha real, ver seção 3.
 - **Frente 4** (proveniência): feito, 18 testes, verificado no painel com
   dados sintéticos, ver seção 4.
-- **Frente 5** (produtos reutilizados): implementada (sessão 13); quatro
+- **Frente 5** (produtos reutilizados): implementada (sessão 13); cinco
   rodadas de revisão independente da Astra acharam 6, depois 3, depois mais
-  3 e depois mais 4 lacunas reais, as quatro corrigidas com teste
-  permanente + mutação (sessões 14, 15, 16 e 17) — suíte completa,
-  `checar-segredos --strict`, `operacoes-pendentes --strict`,
-  `auditar-decisoes --strict` e `git diff --check` limpos nas quatro
-  rodadas, ver seção 5. **Ainda falta uma rodada de revisão independente
-  que passe limpa** — já foi dada como pronta QUATRO vezes e as quatro
-  vezes apareceu lacuna nova; não presumir "concluída sob reserva" até
-  isso acontecer de verdade.
+  3, depois mais 4 e depois mais 2 lacunas reais (as 2 últimas eram perda
+  de dados), as cinco corrigidas com teste permanente + mutação (sessões
+  14, 15, 16, 17 e 18) — suíte completa, `checar-segredos --strict`,
+  `operacoes-pendentes --strict`, `auditar-decisoes --strict` e
+  `git diff --check` limpos nas cinco rodadas, ver seção 5. **Ainda falta
+  uma rodada de revisão independente que passe limpa** — já foi dada como
+  pronta CINCO vezes e as cinco vezes apareceu lacuna nova; não presumir
+  "concluída sob reserva" até isso acontecer de verdade.
 - **Frente 6** (datas/veredito): não iniciada.

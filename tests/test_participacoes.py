@@ -1086,22 +1086,172 @@ class QuartaRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
 
     def test_motivo_invalido_nunca_vaza_para_disco(self):
         """`read_participation` anexa `_motivo_invalido` (diagnostico interno)
-        ao dict devolvido para participacao invalida - esse campo nao pode
-        ser persistido: nem ao regravar a participacao via `descartar`/
-        `aguardar-preco` (caminho normal de reconciliacao), nem no snapshot
-        congelado de uma decisao."""
+        ao dict devolvido para participacao invalida - esse campo nunca pode
+        ser persistido. `write_participation` (unico lugar que efetivamente
+        grava um arquivo de participacao) filtra qualquer campo com prefixo
+        `_` antes de escrever, defesa em profundidade independente de quem
+        chama (mesmo um chamador hipotetico que nao passasse por
+        `_recusar_se_participacao_invalida`)."""
+        a = self.project()
+        self.product(a)
+        path = cc.participation_path(a, "candidato")
+        dados = cc.default_participation("candidato")
+        dados.update(estado="descartado", descartado_porque="motivo", _motivo_invalido="NUNCA_GRAVAR")
+        cc.write_participation(a, "candidato", dados)
+        self.assertNotIn("_motivo_invalido", cc.read_yaml(path, {}))
+
+    def test_write_participation_recusa_estado_sintetico(self):
+        """Defesa em profundidade: `write_participation` nunca aceita o
+        estado sintetico `invalido` como dado persistente, mesmo chamada
+        direto (sem passar pelos comandos que ja recusam antes)."""
+        a = self.project()
+        self.product(a)
+        dados = cc.default_participation("candidato")
+        dados["estado"] = cc.ESTADO_PARTICIPACAO_INVALIDA
+        with self.assertRaises(SystemExit):
+            cc.write_participation(a, "candidato", dados)
+
+
+class QuintaRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
+    """Regressao dos 2 achados da 5a revisao independente (Astra) sobre o
+    commit `70c3df8` - cada teste aqui reproduziu uma falha real contra
+    aquele codigo antes da correcao (scripts em
+    `astra_review_70c3df8.py`/`astra_review_70c3df8_details.py`). Ver
+    STATUS.md e docs/como-conferir-auditoria.md.
+
+    Raiz comum: a correcao da 4a revisao criou um dict SINTETICO (so
+    defaults + estado `invalido`) para os CONSUMIDORES de leitura
+    (`gate_eliminations`, `validation_report`) saberem "nao decido
+    sozinho" sobre participacao com conteudo incoerente. Mas dois outros
+    lugares tambem chamavam `read_participation` e tratavam o resultado
+    como se fosse DADO REAL a mutar/preservar: os comandos que alteram
+    estado (`descartar`/`aguardar-preco`) e o snapshot de uma decisao."""
+
+    def _quebrada(self, project, pid="candidato"):
+        """Participacao com identidade divergente (invalida) mas CONTEUDO
+        real reconhecivel nos demais campos - preco-alvo/teto, requisito
+        negativo e um campo desconhecido, todos com marcador exclusivo pra
+        provar se sobreviveram."""
+        self.product(project, pid)
+        path = cc.participation_path(project, pid)
+        dados = cc.read_yaml(path, {})
+        dados.update(
+            produto_id="IDENTIDADE_DIVERGENTE", preco_alvo=75, preco_teto=100,
+            requisitos_atendidos={"uso": False}, evidencia_extra="EVIDENCIA_REAL_EXCLUSIVA",
+        )
+        cc.write_yaml(path, dados)
+        return path, dados
+
+    def test_descartar_e_aguardar_preco_recusam_sobre_participacao_invalida(self):
+        """Achado 1: `descartar`/`aguardar-preco` liam a participacao via
+        `read_participation` (dict sintetico, so defaults + estado
+        `invalido`), mudavam so o campo de estado, e regravavam o resto por
+        cima com `write_participation` - apagando preco-alvo/teto,
+        requisito e o campo desconhecido que so existiam no arquivo real.
+        Corrigido: os dois comandos recusam ANTES de qualquer escrita."""
+        for comando in ["descartar", "aguardar-preco"]:
+            with self.subTest(comando=comando):
+                a = self.project(comando)
+                path, _ = self._quebrada(a, comando)
+                before = path.read_bytes()
+
+                with self.assertRaises(SystemExit):
+                    self.cli(comando, "--produto-id", comando, "--projeto", str(a),
+                              "--porque", "nova orientacao de estado")
+
+                self.assertEqual(
+                    path.read_bytes(), before,
+                    f"{comando}: recusou mas alterou o arquivo de participacao mesmo assim",
+                )
+
+    def test_aguardar_preco_nao_apaga_requisito_negativo_e_nao_reabilita(self):
+        """Efeito concreto do achado 1: sem a recusa, `aguardar-preco`
+        perdia `requisitos_atendidos={'uso': False}` e `preco_teto=100` -
+        uma oferta de R$200 (acima do teto, com requisito nao atendido)
+        passava a ELEGIVEL depois do comando, mesmo ele so tendo pedido
+        para esperar preco melhor."""
+        a = self.project()
+        self._quebrada(a)
+        self.quote(a, "candidato", "--fonte", "manual")
+        self.assertEqual(cc.compute_ranking(a)[0], [])
+
+        with self.assertRaises(SystemExit):
+            self.cli("aguardar-preco", "--produto-id", "candidato", "--projeto", str(a),
+                      "--porque", "esperar oferta")
+
+        self.assertEqual(
+            cc.compute_ranking(a)[0], [],
+            "aguardar-preco perdeu requisito uso=false e teto=100; oferta de 200 virou elegivel",
+        )
+
+    def test_participacao_valida_continua_preservando_campos_ao_alterar_estado(self):
+        """Controle: a recusa e SO para participacao invalida - uma
+        participacao valida (identidade e estado corretos) continua
+        aceitando `aguardar-preco`/`descartar` normalmente, preservando
+        preco-alvo/teto, requisitos e campo desconhecido nao mexidos pelo
+        comando."""
         a = self.project()
         self.product(a)
         path = cc.participation_path(a, "candidato")
         dados = cc.read_yaml(path, {})
-        dados["produto_id"] = "outro-produto"
+        dados.update(preco_alvo=75, preco_teto=100, requisitos_atendidos={"uso": False},
+                     evidencia_extra="PRESERVAR")
         cc.write_yaml(path, dados)
-        self.assertIn("_motivo_invalido", cc.read_participation(a, "candidato"))
 
-        self.cli("descartar", "--produto-id", "candidato", "--projeto", str(a), "--porque", "reconciliado")
+        self.cli("aguardar-preco", "--produto-id", "candidato", "--projeto", str(a), "--porque", "esperar")
 
-        self.assertNotIn("_motivo_invalido", cc.read_yaml(path, {}))
-        self.assertEqual(cc.read_participation(a, "candidato")["estado"], "descartado")
+        after = cc.read_yaml(path, {})
+        for key in ["preco_alvo", "preco_teto", "requisitos_atendidos", "evidencia_extra"]:
+            self.assertEqual(after[key], dados[key], f"participacao valida perdeu {key} ao alterar estado")
+        self.assertEqual(after["estado"], "aguardando_preco")
+
+    def test_snapshot_preserva_arquivo_bruto_de_concorrente_com_participacao_invalida(self):
+        """Achado 2: o snapshot de uma decisao gravava, para CADA produto do
+        projeto (inclusive perdedores), o resultado INTERPRETADO de
+        `read_participation` - para um concorrente com participacao
+        invalida isso e o dict SINTETICO (defaults + estado `invalido`),
+        nunca o conteudo real do arquivo. `auditar-decisoes --strict`
+        passava, mas a decisao deixava de ser reconstruivel: nenhum arquivo
+        congelado preservava preco-alvo/teto, requisito ou o campo
+        desconhecido do concorrente perdedor."""
+        a = self.project()
+        _, dados_concorrente = self._quebrada(a, "concorrente")
+        self.quote(a, "concorrente", "--fonte", "manual")
+        self.product(a, "escolhido")
+        self.quote(a, "escolhido", "--fonte", "manual")
+
+        self.cli("decidir", str(a), "--produto-id", "escolhido", "--porque", "melhor candidato valido",
+                  "--perdedores", "concorrente: participacao invalida", "--comprado")
+
+        snapshot = next((a / "snapshots").iterdir())
+        congelado = snapshot / "participacoes" / "concorrente.yaml"
+        self.assertIn(
+            "EVIDENCIA_REAL_EXCLUSIVA", congelado.read_text(encoding="utf-8"),
+            "Snapshot nao preserva o conteudo bruto da participacao invalida do concorrente",
+        )
+        self.assertEqual(
+            cc.read_yaml(congelado, {}).get("preco_alvo"), dados_concorrente["preco_alvo"],
+            "preco_alvo real do concorrente nao sobreviveu no snapshot",
+        )
+        self.cli("auditar-decisoes", "--strict")
+
+    def test_snapshot_participacao_invalida_imutavel_apos_alteracao_posterior(self):
+        """Controle: a evidencia bruta congelada do concorrente invalido nao
+        muda se o arquivo original for alterado DEPOIS da decisao fechada -
+        mesmo principio ja valido para participacao valida."""
+        a = self.project()
+        self._quebrada(a, "concorrente")
+        self.quote(a, "concorrente", "--fonte", "manual")
+        self.product(a, "escolhido")
+        self.quote(a, "escolhido", "--fonte", "manual")
+        self.cli("decidir", str(a), "--produto-id", "escolhido", "--porque", "melhor candidato valido",
+                  "--perdedores", "concorrente: participacao invalida", "--comprado")
+        snapshot = next((a / "snapshots").iterdir())
+        congelado_antes = (snapshot / "participacoes" / "concorrente.yaml").read_bytes()
+
+        cc.write_yaml(cc.participation_path(a, "concorrente"), {"anotacao": "MUDOU_DEPOIS"})
+
+        self.assertEqual((snapshot / "participacoes" / "concorrente.yaml").read_bytes(), congelado_antes)
 
 
 if __name__ == "__main__":

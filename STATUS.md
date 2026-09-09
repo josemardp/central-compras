@@ -5,33 +5,107 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (08/09/2026, sessao 17)
+## AO RETOMAR — comece por aqui (09/09/2026, sessao 18)
 
-**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (5a
+**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (6a
 rodada) desta correcao antes de iniciar a frente 6. So depois dessa revisao
 passar limpa, va para `docs/plano-pendencias-auditoria-2026-09-06.md`
 secao 6.
 
 **Pendencias / bloqueios:**
 - Frente 6 (datas/veredito) **nao iniciada**.
-- Frente 5 (produtos reutilizados): a correcao da sessao 16 (3 falhas)
-  **tinha mais 4 lacunas**, achadas pela 4a revisao independente (Astra)
-  sobre o commit `f2d5cd1`. **As 4 foram corrigidas e testadas nesta sessao
-  (17)** - ver bloco abaixo. Continua precisando de UMA rodada de revisao
-  que passe limpa antes de declarar "concluida"; **ja foi declarada pronta
-  QUATRO vezes e as quatro vezes apareceu lacuna nova** - nao presuma que
-  esta e a ultima rodada so porque os testes passam localmente. Padrao que
-  se repete: cada rodada acha problema mais profundo no MESMO conjunto de
-  mecanismos - agora e o contrato de participacao
-  (`_participacao_invalida`/`read_participation`) e os consumidores que
-  ainda liam `estado` bruto do YAML (`project_candidate_ids`/
-  `project_discarded_candidate_ids`) - antes de mexer de novo, leia o
-  contrato inteiro (nao so o diff da ultima correcao).
+- Frente 5 (produtos reutilizados): a correcao da sessao 17 (4 falhas)
+  **tinha mais 2 lacunas** - as duas eram PERDA DE DADOS reais, achadas
+  pela 5a revisao independente (Astra) sobre o commit `70c3df8`. **As 2
+  foram corrigidas e testadas nesta sessao (18)** - ver bloco abaixo.
+  Continua precisando de UMA rodada de revisao que passe limpa antes de
+  declarar "concluida"; **ja foi declarada pronta CINCO vezes e as cinco
+  vezes apareceu lacuna nova** - nao presuma que esta e a ultima rodada so
+  porque os testes passam localmente. Padrao que se repete: a correcao da
+  sessao 17 criou um estado sintetico (`invalido`) pros CONSUMIDORES DE
+  LEITURA reconhecerem "nao decido sozinho", mas nao tinha protegido os
+  lugares que tratam o resultado de `read_participation` como DADO A
+  MUTAR/PRESERVAR (comandos que escrevem, snapshot de decisao) - antes de
+  mexer de novo, leia o contrato inteiro (nao so o diff da ultima
+  correcao), e pergunte "quem mais chama `read_participation` e o que faz
+  com o resultado".
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 5, 5a correcao da revisao independente (09/09/2026, sessao 18).**
+A Astra reproduziu 2 falhas reais contra o commit `70c3df8` (sessao 17, que
+tinha corrigido as 4 anteriores), com os scripts
+`astra_review_70c3df8.py`/`astra_review_70c3df8_details.py` (reproduzidos
+ANTES de corrigir). As 2 eram PERDA DE DADOS de verdade - a correcao da
+sessao 17 tinha criado o estado sintetico `invalido` so pros consumidores
+de LEITURA (`gate_eliminations`, `validation_report`), mas dois lugares que
+tratam o retorno de `read_participation` como dado a MUTAR/PRESERVAR ainda
+nao sabiam da diferenca. As 2 viraram teste permanente em
+`tests/test_participacoes.py` (`QuintaRevisaoIndependenteFrente5Test`: os 2
+testes da Astra + 3 testes de controle/efeito colateral).
+
+1. **Comandos de estado apagavam evidencia real.** `descartar`/
+   `aguardar-preco` liam a participacao via `read_participation` - pra
+   participacao com conteudo invalido isso e um dict SINTETICO (so
+   defaults + estado `invalido`, nunca o conteudo do arquivo). Os dois
+   comandos mudavam so o campo de estado nesse dict e regravavam TUDO com
+   `write_participation` - apagando preco-alvo/teto, `requisitos_atendidos`
+   e qualquer campo desconhecido que so existia no arquivo real. Efeito
+   concreto reproduzido: `aguardar-preco` sobre uma participacao com
+   `preco_teto=100` e `requisitos_atendidos={uso: false}` fazia uma oferta
+   de R$200 (que devia ficar cortada pelos dois) virar ELEGIVEL depois do
+   comando. Corrigido: `_recusar_se_participacao_invalida` roda ANTES de
+   qualquer leitura/escrita nos dois comandos - participacao invalida
+   recusa com `SystemExit`, nomeando o arquivo a reconciliar a mao, sem
+   tocar em nada. Defesa em profundidade: `write_participation` (unico
+   lugar que efetivamente grava um arquivo de participacao) tambem passou
+   a recusar gravar o proprio estado sintetico `invalido`, mesmo chamada
+   direto - o diagnostico nunca pode virar dado persistente por nenhum
+   caminho.
+2. **Snapshot de decisao substituia a fonte pelo diagnostico.** O snapshot
+   gravava, para CADA produto do projeto (inclusive perdedores), o
+   resultado INTERPRETADO de `read_participation` - para um concorrente com
+   participacao invalida isso e o dict sintetico, nunca o arquivo real.
+   `auditar-decisoes --strict` passava, mas a decisao deixava de ser
+   reconstruivel: nenhum arquivo congelado preservava preco-alvo/teto,
+   requisito ou campo desconhecido do concorrente perdedor. Corrigido: o
+   snapshot agora classifica cada participacao
+   (`_classificar_participacao`, mesma funcao usada pelo resto do
+   contrato) e, so quando o status e "invalida", copia o arquivo BRUTO tal
+   como esta em disco - a fonte, nao a interpretacao. Participacao "vazia"
+   (ausente/0 bytes) continua gravando o resultado interpretado
+   (recuperacao do legado, comportamento da 2a revisao, preservado). O
+   manifesto (`manifesto.json`) inclui o arquivo automaticamente - ele so
+   itera sobre tudo que existe no diretorio do snapshot, sem tratamento
+   especial por tipo de conteudo.
+
+**Achado colateral do proprio pacote:** o teste da sessao 17
+(`test_motivo_invalido_nunca_vaza_para_disco`) tratava `descartar` sobre
+arquivo invalido como "caminho normal de reconciliacao" e so checava a
+ausencia de `_motivo_invalido` - nunca a perda dos demais campos, por isso
+nao pegou a lacuna. Reescrito para testar a filtragem de `_motivo_invalido`
+direto em `write_participation` (defesa em profundidade, independente de
+`descartar` agora recusar); o cenario de reconciliacao automatica saiu do
+teste porque deixou de existir - reconciliacao de participacao invalida e
+sempre manual agora.
+
+**Verificacao (sessao 18):** suite completa **451 testes, 0 falhas** (445 +
+6 novos). Mutacao aplicada nas 3 correcoes de fundo (recusa nos dois
+comandos, snapshot bruto, guarda de `write_participation`), uma de cada
+vez, desfeita e restaurada em seguida: cada mutacao derrubou exatamente
+o(s) teste(s)-armadilha daquele achado, nenhum outro. `auditar-decisoes
+--strict`, `operacoes-pendentes --strict`, `checar-segredos --strict` e
+`git diff --check` limpos contra a arvore real. Confirmacao manual
+adicional (fora dos testes automatizados) reproduzindo os 2 cenarios da
+Astra ponta a ponta: arquivo inalterado apos recusa, participacao
+congelada no snapshot byte-identica a original com o marcador exclusivo
+preservado. Detalhe completo:
+`docs/plano-pendencias-auditoria-2026-09-06.md`, secao 5.
+
+## Sessao anterior (08/09/2026, sessao 17) — historico
 
 **Frente 5, 4a correcao da revisao independente (08/09/2026, sessao 17).**
 A Astra reproduziu 4 falhas reais contra o commit `f2d5cd1` (sessao 16, que

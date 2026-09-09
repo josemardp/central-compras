@@ -1786,19 +1786,62 @@ def read_participation(project: Path, produto_id: str) -> dict[str, Any]:
     return default_participation(produto_id)
 
 
+def _recusar_se_participacao_invalida(project: Path, produto_id: str) -> None:
+    """Recusa ANTES de qualquer escrita quando o arquivo de participacao em
+    disco tem conteudo invalido (`_classificar_participacao` == "invalida").
+
+    `descartar`/`aguardar-preco` mudam so um punhado de campos (estado,
+    motivo, preco-alvo/teto) sobre o dict que `read_participation` devolve
+    - mas para participacao invalida esse dict e SINTETICO (so defaults +
+    o estado `invalido`), nunca o conteudo real do arquivo. Deixar esses
+    comandos prosseguirem gravaria o sintetico por cima do real via
+    `write_participation`, apagando preco-alvo/teto, requisitos e qualquer
+    campo desconhecido que so existia no arquivo - o diagnostico nunca pode
+    virar BASE para reconstruir dado. A reconciliacao e sempre manual:
+    corrigir ou apagar o arquivo a mao, olhando o conteudo real.
+    """
+    dados = read_yaml(participation_path(project, produto_id), None)
+    status, motivo = _classificar_participacao(dados, produto_id)
+    if status == "invalida":
+        raise SystemExit(
+            f"Participacao de {produto_id} em {project.name} tem conteudo invalido "
+            f"({motivo}).\nArquivo: {participation_path(project, produto_id)}\n"
+            "Nao decido sozinho se e dado real incompleto ou lixo - corrija ou apague "
+            "o arquivo a mao (preservando o que for dado real) e rode o comando de novo. "
+            "Nada foi alterado."
+        )
+
+
 def _participacao_serializavel(dados: dict[str, Any]) -> dict[str, Any]:
     """Remove campos sinteticos internos (prefixo `_` - hoje so
     `_motivo_invalido`, o diagnostico que `read_participation` anexa quando
     o arquivo em disco tem conteudo invalido) antes de qualquer escrita.
-    Nunca gravar isso em disco: nem no proprio arquivo de participacao
-    (rodar `descartar`/`aguardar-preco` sobre um arquivo invalido e o
-    caminho normal de reconciliacao - regrava limpo), nem no snapshot
-    congelado de uma decisao (evidencia, nao rascunho de diagnostico).
+    Nunca gravar isso em disco: nem no proprio arquivo de participacao, nem
+    no snapshot congelado de uma decisao (evidencia, nao rascunho de
+    diagnostico).
     """
     return {key: value for key, value in dados.items() if not key.startswith("_")}
 
 
 def write_participation(project: Path, produto_id: str, dados: dict[str, Any]) -> None:
+    """Grava participacao completa (defaults preenchidos) no arquivo proprio.
+
+    Recusa gravar o estado sintetico (`ESTADO_PARTICIPACAO_INVALIDA`) como
+    dado persistente - ele so existe para os CONSUMIDORES de leitura
+    (`gate_eliminations`, `validation_report`) reconhecerem "nao decido
+    sozinho"; nenhum comando de escrita pode fabricar essa palavra em disco.
+    Defesa em profundidade: os chamadores que MUDAM estado (`descartar`,
+    `aguardar-preco`) ja recusam antes de chegar aqui
+    (`_recusar_se_participacao_invalida`), mas esta funcao e o unico lugar
+    que efetivamente grava - nunca confia sozinho no chamador ter checado.
+    """
+    if dados.get("estado") == ESTADO_PARTICIPACAO_INVALIDA:
+        raise SystemExit(
+            f"Bug interno: tentativa de gravar o estado sintetico "
+            f"{ESTADO_PARTICIPACAO_INVALIDA!r} em "
+            f"{participation_path(project, produto_id)} - isso nunca pode virar dado "
+            "persistente. Nada foi escrito."
+        )
     path = participation_path(project, produto_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     completo = default_participation(produto_id)
@@ -3253,6 +3296,7 @@ def discard_product(args: argparse.Namespace) -> None:
     # ambigua (produto participando de mais de um projeto sem --projeto): a
     # participacao e por projeto, nunca um estado global do produto.
     project = resolve_participation_project(args.produto_id, args.projeto)
+    _recusar_se_participacao_invalida(project, args.produto_id)
     participacao = read_participation(project, args.produto_id)
     participacao["estado"] = "descartado"
     participacao["descartado_porque"] = args.porque
@@ -3269,6 +3313,7 @@ def wait_price(args: argparse.Namespace) -> None:
     if not find_product_path(args.produto_id):
         raise SystemExit(f"Produto nao encontrado: {args.produto_id}")
     project = resolve_participation_project(args.produto_id, args.projeto)
+    _recusar_se_participacao_invalida(project, args.produto_id)
     participacao = read_participation(project, args.produto_id)
     participacao["estado"] = "aguardando_preco"
     if args.preco_alvo is not None:
@@ -3803,12 +3848,30 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
         # deixava um requisito exclusivo desta compra fora da evidencia: um
         # requisito gravado so na participacao passava no `auditar-decisoes
         # --strict` sem nunca aparecer em nenhum arquivo congelado.
+        #
+        # Participacao com CONTEUDO INVALIDO (arquivo existe, mas identidade/
+        # estado/tipo incoerente) e o caso especial: `read_participation`
+        # devolve um dict SINTETICO (so defaults + estado `invalido`) para os
+        # consumidores de leitura saberem "nao decido sozinho" - isso e
+        # diagnostico, nunca evidencia. Gravar o sintetico no snapshot
+        # apagaria a unica copia do dado real do concorrente (preco-alvo/
+        # teto, requisitos, campo desconhecido) sem deixar rastro nenhum -
+        # `auditar-decisoes --strict` passaria sem a decisao ser
+        # reconstruivel a partir do que de fato existia. Congela o arquivo
+        # BRUTO, tal como esta em disco, nesse caso - a fonte, nao a
+        # interpretacao. Participacao "vazia" (ausente/0 bytes) continua
+        # gravando o resultado INTERPRETADO (recupera do legado) - nao ha
+        # arquivo bruto ali pra preservar, e essa recuperacao ja e o
+        # comportamento estabelecido desde a 2a revisao independente.
         (snapshot_dir / "participacoes").mkdir(parents=True, exist_ok=True)
         for pid in sorted(project_product_ids(project)):
-            write_yaml(
-                snapshot_dir / "participacoes" / f"{pid}.yaml",
-                _participacao_serializavel(read_participation(project, pid)),
-            )
+            destino = snapshot_dir / "participacoes" / f"{pid}.yaml"
+            origem = participation_path(project, pid)
+            status, _ = _classificar_participacao(read_yaml(origem, None), pid)
+            if status == "invalida":
+                atomic_write_text(destino, origem.read_text(encoding="utf-8"))
+            else:
+                write_yaml(destino, _participacao_serializavel(read_participation(project, pid)))
         atomic_write_text(snapshot_dir / "ambiente.json", json.dumps({
             "python": sys.version, "pyyaml": yaml.__version__,
             "argumentos": {key: value for key, value in vars(args).items() if key != "func"},
