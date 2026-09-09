@@ -1398,9 +1398,12 @@ de novo, vale reler o contrato inteiro desta seção antes de mexer.
 
 ## 6. Datas e vereditos
 
-**Estado: implementada (09/09/2026, sessão 19), não revisada de forma
-independente ainda — próximo passo é pedir revisão, como nas frentes
-anteriores.**
+**Estado: implementada (09/09/2026, sessão 20), corrigida em uma rodada de
+revisão independente da Astra (sessão 21 — 5 achados). Ainda falta UMA
+rodada de revisão que passe limpa antes de declarar "concluída sob
+reserva" — mesmo padrão disciplinado da frente 5 (6 rodadas com achado
+antes da 7ª passar limpa); não presuma que a 2ª rodada não vai achar mais
+nada.**
 
 **Contrato adotado:** decisão, compra/pagamento, entrega e início de uso
 são quatro fatos datados independentes. `decidir` fecha só a escolha —
@@ -1535,11 +1538,121 @@ nesta sessão isso foi tentado por engano uma vez, criou um projeto e um
 veredito de teste na árvore real, e foi limpo antes do commit (arquivos
 nunca chegaram a ser versionados).
 
+### 1ª revisão independente (Astra, sessão 21, sobre o commit `e564618`) — 5 falhas
+
+A implementação da sessão 20 corrigiu os dois comandos (`decidir`,
+`registrar-evento`) isoladamente, sem considerar a INTERAÇÃO entre eles
+nem a RECUPERAÇÃO de falha no meio de uma sincronização que passou a
+tocar mais de um arquivo:
+
+1. **`registrar-evento --evento comprado` não sincronizava o estado
+   operacional.** O veredito recebia a data da compra, mas
+   `processo.md`/`briefing.md` continuavam dizendo "pesquisando"/"comprar
+   ou marcar como comprado" — o `status` do projeto ficava incoerente com
+   a própria confirmação registrada minutos antes. Corrigido:
+   `_marcar_projeto_comprado` (extraída da lógica que `decidir --comprado`
+   já tinha) roda também aqui — MAS SÓ quando o veredito é comprovadamente
+   o da decisão ABERTA agora. Isso exigiu um campo novo no veredito,
+   `Produto ID` (gravado por `create_verdict`, ausente em `novo-veredito`
+   standalone), comparado contra o `Produto ID` de `decisao.md` via
+   `_decisao_atual_e_deste_produto` — um veredito de decisão já
+   substituída por outra (mesmo projeto, produto diferente), ou um
+   veredito standalone sem essa identidade, nunca sincroniza estado; só
+   avisa.
+2. **2ª chamada de `decidir --comprado` não complementava o veredito já
+   criado.** `create_verdict` retornava o `path` direto porque o arquivo
+   já existia (guarda contra sobrescrita) — o projeto ficava marcado
+   comprado (via `_decide_writes`), mas o veredito continuava sem `Data da
+   compra`. Corrigido: quando o arquivo já existe e não há
+   `--force-veredito`, `create_verdict` complementa SÓ `Data da compra` se
+   ela ainda estiver em branco (nunca sobrescreve uma já registrada — o
+   mesmo princípio de "fato datado" de `registrar-evento` — e nunca toca
+   no resto do conteúdo, D+30/D+180 incluídos) — não é preciso
+   apagar/recriar o veredito inteiro só para registrar uma confirmação que
+   chegou depois.
+3. **Retomada em outro dia trocava a data da compra.** `decidir --comprado`
+   sem `--data-compra` explícita, interrompido ANTES de `create_verdict`
+   rodar (`veredito:iniciado`), retomado no dia seguinte, gravava a data
+   da RETOMADA como se fosse a data da compra — a mesma classe de bug já
+   corrigida para `veredito_nome`/`snapshot_rel` nas rodadas anteriores,
+   agora reaberta pelo campo novo. Corrigido: `data_compra_efetiva`
+   (`args.data_compra or today()` quando `comprado`, `None` quando não) é
+   calculada e congelada em `op.detalhe` na 1ª tentativa, nunca
+   recalculada numa retomada.
+4. **Journal de versão anterior à frente 6 deixava de ser retomável.** A
+   assinatura de `decidir` ganhou o campo `data_compra` — um journal real
+   pendente, criado pelo código do commit `5998a15` (anterior à frente 6
+   inteira, sem esse campo), continuava reivindicado depois de atualizar o
+   código, mas a MESMA chamada original era recusada como "dados
+   diferentes" só por causa da evolução do próprio schema da assinatura.
+   Corrigido com `_assinaturas_compativeis`: compara a assinatura
+   persistida (json canônico da 1ª tentativa) com a desta chamada,
+   tratando um campo AUSENTE na assinatura antiga como compatível com o
+   valor atual só quando esse valor é o default neutro (`None`/`False`/
+   vazio) — um valor PREENCHIDO onde antes não existia o campo continua
+   RECUSADO (argumento genuinamente diferente, não mera evolução de
+   schema; testado em separado, com um crash na PRÓPRIA versão atual sem
+   `--data-compra` seguido de retomada COM `--data-compra` explícita).
+5. **Cronologia de `registrar-evento` só validava para trás.** A checagem
+   original só comparava a nova data contra eventos ANTERIORES na ordem
+   canônica (`comprado` → `entrega` → `inicio_uso`) — registrar
+   `inicio_uso` ontem e depois `entrega` hoje era aceito, mesmo sendo
+   cronologicamente impossível (entrega tem que vir antes do início de
+   uso). Corrigido com um segundo laço simétrico, checando os eventos
+   POSTERIORES já registrados na mesma chamada (antes de entrar em
+   `tracked_operation` quando `--data` é explícita; refeito com a data
+   congelada dentro do bloco quando `--data` é omitida, pelo mesmo motivo
+   do achado 3).
+
+**Achado colateral do próprio pacote, corrigido junto:** como a
+sincronização do achado 1 passou a gravar `processo.md`/`briefing.md` além
+do veredito, `registrar-evento` deixou de ser um "escritor direto" (sem
+journal) e ganhou o próprio `tracked_operation` — mesmo mecanismo de
+`decidir`/`aprender-veredito`. Isso resolveu de uma vez a exigência de
+cobrir "travas, recursos reivindicados, falhas intermediárias e
+retomada": uma falha ENTRE gravar o evento no veredito e sincronizar o
+projeto fica pendente e RETOMÁVEL (a guarda de "fato já registrado"
+reconhece a própria retomada via `has_pending_operation`, sem duplicar o
+bullet nem exigir reescrever); o projeto (`processo.md`/`briefing.md`) é
+reivindicado como recurso ANTES de escrever, tanto no `main()` (trava de
+verdade, `project_lock`, contra um `decidir` concorrente de verdade) quanto
+dentro do próprio `tracked_operation` (checagem contra outra operação
+pendente); `registrar-evento` saiu de `RECURSOS_DIRETOS_POR_COMANDO` (esse
+mecanismo é só para "escritores diretos sem journal próprio" — o mesmo
+motivo que já excluía `decidir`/`aprender-veredito` de lá).
+
+### Testes (1ª revisão)
+
+`tests/test_frente6_datas_veredito.py`, `SegundaRevisaoIndependenteFrente6Test`:
+16 testes — os 5 achados (reprodução real contra o commit `e564618`,
+confirmada ANTES da correção — script `astra_review_e564618.py`), 8
+controles (associação veredito↔decisão correta e incorreta, complemento
+não sobrescreve data já registrada nem exige `--force-veredito`, `--data-
+compra` explícita sobrevive à retomada, retomada normal continua
+funcionando, assinatura genuinamente diferente continua recusada,
+cronologia válida aceita) e 3 testes da cobertura adicional pedida
+explicitamente (recurso reivindicado por `decidir` pendente bloqueia
+`registrar-evento`; falha entre gravar o evento e sincronizar o projeto é
+retomável; a retomada não duplica o bullet). Mutação aplicada nas 5
+correções de fundo, uma de cada vez, desfeita e restaurada em seguida:
+derrubou exatamente os testes do mecanismo mutado (achado 1: 3 testes;
+achado 2: 1; achado 3: 1; achado 4: 1 — só depois de corrigir o próprio
+teste para usar o commit `5998a15`, o correto para esse achado, no lugar
+de `e564618`, que já tinha o campo novo; achado 5: 1), nenhum fora disso.
+Suíte completa depois da correção: **498 testes, 0 falhas** (482 + 16
+novos). `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a árvore
+real.
+
+**Fora do escopo desta correção, deliberadamente:** pesos/gates/
+classificação por estrela intocados; nenhuma migração rodada contra
+produtos reais; nenhuma infraestrutura externa tocada.
+
 ## 7. Validação e publicação
 
-**Estado (09/09/2026, sessão 19, reconciliado): feita integralmente para as
-frentes 2, 3, 4 e 5. Frente 6 implementada, ainda sem revisão
-independente.**
+**Estado (09/09/2026, sessão 21, reconciliado): feita integralmente para as
+frentes 2, 3, 4 e 5. Frente 6 implementada e com uma rodada de revisão
+corrigida, ainda sem rodada limpa.**
 
 Esta seção estava desatualizada desde a sessão 9-12: as frentes 3 (receptor
 Sheets, 3 rodadas de revisão + redeploy verificado na nuvem) e 4
@@ -1572,9 +1685,14 @@ revisado, fluxos testados no navegador quando aplicável, push para
   rodadas, ver seção 5. Migração de produtos legados
   (`migrar-produtos --aplicar`) continua não executada contra a árvore
   real.
-- **Frente 6** (datas/veredito): implementada (sessão 19) — separação de
+- **Frente 6** (datas/veredito): implementada (sessão 20) — separação de
   decisão/compra/entrega/início de uso, D+30/D+180 ancorados em início de
-  uso explícito, comando `registrar-evento`, 25 testes novos, suíte
-  completa (482 testes) e as três checagens estritas limpas, ver seção 6.
-  **Ainda sem revisão independente** — próximo passo natural desta frente,
-  como já é praxe nas outras.
+  uso explícito, comando `registrar-evento`. 1ª revisão independente da
+  Astra (sessão 21) achou 5 falhas reais — sincronização de estado
+  operacional ausente, complemento de veredito existente, congelamento de
+  data em retomada, compatibilidade de schema no journal, cronologia
+  bidirecional — todas corrigidas com teste permanente + mutação, ver
+  seção 6. Suíte completa (498 testes) e as três checagens estritas
+  limpas em todas as rodadas. **Ainda falta UMA rodada de revisão
+  independente que passe limpa** — não presumir "concluída sob reserva"
+  até isso acontecer de verdade, mesmo padrão da frente 5.

@@ -384,6 +384,43 @@ def _fingerprint(dados: dict[str, Any]) -> str:
     return json.dumps(dados, ensure_ascii=True, sort_keys=True, default=str, separators=(",", ":"))
 
 
+def _assinaturas_compativeis(fingerprint_antigo: str, assinatura_nova: dict[str, Any]) -> bool:
+    """Compara a assinatura persistida na 1a tentativa com a desta chamada,
+    tolerando EVOLUCAO DE SCHEMA - um campo novo que o codigo antigo (que
+    comecou o journal pendente) nem sabia que existia - sem abrir mao de
+    recusar argumento realmente diferente.
+
+    Um campo ausente na assinatura antiga so e compativel com o valor
+    ATUAL se esse valor for o default neutro (None/False/vazio/0) - o
+    mesmo que "esta retomada nao esta pedindo nada que a versao antiga do
+    codigo nao pudesse ja ter oferecido". Um campo ausente comparado com um
+    valor PREENCHIDO continua RECUSADO - isso e argumento realmente
+    diferente (ex.: `--data-compra` explicita numa retomada cujo journal
+    foi criado antes desse argumento existir), nao mera evolucao de
+    schema. Journal corrompido/nao-dict aqui nunca deveria acontecer (quem
+    chama ja passou por `_ler_journal`), mas devolve incompativel por
+    seguranca em vez de propagar excecao de parsing.
+    """
+    try:
+        antiga = json.loads(fingerprint_antigo)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    if not isinstance(antiga, dict):
+        return False
+    ausente = object()
+    for chave in set(antiga) | set(assinatura_nova):
+        valor_antigo = antiga.get(chave, ausente)
+        valor_novo = assinatura_nova.get(chave, ausente)
+        if valor_antigo == valor_novo:
+            continue
+        if valor_antigo is ausente and not valor_novo:
+            continue
+        if valor_novo is ausente and not valor_antigo:
+            continue
+        return False
+    return True
+
+
 class JournalPrecisaReconciliacao(Exception):
     """Journal existe mas nao da para saber com seguranca o que ja foi feito.
 
@@ -757,7 +794,10 @@ def tracked_operation(scope: Path, op_id: str, kind: str, assinatura: dict[str, 
         ) from erro
     fingerprint_nova = _fingerprint(assinatura)
     if existente is not None and existente.get("kind") == kind and existente.get("situacao") == "em_andamento":
-        if existente.get("assinatura_fingerprint") != fingerprint_nova:
+        fingerprint_antiga = existente.get("assinatura_fingerprint")
+        if fingerprint_antiga != fingerprint_nova and not (
+            isinstance(fingerprint_antiga, str) and _assinaturas_compativeis(fingerprint_antiga, assinatura)
+        ):
             raise SystemExit(
                 f"Ha uma operacao '{kind}' pendente para {op_id!r} com dados diferentes dos desta "
                 f"chamada (journal: {path}).\n"
@@ -3715,6 +3755,12 @@ def decide(args: argparse.Namespace) -> None:
     # que ser o MESMO arquivo da tentativa que falhou, nao um recalculado
     # com `today()` de um dia diferente.
     veredito_nome_candidato = f"{today()}-{project.name}-{args.produto_id}.md"
+    # Mesmo principio para `Data da compra`: `--comprado` sem `--data-compra`
+    # explicita cai em `today()`, mas isso so pode ser calculado UMA VEZ, na
+    # 1a tentativa - uma interrupcao antes de `create_verdict` rodar e uma
+    # retomada em outro dia nao pode trocar a data da confirmacao original
+    # pela data da retomada. `None` quando nao comprado (nunca fabrica).
+    data_compra_efetiva = (args.data_compra or today()) if args.comprado else None
     op_id = f"decidir:{args.produto_id}"
     # decisao.md e processo.md sao arquivos UNICOS por projeto, nao por
     # produto: `decidir A` e `decidir B` do mesmo projeto escrevem os dois no
@@ -3730,7 +3776,8 @@ def decide(args: argparse.Namespace) -> None:
     # e apagava o D+30/D+180 preenchido - a mesma classe de bug que motivou
     # `recursos`, so que decidir nunca tinha declarado esse terceiro arquivo.
     with tracked_operation(project, op_id, "decidir", assinatura,
-                            {"snapshot_rel": snapshot_rel_candidato, "veredito_nome": veredito_nome_candidato},
+                            {"snapshot_rel": snapshot_rel_candidato, "veredito_nome": veredito_nome_candidato,
+                             "data_compra_efetiva": data_compra_efetiva},
                             recursos={project / "decisao.md", project / "processo.md",
                                       VEREDITOS / veredito_nome_candidato}) as op:
         _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado, minima,
@@ -3939,9 +3986,7 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
     )
     mark_steps(project, [8])
     if args.comprado:
-        mark_steps(project, [9])
-        set_project_state(project, "comprado")
-        set_process_state(project, estado="comprado", proxima_acao="acompanhar entrega e preencher veredito D+30")
+        _marcar_projeto_comprado(project)
     else:
         set_process_state(project, proxima_acao="comprar ou marcar como comprado depois da confirmacao final")
     # O caminho vem congelado em `op.detalhe`, igual ao snapshot: precisa
@@ -3955,7 +4000,7 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
         "veredito",
         lambda: create_verdict(project, args.produto_id, product, quote,
                                 force=args.force_veredito, path=verdict_path,
-                                comprado=bool(args.comprado), data_compra=args.data_compra),
+                                data_compra=op.detalhe.get("data_compra_efetiva")),
     )
     op.registrar_efeito(
         "timeline_veredito", timeline_path,
@@ -4059,35 +4104,48 @@ def report_pending_operations(args: argparse.Namespace) -> None:
 
 def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quote: dict[str, str],
                     force: bool = False, path: Path | None = None,
-                    comprado: bool = False, data_compra: str | None = None) -> Path:
+                    data_compra: str | None = None) -> Path:
     """Cria o arquivo de veredito no momento de `decidir`.
 
     Frente 6: `decidir` fecha a DECISAO (escolha e justificativa), nunca a
     compra em si - cotacao manual e evidencia de uma OFERTA conferida, nao
-    prova de pagamento. `Data da compra` so entra aqui quando quem chamou
-    passa `comprado=True` explicitamente (a flag `--comprado` do `decidir`,
-    uma afirmacao direta do Josemar "eu comprei", nao uma inferencia da
-    fonte da cotacao) - se `decidir` rodou sem `--comprado`, o campo fica
-    em branco e so e preenchido depois via `registrar-evento`, quando a
-    compra de fato acontecer.
+    prova de pagamento. `data_compra` so chega aqui JA RESOLVIDA por quem
+    chama (`_decide_writes`, a partir de `--comprado`/`--data-compra`
+    congelados em `op.detalhe` na 1a tentativa - nunca recalculado numa
+    retomada em outro dia) - `None`/vazio significa "nao confirmado ainda",
+    nunca fabricado a partir da fonte da cotacao.
 
-    `Veredito D+30 previsto`/`D+180 previsto` tambem ficam em branco aqui -
-    ver `register_verdict_event`: so sao calculados a partir da data de
-    INICIO DE USO explicitamente registrada, nunca da data da decisao/
-    compra/entrega, e nunca fabricados com `hoje()` na ausencia dela. Sem
-    essa data, o painel mostra "aguardando inicio de uso" ate ser
-    informado - nunca vence nem atrasa por conta de um prazo que ninguem
-    confirmou.
+    `Veredito D+30 previsto`/`D+180 previsto` ficam em branco aqui - ver
+    `register_verdict_event`: so sao calculados a partir da data de INICIO
+    DE USO explicitamente registrada, nunca da data da decisao/compra/
+    entrega, e nunca fabricados com `hoje()` na ausencia dela. Sem essa
+    data, o painel mostra "aguardando inicio de uso" ate ser informado -
+    nunca vence nem atrasa por conta de um prazo que ninguem confirmou.
+
+    Quando o arquivo JA EXISTE (2a chamada de `decidir` sobre o mesmo
+    projeto/produto/dia, tipicamente `decidir` sem `--comprado` seguido de
+    `decidir --comprado` para so confirmar a compra) e `force=False`, o
+    conteudo existente e PRESERVADO - so complementa `Data da compra` se
+    ela ainda estiver em branco E esta chamada trouxe uma data (nunca
+    sobrescreve uma ja registrada, mesmo principio de `registrar-evento`).
+    Nao exige `--force-veredito` (que reescreveria o veredito inteiro,
+    inclusive D+30/D+180 ja preenchidos) so para registrar uma confirmacao
+    de compra que chegou depois.
     """
     if path is None:
         path = VEREDITOS / f"{today()}-{project.name}-{produto_id}.md"
     if path.exists() and not force:
+        if data_compra:
+            texto = path.read_text(encoding="utf-8")
+            if not extract_bullet(texto, "Data da compra"):
+                atomic_write_text(path, replace_or_append_bullet(texto, "Data da compra", data_compra))
         return path
     text = render_template("veredito.md")
     replacements = {
         "- Projeto:": f"- Projeto: {project.name}",
         "- Produto:": f"- Produto: {product.get('nome') or produto_id}",
-        "- Data da compra:": f"- Data da compra: {data_compra or today() if comprado else ''}",
+        "- Produto ID:": f"- Produto ID: {produto_id}",
+        "- Data da compra:": f"- Data da compra: {data_compra or ''}",
         "- Valor pago:": f"- Valor pago: {brl(quote.get('custo_total'))}",
         "- Vendedor:": f"- Vendedor: {quote.get('loja')} / {quote.get('vendedor')}",
         # Preenchidos aqui para que `aprender-veredito` consiga exportar marca,
@@ -4180,6 +4238,58 @@ VERDICT_EVENT_BULLET = {
 VERDICT_EVENT_ORDER = ["comprado", "entrega", "inicio_uso"]
 
 
+def _marcar_projeto_comprado(project: Path) -> None:
+    """Mesma transicao de estado que `decidir --comprado` ja fazia -
+    extraida pra `registrar-evento --evento comprado` (achado independente:
+    a confirmacao podia chegar DEPOIS de `decidir`, e so o veredito era
+    atualizado - `processo.md`/`briefing.md` continuavam dizendo
+    'pesquisando'/'comprar ou marcar como comprado')."""
+    mark_steps(project, [9])
+    set_project_state(project, "comprado")
+    set_process_state(project, estado="comprado", proxima_acao="acompanhar entrega e preencher veredito D+30")
+
+
+def _decisao_atual_e_deste_produto(project: Path, produto_id: str) -> bool:
+    """Confere se `produto_id` e o produto da decisao ABERTA deste projeto
+    agora - nunca sincroniza estado operacional (singular, um por projeto)
+    a partir de um veredito de uma decisao ja substituida por outra mais
+    recente sobre um produto diferente."""
+    decisao_path = project / "decisao.md"
+    if not decisao_path.exists():
+        return False
+    texto = decisao_path.read_text(encoding="utf-8")
+    return bool(produto_id) and extract_bullet(texto, "Produto ID") == produto_id
+
+
+def _projeto_da_confirmacao_de_compra(veredito: str) -> Path | None:
+    """Projeto associado a um `registrar-evento --evento comprado` - unico
+    ponto usado tanto pra TRAVAR (`main()`, ANTES de rodar) quanto pra
+    DECLARAR RECURSO (dentro da propria `register_verdict_event`, ao
+    montar `recursos=` de `tracked_operation`), pra nunca divergir sobre
+    qual projeto e afetado. So LE arquivos (veredito e `decisao.md`), nunca
+    escreve.
+    Devolve `None` sempre que a sincronizacao de estado nao deve acontecer:
+    veredito inexistente ainda, sem `Projeto`/`Produto ID` gravado (ex.:
+    `novo-veredito` standalone), projeto inexistente, ou a decisao aberta
+    do projeto nao ser deste produto (decisao substituida por outra)."""
+    caminho = Path(veredito)
+    if not caminho.is_absolute():
+        caminho = ROOT / veredito
+    if not caminho.exists():
+        return None
+    texto = caminho.read_text(encoding="utf-8")
+    projeto_nome = extract_bullet(texto, "Projeto")
+    produto_id = extract_bullet(texto, "Produto ID")
+    if not projeto_nome:
+        return None
+    projeto_dir = PROJETOS / projeto_nome
+    if not projeto_dir.is_dir():
+        return None
+    if not _decisao_atual_e_deste_produto(projeto_dir, produto_id):
+        return None
+    return projeto_dir
+
+
 def register_verdict_event(args: argparse.Namespace) -> None:
     """`registrar-evento`: grava, num veredito ja existente, a data em que
     a compra foi paga, o produto chegou, ou o uso comecou de verdade -
@@ -4190,46 +4300,140 @@ def register_verdict_event(args: argparse.Namespace) -> None:
     e nunca e sobrescrito silenciosamente - uma segunda tentativa de
     registrar o MESMO evento (mesmo com data diferente) e recusada antes de
     qualquer escrita; corrigir um engano de digitacao e edicao manual do
-    arquivo, o mesmo padrao ja usado para participacao invalida.
+    arquivo, o mesmo padrao ja usado para participacao invalida. A
+    cronologia e checada nos DOIS sentidos - um evento anterior ja
+    registrado (`comprado`/`entrega` mais cedo na ordem) nao pode ficar
+    DEPOIS do que esta sendo gravado agora, e um evento POSTERIOR ja
+    registrado (ex.: `inicio_uso` gravado antes de `entrega` ser
+    perguntada) tambem nao pode ficar ANTES - a ordem de gravacao no CLI
+    nao e a ordem cronologica dos fatos.
 
     So o evento `inicio_uso` recalcula `Veredito D+30 previsto`/`D+180
     previsto` (data de inicio + 30/180 dias) - e a UNICA ancora valida para
     esses lembretes; nunca decisao, compra ou entrega. Uma fase que ja foi
     RESPONDIDA (`D+30 preenchido em` presente) nunca tem o `previsto`
     recalculado por cima - preserva o veredito ja preenchido, como pedido.
+
+    `--evento comprado` tambem sincroniza o estado operacional do projeto
+    (`processo.md`/`briefing.md`) com a mesma transicao de `decidir
+    --comprado` - MAS SO quando este veredito e comprovadamente o da
+    decisao ABERTA agora (`_projeto_da_confirmacao_de_compra`); um veredito
+    de produto ja substituido por outra decisao, ou um `novo-veredito`
+    standalone sem `Produto ID`, nunca mexe no estado do projeto - so avisa.
+
+    Quando ha projeto associado, este comando grava DOIS arquivos por fora
+    do proprio veredito (`processo.md`, `briefing.md`) - por isso roda
+    dentro de `tracked_operation` (mesmo mecanismo de `decidir`/`aprender-
+    veredito`): uma falha entre gravar o evento no veredito e sincronizar o
+    projeto fica pendente e RETOMAVEL (a guarda de "fato ja registrado"
+    acima reconhece a propria retomada via `has_pending_operation` e nao
+    bloqueia), a data efetiva e congelada em `op.detalhe` na 1a tentativa
+    (nunca recalculada com `today()` de uma retomada em outro dia - mesmo
+    principio do `data_compra_efetiva` de `decidir`), e o projeto/
+    `processo.md`/`briefing.md` sao reivindicados como recurso ANTES de
+    escrever (passados em `recursos=` pra `tracked_operation`) - alem
+    disso, `main()` tambem TRAVA esse mesmo projeto antes de chamar esta
+    funcao (`_projeto_da_confirmacao_de_compra`), protegendo contra um
+    `decidir` verdadeiramente concorrente no mesmo projeto.
     """
     path = resolve_verdict_path(args.veredito)
     text = path.read_text(encoding="utf-8")
     label = VERDICT_EVENT_BULLET[args.evento]
+    op_id = f"registrar-evento:{path.name}:{args.evento}"
+    retomando_propria = has_pending_operation(BASE, op_id, "registrar-evento")
     existente = extract_bullet(text, label)
-    if existente:
+    if existente and not retomando_propria:
         raise SystemExit(
             f"{label} ja esta registrada ({existente}) neste veredito - fato datado nao e "
             "sobrescrito silenciosamente. Se foi engano de digitacao, corrija o arquivo a "
             f"mao: {path}"
         )
-    nova_data = args.data or today()
     indice = VERDICT_EVENT_ORDER.index(args.evento)
     for evento_anterior in VERDICT_EVENT_ORDER[:indice]:
         data_anterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_anterior])
-        if data_anterior and nova_data < data_anterior:
+        if data_anterior and args.data and args.data < data_anterior:
             raise SystemExit(
-                f"{label} ({nova_data}) e anterior a {VERDICT_EVENT_BULLET[evento_anterior]} "
+                f"{label} ({args.data}) e anterior a {VERDICT_EVENT_BULLET[evento_anterior]} "
                 f"({data_anterior}) - confira a data informada. Nada foi alterado."
             )
-    text = replace_or_append_bullet(text, label, nova_data)
-    if args.evento == "inicio_uso":
-        inicio = dt.date.fromisoformat(nova_data)
-        if not extract_bullet(text, "D+30 preenchido em"):
-            text = replace_or_append_bullet(
-                text, "Veredito D+30 previsto", (inicio + dt.timedelta(days=30)).isoformat()
+    for evento_posterior in VERDICT_EVENT_ORDER[indice + 1:]:
+        data_posterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_posterior])
+        if data_posterior and args.data and args.data > data_posterior:
+            raise SystemExit(
+                f"{label} ({args.data}) e posterior a {VERDICT_EVENT_BULLET[evento_posterior]} "
+                f"({data_posterior}) - confira a data informada. Nada foi alterado."
             )
-        if not extract_bullet(text, "D+180 preenchido em"):
-            text = replace_or_append_bullet(
-                text, "Veredito D+180 previsto", (inicio + dt.timedelta(days=180)).isoformat()
-            )
-    atomic_write_text(path, text)
+    # A data EFETIVA (`--data` explicita ou `today()` no momento da 1a
+    # tentativa) so pode ser calculada uma vez - ver docstring. Quando nao
+    # ha `--data`, a checagem cronologica acima com valor ainda desconhecido
+    # e refeita depois de congelar, dentro do `with`, contra o valor real.
+    projeto_dir = _projeto_da_confirmacao_de_compra(args.veredito) if args.evento == "comprado" else None
+    assinatura = {"evento": args.evento, "data": args.data}
+    recursos = {path}
+    if projeto_dir:
+        recursos |= {projeto_dir / "processo.md", projeto_dir / "briefing.md"}
+    with tracked_operation(
+        BASE, op_id, "registrar-evento", assinatura,
+        {
+            "data_efetiva": args.data or today(),
+            "projeto_dir": str(projeto_dir) if projeto_dir else None,
+        },
+        recursos=recursos,
+    ) as op:
+        nova_data = op.detalhe["data_efetiva"]
+        if not args.data:
+            # `--data` nao foi passada: a checagem cronologica de cima usou
+            # so os limites conhecidos ANTES de resolver `nova_data` (podia
+            # nao ter comparado nada). Confere de novo, agora com o valor
+            # efetivo, ANTES de escrever - mesmas duas direcoes.
+            for evento_anterior in VERDICT_EVENT_ORDER[:indice]:
+                data_anterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_anterior])
+                if data_anterior and nova_data < data_anterior:
+                    raise SystemExit(
+                        f"{label} ({nova_data}) e anterior a {VERDICT_EVENT_BULLET[evento_anterior]} "
+                        f"({data_anterior}) - confira a data informada. Nada foi alterado."
+                    )
+            for evento_posterior in VERDICT_EVENT_ORDER[indice + 1:]:
+                data_posterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_posterior])
+                if data_posterior and nova_data > data_posterior:
+                    raise SystemExit(
+                        f"{label} ({nova_data}) e posterior a {VERDICT_EVENT_BULLET[evento_posterior]} "
+                        f"({data_posterior}) - confira a data informada. Nada foi alterado."
+                    )
+
+        def _gravar_evento() -> None:
+            texto_atual = path.read_text(encoding="utf-8")
+            texto_atual = replace_or_append_bullet(texto_atual, label, nova_data)
+            if args.evento == "inicio_uso":
+                inicio = dt.date.fromisoformat(nova_data)
+                if not extract_bullet(texto_atual, "D+30 preenchido em"):
+                    texto_atual = replace_or_append_bullet(
+                        texto_atual, "Veredito D+30 previsto", (inicio + dt.timedelta(days=30)).isoformat()
+                    )
+                if not extract_bullet(texto_atual, "D+180 preenchido em"):
+                    texto_atual = replace_or_append_bullet(
+                        texto_atual, "Veredito D+180 previsto", (inicio + dt.timedelta(days=180)).isoformat()
+                    )
+            atomic_write_text(path, texto_atual)
+
+        op.executar_uma_vez("evento", _gravar_evento)
+
+        projeto_salvo = op.detalhe.get("projeto_dir")
+        if projeto_salvo:
+            op.executar_uma_vez("estado_projeto", lambda: _marcar_projeto_comprado(Path(projeto_salvo)))
+
     print(path)
+    if args.evento == "comprado":
+        if projeto_dir:
+            print(f"Estado do projeto {projeto_dir.name} atualizado para comprado.")
+        else:
+            projeto_nome = extract_bullet(text, "Projeto") or "?"
+            print(
+                f"Nao encontrei a decisao aberta correspondente em `{projeto_nome}` - "
+                "estado do projeto NAO foi alterado (so a data no veredito). Se o projeto ainda "
+                "estiver com a decisao deste produto em aberto, confira `decisao.md` e "
+                "`Produto ID` neste veredito."
+            )
 
 
 def learn_from_verdict(args: argparse.Namespace) -> None:
@@ -7043,7 +7247,6 @@ RECURSOS_DIRETOS_POR_COMANDO: dict[str, Any] = {
     "aguardar-preco": _recursos_diretos_participacao,
     "regenerar": _recursos_diretos_regenerar,
     "preencher-veredito": _recursos_diretos_preencher_veredito,
-    "registrar-evento": _recursos_diretos_preencher_veredito,
     "novo-veredito": _recursos_diretos_novo_veredito,
     "registrar-licao": _recursos_diretos_registrar_licao,
     "registrar-marca": _recursos_diretos_registrar_marca,
@@ -7105,6 +7308,16 @@ def main(argv: list[str] | None = None) -> int:
             alvo_existente = PROJETOS / _novo_projeto_id(args)
             if alvo_existente.exists():
                 alvos.add(alvo_existente)
+        if args.comando == "registrar-evento" and getattr(args, "evento", None) == "comprado":
+            # So sabemos QUAL projeto depois de ler o veredito (nao ha
+            # `args.projeto` neste comando) - mesma resolucao usada por
+            # `register_verdict_event` pra travar e checar recurso ANTES
+            # dele rodar, nao depois. `None` (sem decisao aberta deste
+            # produto, ou veredito standalone) nao trava nada: a funcao
+            # real so escreve o proprio veredito nesse caso.
+            projeto_evento = _projeto_da_confirmacao_de_compra(args.veredito)
+            if projeto_evento is not None:
+                alvos.add(projeto_evento)
         if args.comando == "dashboard":
             alvos.update({BASE, DASHBOARD, PROJETOS, *project_dirs()})
         if args.comando in ALL_PROJECT_COMMANDS and not getattr(args, "projeto", None):

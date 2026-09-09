@@ -5,14 +5,13 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (09/09/2026, sessao 20)
+## AO RETOMAR — comece por aqui (09/09/2026, sessao 21)
 
-**Proximo passo:** o Josemar provavelmente vai pedir REVISAO independente
-da frente 6 (datas/veredito), igual ja virou rotina nas outras frentes.
-Depois disso (ou se ele preferir seguir direto), nao ha mais frente nova
-pendente no plano - `docs/plano-pendencias-auditoria-2026-09-06.md` esta
-com as 6 frentes cobertas (5 concluidas sob reserva, 1 - frente 6 -
-implementada aguardando revisao).
+**Proximo passo:** o Josemar provavelmente vai pedir uma NOVA rodada de
+revisao independente da frente 6 (a 1a achou 5 falhas reais, ja
+corrigidas nesta sessao). So depois disso passar limpa - mesmo padrao
+disciplinado que a frente 5 seguiu (6 rodadas com achado antes da 7a
+passar limpa) - considere a frente 6 "concluida sob reserva".
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -23,15 +22,98 @@ implementada aguardando revisao).
   secao 5 do plano. Migracao de produtos legados
   (`migrar-produtos --aplicar`) continua **nao executada** contra a arvore
   real - so o preview foi conferido em cada rodada.
-- **Frente 6 (datas/veredito): IMPLEMENTADA nesta sessao (20)** - ver
-  bloco abaixo. Ainda sem revisao independente - trate como "recem-feita,
-  nao blindada" ate uma rodada de revisao passar limpa, mesmo padrao que
-  a frente 5 seguiu.
+- **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
+  sessao 20; a 1a revisao independente (Astra), sobre o commit `e564618`,
+  achou 5 falhas reais - todas corrigidas e testadas nesta sessao (21),
+  ver bloco abaixo. **Precisa de UMA rodada de revisao que passe limpa**
+  antes de considerar "concluida sob reserva" - nao presuma que esta e a
+  ultima rodada so porque os testes passam localmente (a frente 5 levou 7
+  rodadas). Padrao do achado desta rodada: os dois comandos (`decidir`,
+  `registrar-evento`) foram corrigidos isoladamente sem considerar a
+  INTERACAO entre eles (2 chamadas de decidir sobre o mesmo veredito,
+  registrar-evento sincronizando de volta pro projeto) nem RECUPERACAO de
+  falha no meio - antes de mexer de novo, pergunte "o que acontece se este
+  comando for chamado duas vezes, ou interrompido no meio, considerando
+  TODOS os outros comandos que tocam o mesmo veredito/projeto".
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, 1a correcao da revisao independente (09/09/2026, sessao 21).**
+A Astra reproduziu 5 falhas reais contra o commit `e564618` (sessao 20,
+que implementou a frente 6 pela primeira vez), com o script
+`astra_review_e564618.py` (8 testes: 5 achados + 3 controles, todos
+reproduzidos ANTES de corrigir). As 5 viraram teste permanente em
+`tests/test_frente6_datas_veredito.py`
+(`SegundaRevisaoIndependenteFrente6Test`: 16 testes - os 5 achados + 8
+controles + 3 testes de cobertura adicional pedida explicitamente
+- travas, recursos reivindicados, falha intermediaria, retomada).
+
+1. **`registrar-evento --evento comprado` nao sincronizava o estado
+   operacional.** O veredito recebia a data, mas `processo.md`/
+   `briefing.md` continuavam dizendo "pesquisando"/"comprar ou marcar
+   como comprado". Corrigido: `_marcar_projeto_comprado` (extraida da
+   logica que `decidir --comprado` ja tinha) roda tambem aqui - MAS SO
+   quando o veredito e comprovadamente o da decisao ABERTA agora
+   (`_projeto_da_confirmacao_de_compra` confere `Projeto`/`Produto ID` do
+   veredito contra `decisao.md`); um veredito de decisao ja substituida,
+   ou standalone sem `Produto ID`, nunca mexe no estado - so avisa.
+2. **2a chamada de `decidir --comprado` nao complementava o veredito ja
+   criado.** `create_verdict` retornava direto porque o arquivo ja
+   existia - o projeto ficava marcado comprado, mas o veredito sem `Data
+   da compra`. Corrigido: quando o arquivo ja existe e nao ha `--force-
+   veredito`, complementa SO `Data da compra` se ainda estiver em branco
+   (nunca sobrescreve uma ja registrada, nunca mexe no resto do
+   conteudo) - nao precisa apagar/recriar o veredito so pra confirmar uma
+   compra que chegou depois.
+3. **Retomada em outro dia trocava a data da compra.** `decidir
+   --comprado` sem `--data-compra` interrompido ANTES de criar o veredito,
+   retomado no dia seguinte, gravava a data da RETOMADA como data da
+   compra. Corrigido: `data_compra_efetiva` e calculada e congelada em
+   `op.detalhe` na 1a tentativa (mesmo mecanismo ja usado para
+   `snapshot_rel`/`veredito_nome`), nunca recalculada numa retomada.
+4. **Journal de versao anterior a frente 6 parava de ser retomavel.** A
+   assinatura de `decidir` ganhou o campo `data_compra`; um journal real
+   criado pelo codigo de `5998a15` (sem esse campo), apos atualizar o
+   codigo, era recusado como "dados diferentes" so por causa da propria
+   evolucao do schema. Corrigido com `_assinaturas_compativeis`: um campo
+   AUSENTE na assinatura antiga so e compativel com o valor ATUAL se for
+   o default neutro (None/False/vazio) - um valor PREENCHIDO continua
+   recusado (protecao contra argumento realmente diferente preservada,
+   testada em separado).
+5. **Cronologia de `registrar-evento` so validava pra tras.** Registrar
+   `inicio_uso` ontem e depois `entrega` hoje era aceito, mesmo sendo
+   cronologicamente impossivel (entrega tem que vir ANTES do inicio de
+   uso) - a checagem so olhava os eventos ANTERIORES na ordem
+   (`comprado`→`entrega`→`inicio_uso`), nunca os posteriores ja
+   registrados. Corrigido com um segundo loop simetrico checando os
+   eventos posteriores.
+
+**Achado colateral do proprio pacote, corrigido junto:** como a
+sincronizacao do achado 1 passou a gravar `processo.md`/`briefing.md`
+alem do veredito, `registrar-evento` ganhou o proprio `tracked_operation`
+(mesmo mecanismo de `decidir`/`aprender-veredito`) - uma falha ENTRE
+gravar o evento no veredito e sincronizar o projeto fica pendente e
+RETOMAVEL (testado com crash injetado), o projeto e reivindicado como
+recurso ANTES de escrever (bloqueia contra um `decidir` concorrente no
+mesmo projeto, tambem testado), e a data efetiva tambem e congelada em
+`op.detalhe` pelo mesmo motivo do achado 3.
+
+**Verificacao (sessao 21):** suite completa **498 testes, 0 falhas**
+(482 + 16 novos). Mutacao aplicada nas 5 correcoes de fundo, uma de cada
+vez, desfeita e restaurada em seguida: derrubou exatamente os testes do
+mecanismo mutado (1o: 3; 2o: 1; 3o: 1; 4o: 1, so depois de corrigir o
+proprio teste pra usar o commit `5998a15` - o correto pra achado 4 - em
+vez de `e564618`, que ja tinha o campo novo; 5o: 1), nenhum fora disso.
+`auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a arvore
+real. Nenhuma migracao rodada contra produtos reais, pesos/gates
+intocados. Detalhe completo:
+`docs/plano-pendencias-auditoria-2026-09-06.md`, secao 6.
+
+## Sessao anterior (09/09/2026, sessao 20) — historico
 
 **Frente 6 - Datas e vereditos (09/09/2026, sessao 20).** Pedido do
 Josemar: separar data da decisao, compra/pagamento, entrega e inicio de

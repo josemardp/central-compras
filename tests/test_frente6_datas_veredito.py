@@ -14,11 +14,17 @@ docs/como-conferir-auditoria.md).
 """
 
 import datetime as dt
+import os
+import subprocess
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import ambiente
 from scripts import central_compras as cc
+
+REPO = Path(__file__).resolve().parents[1]
 
 
 class SeparacaoDeDatasTest(ambiente.RepoTestCase):
@@ -380,6 +386,380 @@ class RegistroAntigoCompatibilidadeTest(ambiente.RepoTestCase):
         )
         # A data da compra legada continua intocada.
         self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), "2025-01-01")
+
+
+class SegundaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
+    """Regressao dos 5 achados da 2a revisao independente (Astra) sobre o
+    commit `e564618` - cada teste aqui reproduziu uma falha real contra
+    aquele codigo antes da correcao (script `astra_review_e564618.py`).
+    Ver STATUS.md e docs/como-conferir-auditoria.md.
+
+    Raiz comum: a correcao anterior tratava `decidir` e `registrar-evento`
+    como dois comandos isolados - nao sincronizava o veredito de volta pro
+    estado operacional do projeto (achado 1), nao complementava um
+    veredito ja existente numa segunda `decidir --comprado` (achado 2), nao
+    congelava a data efetiva contra retomada em outro dia (achado 3), a
+    assinatura de `decidir` nao tolerava a evolucao do proprio schema
+    (achado 4), e a checagem de cronologia so olhava pra tras, nunca pra
+    frente (achado 5)."""
+
+    def _decidir(self, project, pid="candidato", extra=()):
+        self.product(project, pid)
+        self.quote(project, pid, "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", pid,
+                  "--porque", "unico candidato", "--sem-perdedores", *extra)
+        return next(p for p in cc.VEREDITOS.glob("*.md") if pid in p.name)
+
+    def _status(self, project):
+        return self.cli("status", str(project))
+
+    # ---- achado 1: registrar-evento --evento comprado nao sincronizava --
+
+    def test_comprado_registrado_por_evento_atualiza_estado_operacional(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        status = self._status(project)
+        self.assertIn("Estado: comprado", status)
+        self.assertNotIn("comprar ou marcar como comprado", status)
+        self.assertIn("acompanhar entrega e preencher veredito D+30", status)
+
+    def test_comprado_sem_decisao_correspondente_nao_mexe_no_estado(self):
+        """Controle da verificacao de associacao: um veredito standalone
+        (`novo-veredito`, sem `Produto ID`) nunca tem como corresponder a
+        UMA decisao aberta - o evento e gravado, mas o estado do projeto
+        fica intocado, so um aviso e impresso."""
+        project = self.project()
+        self.cli("novo-veredito", str(project))
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+
+        saida = self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+        self.assertIn("NAO foi alterado", saida)
+        status = self._status(project)
+        self.assertNotIn("Estado: comprado", status)
+
+    def test_comprado_de_decisao_substituida_nao_mexe_no_estado_da_nova(self):
+        """Controle mais forte: o projeto TEM uma decisao aberta, mas para
+        OUTRO produto (esta decisao substituiu a anterior) - o veredito
+        antigo confirmando compra nao pode sincronizar estado que agora
+        pertence a uma decisao diferente."""
+        project = self.project()
+        veredito_antigo = self._decidir(project, pid="antigo")
+        self.product(project, "novo")
+        self.quote(project, "novo", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "novo", "--porque",
+                  "troquei de ideia", "--perdedores", "antigo: troquei de ideia")
+
+        self.cli("registrar-evento", str(veredito_antigo), "--evento", "comprado")
+
+        status = self._status(project)
+        self.assertNotIn("Estado: comprado", status)
+
+    # ---- achado 2: 2a chamada de decidir --comprado nao complementava ----
+
+    def test_decidir_comprado_depois_complementa_veredito_existente(self):
+        project = self.project()
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores"]
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli(*args)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), "")
+
+        self.cli(*args, "--comprado")
+
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+        status = self._status(project)
+        self.assertIn("Estado: comprado", status)
+
+    def test_decidir_comprado_depois_nao_sobrescreve_data_ja_registrada(self):
+        """Controle: se a compra ja tinha sido registrada por outro caminho
+        (`registrar-evento`) ANTES da 2a chamada de `decidir --comprado`,
+        o complemento nao pode pisar em cima - fato datado nao e
+        sobrescrito, nem por este caminho."""
+        project = self.project()
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores"]
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli(*args)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        ontem = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        self.cli("registrar-evento", str(veredito), "--evento", "comprado", "--data", ontem)
+
+        self.cli(*args, "--comprado")
+
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), ontem)
+
+    def test_decidir_comprado_depois_nao_exige_force_veredito(self):
+        """O veredito nao pode ser reescrito do zero so pra registrar a
+        confirmacao - `--force-veredito` continua sendo so pra descartar o
+        conteudo inteiro de proposito."""
+        project = self.project()
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores"]
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli(*args)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        cc.atomic_write_text(
+            veredito,
+            cc.replace_or_append_bullet(veredito.read_text(encoding="utf-8"), "D+30 resumo", "MARCADOR_PRESERVAR"),
+        )
+
+        self.cli(*args, "--comprado")
+
+        self.assertIn("MARCADOR_PRESERVAR", veredito.read_text(encoding="utf-8"))
+
+    # ---- achado 3: retomada em outro dia trocava a data da compra --------
+
+    def test_retomada_em_outro_dia_nao_troca_data_de_compra_congelada(self):
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+        primeiro_dia = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        segundo_dia = dt.date.today().isoformat()
+
+        def crash(ponto):
+            if ponto == "veredito:iniciado":
+                raise OSError("falha antes de criar veredito")
+
+        with patch.object(cc, "today", return_value=primeiro_dia), \
+                patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        with patch.object(cc, "today", return_value=segundo_dia):
+            self.cli(*args)
+
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(
+            cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), primeiro_dia,
+            f"Retomada no dia {segundo_dia} nao pode trocar a data da confirmacao original ({primeiro_dia})",
+        )
+
+    def test_controle_data_compra_explicita_sobrevive_retomada_em_outro_dia(self):
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        primeiro_dia = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado", "--data-compra", primeiro_dia]
+
+        def crash(ponto):
+            if ponto == "veredito:iniciado":
+                raise OSError("falha antes de criar veredito")
+
+        with patch.object(cc, "today", return_value=primeiro_dia), \
+                patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        self.cli(*args)
+
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), primeiro_dia)
+
+    def test_controle_retomada_mesma_versao_com_comprado_funciona(self):
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+
+        def crash(ponto):
+            if ponto == "veredito:iniciado":
+                raise OSError("falha antes de criar veredito")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        self.cli(*args)
+
+        self.assertFalse(cc.pending_operations([project]))
+        self.assertEqual(
+            cc.extract_bullet(next(cc.VEREDITOS.glob("*.md")).read_text(encoding="utf-8"), "Data da compra"),
+            cc.today(),
+        )
+
+    # ---- achado 4: assinatura de decidir perdia compatibilidade ----------
+
+    def test_journal_de_versao_anterior_a_data_compra_continua_retomavel(self):
+        """Journal real criado pelo codigo do commit `5998a15` (a versao
+        anterior a frente 6 inteira - sem `--data-compra`, sem os campos
+        `data_compra`/`data_compra_efetiva` na assinatura/detalhe),
+        interrompido em `veredito:iniciado`, tem que continuar retomavel
+        com o MESMO comando depois do upgrade - sem exigir apagar o
+        journal, sem enfraquecer a recusa pra argumento realmente
+        diferente (ver teste de controle abaixo)."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+
+        script = self.root / "scripts" / "central_compras.py"
+        atual = script.read_bytes()
+        antigo = subprocess.run(
+            ["git", "show", "5998a15:scripts/central_compras.py"],
+            cwd=REPO, capture_output=True, check=True,
+        ).stdout
+        script.write_bytes(antigo)
+        env = os.environ.copy()
+        env["CENTRAL_COMPRAS_TESTE_CRASH_APOS"] = "veredito:iniciado"
+        crash = subprocess.run(
+            [sys.executable, str(script), *args], cwd=self.root, env=env, capture_output=True, text=True,
+        )
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+
+        script.write_bytes(atual)
+        retry = subprocess.run(
+            [sys.executable, str(script), *args], cwd=self.root, capture_output=True, text=True,
+        )
+        self.assertEqual(
+            retry.returncode, 0,
+            "MESMO comando e argumentos recusados como 'dados diferentes' so por causa da "
+            "evolucao do schema da assinatura:\n" + retry.stderr,
+        )
+        self.assertFalse(cc.pending_operations([project]))
+
+    def test_controle_assinatura_realmente_diferente_continua_recusada(self):
+        """A tolerancia a evolucao de schema (achado 4) nao pode abrir mao
+        de recusar um argumento genuinamente diferente - aqui a PROPRIA
+        versao atual comeca a operacao sem `--data-compra` e a retomada
+        tenta completar com uma `--data-compra` explicita: isso e dado
+        novo de verdade, tem que continuar recusado."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+
+        def crash(ponto):
+            if ponto == "veredito:iniciado":
+                raise OSError("falha antes de criar veredito")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        ontem = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        with self.assertRaisesRegex(SystemExit, "dados diferentes"):
+            self.cli(*args, "--data-compra", ontem)
+
+    # ---- achado 5: cronologia so validava pra tras ------------------------
+
+    def test_cronologia_bidirecional_recusa_entrega_apos_inicio_de_uso(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        ontem = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso", "--data", ontem)
+        antes = veredito.read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "e posterior a Data de inicio de uso"):
+            self.cli("registrar-evento", str(veredito), "--evento", "entrega", "--data", cc.today())
+
+        self.assertEqual(veredito.read_bytes(), antes)
+
+    def test_controle_uso_depois_da_entrega_calcula_lembretes(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        self.cli("registrar-evento", str(veredito), "--evento", "entrega", "--data", cc.today())
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso", "--data", cc.today())
+
+        texto = veredito.read_text(encoding="utf-8")
+        esperado = (dt.date.today() + dt.timedelta(days=30)).isoformat()
+        self.assertEqual(cc.extract_bullet(texto, "Veredito D+30 previsto"), esperado)
+
+    # ---- cobertura adicional: multiplos arquivos, travas, recuperacao ----
+
+    def test_recursos_reivindicados_por_decidir_pendente_bloqueiam_evento_comprado(self):
+        """`registrar-evento --evento comprado` grava `processo.md`/
+        `briefing.md` do projeto associado, alem do veredito - por isso
+        precisa reivindicar os dois como recurso. Um `decidir` interrompido
+        (journal pendente reivindicando `processo.md` do MESMO projeto)
+        bloqueia `registrar-evento` ate ser resolvido."""
+        project = self.project()
+        veredito_path = self._decidir(project)
+        self.assertEqual(cc.extract_bullet(veredito_path.read_text(encoding="utf-8"), "Data da compra"), "")
+
+        # 2a chamada, agora com --comprado, interrompida ANTES de tocar em
+        # qualquer arquivo (a captura ainda nem comecou) - o journal fica
+        # pendente reivindicando decisao.md/processo.md/o proprio veredito,
+        # mas o conteudo do veredito continua exatamente como o da 1a
+        # chamada (Data da compra ainda em branco).
+        def crash(ponto):
+            if ponto == "captura:iniciado":
+                raise OSError("falha antes de qualquer escrita da 2a chamada")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                          "unico candidato", "--sem-perdedores", "--comprado")
+
+        self.assertEqual(cc.extract_bullet(veredito_path.read_text(encoding="utf-8"), "Data da compra"), "")
+        with self.assertRaisesRegex(SystemExit, "ja reivindica"):
+            self.cli("registrar-evento", str(veredito_path), "--evento", "comprado")
+        self.assertEqual(cc.extract_bullet(veredito_path.read_text(encoding="utf-8"), "Data da compra"), "")
+
+        # Retomando `decidir`, o registro do evento volta a funcionar.
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores", "--comprado")
+        self.assertFalse(cc.pending_operations([project]))
+
+    def test_falha_entre_gravar_evento_e_sincronizar_projeto_e_retomavel(self):
+        """Uma falha DEPOIS do evento ja estar gravado no veredito, mas
+        ANTES de `processo.md`/`briefing.md` serem atualizados, nao pode
+        deixar o projeto preso em 'pesquisando' pra sempre - repetir o
+        MESMO comando completa so o que faltou, sem duplicar nem recusar
+        como 'ja registrado'."""
+        project = self.project()
+        veredito = self._decidir(project)
+
+        def crash(ponto):
+            if ponto == "estado_projeto:iniciado":
+                raise OSError("falha entre gravar o evento e sincronizar o projeto")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+        self.assertNotIn("Estado: comprado", self._status(project))
+        self.assertTrue(cc.pending_operations([project]) or cc.pending_operations([cc.BASE]))
+
+        self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        self.assertIn("Estado: comprado", self._status(project))
+        self.assertFalse(cc.pending_operations([cc.BASE]))
+
+    def test_falha_apos_gravar_evento_nao_duplica_bullet(self):
+        """Mesmo cenario da falha intermediaria, mas confirmando que a
+        retomada nao duplica a linha `Data da compra` no veredito (o passo
+        `evento` e reconhecido como ja concluido, `executar_uma_vez` nao
+        roda `_gravar_evento` de novo)."""
+        project = self.project()
+        veredito = self._decidir(project)
+
+        def crash(ponto):
+            if ponto == "estado_projeto:iniciado":
+                raise OSError("falha entre gravar o evento e sincronizar o projeto")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        texto = veredito.read_text(encoding="utf-8")
+        self.assertEqual(texto.count("- Data da compra:"), 1)
 
 
 if __name__ == "__main__":
