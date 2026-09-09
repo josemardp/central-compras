@@ -5,6 +5,8 @@
 - Projeto:
 - Produto:
 - Data da compra:
+- Data de entrega:
+- Data de inicio de uso:
 - Valor pago:
 - Vendedor:
 - Veredito D+30 previsto:

@@ -226,6 +226,26 @@ def reject_future(momento: dt.datetime) -> dt.datetime:
     return momento
 
 
+def iso_event_date(value: str) -> str:
+    """Valida `--data` de eventos pos-decisao (compra/entrega/inicio de uso).
+
+    So data (sem hora - esses eventos, diferente de cotacao, nao registram
+    granularidade de horario) e sempre um FATO do passado, nunca previsao -
+    mesmo principio de `reject_future`, aplicado aqui de novo porque estes
+    eventos usam um formato mais estrito (so `AAAA-MM-DD`).
+    """
+    texto = (value or "").strip()
+    try:
+        data = dt.datetime.strptime(texto, "%Y-%m-%d").date()
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"data invalida: {value!r}. Use AAAA-MM-DD.") from None
+    if data > dt.date.today():
+        raise argparse.ArgumentTypeError(
+            f"data no futuro: {data.isoformat()}. Evento e algo que ja aconteceu, nao previsao."
+        )
+    return data.isoformat()
+
+
 def valid_collection_date(value: Any) -> bool:
     texto = str(value or "").strip()
     if not texto:
@@ -3549,6 +3569,12 @@ Tarefa: monte perguntas de veredito D+30 e D+180 para extrair aprendizado reutil
 
 
 def decide(args: argparse.Namespace) -> None:
+    if args.data_compra and not args.comprado:
+        raise SystemExit(
+            "--data-compra so faz sentido junto de --comprado - decidir sozinho nunca "
+            "comprova pagamento. Adicione --comprado, ou registre a compra depois com "
+            "`registrar-evento` quando ela de fato acontecer."
+        )
     project = project_path(args.projeto)
     # Gate, confianca e snapshot precisam se referir a MESMA oferta. Selecionar
     # de novo sem a preferencia do ranking podia fechar outra loja/preco ou
@@ -3673,6 +3699,7 @@ def decide(args: argparse.Namespace) -> None:
         "perdedores": sorted(perdedores),
         "sem_perdedores": bool(args.sem_perdedores),
         "comprado": bool(args.comprado),
+        "data_compra": args.data_compra,
         "risco": sorted(args.risco or []),
         "force_veredito": bool(args.force_veredito),
         "flags": {
@@ -3927,7 +3954,8 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
     op.executar_uma_vez(
         "veredito",
         lambda: create_verdict(project, args.produto_id, product, quote,
-                                force=args.force_veredito, path=verdict_path),
+                                force=args.force_veredito, path=verdict_path,
+                                comprado=bool(args.comprado), data_compra=args.data_compra),
     )
     op.registrar_efeito(
         "timeline_veredito", timeline_path,
@@ -4030,22 +4058,38 @@ def report_pending_operations(args: argparse.Namespace) -> None:
 
 
 def create_verdict(project: Path, produto_id: str, product: dict[str, Any], quote: dict[str, str],
-                    force: bool = False, path: Path | None = None) -> Path:
+                    force: bool = False, path: Path | None = None,
+                    comprado: bool = False, data_compra: str | None = None) -> Path:
+    """Cria o arquivo de veredito no momento de `decidir`.
+
+    Frente 6: `decidir` fecha a DECISAO (escolha e justificativa), nunca a
+    compra em si - cotacao manual e evidencia de uma OFERTA conferida, nao
+    prova de pagamento. `Data da compra` so entra aqui quando quem chamou
+    passa `comprado=True` explicitamente (a flag `--comprado` do `decidir`,
+    uma afirmacao direta do Josemar "eu comprei", nao uma inferencia da
+    fonte da cotacao) - se `decidir` rodou sem `--comprado`, o campo fica
+    em branco e so e preenchido depois via `registrar-evento`, quando a
+    compra de fato acontecer.
+
+    `Veredito D+30 previsto`/`D+180 previsto` tambem ficam em branco aqui -
+    ver `register_verdict_event`: so sao calculados a partir da data de
+    INICIO DE USO explicitamente registrada, nunca da data da decisao/
+    compra/entrega, e nunca fabricados com `hoje()` na ausencia dela. Sem
+    essa data, o painel mostra "aguardando inicio de uso" ate ser
+    informado - nunca vence nem atrasa por conta de um prazo que ninguem
+    confirmou.
+    """
     if path is None:
         path = VEREDITOS / f"{today()}-{project.name}-{produto_id}.md"
     if path.exists() and not force:
         return path
-    d30 = dt.date.today() + dt.timedelta(days=30)
-    d180 = dt.date.today() + dt.timedelta(days=180)
     text = render_template("veredito.md")
     replacements = {
         "- Projeto:": f"- Projeto: {project.name}",
         "- Produto:": f"- Produto: {product.get('nome') or produto_id}",
-        "- Data da compra:": f"- Data da compra: {today() if quote.get('fonte') == 'manual' else ''}",
+        "- Data da compra:": f"- Data da compra: {data_compra or today() if comprado else ''}",
         "- Valor pago:": f"- Valor pago: {brl(quote.get('custo_total'))}",
         "- Vendedor:": f"- Vendedor: {quote.get('loja')} / {quote.get('vendedor')}",
-        "- Veredito D+30 previsto:": f"- Veredito D+30 previsto: {d30.isoformat()}",
-        "- Veredito D+180 previsto:": f"- Veredito D+180 previsto: {d180.isoformat()}",
         # Preenchidos aqui para que `aprender-veredito` consiga exportar marca,
         # loja e categoria sem depender de o usuario redigitar tudo na mao.
         "- Marca:": f"- Marca: {product.get('marca') or ''}",
@@ -4067,12 +4111,17 @@ def replace_or_append_bullet(text: str, label: str, value: str) -> str:
     return text.rstrip() + f"\n- {label}: {value}\n"
 
 
-def fill_verdict(args: argparse.Namespace) -> None:
-    path = Path(args.veredito)
+def resolve_verdict_path(veredito: str) -> Path:
+    path = Path(veredito)
     if not path.is_absolute():
-        path = ROOT / args.veredito
+        path = ROOT / veredito
     if not path.exists():
-        raise SystemExit(f"Veredito nao encontrado: {args.veredito}")
+        raise SystemExit(f"Veredito nao encontrado: {veredito}")
+    return path
+
+
+def fill_verdict(args: argparse.Namespace) -> None:
+    path = resolve_verdict_path(args.veredito)
     text = path.read_text(encoding="utf-8")
     prefix = "D+30" if args.fase == "d30" else "D+180"
     updates = {
@@ -4117,12 +4166,74 @@ def extract_bullet(text: str, label: str) -> str:
     return ""
 
 
+# Ordem cronologica esperada dos eventos pos-decisao - so usada pra recusar
+# entrada obviamente fora de ordem (ex.: entrega registrada antes da
+# compra). Nao exige que os eventos anteriores existam (o Josemar pode
+# nunca ter rodado `decidir --comprado`, ou pode registrar so o inicio de
+# uso), so que quando um evento anterior JA esta gravado, o novo nao seja
+# cronologicamente impossivel.
+VERDICT_EVENT_BULLET = {
+    "comprado": "Data da compra",
+    "entrega": "Data de entrega",
+    "inicio_uso": "Data de inicio de uso",
+}
+VERDICT_EVENT_ORDER = ["comprado", "entrega", "inicio_uso"]
+
+
+def register_verdict_event(args: argparse.Namespace) -> None:
+    """`registrar-evento`: grava, num veredito ja existente, a data em que
+    a compra foi paga, o produto chegou, ou o uso comecou de verdade -
+    sempre POSTERIOR a `decidir` (que so fecha a escolha, nunca comprova
+    nenhum desses tres fatos).
+
+    Frente 6, principio central: cada evento e um FATO DATADO independente
+    e nunca e sobrescrito silenciosamente - uma segunda tentativa de
+    registrar o MESMO evento (mesmo com data diferente) e recusada antes de
+    qualquer escrita; corrigir um engano de digitacao e edicao manual do
+    arquivo, o mesmo padrao ja usado para participacao invalida.
+
+    So o evento `inicio_uso` recalcula `Veredito D+30 previsto`/`D+180
+    previsto` (data de inicio + 30/180 dias) - e a UNICA ancora valida para
+    esses lembretes; nunca decisao, compra ou entrega. Uma fase que ja foi
+    RESPONDIDA (`D+30 preenchido em` presente) nunca tem o `previsto`
+    recalculado por cima - preserva o veredito ja preenchido, como pedido.
+    """
+    path = resolve_verdict_path(args.veredito)
+    text = path.read_text(encoding="utf-8")
+    label = VERDICT_EVENT_BULLET[args.evento]
+    existente = extract_bullet(text, label)
+    if existente:
+        raise SystemExit(
+            f"{label} ja esta registrada ({existente}) neste veredito - fato datado nao e "
+            "sobrescrito silenciosamente. Se foi engano de digitacao, corrija o arquivo a "
+            f"mao: {path}"
+        )
+    nova_data = args.data or today()
+    indice = VERDICT_EVENT_ORDER.index(args.evento)
+    for evento_anterior in VERDICT_EVENT_ORDER[:indice]:
+        data_anterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_anterior])
+        if data_anterior and nova_data < data_anterior:
+            raise SystemExit(
+                f"{label} ({nova_data}) e anterior a {VERDICT_EVENT_BULLET[evento_anterior]} "
+                f"({data_anterior}) - confira a data informada. Nada foi alterado."
+            )
+    text = replace_or_append_bullet(text, label, nova_data)
+    if args.evento == "inicio_uso":
+        inicio = dt.date.fromisoformat(nova_data)
+        if not extract_bullet(text, "D+30 preenchido em"):
+            text = replace_or_append_bullet(
+                text, "Veredito D+30 previsto", (inicio + dt.timedelta(days=30)).isoformat()
+            )
+        if not extract_bullet(text, "D+180 preenchido em"):
+            text = replace_or_append_bullet(
+                text, "Veredito D+180 previsto", (inicio + dt.timedelta(days=180)).isoformat()
+            )
+    atomic_write_text(path, text)
+    print(path)
+
+
 def learn_from_verdict(args: argparse.Namespace) -> None:
-    path = Path(args.veredito)
-    if not path.is_absolute():
-        path = ROOT / args.veredito
-    if not path.exists():
-        raise SystemExit(f"Veredito nao encontrado: {args.veredito}")
+    path = resolve_verdict_path(args.veredito)
     text = path.read_text(encoding="utf-8")
     preenchidas = {
         fase: any(
@@ -4877,7 +4988,11 @@ def verdict_summaries() -> list[dict[str, str]]:
             return f"preenchido {filled.isoformat()}"
         expected = parse_dashboard_date(extract_bullet(text, f"Veredito {prefix} previsto"))
         if not expected:
-            return "sem data"
+            # `Veredito {prefix} previsto` so existe depois que o inicio de
+            # uso e registrado (`registrar-evento --evento inicio_uso`) -
+            # frente 6. Sem essa data, o lembrete fica pendente aqui, nunca
+            # "atrasado" ou "vence hoje" fabricado a partir de hoje.
+            return "aguardando inicio de uso"
         delta = (expected - dt.date.today()).days
         if delta < 0:
             return f"atrasado {abs(delta)} dia(s)"
@@ -6682,6 +6797,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--permitir-incompleto", action="store_true", help="fecha mesmo com confianca abaixo do minimo")
     p.add_argument("--sem-perdedores", action="store_true", help="fecha sem registrar derrotados (nao houve concorrente)")
     p.add_argument("--comprado", action="store_true", help="marca o projeto como comprado ao decidir")
+    p.add_argument("--data-compra", type=iso_event_date,
+                    help="AAAA-MM-DD da compra, so com --comprado (default: hoje). "
+                         "Decidir sem --comprado nunca grava data de compra.")
     p.add_argument("--force-veredito", action="store_true", help="sobrescreve veredito existente")
     p.set_defaults(func=decide)
 
@@ -6776,6 +6894,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--valeu-o-que-pagou", choices=["sim", "nao", "parcial"])
     p.add_argument("--o-que-aprendi")
     p.set_defaults(func=fill_verdict)
+
+    p = sub.add_parser("registrar-evento",
+                        help="registra data de compra, entrega ou inicio de uso num veredito existente")
+    p.add_argument("veredito")
+    p.add_argument("--evento", choices=["comprado", "entrega", "inicio_uso"], required=True)
+    p.add_argument("--data", type=iso_event_date,
+                    help="AAAA-MM-DD do evento (default: hoje). D+30/D+180 so contam a partir "
+                         "de --evento inicio_uso; os outros eventos nao mexem no prazo.")
+    p.set_defaults(func=register_verdict_event)
 
     p = sub.add_parser("aprender-veredito", help="transforma veredito preenchido em marca, loja e licao")
     p.add_argument("veredito")
@@ -6916,6 +7043,7 @@ RECURSOS_DIRETOS_POR_COMANDO: dict[str, Any] = {
     "aguardar-preco": _recursos_diretos_participacao,
     "regenerar": _recursos_diretos_regenerar,
     "preencher-veredito": _recursos_diretos_preencher_veredito,
+    "registrar-evento": _recursos_diretos_preencher_veredito,
     "novo-veredito": _recursos_diretos_novo_veredito,
     "registrar-licao": _recursos_diretos_registrar_licao,
     "registrar-marca": _recursos_diretos_registrar_marca,
@@ -6935,7 +7063,7 @@ MUTATING_COMMANDS = {
 KNOWLEDGE_COMMANDS = {
     "registrar-marca", "registrar-loja", "registrar-licao", "aprender-veredito",
     "reaproveitamento", "listar-aguardando-preco", "regenerar", "decidir",
-    "preencher-veredito",
+    "preencher-veredito", "registrar-evento",
 }
 
 PRODUCT_COMMANDS = {"novo-produto", "descartar", "aguardar-preco", "vincular-produto", "migrar-produtos"}

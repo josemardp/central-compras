@@ -52,6 +52,14 @@ class VerdictTemplateTest(unittest.TestCase):
         for rotulo in ["- Marca:", "- Loja:", "- Categoria:", "- Projeto:", "- Produto:", "- Vendedor:"]:
             self.assertIn(rotulo, texto, f"veredito sem o campo {rotulo}")
 
+    def test_verdict_has_the_frente6_event_dates(self):
+        """Frente 6: decisao, compra, entrega e inicio de uso sao fatos
+        distintos - cada um precisa do proprio campo, nunca inferido de
+        outro (`registrar-evento` escreve nestes bullets)."""
+        texto = (ROOT / "templates" / "veredito.md").read_text(encoding="utf-8")
+        for rotulo in ["- Data da compra:", "- Data de entrega:", "- Data de inicio de uso:"]:
+            self.assertIn(rotulo, texto, f"veredito sem o campo {rotulo}")
+
 
 class CategoryConfigTest(unittest.TestCase):
     def test_every_declared_gate_is_actually_enforced(self):

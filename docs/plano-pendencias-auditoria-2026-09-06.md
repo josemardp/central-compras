@@ -835,25 +835,31 @@ gates e limites de score do ranking também não foram tocados, como pedido.
 
 ## 5. Produtos reutilizados em projetos diferentes
 
-**Estado: implementada (sessão 13), corrigida em seis rodadas de revisão
+**Estado: concluída sob reserva (sessão 19, sétima revisão independente da
+Astra sobre o commit `5998a15` passou limpa — 456 testes oficiais, 25
+testes externos anteriores e 3 controles adicionais, sem achado novo).**
+Implementada na sessão 13, corrigida em seis rodadas de revisão
 independente da Astra (sessões 14, 15, 16, 17, 18 e 19 — 6 + 3 + 3 + 4 + 2
-+ 1 achados). Ainda falta UMA rodada de revisão que passe limpa antes de
-declarar "concluída sob reserva" — já foi dada como pronta SEIS vezes e as
-seis vezes apareceu lacuna nova; não presuma que a 7ª rodada não vai achar
-mais nada. Padrão que se repete: cada rodada acha problema mais profundo
-no MESMO conjunto de mecanismos — as 3 primeiras em `link_product`/
-`migrate_products` + `tracked_operation`, a 4ª no contrato de participação
++ 1 achados) antes desta sétima rodada limpa. Padrão que se repetiu nas
+seis rodadas anteriores, registrado aqui para quem revisar de novo no
+futuro: cada rodada achava problema mais profundo no MESMO conjunto de
+mecanismos — as 3 primeiras em `link_product`/`migrate_products` +
+`tracked_operation`, a 4ª no contrato de participação
 (`_participacao_invalida`/`read_participation`) e nos consumidores que
 ainda liam `estado` bruto do YAML (`project_candidate_ids`/
 `project_discarded_candidate_ids`), a 5ª nos lugares que tratam
 `read_participation` como DADO A MUTAR/PRESERVAR (`descartar`/
 `aguardar-preco`, snapshot de decisão) em vez de sinal de corte, a 6ª numa
 variante adjacente da própria correção da 5ª (participação inválida SEM
-cotação, fora do conjunto que o loop de captura varria) — a próxima
-revisão (ou correção) deveria ler o contrato inteiro dessas áreas, e
-perguntar "quem mais chama `read_participation`/`project_product_ids` e o
-que faz com o resultado, inclusive quem fica de fora por não ter
-cotação", não só o diff da última rodada.**
+cotação, fora do conjunto que o loop de captura varria). **"Concluída sob
+reserva" nesta frente já foi contestada seis vezes por revisão futura —
+uma sessão que for mexer aqui de novo (nova frente que reutilize
+`read_participation`/`project_product_ids`, ou pedido de nova revisão)
+deve ler o contrato inteiro antes, não só o diff da última mudança.** A
+migração de produtos legados (`migrar-produtos --aplicar`) continua **não
+executada** contra a árvore real — só o preview (read-only) foi conferido
+em cada rodada; aplicá-la de verdade fica para quando o Josemar pedir
+explicitamente.
 
 **Contrato:** `produto.yaml` (ficha) passou a guardar só identidade e dado
 técnico — `id`, `categoria`, `nome`, `marca`, `atributos`,
@@ -1372,18 +1378,168 @@ real.
 pesos/gates/calibragem do score intocados; nenhuma infraestrutura externa
 tocada; nenhuma migração rodada contra produtos reais.
 
+### 7ª revisão independente (Astra, sessão 19, sobre o commit `5998a15`) — passou limpa
+
+Confirmou as seis correções anteriores sem achado novo: **456 testes
+oficiais** (suíte completa do repositório), **25 testes externos**
+anteriores da própria Astra (scripts de reprodução das sessões 14 a 19,
+reexecutados contra o código corrigido) e **3 controles adicionais**
+específicos desta rodada, todos passando. Esta é a rodada que faltava —
+seis vezes seguidas uma revisão anterior tinha achado lacuna nova depois
+de "concluída sob reserva" ser cogitada; desta vez não achou. Frente 5
+passa a **concluída sob reserva** de fato, não mais "quase lá".
+
+**Não presuma que isso significa "nunca mais vai aparecer achado
+nenhum"** — significa que a rodada mais recente, com o histórico completo
+das seis anteriores em mãos, não encontrou mais nada. Se uma frente futura
+tocar `read_participation`, `project_product_ids`/
+`project_evidence_participant_ids`, ou o mecanismo de captura de snapshot
+de novo, vale reler o contrato inteiro desta seção antes de mexer.
+
 ## 6. Datas e vereditos
 
-**Estado: não iniciada.**
+**Estado: implementada (09/09/2026, sessão 19), não revisada de forma
+independente ainda — próximo passo é pedir revisão, como nas frentes
+anteriores.**
 
-Pendente: diferenciar data da decisão, da compra/pagamento, da entrega e do
-início de uso; definir e documentar qual evento dispara D+30/D+180. Não
-presumir compra realizada só por haver decisão ou cotação manual.
+**Contrato adotado:** decisão, compra/pagamento, entrega e início de uso
+são quatro fatos datados independentes. `decidir` fecha só a escolha —
+cotação manual é evidência de uma OFERTA conferida, nunca prova de
+pagamento, entrega ou uso. D+30/D+180 contam a partir do INÍCIO DE USO
+explicitamente registrado; sem essa data, os lembretes ficam pendentes
+("aguardando inicio de uso" no painel), nunca fabricados a partir de
+hoje/decisão/compra/entrega. Cada evento é um fato datado que não é
+sobrescrito silenciosamente — mesmo princípio já usado para
+`cotacoes.csv` e para participação inválida (frente 5).
+
+**Inventário antes de mexer (achado da investigação, não só declarado):**
+`create_verdict` (chamada por `decidir`) fabricava `Veredito D+30
+previsto`/`D+180 previsto` como `hoje() + 30/180 dias` no momento da
+CRIAÇÃO do veredito — ou seja, ancorado na data da decisão, nunca no uso
+real. `Data da compra` dependia de `quote.get('fonte') == 'manual'`, não
+da flag `--comprado` — um `decidir --comprado --permitir-web` (cotação
+web) não registrava data nenhuma, e um `decidir` comum com cotação manual
+registrava `Data da compra` mesmo sem nenhuma confirmação de pagamento. Não
+existia campo nem comando para entrega ou início de uso. `novo-veredito`
+(caminho standalone, fora de `decidir`) já não preenchia os previstos —
+inconsistente com `decidir`, que preenchia.
+
+**Correção:**
+- `templates/veredito.md`: dois campos novos na seção `## Compra` —
+  `Data de entrega` e `Data de inicio de uso`, ao lado de `Data da
+  compra` já existente.
+- `create_verdict`: `Data da compra` passa a depender só do parâmetro
+  `comprado` (mapeado de `args.comprado` em `decidir`, nunca da fonte da
+  cotação) e de `data_compra` opcional (`--data-compra`, só aceito junto
+  de `--comprado`). `Veredito D+30/D+180 previsto` ficam em BRANCO na
+  criação — nunca mais fabricados com `hoje()+30/180`.
+- Comando novo, `registrar-evento <veredito> --evento
+  {comprado,entrega,inicio_uso} [--data AAAA-MM-DD]`: grava o evento no
+  veredito já existente. Recusa ANTES de escrever se o evento já estava
+  registrado (fato datado não é sobrescrito — corrigir engano de
+  digitação é edição manual do arquivo, mesmo padrão já usado para
+  participação inválida) e se a data é cronologicamente anterior a um
+  evento anterior já registrado (`comprado` → `entrega` → `inicio_uso`);
+  registrar um evento sem os anteriores existirem é permitido (o Josemar
+  pode ter esquecido de marcar `--comprado` na hora). Só `--evento
+  inicio_uso` recalcula `Veredito D+30/D+180 previsto` (início + 30/180
+  dias) — e só quando a fase correspondente ainda não foi RESPONDIDA
+  (`D+30 preenchido em` ausente), preservando um veredito já preenchido.
+  `--data` valida formato e recusa data no futuro (`iso_event_date`, mesmo
+  princípio de `reject_future` já usado em cotações). Registrado em
+  `RECURSOS_DIRETOS_POR_COMANDO`/`KNOWLEDGE_COMMANDS` com o mesmo resolver
+  de `preencher-veredito` — uma operação `decidir` pendente sobre o MESMO
+  veredito bloqueia `registrar-evento`, e vice-versa, como já acontecia
+  entre `decidir`/`preencher-veredito`/`aprender-veredito`.
+- `phase_status` (painel/dashboard): a mensagem para "sem previsto ainda"
+  mudou de `"sem data"` (genérico) para `"aguardando inicio de uso"`
+  (explica o motivo). O cálculo de atrasado/pendente/preenchido em cima de
+  um `previsto` já existente não mudou — registros antigos com o campo já
+  preenchido (pela fórmula antiga) continuam calculando status
+  normalmente, sem reescrita nem reinterpretação.
+- `resolve_verdict_path`: pequeno helper extraído (`fill_verdict`,
+  `learn_from_verdict` e `register_verdict_event` resolviam o mesmo
+  caminho de veredito de forma duplicada) — sem mudança de comportamento.
+
+**Registros antigos (compatibilidade):** nenhum veredito existente foi
+reescrito. Um veredito criado antes desta correção, com `Veredito D+30
+previsto` já fabricado pela fórmula antiga (`data_decisão + 30`), continua
+funcionando exatamente como antes — `phase_status` só LÊ o que está lá,
+nunca recalcula por conta própria. `Data da compra` de um registro antigo
+nunca é reinterpretada como início de uso nem qualquer outra coisa — só um
+`registrar-evento --evento inicio_uso` explícito grava esse campo novo.
+Snapshots de decisões já fechadas (`snapshots/<data>-<produto>/`) nunca
+são tocados por nada desta frente — o veredito é um artefato separado, fora
+de `snapshot_dir`, e não muda com o passar do tempo.
+
+**O que NÃO mudou de propósito:** pesos, gates e classificação por estrela
+do ranking; nenhuma migração rodada contra produtos reais; nenhuma
+infraestrutura externa tocada (o export para Google Sheets só envia
+`data_decisao`, nunca dado de veredito — confirmado no inventário antes de
+mexer, consistente com `docs/infraestrutura-externa.md`); `painel.py` (o
+servidor HTTP local) não expõe `decidir` nem comandos de veredito no
+formulário web hoje (`ACOES` só tem `ranking`/`validar`/`auditar`/
+`historico`/`cotar`/`regenerar`) — a frente 6 é hoje um fluxo 100% CLI,
+sem UI própria a atualizar.
+
+**Testes:** `tests/test_frente6_datas_veredito.py`, 25 testes cobrindo:
+separação de datas (decidir com/sem `--comprado`, cotação manual vs. web,
+`--data-compra` sem `--comprado` recusado, data futura recusada pelo
+parser); previsto ancorado em início de uso (veredito criado em branco,
+controle do `novo-veredito` standalone, cálculo de D+30/D+180,
+`phase_status` pendente/atrasado com datas relativas ao dia do teste);
+integridade de `registrar-evento` (recusa de sobrescrita, ordem
+cronológica inválida recusada e válida aceita, evento sem antecessor
+aceito, preservação de fase já preenchida, veredito inexistente, formato
+de data inválido, bloqueio por operação `decidir` pendente no mesmo
+veredito com recuperação real via crash injetado); fluxo completo ponta a
+ponta (decisão → compra → entrega → início de uso → D+30 → D+180, com
+`auditar-decisoes --strict`/`operacoes-pendentes --strict` no final);
+compatibilidade com registro legado (veredito com previsto no formato
+antigo continua calculando status sem reescrita; `Data da compra` legada
+não vira início de uso por inferência). `tests/test_templates.py` ganhou
+um teste checando que o template documenta os três campos de data novos.
+Datas usadas nos testes são relativas ao dia real da execução
+(`dt.date.today() ± N dias`) ou controladas via `patch.object(cc, "today",
+...)` de forma autoconsistente (nunca comparadas contra `dt.date.today()`
+não mockado) — para não quebrar conforme o calendário avança, mesmo
+princípio já usado em `tests/test_participacoes.py`.
+
+Mutação aplicada nos três mecanismos de fundo (regra `Data da compra`
+por `comprado`; recusa de sobrescrita em `registrar-evento`; cálculo de
+D+30/D+180 a partir do início de uso), cada uma desfeita e restaurada em
+seguida: a primeira derrubou 4 testes diretos + 2 colaterais em cascata
+(mesma causa raiz), todos rastreáveis; a segunda derrubou exatamente 1
+teste; a terceira derrubou exatamente 4 testes — nenhuma mutação afetou
+teste fora do mecanismo mutado. Suíte completa: **482 testes, 0 falhas**
+(456 + 25 novos + 1 no template). `auditar-decisoes --strict`,
+`operacoes-pendentes --strict`, `checar-segredos --strict` e
+`git diff --check` limpos contra a árvore real.
+
+**Fluxo visual conferido manualmente** (sandbox isolado — cópia de
+`config`/`templates`/`scripts`, nunca a árvore real, seguindo o mesmo
+cuidado de sessões anteriores): projeto → produto → cotação → `decidir
+--comprado` → veredito com `Data da compra` preenchida e os dois
+`previsto` em branco → `registrar-evento --evento entrega` →
+`registrar-evento --evento inicio_uso` → `Veredito D+30/D+180 previsto`
+calculados corretamente → `dashboard` regenerado, HTML mostrando
+`"aguardando inicio de uso"` para um segundo projeto sem início de uso
+registrado e `"pendente, faltam N dia(s)"` para o que já tinha →
+`registrar-evento` repetido sobre o mesmo evento recusado com a mensagem
+certa, arquivo intacto. **Atenção registrada para a próxima sessão:** o
+script `scripts/central_compras.py` resolve `ROOT` a partir do próprio
+`__file__`, não do diretório de trabalho — rodar o script apontando para
+uma pasta de sandbox só isola de verdade se for uma CÓPIA do script (via
+`ambiente.montar`), nunca o script real invocado com `cwd` diferente;
+nesta sessão isso foi tentado por engano uma vez, criou um projeto e um
+veredito de teste na árvore real, e foi limpo antes do commit (arquivos
+nunca chegaram a ser versionados).
 
 ## 7. Validação e publicação
 
-**Estado (08/09/2026, sessão 13, reconciliado): feita integralmente para as
-frentes 2, 3, 4 e 5. Frente 6 não iniciada, sem checklist ainda.**
+**Estado (09/09/2026, sessão 19, reconciliado): feita integralmente para as
+frentes 2, 3, 4 e 5. Frente 6 implementada, ainda sem revisão
+independente.**
 
 Esta seção estava desatualizada desde a sessão 9-12: as frentes 3 (receptor
 Sheets, 3 rodadas de revisão + redeploy verificado na nuvem) e 4
@@ -1404,15 +1560,21 @@ revisado, fluxos testados no navegador quando aplicável, push para
   na planilha real, ver seção 3.
 - **Frente 4** (proveniência): feito, 18 testes, verificado no painel com
   dados sintéticos, ver seção 4.
-- **Frente 5** (produtos reutilizados): implementada (sessão 13); seis
-  rodadas de revisão independente da Astra acharam 6, depois 3, depois mais
-  3, depois mais 4, depois mais 2 (perda de dados) e depois mais 1 (omissão
-  de evidência) lacunas reais, as seis corrigidas com teste permanente +
-  mutação (sessões 14, 15, 16, 17, 18 e 19) — suíte completa,
+- **Frente 5** (produtos reutilizados): **concluída sob reserva** (sessão
+  13 implementou; seis rodadas de revisão independente da Astra acharam 6,
+  depois 3, depois mais 3, depois mais 4, depois mais 2 (perda de dados) e
+  depois mais 1 (omissão de evidência) lacunas reais, todas corrigidas com
+  teste permanente + mutação nas sessões 14 a 19; a 7ª rodada, sobre o
+  commit `5998a15`, passou limpa — 456 testes oficiais + 25 testes
+  externos anteriores + 3 controles novos, sem achado) — suíte completa,
   `checar-segredos --strict`, `operacoes-pendentes --strict`,
-  `auditar-decisoes --strict` e `git diff --check` limpos nas seis
-  rodadas, ver seção 5. **Ainda falta uma rodada de revisão independente
-  que passe limpa** — já foi dada como pronta SEIS vezes e as seis vezes
-  apareceu lacuna nova; não presumir "concluída sob reserva" até isso
-  acontecer de verdade.
-- **Frente 6** (datas/veredito): não iniciada.
+  `auditar-decisoes --strict` e `git diff --check` limpos em todas as
+  rodadas, ver seção 5. Migração de produtos legados
+  (`migrar-produtos --aplicar`) continua não executada contra a árvore
+  real.
+- **Frente 6** (datas/veredito): implementada (sessão 19) — separação de
+  decisão/compra/entrega/início de uso, D+30/D+180 ancorados em início de
+  uso explícito, comando `registrar-evento`, 25 testes novos, suíte
+  completa (482 testes) e as três checagens estritas limpas, ver seção 6.
+  **Ainda sem revisão independente** — próximo passo natural desta frente,
+  como já é praxe nas outras.

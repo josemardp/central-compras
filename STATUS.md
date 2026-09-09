@@ -5,35 +5,114 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (09/09/2026, sessao 19)
+## AO RETOMAR — comece por aqui (09/09/2026, sessao 20)
 
-**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (7a
-rodada) desta correcao antes de iniciar a frente 6. So depois dessa revisao
-passar limpa, va para `docs/plano-pendencias-auditoria-2026-09-06.md`
-secao 6.
+**Proximo passo:** o Josemar provavelmente vai pedir REVISAO independente
+da frente 6 (datas/veredito), igual ja virou rotina nas outras frentes.
+Depois disso (ou se ele preferir seguir direto), nao ha mais frente nova
+pendente no plano - `docs/plano-pendencias-auditoria-2026-09-06.md` esta
+com as 6 frentes cobertas (5 concluidas sob reserva, 1 - frente 6 -
+implementada aguardando revisao).
 
 **Pendencias / bloqueios:**
-- Frente 6 (datas/veredito) **nao iniciada**.
-- Frente 5 (produtos reutilizados): a correcao da sessao 18 (2 falhas de
-  perda de dados) **tinha mais 1 lacuna** - uma OMISSAO de evidencia,
-  achada pela 6a revisao independente (Astra) sobre o commit `88ba7c2`.
-  **Foi corrigida e testada nesta sessao (19)** - ver bloco abaixo.
-  Continua precisando de UMA rodada de revisao que passe limpa antes de
-  declarar "concluida"; **ja foi declarada pronta SEIS vezes e as seis
-  vezes apareceu lacuna nova** - nao presuma que esta e a ultima rodada so
-  porque os testes passam localmente. Padrao que se repete: cada correcao
-  desta frente resolve o caso reproduzido mas deixa uma variante
-  adjacente (aqui: participacao invalida SEM cotacao, um caminho que o
-  loop de captura do snapshot nem alcancava) - antes de mexer de novo,
-  leia o contrato inteiro (nao so o diff da ultima correcao), e para
-  qualquer funcao nova que filtra/classifica participacao, pergunte "que
-  conjunto de produto_id ela varre, e quem fica de fora desse conjunto
-  por nao ter cotacao ou nao ser candidato ativo".
+- **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
+  revisao independente (Astra), sobre o commit `5998a15`, passou limpa:
+  456 testes oficiais, 25 testes externos das rodadas anteriores e 3
+  controles novos, sem achado. Historico completo (6 rodadas, 19 achados
+  reais corrigidos) preservado nas secoes anteriores deste arquivo e na
+  secao 5 do plano. Migracao de produtos legados
+  (`migrar-produtos --aplicar`) continua **nao executada** contra a arvore
+  real - so o preview foi conferido em cada rodada.
+- **Frente 6 (datas/veredito): IMPLEMENTADA nesta sessao (20)** - ver
+  bloco abaixo. Ainda sem revisao independente - trate como "recem-feita,
+  nao blindada" ate uma rodada de revisao passar limpa, mesmo padrao que
+  a frente 5 seguiu.
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6 - Datas e vereditos (09/09/2026, sessao 20).** Pedido do
+Josemar: separar data da decisao, compra/pagamento, entrega e inicio de
+uso; D+30/D+180 tem que contar do inicio de uso EXPLICITAMENTE
+registrado, nunca fabricado a partir de hoje/decisao/compra/entrega;
+cotacao manual confirma oferta, nao compra realizada.
+
+Inventario ANTES de mexer (agente Explore dedicado, depois conferido a
+mao): `create_verdict` (chamada por `decidir`) fabricava
+`Veredito D+30/D+180 previsto` como `hoje()+30/180 dias` na CRIACAO do
+veredito - ancorado na data da decisao, nunca no uso real. `Data da
+compra` dependia de `quote.fonte == 'manual'`, nao da flag `--comprado` -
+um `decidir --comprado --permitir-web` (cotacao web) nao registrava data
+nenhuma, e um `decidir` comum com cotacao manual registrava `Data da
+compra` sem nenhuma confirmacao de pagamento. Nao existia campo nem
+comando para entrega ou inicio de uso. `novo-veredito` (caminho
+standalone) ja nao preenchia os previstos - inconsistente com `decidir`.
+
+**Corrigido:**
+- `templates/veredito.md`: campos novos `Data de entrega`/`Data de
+  inicio de uso`, ao lado de `Data da compra`.
+- `create_verdict`: `Data da compra` passa a depender SO de `comprado`
+  (de `args.comprado`, nunca da fonte da cotacao) + `data_compra`
+  opcional (`--data-compra`, so aceito junto de `--comprado` - `decidir`
+  recusa a combinacao errada ANTES de qualquer escrita).
+  `Veredito D+30/D+180 previsto` ficam em BRANCO na criacao.
+- Comando novo `registrar-evento <veredito> --evento
+  {comprado,entrega,inicio_uso} [--data AAAA-MM-DD]`: grava o evento no
+  veredito ja existente. Recusa ANTES de escrever se o evento ja estava
+  registrado (fato datado nao e sobrescrito - mesmo principio ja usado
+  para `cotacoes.csv` e participacao invalida) e se a data e
+  cronologicamente anterior a um evento anterior ja registrado; registrar
+  sem os anteriores existirem e permitido. So `inicio_uso` recalcula
+  `Veredito D+30/D+180 previsto`, e so quando a fase ainda nao foi
+  RESPONDIDA (preserva veredito ja preenchido). `--data` recusa formato
+  invalido e data no futuro. Protegido pelo mesmo mecanismo de trava que
+  `preencher-veredito`/`decidir` - operacao pendente no MESMO veredito
+  bloqueia, com recuperacao real testada via crash injetado.
+- `phase_status` (painel): mensagem "sem previsto ainda" mudou de "sem
+  data" pra "aguardando inicio de uso" - conferido visualmente no
+  dashboard HTML gerado em sandbox.
+- Registros antigos: NENHUM veredito existente foi reescrito. Um veredito
+  com `Veredito D+30 previsto` ja fabricado pela formula antiga continua
+  calculando status normalmente - `phase_status` so LE, nunca recalcula
+  por conta propria. `Data da compra` legada nunca vira inicio de uso por
+  inferencia.
+- Fora do escopo, deliberadamente: pesos/gates/estrela intocados; nenhuma
+  migracao rodada contra produtos reais; nenhuma infraestrutura externa
+  tocada (Sheets so exporta `data_decisao`, nunca veredito - confirmado
+  no inventario); `painel.py` (servidor local) nao expoe `decidir` nem
+  comandos de veredito hoje - frente 6 e 100% CLI, sem UI propria a
+  atualizar.
+
+**Verificacao (sessao 20):** `tests/test_frente6_datas_veredito.py`, 25
+testes novos (separacao de datas, previsto ancorado em inicio de uso,
+integridade de `registrar-evento`, fluxo completo ponta a ponta com
+`auditar-decisoes --strict` no final, compatibilidade com registro
+legado) + 1 teste novo em `test_templates.py`. Datas relativas ao dia real
+da execucao ou controladas via `patch.object(cc, "today", ...)` de forma
+autoconsistente - nunca comparadas contra `dt.date.today()` nao mockado -
+pra nao quebrar conforme o calendario avanca. Mutacao aplicada nos 3
+mecanismos de fundo, cada uma desfeita e restaurada em seguida: derrubou
+exatamente os testes do mecanismo mutado (1o: 4 diretos + 2 colaterais em
+cascata, mesma causa; 2o: 1; 3o: 4), nenhum fora disso. Suite completa:
+**482 testes, 0 falhas** (456 + 25 + 1). `auditar-decisoes --strict`,
+`operacoes-pendentes --strict`, `checar-segredos --strict` e
+`git diff --check` limpos. Fluxo conferido visualmente ponta a ponta num
+SANDBOX ISOLADO (copia de config/templates/scripts, nunca a arvore real).
+
+**Licao registrada para a proxima sessao:** `scripts/central_compras.py`
+resolve `ROOT` a partir do proprio `__file__`, nao do diretorio de
+trabalho - rodar o SCRIPT REAL com `cwd` diferente NAO isola nada, ele
+sempre escreve na arvore real. Isolar de verdade exige uma COPIA do
+script (`ambiente.montar` faz isso). Nesta sessao isso foi tentado por
+engano uma vez (`cd /tmp/sandbox && python c:/projetos/.../central_compras.py
+...`), criou projeto/veredito de teste na arvore real - identificados via
+`git status` (tudo untracked) e removidos antes do commit, nunca
+versionados. Detalhe completo:
+`docs/plano-pendencias-auditoria-2026-09-06.md`, secao 6.
+
+## Sessao anterior (09/09/2026, sessao 19) — historico
 
 **Frente 5, 6a correcao da revisao independente (09/09/2026, sessao 19).**
 A Astra reproduziu 1 falha real contra o commit `88ba7c2` (sessao 18, que
