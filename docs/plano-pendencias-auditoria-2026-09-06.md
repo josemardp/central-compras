@@ -835,22 +835,25 @@ gates e limites de score do ranking também não foram tocados, como pedido.
 
 ## 5. Produtos reutilizados em projetos diferentes
 
-**Estado: implementada (sessão 13), corrigida em cinco rodadas de revisão
-independente da Astra (sessões 14, 15, 16, 17 e 18 — 6 + 3 + 3 + 4 + 2
-achados). Ainda falta UMA rodada de revisão que passe limpa antes de
-declarar "concluída sob reserva" — já foi dada como pronta CINCO vezes e
-as cinco vezes apareceu lacuna nova; não presuma que a 6ª rodada não vai
-achar mais nada. Padrão que se repete: cada rodada acha problema mais
-profundo no MESMO conjunto de mecanismos — as 3 primeiras em
-`link_product`/`migrate_products` + `tracked_operation`, a 4ª no contrato
-de participação (`_participacao_invalida`/`read_participation`) e nos
-consumidores que ainda liam `estado` bruto do YAML
-(`project_candidate_ids`/`project_discarded_candidate_ids`), a 5ª nos
-lugares que tratam `read_participation` como DADO A MUTAR/PRESERVAR
-(`descartar`/`aguardar-preco`, snapshot de decisão) em vez de sinal de
-corte — a próxima revisão (ou correção) deveria ler o contrato inteiro
-dessas áreas, e perguntar "quem mais chama `read_participation` e o que
-faz com o resultado", não só o diff da última rodada.**
+**Estado: implementada (sessão 13), corrigida em seis rodadas de revisão
+independente da Astra (sessões 14, 15, 16, 17, 18 e 19 — 6 + 3 + 3 + 4 + 2
++ 1 achados). Ainda falta UMA rodada de revisão que passe limpa antes de
+declarar "concluída sob reserva" — já foi dada como pronta SEIS vezes e as
+seis vezes apareceu lacuna nova; não presuma que a 7ª rodada não vai achar
+mais nada. Padrão que se repete: cada rodada acha problema mais profundo
+no MESMO conjunto de mecanismos — as 3 primeiras em `link_product`/
+`migrate_products` + `tracked_operation`, a 4ª no contrato de participação
+(`_participacao_invalida`/`read_participation`) e nos consumidores que
+ainda liam `estado` bruto do YAML (`project_candidate_ids`/
+`project_discarded_candidate_ids`), a 5ª nos lugares que tratam
+`read_participation` como DADO A MUTAR/PRESERVAR (`descartar`/
+`aguardar-preco`, snapshot de decisão) em vez de sinal de corte, a 6ª numa
+variante adjacente da própria correção da 5ª (participação inválida SEM
+cotação, fora do conjunto que o loop de captura varria) — a próxima
+revisão (ou correção) deveria ler o contrato inteiro dessas áreas, e
+perguntar "quem mais chama `read_participation`/`project_product_ids` e o
+que faz com o resultado, inclusive quem fica de fora por não ter
+cotação", não só o diff da última rodada.**
 
 **Contrato:** `produto.yaml` (ficha) passou a guardar só identidade e dado
 técnico — `id`, `categoria`, `nome`, `marca`, `atributos`,
@@ -1311,6 +1314,63 @@ real.
 **Fora do escopo desta correção, deliberadamente:** frente 6 não iniciada;
 pesos/gates/calibragem do score intocados; nenhuma infraestrutura externa
 tocada; `migrar-produtos --aplicar` não foi rodado contra a árvore real.
+**Essa correção deixou uma lacuna adjacente que virou o gancho da 6ª
+revisão, abaixo: o loop de captura do snapshot usava `project_product_ids`,
+que exclui participação inválida sem cotação (de propósito, para
+elegibilidade) — sem cotação para "ancorar" o produto num conjunto de
+candidatos, o loop nunca alcançava esse participante nenhum.**
+
+### 6ª revisão independente (Astra, sessão 19, sobre o commit `88ba7c2`) — 1 falha (omissão de evidência)
+
+Um produto com participação INVÁLIDA e SEM NENHUMA cotação desaparecia por
+completo da evidência de uma decisão — nem a ficha nem a participação
+apareciam em nenhum arquivo do snapshot, e `auditar-decisoes --strict`
+passava mesmo assim. Causa: `project_candidate_ids`/
+`project_discarded_candidate_ids` (correção da 4ª revisão) excluem
+participação inválida dos dois conjuntos de propósito — correto para
+elegibilidade, mas `project_product_ids` (usado pelo loop de captura de
+`_decide_writes`) é só a união desses dois conjuntos com quem tem cotação.
+Sem cotação e excluído dos dois conjuntos de candidatos, o produto nunca
+entrava em `project_product_ids`, e o loop nunca alcançava nem a cópia da
+ficha nem o ramo (da 5ª revisão) que copiaria o arquivo bruto de
+participação.
+
+**Corrigido:** função nova `project_evidence_participant_ids(project)` —
+superset de `project_product_ids` que também inclui todo produto_id com um
+ARQUIVO de participação no projeto, válido ou não
+(`participacoes/*.yaml` no disco, via glob). Usada só nos dois loops de
+`_decide_writes` (inventário de fontes de ficha e de participação);
+`project_product_ids` continua exatamente como estava, e nenhum outro
+consumidor (ranking, regra de parada, `sem_cotacao_candidates`, prompt-ia)
+foi tocado — a distinção pedida pela Astra ("pertencer ao projeto para
+fins de evidência" ≠ "ser candidato elegível") foi preservada com um
+superset isolado, não alargando o conjunto usado em elegibilidade.
+
+### Testes (6ª revisão)
+
+`tests/test_participacoes.py`, `SextaRevisaoIndependenteFrente5Test`: 5
+testes — reprodução do achado (conteúdo bruto preservado, ficha também
+congelada), inclusão do arquivo no `manifesto.json` com hash correto,
+imutabilidade da evidência congelada após alteração posterior do arquivo
+original, controle explícito da distinção evidência-vs-elegibilidade
+(`project_evidence_participant_ids` inclui o produto, mas
+`project_candidate_ids`/`project_discarded_candidate_ids`/`compute_ranking`/
+`sem_cotacao_candidates` continuam sem ele, antes e depois da decisão), e
+controle do caso já funcional (participação válida sem cotação, que já era
+preservada antes desta correção). Mutação aplicada revertendo os dois
+loops de `_decide_writes` de volta para `project_product_ids` (script
+Python, para trocar as duas ocorrências idênticas de forma atômica) e
+restaurada em seguida: derrubou exatamente os 3 testes-armadilha
+(evidência bruta, manifesto, imutabilidade), nenhum outro — os 2 testes de
+controle continuaram passando, confirmando que não dependem do mecanismo
+mutado. Suíte completa depois da correção: **456 testes, 0 falhas** (451 +
+5 novos). `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a árvore
+real.
+
+**Fora do escopo desta correção, deliberadamente:** frente 6 não iniciada;
+pesos/gates/calibragem do score intocados; nenhuma infraestrutura externa
+tocada; nenhuma migração rodada contra produtos reais.
 
 ## 6. Datas e vereditos
 
@@ -1344,14 +1404,15 @@ revisado, fluxos testados no navegador quando aplicável, push para
   na planilha real, ver seção 3.
 - **Frente 4** (proveniência): feito, 18 testes, verificado no painel com
   dados sintéticos, ver seção 4.
-- **Frente 5** (produtos reutilizados): implementada (sessão 13); cinco
+- **Frente 5** (produtos reutilizados): implementada (sessão 13); seis
   rodadas de revisão independente da Astra acharam 6, depois 3, depois mais
-  3, depois mais 4 e depois mais 2 lacunas reais (as 2 últimas eram perda
-  de dados), as cinco corrigidas com teste permanente + mutação (sessões
-  14, 15, 16, 17 e 18) — suíte completa, `checar-segredos --strict`,
-  `operacoes-pendentes --strict`, `auditar-decisoes --strict` e
-  `git diff --check` limpos nas cinco rodadas, ver seção 5. **Ainda falta
-  uma rodada de revisão independente que passe limpa** — já foi dada como
-  pronta CINCO vezes e as cinco vezes apareceu lacuna nova; não presumir
-  "concluída sob reserva" até isso acontecer de verdade.
+  3, depois mais 4, depois mais 2 (perda de dados) e depois mais 1 (omissão
+  de evidência) lacunas reais, as seis corrigidas com teste permanente +
+  mutação (sessões 14, 15, 16, 17, 18 e 19) — suíte completa,
+  `checar-segredos --strict`, `operacoes-pendentes --strict`,
+  `auditar-decisoes --strict` e `git diff --check` limpos nas seis
+  rodadas, ver seção 5. **Ainda falta uma rodada de revisão independente
+  que passe limpa** — já foi dada como pronta SEIS vezes e as seis vezes
+  apareceu lacuna nova; não presumir "concluída sob reserva" até isso
+  acontecer de verdade.
 - **Frente 6** (datas/veredito): não iniciada.

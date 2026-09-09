@@ -3835,7 +3835,7 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
             "preferencias.yaml": CONFIG / "preferencias.yaml",
             "motor.py": Path(__file__),
         }
-        for pid in sorted(project_product_ids(project)):
+        for pid in sorted(project_evidence_participant_ids(project)):
             path = find_product_path(pid)
             if path:
                 fontes[f"produtos/{pid}.yaml"] = path
@@ -3863,8 +3863,20 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
         # gravando o resultado INTERPRETADO (recupera do legado) - nao ha
         # arquivo bruto ali pra preservar, e essa recuperacao ja e o
         # comportamento estabelecido desde a 2a revisao independente.
+        #
+        # O inventario usa `project_evidence_participant_ids`, nao
+        # `project_product_ids`: um produto com participacao INVALIDA e SEM
+        # cotacao nenhuma fica de fora de `project_candidate_ids`/
+        # `project_discarded_candidate_ids` de proposito (nao e "ativo" nem
+        # "descartado" confirmado), e por isso tambem ficava fora de
+        # `project_product_ids` - o loop nunca alcancava nem a ficha nem a
+        # participacao desse produto, e `auditar-decisoes --strict` passava
+        # sem preservar NENHUM arquivo daquele participante. A funcao nova
+        # e um superset so pra fins de EVIDENCIA - nunca usada em ranking,
+        # regra de parada ou qualquer lista de candidatos; incluir aqui nao
+        # reabilita, nao pontua e nao fabrica descarte.
         (snapshot_dir / "participacoes").mkdir(parents=True, exist_ok=True)
-        for pid in sorted(project_product_ids(project)):
+        for pid in sorted(project_evidence_participant_ids(project)):
             destino = snapshot_dir / "participacoes" / f"{pid}.yaml"
             origem = participation_path(project, pid)
             status, _ = _classificar_participacao(read_yaml(origem, None), pid)
@@ -4563,6 +4575,35 @@ def project_product_ids(project: Path) -> set[str]:
     ids = {row.get("produto_id") for row in read_quotes(project) if row.get("produto_id")}
     ids |= project_candidate_ids(project)
     ids |= project_discarded_candidate_ids(project)
+    return ids
+
+
+def project_evidence_participant_ids(project: Path) -> set[str]:
+    """Todo produto_id que precisa ter EVIDENCIA congelada num snapshot de
+    decisao deste projeto - superset de `project_product_ids`, usado SO
+    por `_decide_writes` pra montar o inventario de fontes a copiar. Nunca
+    usar para ranking, regra de parada, prompt-ia ou qualquer lista de
+    candidatos - incluir um produto_id aqui nao reabilita, nao pontua e
+    nao fabrica descarte.
+
+    Participacao com CONTEUDO INVALIDO e SEM cotacao nenhuma fica de fora
+    de `project_candidate_ids`/`project_discarded_candidate_ids` de
+    proposito (nao e "ativo" confirmado nem "descartado" confirmado - ver
+    docstring das duas) - e por isso tambem de fora de
+    `project_product_ids`, que so uniao os dois mais quem tem cotacao. Isso
+    e CORRETO para elegibilidade, mas errado para evidencia: o arquivo de
+    participacao existe em disco com dado real (preco-alvo/teto, requisito,
+    campo desconhecido), e uma decisao fechada nesse projeto precisa
+    preservar essa evidencia tambem - mesmo que o participante nunca tenha
+    entrado na disputa por falta de cotacao. Sem isto, `_decide_writes`
+    nunca alcancava o ramo que copia o arquivo bruto (participacao
+    invalida) nem a ficha desse produto: `auditar-decisoes --strict`
+    passava sem nenhum arquivo do snapshot preservar aquele participante.
+    """
+    ids = set(project_product_ids(project))
+    pasta = participations_dir(project)
+    if pasta.exists():
+        ids |= {path.stem for path in pasta.glob("*.yaml")}
     return ids
 
 

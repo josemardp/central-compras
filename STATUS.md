@@ -5,35 +5,84 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (09/09/2026, sessao 18)
+## AO RETOMAR — comece por aqui (09/09/2026, sessao 19)
 
-**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (6a
+**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (7a
 rodada) desta correcao antes de iniciar a frente 6. So depois dessa revisao
 passar limpa, va para `docs/plano-pendencias-auditoria-2026-09-06.md`
 secao 6.
 
 **Pendencias / bloqueios:**
 - Frente 6 (datas/veredito) **nao iniciada**.
-- Frente 5 (produtos reutilizados): a correcao da sessao 17 (4 falhas)
-  **tinha mais 2 lacunas** - as duas eram PERDA DE DADOS reais, achadas
-  pela 5a revisao independente (Astra) sobre o commit `70c3df8`. **As 2
-  foram corrigidas e testadas nesta sessao (18)** - ver bloco abaixo.
+- Frente 5 (produtos reutilizados): a correcao da sessao 18 (2 falhas de
+  perda de dados) **tinha mais 1 lacuna** - uma OMISSAO de evidencia,
+  achada pela 6a revisao independente (Astra) sobre o commit `88ba7c2`.
+  **Foi corrigida e testada nesta sessao (19)** - ver bloco abaixo.
   Continua precisando de UMA rodada de revisao que passe limpa antes de
-  declarar "concluida"; **ja foi declarada pronta CINCO vezes e as cinco
+  declarar "concluida"; **ja foi declarada pronta SEIS vezes e as seis
   vezes apareceu lacuna nova** - nao presuma que esta e a ultima rodada so
-  porque os testes passam localmente. Padrao que se repete: a correcao da
-  sessao 17 criou um estado sintetico (`invalido`) pros CONSUMIDORES DE
-  LEITURA reconhecerem "nao decido sozinho", mas nao tinha protegido os
-  lugares que tratam o resultado de `read_participation` como DADO A
-  MUTAR/PRESERVAR (comandos que escrevem, snapshot de decisao) - antes de
-  mexer de novo, leia o contrato inteiro (nao so o diff da ultima
-  correcao), e pergunte "quem mais chama `read_participation` e o que faz
-  com o resultado".
+  porque os testes passam localmente. Padrao que se repete: cada correcao
+  desta frente resolve o caso reproduzido mas deixa uma variante
+  adjacente (aqui: participacao invalida SEM cotacao, um caminho que o
+  loop de captura do snapshot nem alcancava) - antes de mexer de novo,
+  leia o contrato inteiro (nao so o diff da ultima correcao), e para
+  qualquer funcao nova que filtra/classifica participacao, pergunte "que
+  conjunto de produto_id ela varre, e quem fica de fora desse conjunto
+  por nao ter cotacao ou nao ser candidato ativo".
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 5, 6a correcao da revisao independente (09/09/2026, sessao 19).**
+A Astra reproduziu 1 falha real contra o commit `88ba7c2` (sessao 18, que
+tinha corrigido as 2 anteriores), com o script `astra_review_88ba7c2.py`
+(2 testes: 1 achado + 1 controle, ambos reproduzidos ANTES de corrigir - o
+controle ja passava contra o codigo antigo, confirmando que a lacuna era
+so no caso invalido). Virou teste permanente em `tests/test_participacoes.py`
+(`SextaRevisaoIndependenteFrente5Test`: 5 testes - reproducao do achado,
+inclusao no manifesto, imutabilidade apos alteracao posterior, controle da
+distincao evidencia-vs-elegibilidade, e controle do caso valido sem
+cotacao).
+
+**O achado.** Um produto com participacao INVALIDA e SEM NENHUMA cotacao
+desaparecia por completo da evidencia de uma decisao - nem a ficha nem a
+participacao apareciam em nenhum arquivo do snapshot, e
+`auditar-decisoes --strict` passava mesmo assim. Causa: a correcao da
+sessao 17 fez `project_candidate_ids`/`project_discarded_candidate_ids`
+excluirem participacao invalida dos dois conjuntos DE PROPOSITO (nao e
+"ativo" nem "descartado" confirmado) - correto para elegibilidade, mas
+`project_product_ids` (usado pelo loop de captura do snapshot em
+`_decide_writes`) e so a uniao desses dois conjuntos com quem tem cotacao.
+Sem cotacao E excluido dos dois conjuntos, o produto nunca entrava em
+`project_product_ids`, e o loop nunca alcancava o ramo (da sessao 18) que
+copiaria o arquivo bruto.
+
+**Corrigido:** funcao nova `project_evidence_participant_ids(project)` -
+superset de `project_product_ids` que tambem inclui todo produto_id com
+um ARQUIVO de participacao no projeto, valido ou nao (`participacoes/*.yaml`
+no disco). Usada SO nos dois loops de `_decide_writes` (fontes de ficha e
+de participacao); `project_product_ids` continua exatamente como estava,
+e nenhum outro consumidor (ranking, regra de parada, `sem_cotacao_candidates`,
+prompt-ia) foi tocado - confirmado com teste dedicado que o produto
+continua fora de `project_candidate_ids`, `project_discarded_candidate_ids`,
+elegiveis e cortados mesmo entrando no snapshot.
+
+**Verificacao (sessao 19):** suite completa **456 testes, 0 falhas** (451
++ 5 novos). Mutacao aplicada revertendo os dois loops de volta para
+`project_product_ids` (script Python, nao Edit manual, pra trocar as duas
+ocorrencias identicas de forma atomica) e restaurada em seguida: derrubou
+exatamente os 3 testes-armadilha (evidencia bruta, manifesto,
+imutabilidade), nenhum outro - os 2 testes de controle (distincao
+evidencia-vs-elegibilidade, caso valido sem cotacao) continuaram passando
+porque nao dependem do mecanismo mutado. `auditar-decisoes --strict`,
+`operacoes-pendentes --strict`, `checar-segredos --strict` e
+`git diff --check` limpos contra a arvore real. Nenhuma migracao rodada
+contra produtos reais, pesos/gates intocados. Detalhe completo:
+`docs/plano-pendencias-auditoria-2026-09-06.md`, secao 5.
+
+## Sessao anterior (09/09/2026, sessao 18) — historico
 
 **Frente 5, 5a correcao da revisao independente (09/09/2026, sessao 18).**
 A Astra reproduziu 2 falhas reais contra o commit `70c3df8` (sessao 17, que

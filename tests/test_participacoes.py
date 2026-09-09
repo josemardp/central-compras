@@ -9,6 +9,7 @@ teto, requisitos atendidos) mora em `projetos/<projeto>/participacoes/
 """
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -1252,6 +1253,141 @@ class QuintaRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
         cc.write_yaml(cc.participation_path(a, "concorrente"), {"anotacao": "MUDOU_DEPOIS"})
 
         self.assertEqual((snapshot / "participacoes" / "concorrente.yaml").read_bytes(), congelado_antes)
+
+
+class SextaRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
+    """Regressao do achado da 6a revisao independente (Astra) sobre o
+    commit `88ba7c2` - reproduzido contra aquele codigo antes da correcao
+    (script `astra_review_88ba7c2.py`). Ver STATUS.md e
+    docs/como-conferir-auditoria.md.
+
+    Raiz: a correcao da 5a revisao passou a congelar o arquivo BRUTO da
+    participacao invalida no snapshot, mas o loop que decide QUAIS
+    produto_id entram nesse inventario usava `project_product_ids`
+    (cotacoes + `project_candidate_ids` + `project_discarded_candidate_ids`).
+    Um participante com participacao invalida e SEM NENHUMA cotacao fica de
+    fora dos dois conjuntos de candidatos DE PROPOSITO (nao e "ativo" nem
+    "descartado" confirmado - ver `project_candidate_ids`), e portanto
+    tambem de `project_product_ids` - o loop nunca alcancava nem a ficha
+    nem a participacao desse produto. `auditar-decisoes --strict` passava
+    sem preservar NENHUM arquivo daquele participante."""
+
+    def _quebrada_sem_cotacao(self, project, pid="sem-cotacao", invalida=True):
+        self.product(project, pid)
+        path = cc.participation_path(project, pid)
+        dados = cc.read_yaml(path, {})
+        dados.update(preco_teto=100, requisitos_atendidos={"uso": False},
+                     evidencia_extra="EVIDENCIA_EXCLUSIVA_SEM_COTACAO")
+        if invalida:
+            dados["produto_id"] = "IDENTIDADE_DIVERGENTE"
+        cc.write_yaml(path, dados)
+        return path, dados
+
+    def _decidir_com_terceiro(self, project, pid_terceiro):
+        self.product(project, "escolhido")
+        self.quote(project, "escolhido", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "escolhido",
+                  "--porque", "unico candidato com cotacao manual",
+                  "--sem-perdedores", "--comprado")
+        return next((project / "snapshots").iterdir())
+
+    def test_participante_invalido_sem_cotacao_preserva_evidencia_bruta(self):
+        """Achado: sem nenhuma cotacao, o participante invalido sumia por
+        completo da evidencia congelada - nem a ficha nem a participacao
+        apareciam em nenhum arquivo do snapshot."""
+        a = self.project()
+        path, dados = self._quebrada_sem_cotacao(a)
+        original = path.read_bytes()
+
+        snapshot = self._decidir_com_terceiro(a, "sem-cotacao")
+
+        congelado = snapshot / "participacoes" / "sem-cotacao.yaml"
+        self.assertTrue(congelado.exists(), "Participacao invalida sem cotacao nao foi congelada no snapshot")
+        self.assertEqual(
+            congelado.read_bytes(), original,
+            "Conteudo bruto congelado diverge do arquivo original",
+        )
+        ficha_congelada = snapshot / "produtos" / "sem-cotacao.yaml"
+        self.assertTrue(ficha_congelada.exists(), "Ficha do participante sem cotacao nao foi congelada no snapshot")
+        self.assertEqual(path.read_bytes(), original, "Arquivo original foi alterado pela captura do snapshot")
+
+    def test_participante_invalido_sem_cotacao_entra_no_manifesto(self):
+        """O arquivo preservado precisa estar listado (com hash) no
+        `manifesto.json` - senao a evidencia existe mas nao e reconhecida
+        como parte formal do que foi congelado."""
+        a = self.project()
+        self._quebrada_sem_cotacao(a)
+
+        snapshot = self._decidir_com_terceiro(a, "sem-cotacao")
+
+        manifesto = cc.read_yaml(snapshot / "manifesto.json", {})
+        self.assertIn("participacoes/sem-cotacao.yaml", manifesto)
+        self.assertIn("produtos/sem-cotacao.yaml", manifesto)
+        congelado = snapshot / "participacoes" / "sem-cotacao.yaml"
+        self.assertEqual(
+            manifesto["participacoes/sem-cotacao.yaml"],
+            hashlib.sha256(congelado.read_bytes()).hexdigest(),
+        )
+        self.cli("auditar-decisoes", "--strict")
+
+    def test_participante_invalido_sem_cotacao_imutavel_apos_alteracao_posterior(self):
+        """A evidencia bruta congelada nao pode mudar se o arquivo original
+        for alterado DEPOIS da decisao fechada - mesmo principio ja valido
+        para participacao invalida COM cotacao (revisao anterior)."""
+        a = self.project()
+        self._quebrada_sem_cotacao(a)
+        snapshot = self._decidir_com_terceiro(a, "sem-cotacao")
+        congelado_antes = (snapshot / "participacoes" / "sem-cotacao.yaml").read_bytes()
+
+        cc.write_yaml(cc.participation_path(a, "sem-cotacao"), {"anotacao": "MUDOU_DEPOIS"})
+
+        self.assertEqual((snapshot / "participacoes" / "sem-cotacao.yaml").read_bytes(), congelado_antes)
+
+    def test_incluir_para_evidencia_nao_reabilita_nem_pontua_nem_descarta(self):
+        """A distincao pedida pela Astra: `project_evidence_participant_ids`
+        e um SUPERSET so pra fins de captura de snapshot - nunca pode
+        vazar para ranking, regra de parada ou listagem de candidatos.
+        Participante invalido sem cotacao continua fora de elegiveis,
+        cortados, `project_candidate_ids`, `project_discarded_candidate_ids`
+        e `sem_cotacao_candidates`, mesmo aparecendo em
+        `project_evidence_participant_ids`."""
+        a = self.project()
+        self._quebrada_sem_cotacao(a)
+
+        self.assertIn("sem-cotacao", cc.project_evidence_participant_ids(a))
+        self.assertNotIn("sem-cotacao", cc.project_candidate_ids(a))
+        self.assertNotIn("sem-cotacao", cc.project_discarded_candidate_ids(a))
+        self.assertNotIn("sem-cotacao", cc.project_product_ids(a))
+        elegiveis, cortados = cc.compute_ranking(a)
+        self.assertEqual([i.produto_id for i in elegiveis], [])
+        self.assertEqual([i.produto_id for i in cortados], [])
+        sem_cotacao = cc.sem_cotacao_candidates(a, "fone", [])
+        self.assertEqual([i.produto_id for i in sem_cotacao], [])
+
+        self._decidir_com_terceiro(a, "sem-cotacao")
+
+        # "escolhido" legitimamente entra em elegiveis (tem cotacao manual e
+        # foi o proprio decidido) - o que importa e "sem-cotacao" nunca
+        # aparecer em nenhuma das duas listas, nem depois da decisao.
+        elegiveis, cortados = cc.compute_ranking(a)
+        self.assertNotIn("sem-cotacao", [i.produto_id for i in elegiveis])
+        self.assertNotIn("sem-cotacao", [i.produto_id for i in cortados])
+
+    def test_participante_valido_sem_cotacao_continua_preservado(self):
+        """Controle: uma participacao VALIDA sem cotacao ja era preservada
+        antes desta correcao (esta no formato novo com arquivo proprio,
+        `project_candidate_ids` ja a inclui) - a mudanca desta rodada nao
+        pode regredir esse caso."""
+        a = self.project()
+        path, dados = self._quebrada_sem_cotacao(a, invalida=False)
+
+        snapshot = self._decidir_com_terceiro(a, "sem-cotacao")
+
+        congelado = snapshot / "participacoes" / "sem-cotacao.yaml"
+        self.assertTrue(congelado.exists())
+        self.assertEqual(
+            cc.read_yaml(congelado, {})["evidencia_extra"], dados["evidencia_extra"],
+        )
 
 
 if __name__ == "__main__":
