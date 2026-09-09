@@ -5,13 +5,13 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (09/09/2026, sessao 22)
+## AO RETOMAR — comece por aqui (09/09/2026, sessao 23)
 
-**Proximo passo:** o Josemar provavelmente vai pedir mais uma rodada de
-revisao independente da frente 6 (a 2a achou 4 falhas reais, ja
-corrigidas nesta sessao). So depois disso passar limpa - mesmo padrao
-disciplinado que a frente 5 seguiu (6 rodadas com achado antes da 7a
-passar limpa) - considere a frente 6 "concluida sob reserva".
+**Proximo passo:** mandar o Claude Code corrigir as 2 falhas reais
+achadas pela 3a revisao independente da frente 6 sobre o commit
+`ad6a04a` (ver bloco da sessao 23 abaixo). Nao declarar a frente 6
+concluida ainda: depois da correcao, precisa de nova revisao
+independente que passe limpa antes de considerar "concluida sob reserva".
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -23,13 +23,14 @@ passar limpa) - considere a frente 6 "concluida sob reserva".
   (`migrar-produtos --aplicar`) continua **nao executada** contra a arvore
   real - so o preview foi conferido em cada rodada.
 - **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
-  sessao 20; 2 rodadas de revisao independente (Astra) ja acharam 5 e
-  depois mais 4 falhas reais - todas corrigidas e testadas (sessoes 21 e
-  22), ver bloco abaixo. **Precisa de UMA rodada de revisao que passe
-  limpa** antes de considerar "concluida sob reserva" - nao presuma que
-  esta e a ultima rodada so porque os testes passam localmente (a frente
-  5 levou 7 rodadas). **Achado transversal desta 2a rodada, registrado
-  para nao se repetir**: `_assinaturas_compativeis` (mecanismo
+  sessao 20; 3 rodadas de revisao independente (Astra) ja acharam 5,
+  depois 4, e agora mais 2 falhas reais. As 2 primeiras rodadas foram
+  corrigidas e testadas nos commits `3acc96a` e `ad6a04a`; a 3a rodada
+  (sessao 23) ainda esta pendente de correcao. **Nao considere a frente
+  6 encerrada depois de apenas rodar a suite local** - a frente 5 levou
+  7 rodadas ate uma revisao passar limpa. **Achado transversal da 2a
+  rodada, registrado para nao se repetir**: `_assinaturas_compativeis`
+  (mecanismo
   COMPARTILHADO por TODO `tracked_operation` - `decidir`,
   `registrar-evento`, `vincular-produto`, `aprender-veredito`), criada na
   1a rodada pra tolerar evolucao de schema, comparava valores com `==` do
@@ -50,6 +51,49 @@ passar limpa) - considere a frente 6 "concluida sob reserva".
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, 3a revisao independente (09/09/2026, sessao 23).**
+A Astra revisou o commit `ad6a04a` depois da 2a correcao da frente 6.
+Baseline confirmado: suite oficial **506 testes, 0 falhas**; os 14 testes
+externos das revisoes anteriores tambem passam. A nova revisao externa
+adicionou 4 testes em sandbox isolado (`%TEMP%\astra_review_ad6a04a.py`):
+2 controles passam e 2 achados falham contra o codigo atual. Resultado:
+o commit `ad6a04a` melhora a frente 6, mas ainda nao fecha a frente.
+
+1. **Journal antigo de `decidir --comprado` implicito troca a data da
+   compra ao retomar depois de upgrade.** Um journal real criado pelo
+   codigo do commit `e564618` antes de gravar o veredito, com
+   `--comprado` sem `--data-compra`, nao tinha `data_compra_efetiva`,
+   mas tinha a evidencia persistida da data original em `iniciado_em` e
+   no nome congelado do veredito. Ao retomar em `ad6a04a` no dia
+   seguinte, `_decide_writes` cai em `today()` e grava a data da retomada
+   como `Data da compra`. Isso viola o contrato da frente 6: fato
+   datado implicito precisa ser congelado pela tentativa original, nunca
+   fabricado pelo dia da retomada. O executor deve recuperar da evidencia
+   persistida quando possivel; se for ambiguo, deve recusar com mensagem
+   clara em vez de inventar uma data.
+2. **Journal antigo de `registrar-evento` deixado por uma recusa da
+   versao anterior vira execucao valida depois do upgrade.** No commit
+   `3acc96a`, `registrar-evento --evento entrega` com `--data` omitida
+   validava a cronologia tarde demais: recusava entrega "hoje" depois de
+   `inicio_uso` ontem, mas deixava um journal pendente vazio
+   (`passos: {}`). Em `ad6a04a`, a existencia desse journal faz a
+   validacao previa ser pulada como se a tentativa anterior tivesse sido
+   validada; a retomada entao grava exatamente o evento que a versao
+   anterior recusou. Existir journal pendente nao prova validacao
+   concluida; a retomada precisa validar a data congelada real da
+   tentativa ou tratar journal sem efeitos como pendencia invalida a
+   reconciliar.
+
+**Prompt recomendado ao Claude Code:** corrigir esses 2 achados sobre
+`ad6a04a`, reproduzindo ambos antes de mexer com o script externo da
+Astra; transformar os cenarios em testes permanentes; manter os controles
+de retomada valida em outro dia e de recusa nova sem journal; rodar suite
+completa, `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check`; atualizar STATUS/plano;
+commitar e fazer push na `main`. Nao mexer em pesos/gates, nao rodar
+migracao real de produtos, nao reescrever snapshots/vereditos historicos
+e nao declarar a frente 6 concluida nesta correcao.
 
 **Frente 6, 2a correcao da revisao independente (09/09/2026, sessao 22).**
 A Astra reproduziu 4 falhas reais contra o commit `3acc96a` (sessao 21,
