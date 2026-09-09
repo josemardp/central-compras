@@ -5,31 +5,102 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (08/09/2026, sessao 16)
+## AO RETOMAR — comece por aqui (08/09/2026, sessao 17)
 
-**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (4a
+**Proximo passo:** o Josemar vai pedir REVISAO independente de novo (5a
 rodada) desta correcao antes de iniciar a frente 6. So depois dessa revisao
 passar limpa, va para `docs/plano-pendencias-auditoria-2026-09-06.md`
 secao 6.
 
 **Pendencias / bloqueios:**
 - Frente 6 (datas/veredito) **nao iniciada**.
-- Frente 5 (produtos reutilizados): a correcao da sessao 15 (3 falhas)
-  **tinha mais 3 lacunas**, achadas pela 3a revisao independente (Astra)
-  sobre o commit `6669b9d`. **As 3 foram corrigidas e testadas nesta sessao
-  (16)** - ver bloco abaixo. Continua precisando de UMA rodada de revisao
+- Frente 5 (produtos reutilizados): a correcao da sessao 16 (3 falhas)
+  **tinha mais 4 lacunas**, achadas pela 4a revisao independente (Astra)
+  sobre o commit `f2d5cd1`. **As 4 foram corrigidas e testadas nesta sessao
+  (17)** - ver bloco abaixo. Continua precisando de UMA rodada de revisao
   que passe limpa antes de declarar "concluida"; **ja foi declarada pronta
-  TRES vezes e as tres vezes apareceu lacuna nova** - nao presuma que esta
-  e a ultima rodada so porque os testes passam localmente. Padrao que se
-  repete: cada rodada acha problema mais profundo no MESMO par de
-  mecanismos (`link_product`/`migrate_products` + `tracked_operation`) -
-  antes de mexer de novo, leia o contrato inteiro (nao so o diff da ultima
-  correcao).
+  QUATRO vezes e as quatro vezes apareceu lacuna nova** - nao presuma que
+  esta e a ultima rodada so porque os testes passam localmente. Padrao que
+  se repete: cada rodada acha problema mais profundo no MESMO conjunto de
+  mecanismos - agora e o contrato de participacao
+  (`_participacao_invalida`/`read_participation`) e os consumidores que
+  ainda liam `estado` bruto do YAML (`project_candidate_ids`/
+  `project_discarded_candidate_ids`) - antes de mexer de novo, leia o
+  contrato inteiro (nao so o diff da ultima correcao).
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 5, 4a correcao da revisao independente (08/09/2026, sessao 17).**
+A Astra reproduziu 4 falhas reais contra o commit `f2d5cd1` (sessao 16, que
+tinha corrigido as 3 anteriores), com os scripts
+`astra_review_f2d5cd1.py`/`astra_review_f2d5cd1_details.py` (reproduzidos
+ANTES de corrigir). As 4 viraram teste permanente em
+`tests/test_participacoes.py` (`QuartaRevisaoIndependenteFrente5Test`: os 4
+testes da Astra + 3 testes de controle/efeito colateral).
+
+1. **Identidade divergente reabilitava candidato descartado.** Alterar so
+   `produto_id` num arquivo de participacao ja `descartado` fazia
+   `read_participation` cair pro legado (ou pro default `pesquisando`) -
+   `compute_ranking` voltava a considerar ELEGIVEL o mesmo candidato que
+   `project_discarded_candidate_ids` (lendo `estado` bruto do YAML, sem
+   passar pelo contrato) continuava contando como descartado.
+   Simultaneidade real confirmada: `elegiveis=['candidato']` E
+   `descartados=['candidato']` ao mesmo tempo, `validation_report` mudo.
+   Corrigido com um estado sintetico novo, `ESTADO_PARTICIPACAO_INVALIDA`
+   ("invalido") - fora de `ESTADOS_PARTICIPACAO`, nunca gravavel por
+   nenhum comando -, devolvido por `read_participation` quando o conteudo
+   e incoerente (NUNCA cai pro legado nem pro default neutro).
+   `_classificar_participacao` virou o ponto UNICO que decide
+   "vazio"/"invalida"/"valida", usado por `read_participation` E
+   `migrate_products`. `project_candidate_ids`/
+   `project_discarded_candidate_ids` passaram a ler pelo MESMO
+   `read_participation` (nunca mais `estado` bruto) e excluem o estado
+   `invalido` dos dois conjuntos. `gate_eliminations` corta o candidato
+   (nunca elegivel); `validation_report` aponta ERRO mesmo sem cotacao
+   ainda.
+2. **Campo opcional aceitava qualquer tipo.** `requisitos_atendidos:
+   ["uso"]` (lista - quebraria `.items()` em `gate_eliminations` com
+   `AttributeError` real, reproduzido), `preco_teto: "barato"` e
+   `preco_alvo: NaN` (viraria limite ausente em silencio via
+   `quote_float`) passavam no contrato minimo e autorizavam
+   `migrar-produtos` a apagar o legado por cima. Corrigido:
+   `_tipo_invalido_participacao` valida tipo dos campos opcionais
+   CONHECIDOS quando presentes - ausencia continua valida, campo
+   desconhecido nunca invalida.
+3. **Conteudo nao-mapa (lista) era tratado como arquivo vazio na
+   migracao.** `participacao_vazia = not (isinstance(dados, dict) and
+   bool(dados))` classificava QUALQUER conteudo nao-dicionario - inclusive
+   uma LISTA YAML nao vazia com `estado`/`descartado_porque` reais - como
+   "arquivo sem dado", autorizando a migracao a sobrescrever com o legado
+   por cima de evidencia de verdade. Corrigido dentro de
+   `_classificar_participacao`.
+4. **Achado colateral, corrigido junto:** o dict sintetico do estado
+   `invalido` carrega `_motivo_invalido` (diagnostico interno) - sem
+   cuidado, vazaria pro YAML na proxima escrita
+   (`descartar`/`aguardar-preco` sobre arquivo ja invalido - o caminho
+   normal de reconciliacao) ou pro snapshot congelado de uma decisao.
+   `_participacao_serializavel` remove campos com prefixo `_` antes de
+   qualquer escrita.
+
+**Verificacao (sessao 17):** suite completa **445 testes, 0 falhas** (438 +
+7 novos). Mutacao aplicada nas 3 correcoes de fundo, uma de cada vez,
+desfeita e restaurada em seguida: achado 1 desfeito derrubou exatamente os
+2 testes de identidade + o teste de `.items()` + o teste do vazamento (4
+falhas, nenhuma outra); achado 2 desfeito derrubou as 3 subTests do teste
+de tipo + o teste de `.items()` com `AttributeError` real (3 falhas + 1
+erro, nenhum outro); achado 3 desfeito derrubou so o teste da lista (1
+falha, nenhum outro). `auditar-decisoes --strict`, `operacoes-pendentes
+--strict`, `checar-segredos --strict` e `git diff --check` limpos contra a
+arvore real. `migrar-produtos` sem `--aplicar` tambem rodado contra a
+arvore real como conferencia adicional (preview identico ao anterior, 0
+invalido) - **`--aplicar` NAO foi rodado contra a arvore real**, seria
+aplicar uma migracao de 46 produtos sem pedido explicito para isso.
+Detalhe completo: `docs/plano-pendencias-auditoria-2026-09-06.md`, secao 5.
+
+## Sessao anterior (08/09/2026, sessao 16) — historico
 
 **Frente 5, 3a correcao da revisao independente (08/09/2026, sessao 16).**
 A Astra reproduziu 3 falhas reais contra o commit `6669b9d` (sessao 15, que

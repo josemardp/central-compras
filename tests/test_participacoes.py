@@ -925,5 +925,184 @@ class TerceiraRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
         )
 
 
+class QuartaRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
+    """Regressao dos 4 achados da 4a revisao independente (Astra) sobre o
+    commit `f2d5cd1` - cada teste aqui reproduziu uma falha real contra
+    aquele codigo antes da correcao (scripts em
+    `astra_review_f2d5cd1.py`/`astra_review_f2d5cd1_details.py`). Ver
+    STATUS.md e docs/como-conferir-auditoria.md.
+
+    A raiz comum dos achados 1 e 3: `_participacao_invalida`/
+    `participacao_vazia` tratavam "tem conteudo, mas nao e um mapa YAML
+    utilizavel" como sinonimo de "arquivo vazio, seguro recuperar do
+    legado" - uma lista com dado real e um mapa com identidade trocada sao
+    conteudo, nunca ausencia. `_classificar_participacao` agora e o UNICO
+    ponto que decide isso, usado por `read_participation` E
+    `migrate_products`."""
+
+    def test_identidade_divergente_nao_reabilita_descartado_sem_legado(self):
+        """Achado 1 (sem legado concorrente): so alterar `produto_id` na
+        participacao ja gravada nao pode reabilitar um candidato descartado
+        - nem elegivel no ranking, nem some do erro de validacao, e
+        `project_discarded_candidate_ids` tambem para de contar como
+        descartado (nunca simultaneamente elegivel E descartado)."""
+        a = self.project()
+        self.product(a)
+        self.quote(a, "candidato", "--fonte", "manual")
+        self.cli("descartar", "--produto-id", "candidato", "--projeto", str(a), "--porque", "nao atende")
+        self.assertEqual(cc.compute_ranking(a)[0], [])
+
+        path = cc.participation_path(a, "candidato")
+        dados = cc.read_yaml(path, {})
+        dados["produto_id"] = "outro-produto"
+        cc.write_yaml(path, dados)
+
+        elegiveis, _ = cc.compute_ranking(a)
+        self.assertEqual([item.produto_id for item in elegiveis], [])
+        self.assertNotIn("candidato", cc.project_discarded_candidate_ids(a))
+        self.assertNotIn("candidato", cc.project_candidate_ids(a))
+        errors, _ = cc.validation_report(a)
+        self.assertTrue(
+            any("candidato" in erro and "invalido" in erro for erro in errors),
+            f"validacao nao apontou a participacao invalida: {errors}",
+        )
+
+    def test_identidade_divergente_nao_reverte_para_legado_mais_antigo(self):
+        """Achado 1 (com legado concorrente): mesmo quando a FICHA ainda tem
+        um estado legado mais antigo (`pesquisando`) gravado antes do
+        descarte, uma participacao com identidade incoerente nao pode cair
+        de volta para esse legado - fabricaria reabilitacao por cima de um
+        descarte real e mais recente."""
+        a = self.project()
+        self.product(a)
+        self.quote(a, "candidato", "--fonte", "manual")
+        ficha = cc.find_product_path("candidato")
+        original = cc.read_yaml(ficha, {})
+        original.update(projeto=a.name, estado="pesquisando", requisitos_atendidos={"uso": True})
+        cc.write_yaml(ficha, original)
+        self.cli("descartar", "--produto-id", "candidato", "--projeto", str(a), "--porque", "descarte mais recente")
+
+        path = cc.participation_path(a, "candidato")
+        dados = cc.read_yaml(path, {})
+        dados["produto_id"] = "outro-produto"
+        cc.write_yaml(path, dados)
+
+        elegiveis, _ = cc.compute_ranking(a)
+        self.assertEqual([item.produto_id for item in elegiveis], [])
+        self.assertEqual(cc.read_participation(a, "candidato")["estado"], cc.ESTADO_PARTICIPACAO_INVALIDA)
+
+    def _legado(self, project, pid):
+        path = cc.product_dir("fone", pid) / "produto.yaml"
+        cc.write_yaml(path, dict(
+            id=pid, categoria="fone", nome=pid, marca="Marca", projeto=project.name,
+            estado="pesquisando", preco_teto=100, requisitos_atendidos={"uso": True},
+        ))
+        return path
+
+    def test_campos_opcionais_com_tipo_invalido_nao_autorizam_limpar_legado(self):
+        """Achado 2: `_participacao_invalida` so checava identidade e
+        estado - `requisitos_atendidos` como lista (quebraria `.items()` em
+        `gate_eliminations`), `preco_teto` como texto e `preco_alvo` `NaN`
+        passavam no contrato minimo e autorizavam `migrar-produtos` a apagar
+        a ficha legada por cima de dado inutilizavel."""
+        a = self.project()
+        casos = [
+            ("requisitos_atendidos", ["uso"]),
+            ("preco_teto", "barato"),
+            ("preco_alvo", float("nan")),
+        ]
+        for indice, (campo, valor) in enumerate(casos):
+            with self.subTest(campo=campo):
+                pid = f"legado-{indice}"
+                ficha = self._legado(a, pid)
+                dados = cc.default_participation(pid)
+                dados[campo] = valor
+                path = cc.participation_path(a, pid)
+                cc.write_yaml(path, dados)
+                before = (ficha.read_bytes(), path.read_bytes())
+
+                with self.assertRaises(SystemExit):
+                    self.cli("migrar-produtos", "--aplicar")
+
+                self.assertEqual(
+                    (ficha.read_bytes(), path.read_bytes()), before,
+                    f"{campo} invalido passou no contrato minimo e autorizou apagar o legado",
+                )
+
+    def test_requisitos_lista_nao_derruba_gate_eliminations(self):
+        """Efeito colateral do achado 2 que nao era so 'aceita dado ruim':
+        `(product.get('requisitos_atendidos') or {}).items()` em
+        `gate_eliminations` quebraria com `AttributeError` se o campo fosse
+        uma lista nao-vazia. Validar o tipo em `read_participation` evita
+        que esse dado chegue ali."""
+        a = self.project()
+        self.product(a)
+        path = cc.participation_path(a, "candidato")
+        dados = cc.read_yaml(path, {})
+        dados["requisitos_atendidos"] = ["uso"]
+        cc.write_yaml(path, dados)
+        self.quote(a, "candidato", "--fonte", "manual")
+
+        elegiveis, cortados = cc.compute_ranking(a)
+        self.assertEqual(elegiveis, [])
+        self.assertEqual([item.produto_id for item in cortados], ["candidato"])
+
+    def test_lista_com_dados_nao_e_arquivo_vazio_para_migracao(self):
+        """Achado 3: `participacao_vazia = not (isinstance(dados, dict) and
+        bool(dados))` tratava QUALQUER conteudo nao-dicionario, mesmo uma
+        lista YAML com estado e motivo de descarte reais, como "arquivo sem
+        dado" - a migracao recuperava do legado por cima de evidencia de
+        verdade, silenciosamente."""
+        a = self.project()
+        ficha = self._legado(a, "legado")
+        path = cc.participation_path(a, "legado")
+        cc.write_yaml(path, [{"estado": "descartado", "descartado_porque": "EVIDENCIA_NOVA_A_PRESERVAR"}])
+        before = (ficha.read_bytes(), path.read_bytes())
+
+        with self.assertRaises(SystemExit):
+            self.cli("migrar-produtos", "--aplicar")
+
+        self.assertEqual(
+            (ficha.read_bytes(), path.read_bytes()), before,
+            "Lista nao vazia foi sobrescrita como se nao contivesse dados; evidencia desapareceu",
+        )
+
+    def test_arquivo_realmente_vazio_continua_recuperando_do_legado(self):
+        """Controle: a recuperacao de arquivo vazio de verdade (0 bytes),
+        corrigida na 2a revisao independente, continua funcionando - a
+        distincao nova (achado 3) e so entre "sem dado nenhum" e "tem
+        conteudo, mesmo que nao seja mapa", nunca uma regressao da recuperacao
+        ja validada."""
+        a = self.project()
+        ficha = self._legado(a, "legado")
+        path = cc.participation_path(a, "legado")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+
+        self.cli("migrar-produtos", "--aplicar")
+
+        self.assertEqual(cc.read_participation(a, "legado")["estado"], "pesquisando")
+        self.assertNotIn("estado", cc.read_yaml(ficha, {}))
+
+    def test_motivo_invalido_nunca_vaza_para_disco(self):
+        """`read_participation` anexa `_motivo_invalido` (diagnostico interno)
+        ao dict devolvido para participacao invalida - esse campo nao pode
+        ser persistido: nem ao regravar a participacao via `descartar`/
+        `aguardar-preco` (caminho normal de reconciliacao), nem no snapshot
+        congelado de uma decisao."""
+        a = self.project()
+        self.product(a)
+        path = cc.participation_path(a, "candidato")
+        dados = cc.read_yaml(path, {})
+        dados["produto_id"] = "outro-produto"
+        cc.write_yaml(path, dados)
+        self.assertIn("_motivo_invalido", cc.read_participation(a, "candidato"))
+
+        self.cli("descartar", "--produto-id", "candidato", "--projeto", str(a), "--porque", "reconciliado")
+
+        self.assertNotIn("_motivo_invalido", cc.read_yaml(path, {}))
+        self.assertEqual(cc.read_participation(a, "candidato")["estado"], "descartado")
+
+
 if __name__ == "__main__":
     unittest.main()

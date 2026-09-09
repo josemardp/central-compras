@@ -835,15 +835,19 @@ gates e limites de score do ranking também não foram tocados, como pedido.
 
 ## 5. Produtos reutilizados em projetos diferentes
 
-**Estado: implementada (sessão 13), corrigida em três rodadas de revisão
-independente da Astra (sessões 14, 15 e 16 — 6 + 3 + 3 achados). Ainda
-falta UMA rodada de revisão que passe limpa antes de declarar "concluída
-sob reserva" — já foi dada como pronta TRÊS vezes e as três vezes apareceu
-lacuna nova; não presuma que a 4ª rodada não vai achar mais nada. Padrão
-que se repete: cada rodada acha problema mais profundo no MESMO par de
-mecanismos (`link_product`/`migrate_products` + `tracked_operation`) — a
-próxima revisão (ou correção) deveria ler o contrato inteiro dessas duas
-áreas, não só o diff da última rodada.**
+**Estado: implementada (sessão 13), corrigida em quatro rodadas de revisão
+independente da Astra (sessões 14, 15, 16 e 17 — 6 + 3 + 3 + 4 achados).
+Ainda falta UMA rodada de revisão que passe limpa antes de declarar
+"concluída sob reserva" — já foi dada como pronta QUATRO vezes e as quatro
+vezes apareceu lacuna nova; não presuma que a 5ª rodada não vai achar mais
+nada. Padrão que se repete: cada rodada acha problema mais profundo no
+MESMO conjunto de mecanismos — as 3 primeiras em `link_product`/
+`migrate_products` + `tracked_operation`, a 4ª no contrato de participação
+(`_participacao_invalida`/`read_participation`) e nos consumidores que
+ainda liam `estado` bruto do YAML em vez de passar por ele
+(`project_candidate_ids`/`project_discarded_candidate_ids`) — a próxima
+revisão (ou correção) deveria ler o contrato inteiro dessas áreas, não só
+o diff da última rodada.**
 
 **Contrato:** `produto.yaml` (ficha) passou a guardar só identidade e dado
 técnico — `id`, `categoria`, `nome`, `marca`, `atributos`,
@@ -1117,6 +1121,99 @@ participação (`_participacao_invalida`) não foi estendido para
 `project_candidate_ids`/`project_discarded_candidate_ids` (leem `estado`
 direto do YAML sem passar por `read_participation`) — a Astra não apontou
 esses dois como achado, e mexer neles agora seria escopo além do pedido.
+**Essa omissão foi exatamente o gancho da 4ª revisão, abaixo.**
+
+### 4ª revisão independente (Astra, sessão 17, sobre o commit `f2d5cd1`) — 4 falhas
+
+A correção da 3ª revisão criou o contrato mínimo
+(`_participacao_invalida`), mas só o usava em `read_participation` e
+`migrate_products` — os dois consumidores deixados de fora de propósito na
+3ª revisão (nota acima) continuavam lendo `estado` bruto do YAML, e o
+próprio contrato ainda tinha dois buracos:
+
+1. **Identidade divergente reabilitava candidato descartado.** Alterar só
+   `produto_id` num arquivo de participação já `descartado` fazia
+   `read_participation` cair pro legado (ou pro default `pesquisando`) —
+   `compute_ranking` voltava a considerar o candidato ELEGÍVEL, enquanto
+   `project_discarded_candidate_ids` (lendo o YAML bruto, sem passar pelo
+   contrato) continuava contando o MESMO candidato como descartado.
+   Simultaneidade real: `elegiveis=['candidato']` e
+   `descartados=['candidato']` ao mesmo tempo, `validation_report` mudo.
+   Corrigido com um estado sintético novo, `ESTADO_PARTICIPACAO_INVALIDA`
+   ("invalido") — fora de `ESTADOS_PARTICIPACAO`, nunca gravável por
+   nenhum comando —, devolvido por `read_participation` quando o conteúdo
+   é incoerente. Nunca cai pro legado (resolve também o caso "reverte pra
+   estado legado mais antigo", variante do mesmo achado). `_classificar_
+   participacao` virou o ponto único que decide "vazio" (ausente/0 bytes/
+   mapa vazio — recupera do legado, como antes) vs. "inválida" (tem
+   conteúdo mas não presta — nunca recupera, nunca é autoridade) vs.
+   "válida"; usado por `read_participation` E `migrate_products`.
+   `project_candidate_ids`/`project_discarded_candidate_ids` passaram a ler
+   pelo MESMO `read_participation` (nunca mais `estado` bruto) e excluem o
+   estado `invalido` dos dois conjuntos — nem "ativo" nem "descartado"
+   confirmado, fica de fora dos dois até reconciliar. `gate_eliminations`
+   corta o candidato (nunca elegível) com mensagem de reconciliação
+   distinta da de descarte confirmado; `validation_report` aponta ERRO
+   (não aviso) mesmo quando o candidato não tem cotação ainda (loop
+   adicional sobre os arquivos de participação, não só sobre `latest`).
+2. **Campo opcional aceitava qualquer tipo.** `_participacao_invalida` só
+   validava identidade e estado — `requisitos_atendidos: ["uso"]` (lista,
+   quebraria `.items()` em `gate_eliminations` com `AttributeError`),
+   `preco_teto: "barato"` e `preco_alvo: NaN` (viraria limite ausente em
+   silêncio via `quote_float`) passavam no contrato e autorizavam
+   `migrar-produtos` a apagar o legado por cima. Corrigido:
+   `_tipo_invalido_participacao` valida tipo dos campos opcionais
+   CONHECIDOS quando presentes (`requisitos_atendidos` precisa ser mapa;
+   `preco_alvo`/`preco_teto` precisam ser número finito; os três campos de
+   texto precisam ser string) — ausência continua válida, campo
+   desconhecido (schema futuro) nunca invalida.
+3. **Conteúdo não-mapa era tratado como arquivo vazio na migração.**
+   `participacao_vazia = not (isinstance(dados, dict) and bool(dados))`
+   classificava QUALQUER conteúdo não-dicionário — inclusive uma LISTA
+   YAML não vazia com `estado`/`descartado_porque` reais — como "arquivo
+   sem dado", autorizando a migração a sobrescrever com o legado por cima
+   de evidência de verdade. Corrigido dentro de `_classificar_
+   participacao` (mesma função do achado 1): só `None` (0 bytes/`null`) ou
+   mapa vazio `{}` contam como "vazio"; qualquer outro conteúdo não-mapa
+   vira "inválido" (recusa, preserva os dois arquivos).
+
+**Achado colateral, corrigido junto:** o dict sintético devolvido por
+`read_participation` para o estado `invalido` carrega `_motivo_invalido`
+(diagnóstico interno) — sem cuidado, esse campo vazaria pro YAML gravado em
+disco na próxima escrita (`descartar`/`aguardar-preco` sobre um arquivo já
+inválido, que é o caminho normal de reconciliação) ou pro snapshot congelado
+de uma decisão. `_participacao_serializavel` remove campos com prefixo `_`
+antes de qualquer escrita (`write_participation` e o snapshot de
+participações em `_decide_writes`).
+
+### Testes (4ª revisão)
+
+`tests/test_participacoes.py`, `QuartaRevisaoIndependenteFrente5Test`: os 4
+testes-armadilha da Astra (reprodução real de cada achado contra o commit
+`f2d5cd1`, confirmada ANTES da correção — scripts
+`astra_review_f2d5cd1.py`/`astra_review_f2d5cd1_details.py`) + 3 testes de
+controle/efeito colateral (`test_arquivo_realmente_vazio_continua_
+recuperando_do_legado` — a recuperação de 0 bytes da 2ª revisão não
+regrediu; `test_requisitos_lista_nao_derruba_gate_eliminations` — o
+`AttributeError` real que o achado 2 evitava; `test_motivo_invalido_nunca_
+vaza_para_disco`). Mutação aplicada nas 3 correções de fundo, uma de cada
+vez (desfeita e restaurada em seguida): achado 1 desfeito derrubou
+exatamente os 2 testes de identidade + o teste de `.items()` + o teste do
+vazamento (4 falhas, nenhuma outra); achado 2 desfeito derrubou as 3
+subTests do teste de tipo + o teste de `.items()` com `AttributeError` real
+(3 falhas + 1 erro, nenhum outro); achado 3 desfeito derrubou só o teste da
+lista (1 falha, nenhum outro). Suíte completa depois da correção: **445
+testes, 0 falhas** (438 + 7 novos). `auditar-decisoes --strict`,
+`operacoes-pendentes --strict`, `checar-segredos --strict` e
+`git diff --check` limpos contra a árvore real (`migrar-produtos` sem
+`--aplicar` também rodado contra a árvore real como conferência adicional —
+preview idêntico ao anterior, 0 inválido).
+
+**Fora do escopo desta correção, deliberadamente:** frente 6 não iniciada
+(pedido explícito do Josemar); pesos/gates/calibragem do score intocados;
+nenhuma infraestrutura externa tocada; `migrar-produtos --aplicar` não foi
+rodado contra a árvore real (seria aplicar uma migração de 46 produtos sem
+pedido explícito para isso — só o preview, read-only, foi conferido).
 
 ## 6. Datas e vereditos
 
@@ -1150,13 +1247,14 @@ revisado, fluxos testados no navegador quando aplicável, push para
   na planilha real, ver seção 3.
 - **Frente 4** (proveniência): feito, 18 testes, verificado no painel com
   dados sintéticos, ver seção 4.
-- **Frente 5** (produtos reutilizados): implementada (sessão 13); três
-  rodadas de revisão independente da Astra acharam 6, depois 3 e depois
-  mais 3 lacunas reais, as três corrigidas com teste permanente + mutação
-  (sessões 14, 15 e 16) — suíte completa, `checar-segredos --strict`,
-  `operacoes-pendentes --strict`, `auditar-decisoes --strict` e
-  `git diff --check` limpos nas três rodadas, ver seção 5. **Ainda falta uma
-  rodada de revisão independente que passe limpa** — já foi dada como
-  pronta TRÊS vezes e as três vezes apareceu lacuna nova; não presumir
-  "concluída sob reserva" até isso acontecer de verdade.
+- **Frente 5** (produtos reutilizados): implementada (sessão 13); quatro
+  rodadas de revisão independente da Astra acharam 6, depois 3, depois mais
+  3 e depois mais 4 lacunas reais, as quatro corrigidas com teste
+  permanente + mutação (sessões 14, 15, 16 e 17) — suíte completa,
+  `checar-segredos --strict`, `operacoes-pendentes --strict`,
+  `auditar-decisoes --strict` e `git diff --check` limpos nas quatro
+  rodadas, ver seção 5. **Ainda falta uma rodada de revisão independente
+  que passe limpa** — já foi dada como pronta QUATRO vezes e as quatro
+  vezes apareceu lacuna nova; não presumir "concluída sob reserva" até
+  isso acontecer de verdade.
 - **Frente 6** (datas/veredito): não iniciada.

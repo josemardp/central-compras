@@ -1638,26 +1638,67 @@ def default_participation(produto_id: str) -> dict[str, Any]:
     }
 
 
-def _participacao_invalida(dados: Any, produto_id: str) -> str | None:
-    """Contrato minimo de uma participacao no formato novo - o mesmo usado
-    por `read_participation` (decidir se o arquivo em disco e autoridade
-    sobre o estado) e por `migrate_products` (decidir se pode limpar a
-    ficha legada por cima dele). "O arquivo existe" nunca basta.
+# Estado sintetico, NUNCA gravado em disco e fora de `ESTADOS_PARTICIPACAO`
+# de proposito (nenhum comando/CLI jamais escreve isso) - devolvido por
+# `read_participation` quando o arquivo tem CONTEUDO mas ele e incoerente
+# (identidade errada, estado desconhecido, campo com tipo invalido). Marca
+# "nao decido sozinho", nunca "pesquisando": participacao invalida NAO pode
+# ser elegivel (fabricaria decisao sobre dado que ninguem confirmou) nem
+# "descartada" (fabricaria um motivo de descarte que ninguem escreveu).
+ESTADO_PARTICIPACAO_INVALIDA = "invalido"
 
-    So exige os dois campos que provam IDENTIDADE (`produto_id`, tem que
-    bater com o proprio arquivo que o contem - nunca o de outro produto) e
-    ESTADO (dentro do vocabulario conhecido, `ESTADOS_PARTICIPACAO`). Os
-    demais campos (preco-alvo/teto, requisitos, motivo de descarte...) sao
-    opcionais por natureza - uma participacao recem-criada por
+_CAMPOS_MONETARIOS_PARTICIPACAO = ("preco_alvo", "preco_teto")
+_CAMPOS_TEXTO_PARTICIPACAO = ("descartado_porque", "aguardando_preco_porque", "aguardando_preco_desde")
+
+
+def _tipo_invalido_participacao(dados: dict[str, Any]) -> str | None:
+    """Valida o TIPO dos campos OPCIONAIS conhecidos, quando presentes.
+
+    "Opcional" nunca significou "tipo livre": ausencia (`None`, ou campo
+    nem gravado) continua valida, mas um valor presente com tipo errado
+    (`requisitos_atendidos` como lista, `preco_teto` como texto, `NaN` como
+    limite monetario) nao pode passar batido - `requisitos_atendidos` vira
+    `.items()` em `gate_eliminations`, e um preco nao-finito viraria limite
+    ausente em silencio via `quote_float`. Campo desconhecido (schema
+    futuro) nunca entra aqui - passa batido, de proposito.
+    """
+    requisitos = dados.get("requisitos_atendidos")
+    if requisitos is not None and not isinstance(requisitos, dict):
+        return f"requisitos_atendidos precisa ser um mapa (recebeu {type(requisitos).__name__})"
+    for campo in _CAMPOS_MONETARIOS_PARTICIPACAO:
+        valor = dados.get(campo)
+        if valor is None:
+            continue
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+            return f"{campo} precisa ser numero (recebeu {valor!r})"
+        if not math.isfinite(valor):
+            return f"{campo} nao e um numero finito (recebeu {valor!r})"
+    for campo in _CAMPOS_TEXTO_PARTICIPACAO:
+        valor = dados.get(campo)
+        if valor is not None and not isinstance(valor, str):
+            return f"{campo} precisa ser texto (recebeu {type(valor).__name__})"
+    return None
+
+
+def _participacao_invalida(dados: Any, produto_id: str) -> str | None:
+    """Contrato minimo de uma participacao no formato novo, ja sabendo que
+    `dados` e um mapa YAML NAO VAZIO (`_classificar_participacao` decide
+    isso antes de chamar). Usado por `read_participation` (decidir se o
+    arquivo em disco e autoridade sobre o estado) e por `migrate_products`
+    (decidir se pode limpar a ficha legada por cima dele).
+
+    Exige IDENTIDADE (`produto_id`, tem que bater com o proprio arquivo que
+    o contem - nunca o de outro produto), ESTADO (dentro do vocabulario
+    conhecido, `ESTADOS_PARTICIPACAO`) e TIPO dos campos opcionais conhecidos
+    quando presentes (`_tipo_invalido_participacao`). Os demais campos
+    (preco-alvo/teto, requisitos, motivo de descarte...) continuam opcionais
+    por natureza quando AUSENTES - uma participacao recem-criada por
     `vincular-produto` nao tem nenhum deles ainda, e isso e valido. Campo
-    desconhecido (schema futuro) tambem nunca invalida por si so - so o que
-    falta ou diverge nos dois campos exigidos.
+    desconhecido (schema futuro) tambem nunca invalida por si so.
 
     Devolve `None` quando valida, ou o motivo (texto curto, pra diagnostico)
     quando nao.
     """
-    if not isinstance(dados, dict) or not dados:
-        return "vazio ou nao e um mapa YAML"
     if dados.get("produto_id") != produto_id:
         return f"produto_id gravado ({dados.get('produto_id')!r}) diverge do arquivo ({produto_id!r})"
     if dados.get("estado") not in ESTADOS_PARTICIPACAO:
@@ -1665,7 +1706,40 @@ def _participacao_invalida(dados: Any, produto_id: str) -> str | None:
             f"estado {dados.get('estado')!r} fora do vocabulario conhecido "
             f"({', '.join(ESTADOS_PARTICIPACAO)})"
         )
-    return None
+    return _tipo_invalido_participacao(dados)
+
+
+def _classificar_participacao(dados: Any, produto_id: str) -> tuple[str, str | None]:
+    """Classifica o CONTEUDO BRUTO (ja carregado por `read_yaml(path, None)`)
+    de um arquivo de participacao - ponto UNICO usado por `read_participation`
+    e por `migrate_products`, para as duas nunca divergirem sobre o mesmo
+    arquivo.
+
+    Devolve `(status, motivo)`:
+    - `("vazio", None)`: arquivo nao existe, ou existe mas nao tem NENHUM
+      dado (0 bytes / `null` explicito viram `None` apos o parse do YAML, ou
+      mapa vazio `{}`). Nunca houve escrita real; seguro tratar como se a
+      participacao nunca tivesse sido criada (cai para o legado ou default).
+    - `("valida", None)`: mapa YAML que passa no contrato minimo
+      (`_participacao_invalida` devolve `None`).
+    - `("invalida", motivo)`: tem CONTEUDO (uma lista, uma string, um mapa
+      com identidade/estado/tipo errado...) mas nao e utilizavel. Difere de
+      "vazio" de proposito - uma lista YAML com estado e motivo de descarte
+      de verdade NAO e "arquivo sem dado", e tratar as duas a mesma coisa
+      foi exatamente o bug que apagou evidencia por cima de conteudo real.
+      Quem chama tem que diagnosticar e recusar autoridade, preservando os
+      arquivos, nunca reescrever por cima.
+    """
+    if dados is None:
+        return "vazio", None
+    if isinstance(dados, dict) and not dados:
+        return "vazio", None
+    if not isinstance(dados, dict):
+        return "invalida", f"conteudo nao e um mapa YAML (tipo {type(dados).__name__})"
+    motivo = _participacao_invalida(dados, produto_id)
+    if motivo:
+        return "invalida", motivo
+    return "valida", None
 
 
 def _participation_from_legacy_ficha(produto_id: str, ficha: dict[str, Any]) -> dict[str, Any]:
@@ -1679,20 +1753,31 @@ def _participation_from_legacy_ficha(produto_id: str, ficha: dict[str, Any]) -> 
 def read_participation(project: Path, produto_id: str) -> dict[str, Any]:
     """Participacao deste produto NESTE projeto - nunca None.
 
-    Formato novo (arquivo proprio) sempre vence quando existe E passa no
-    contrato minimo (`_participacao_invalida`: identidade e estado
-    coerentes). Um arquivo existente mas incompleto ou incoerente (so uma
-    anotacao solta, `produto_id` de outro produto, `estado` desconhecido)
-    NAO e autoridade - cai no mesmo caminho de "sem participacao no formato
-    novo": os campos legados da ficha (so se ela ainda aponta pra ESTE
-    projeto, nunca para outro) ou o default neutro (`pesquisando`). Nunca um
-    estado CONFIRMADO (`descartado`, por exemplo) fabricado a partir de dado
-    ausente ou invalido - o default e sempre o neutro.
+    Tres caminhos, pela classificacao de `_classificar_participacao`:
+    - "valida": o arquivo proprio sempre vence.
+    - "vazio" (arquivo ausente, 0 bytes, ou mapa vazio): cai para os campos
+      legados da ficha (so se ela ainda aponta pra ESTE projeto, nunca para
+      outro) ou o default neutro (`pesquisando`) - igual a antes.
+    - "invalida" (TEM conteudo, mas incoerente - identidade errada, estado
+      desconhecido, tipo de campo invalido): NUNCA cai para o legado nem
+      para o default neutro. Um estado legado mais antigo, ou "pesquisando"
+      fabricado, reabilitaria silenciosamente um candidato cujo ultimo
+      estado CONHECIDO podia ser `descartado`. Devolve o estado sintetico
+      `invalido` (fora de `ESTADOS_PARTICIPACAO`, nunca gravavel por
+      nenhum comando) com o motivo em `_motivo_invalido` - os consumidores
+      (`gate_eliminations`, `validation_report`) tratam isso como "nao
+      decido sozinho", nunca como elegivel nem como descarte confirmado.
     """
     dados = read_yaml(participation_path(project, produto_id), None)
-    if dados is not None and _participacao_invalida(dados, produto_id) is None:
+    status, motivo = _classificar_participacao(dados, produto_id)
+    if status == "valida":
         base = default_participation(produto_id)
         base.update(dados)
+        return base
+    if status == "invalida":
+        base = default_participation(produto_id)
+        base["estado"] = ESTADO_PARTICIPACAO_INVALIDA
+        base["_motivo_invalido"] = motivo
         return base
     ficha_path = find_product_path(produto_id)
     ficha = read_yaml(ficha_path, {}) if ficha_path else {}
@@ -1701,11 +1786,23 @@ def read_participation(project: Path, produto_id: str) -> dict[str, Any]:
     return default_participation(produto_id)
 
 
+def _participacao_serializavel(dados: dict[str, Any]) -> dict[str, Any]:
+    """Remove campos sinteticos internos (prefixo `_` - hoje so
+    `_motivo_invalido`, o diagnostico que `read_participation` anexa quando
+    o arquivo em disco tem conteudo invalido) antes de qualquer escrita.
+    Nunca gravar isso em disco: nem no proprio arquivo de participacao
+    (rodar `descartar`/`aguardar-preco` sobre um arquivo invalido e o
+    caminho normal de reconciliacao - regrava limpo), nem no snapshot
+    congelado de uma decisao (evidencia, nao rascunho de diagnostico).
+    """
+    return {key: value for key, value in dados.items() if not key.startswith("_")}
+
+
 def write_participation(project: Path, produto_id: str, dados: dict[str, Any]) -> None:
     path = participation_path(project, produto_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     completo = default_participation(produto_id)
-    completo.update(dados)
+    completo.update(_participacao_serializavel(dados))
     write_yaml(path, completo)
 
 
@@ -1749,15 +1846,25 @@ def project_candidate_ids(project: Path) -> set[str]:
     com ou sem cotacao - novo formato tem precedencia; fichas antigas nao
     migradas (campo `projeto` na propria ficha) continuam contando enquanto
     nao tiverem participacao gravada aqui.
+
+    Participacao no formato novo passa por `read_participation` (nunca
+    `estado` bruto do arquivo) - o mesmo contrato usado pelo ranking, para
+    esta lista nunca discordar dele sobre o mesmo candidato. Participacao
+    com conteudo invalido nao entra aqui NEM em
+    `project_discarded_candidate_ids`: nao e "ativo" confirmado, mas
+    tambem nao e "descartado" confirmado - fica de fora dos dois ate
+    reconciliar.
     """
     ids: set[str] = set()
     migrados: set[str] = set()
     pasta = participations_dir(project)
     if pasta.exists():
         for path in pasta.glob("*.yaml"):
-            migrados.add(path.stem)
-            if read_yaml(path, {}).get("estado") != "descartado":
-                ids.add(path.stem)
+            produto_id = path.stem
+            migrados.add(produto_id)
+            estado = read_participation(project, produto_id).get("estado")
+            if estado not in ("descartado", ESTADO_PARTICIPACAO_INVALIDA):
+                ids.add(produto_id)
     for path in PRODUTOS.glob("*/*/produto.yaml"):
         produto_id = path.parent.name
         if produto_id in migrados:
@@ -1770,15 +1877,20 @@ def project_candidate_ids(project: Path) -> set[str]:
 
 def project_discarded_candidate_ids(project: Path) -> set[str]:
     """Descartados conhecidos neste projeto, inclusive os que ainda aparecem
-    em cotacoes. Mesma precedencia novo-formato-primeiro de `project_candidate_ids`."""
+    em cotacoes. Mesma precedencia novo-formato-primeiro de
+    `project_candidate_ids`, e mesmo cuidado com participacao invalida (ver
+    docstring daquela funcao) - nunca conta como descartado so porque um
+    campo bruto qualquer diz `descartado` sem passar pelo contrato minimo.
+    """
     ids: set[str] = set()
     migrados: set[str] = set()
     pasta = participations_dir(project)
     if pasta.exists():
         for path in pasta.glob("*.yaml"):
-            migrados.add(path.stem)
-            if read_yaml(path, {}).get("estado") == "descartado":
-                ids.add(path.stem)
+            produto_id = path.stem
+            migrados.add(produto_id)
+            if read_participation(project, produto_id).get("estado") == "descartado":
+                ids.add(produto_id)
     for path in PRODUTOS.glob("*/*/produto.yaml"):
         produto_id = path.parent.name
         if produto_id in migrados:
@@ -2178,6 +2290,28 @@ def validation_report(project: Path) -> tuple[list[str], list[str]]:
             warnings.append(f"{produto_id}: atributos obrigatorios ausentes: {', '.join(missing_attrs)}")
         if product.get("estado") == "descartado" and not product.get("descartado_porque"):
             errors.append(f"{produto_id}: produto descartado sem motivo.")
+        if product.get("estado") == ESTADO_PARTICIPACAO_INVALIDA:
+            errors.append(
+                f"{produto_id}: participacao com conteudo invalido "
+                f"({product.get('_motivo_invalido')}) - requer reconciliacao manual antes de decidir."
+            )
+
+    # Participacao invalida sem NENHUMA cotacao ainda nao passa pelo loop
+    # acima (que so cobre `latest`) - sem isto, o candidato some do ranking
+    # (gate_eliminations) e some de "candidatos sem cotacao" (excluido de
+    # `project_candidate_ids`), mas a validacao nunca avisa por que.
+    pasta_participacoes = participations_dir(project)
+    if pasta_participacoes.exists():
+        for path in sorted(pasta_participacoes.glob("*.yaml")):
+            produto_id = path.stem
+            if produto_id in latest:
+                continue
+            participacao = read_participation(project, produto_id)
+            if participacao.get("estado") == ESTADO_PARTICIPACAO_INVALIDA:
+                errors.append(
+                    f"{produto_id}: participacao com conteudo invalido "
+                    f"({participacao.get('_motivo_invalido')}) - requer reconciliacao manual antes de decidir."
+                )
 
     for index, row in enumerate(rows, 2):
         missing = quote_missing_fields(row)
@@ -2434,6 +2568,13 @@ def gate_eliminations(row: dict[str, str], product: dict[str, Any], briefing: di
     if product.get("estado") == "descartado":
         motivo = product.get("descartado_porque") or "motivo nao registrado"
         eliminations.append(f"produto descartado ({motivo})")
+    elif product.get("estado") == ESTADO_PARTICIPACAO_INVALIDA:
+        # Participacao com conteudo invalido nunca pode ser elegivel: seria
+        # decidir sobre dado que ninguem confirmou. Tambem nunca vira
+        # "descartado" (ramo acima) - isso fabricaria um motivo de descarte
+        # que ninguem escreveu. Fica cortada ate a reconciliacao manual.
+        motivo = product.get("_motivo_invalido") or "participacao com conteudo invalido"
+        eliminations.append(f"participacao invalida, requer reconciliacao manual ({motivo})")
 
     # Produto sem custo utilizavel nao e candidato: era tratado como "eixo valor
     # sem dado" e seguia elegivel, com score alto sobre os eixos restantes.
@@ -3664,7 +3805,10 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
         # --strict` sem nunca aparecer em nenhum arquivo congelado.
         (snapshot_dir / "participacoes").mkdir(parents=True, exist_ok=True)
         for pid in sorted(project_product_ids(project)):
-            write_yaml(snapshot_dir / "participacoes" / f"{pid}.yaml", read_participation(project, pid))
+            write_yaml(
+                snapshot_dir / "participacoes" / f"{pid}.yaml",
+                _participacao_serializavel(read_participation(project, pid)),
+            )
         atomic_write_text(snapshot_dir / "ambiente.json", json.dumps({
             "python": sys.version, "pyyaml": yaml.__version__,
             "argumentos": {key: value for key, value in vars(args).items() if key != "func"},
@@ -6005,24 +6149,28 @@ def migrate_products(args: argparse.Namespace) -> None:
 
         # A EXISTENCIA do arquivo de participacao nao prova que ele preserva
         # dado nenhum, nem que o dado que ele tem e confiavel. Tres casos,
-        # tratamento diferente pra cada um:
-        #   (a) vazio/ilegivel (0 bytes, ou nao e um mapa YAML) - nao ha
-        #       NENHUM dado ali pra "ser mais recente que a ficha"; seguro
-        #       recuperar do legado, exatamente como se o arquivo nao
+        # tratamento diferente pra cada um (classificados por
+        # `_classificar_participacao` - MESMO ponto usado por
+        # `read_participation`, para as duas funcoes nunca divergirem sobre
+        # o mesmo arquivo):
+        #   (a) vazio (arquivo ausente, 0 bytes, `null`, ou mapa vazio `{}`)
+        #       - nao ha NENHUM dado ali pra "ser mais recente que a ficha";
+        #       seguro recuperar do legado, exatamente como se o arquivo nao
         #       existisse.
-        #   (b) mapa com conteudo, mas que nao passa no contrato minimo de
-        #       participacao (`_participacao_invalida` - identidade ou
-        #       estado incoerente: so uma anotacao solta, produto_id de
-        #       OUTRO produto, estado fora do vocabulario) - dado
-        #       incompleto ou incoerente NAO autoriza apagar a ficha legada
-        #       (unica evidencia confiavel restante). Recusa preservando os
-        #       dois arquivos, relata o motivo, decisao fica com o Josemar.
+        #   (b) tem CONTEUDO mas nao passa no contrato minimo de
+        #       participacao - uma lista/string/numero (nao e um mapa), ou
+        #       um mapa com identidade/estado/tipo incoerente. Conteudo
+        #       existente (mesmo que nao seja um mapa) NAO autoriza apagar a
+        #       ficha legada (unica evidencia confiavel restante) - uma
+        #       lista YAML com estado e motivo de descarte de verdade e
+        #       conteudo, nao "arquivo vazio". Recusa preservando os dois
+        #       arquivos, relata o motivo, decisao fica com o Josemar.
         #   (c) mapa valido (passa no contrato) - e sempre quem manda,
         #       nunca sobrescrito pelo legado; so a ficha e limpa.
         participacao_bruta = read_yaml(participacao_alvo, None)
-        participacao_vazia = not (isinstance(participacao_bruta, dict) and bool(participacao_bruta))
-        motivo_invalido = None if participacao_vazia else _participacao_invalida(participacao_bruta, produto_id)
-        if motivo_invalido:
+        status_participacao, motivo_invalido = _classificar_participacao(participacao_bruta, produto_id)
+        participacao_vazia = status_participacao == "vazio"
+        if status_participacao == "invalida":
             invalidos.append(
                 f"{produto_id}: participacao existente em `{participacao_alvo}` nao passa no contrato "
                 f"minimo de participacao ({motivo_invalido}) - nao decido sozinho se e dado real "
