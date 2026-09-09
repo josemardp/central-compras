@@ -384,11 +384,41 @@ def _fingerprint(dados: dict[str, Any]) -> str:
     return json.dumps(dados, ensure_ascii=True, sort_keys=True, default=str, separators=(",", ":"))
 
 
+def _valores_equivalentes(a: Any, b: Any) -> bool:
+    """Igualdade usada para comparar assinaturas - mais estrita que `==` do
+    Python exatamente onde `==` engana: `bool` e subclasse de `int` em
+    Python, entao `False == 0` e `True == 1` sao `True` pro operador
+    nativo, mesmo sendo valores de ENTRADA distintos (`--requisito
+    uso=false` grava `False`; `--requisito uso=0` grava o INTEIRO `0` -
+    `gate_eliminations` corta so o primeiro, via `is False`). Sem este
+    cuidado, uma retomada podia trocar `false` por `0` (ou vice-versa) e
+    `_assinaturas_compativeis` aceitava como "mesmo dado".
+
+    Recursivo em dict/list/tuple, porque o mesmo problema vale escondido
+    dentro de uma estrutura aninhada (`requisitos_atendidos`, por
+    exemplo) - `==` do Python ja recursa em dict/list, mas carrega o
+    mesmo furo de bool/int em cada nivel.
+    """
+    if isinstance(a, bool) or isinstance(b, bool):
+        return type(a) is type(b) and a == b
+    if isinstance(a, dict) and isinstance(b, dict):
+        return set(a) == set(b) and all(_valores_equivalentes(a[chave], b[chave]) for chave in a)
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return len(a) == len(b) and all(_valores_equivalentes(x, y) for x, y in zip(a, b))
+    return a == b
+
+
 def _assinaturas_compativeis(fingerprint_antigo: str, assinatura_nova: dict[str, Any]) -> bool:
     """Compara a assinatura persistida na 1a tentativa com a desta chamada,
     tolerando EVOLUCAO DE SCHEMA - um campo novo que o codigo antigo (que
     comecou o journal pendente) nem sabia que existia - sem abrir mao de
     recusar argumento realmente diferente.
+
+    A comparacao entre dois valores PRESENTES usa `_valores_equivalentes`
+    (nunca `==` puro), pra nao confundir `False` com `0` nem em estruturas
+    aninhadas - limite deliberado: so tolera a EVOLUCAO DE SCHEMA (campo
+    novo ausente do lado antigo), nunca uma diferenca de tipo/valor real
+    entre dois campos que os DOIS lados ja preenchiam.
 
     Um campo ausente na assinatura antiga so e compativel com o valor
     ATUAL se esse valor for o default neutro (None/False/vazio/0) - o
@@ -411,8 +441,10 @@ def _assinaturas_compativeis(fingerprint_antigo: str, assinatura_nova: dict[str,
     for chave in set(antiga) | set(assinatura_nova):
         valor_antigo = antiga.get(chave, ausente)
         valor_novo = assinatura_nova.get(chave, ausente)
-        if valor_antigo == valor_novo:
-            continue
+        if valor_antigo is not ausente and valor_novo is not ausente:
+            if _valores_equivalentes(valor_antigo, valor_novo):
+                continue
+            return False
         if valor_antigo is ausente and not valor_novo:
             continue
         if valor_novo is ausente and not valor_antigo:
@@ -3762,6 +3794,24 @@ def decide(args: argparse.Namespace) -> None:
     # pela data da retomada. `None` quando nao comprado (nunca fabrica).
     data_compra_efetiva = (args.data_compra or today()) if args.comprado else None
     op_id = f"decidir:{args.produto_id}"
+    # Achado 4: `decidir --comprado` pode COMPLEMENTAR um veredito ja
+    # existente (achado da rodada anterior) - mas isso tem que respeitar o
+    # MESMO contrato de cronologia que `registrar-evento` ja aplica pros
+    # outros eventos, senao da pra gravar uma compra POSTERIOR a um inicio
+    # de uso ja registrado. Confere ANTES de tocar em qualquer arquivo
+    # (decisao.md, processo.md, snapshot, veredito) - mesmo principio do
+    # achado 3 em `registrar-evento`: nunca deixa journal pendente pra
+    # tras por causa de uma entrada invalida, e pula a checagem numa
+    # retomada legitima (o calendario pode ter avancado; a validacao real
+    # ja rodou na tentativa original).
+    if args.comprado and not has_pending_operation(project, op_id, "decidir"):
+        veredito_existente = VEREDITOS / veredito_nome_candidato
+        if veredito_existente.exists():
+            erro = _erro_cronologia_evento(
+                veredito_existente.read_text(encoding="utf-8"), "comprado", data_compra_efetiva
+            )
+            if erro:
+                raise SystemExit(erro + " Nada foi alterado.")
     # decisao.md e processo.md sao arquivos UNICOS por projeto, nao por
     # produto: `decidir A` e `decidir B` do mesmo projeto escrevem os dois no
     # MESMO lugar. Sem declarar isso como recurso, uma retomada de A depois
@@ -3996,11 +4046,24 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
     # o veredito com o template em branco - apagando um D+30 que o Josemar
     # tivesse preenchido na janela entre a falha e a retomada.
     verdict_path = VEREDITOS / op.detalhe["veredito_nome"]
+    # Achado 2: um `--data-compra` EXPLICITO e o mesmo valor em QUALQUER
+    # tentativa (e o proprio dado de entrada, nao um calculo dependente de
+    # `today()`) - nao depende de ter sido congelado em `op.detalhe`
+    # nenhuma vez, entao vale SEMPRE que presente, inclusive num journal
+    # de uma versao anterior que nem tinha o campo `data_compra_efetiva`
+    # (evidencia persistida na propria chamada, nao no journal). So cai
+    # pro valor congelado (implicito, `today()` da 1a tentativa) quando
+    # nao ha data explicita - e so recorre a `today()` de agora como
+    # ultimo recurso, se nem isso sobreviveu (journal legado demais).
+    data_compra_final = (
+        (args.data_compra or op.detalhe.get("data_compra_efetiva") or today())
+        if args.comprado else None
+    )
     op.executar_uma_vez(
         "veredito",
         lambda: create_verdict(project, args.produto_id, product, quote,
                                 force=args.force_veredito, path=verdict_path,
-                                data_compra=op.detalhe.get("data_compra_efetiva")),
+                                data_compra=data_compra_final),
     )
     op.registrar_efeito(
         "timeline_veredito", timeline_path,
@@ -4238,6 +4301,35 @@ VERDICT_EVENT_BULLET = {
 VERDICT_EVENT_ORDER = ["comprado", "entrega", "inicio_uso"]
 
 
+def _erro_cronologia_evento(text: str, evento: str, nova_data: str) -> str | None:
+    """Confere se `nova_data` para `evento` e cronologicamente compativel
+    com os OUTROS eventos ja registrados no veredito (`text`) - ponto
+    UNICO usado tanto por `registrar-evento` quanto pelo complemento de
+    compra em `decidir` (achado 4: os dois caminhos que podem gravar
+    `Data da compra` precisam do MESMO contrato, nunca um mais frouxo que
+    o outro). Devolve `None` se valido, ou a mensagem pronta (sem o
+    'Nada foi alterado' final - quem chama decide o resto da frase) se
+    invalido.
+    """
+    indice = VERDICT_EVENT_ORDER.index(evento)
+    label = VERDICT_EVENT_BULLET[evento]
+    for evento_anterior in VERDICT_EVENT_ORDER[:indice]:
+        data_anterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_anterior])
+        if data_anterior and nova_data < data_anterior:
+            return (
+                f"{label} ({nova_data}) e anterior a {VERDICT_EVENT_BULLET[evento_anterior]} "
+                f"({data_anterior}) - confira a data informada."
+            )
+    for evento_posterior in VERDICT_EVENT_ORDER[indice + 1:]:
+        data_posterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_posterior])
+        if data_posterior and nova_data > data_posterior:
+            return (
+                f"{label} ({nova_data}) e posterior a {VERDICT_EVENT_BULLET[evento_posterior]} "
+                f"({data_posterior}) - confira a data informada."
+            )
+    return None
+
+
 def _marcar_projeto_comprado(project: Path) -> None:
     """Mesma transicao de estado que `decidir --comprado` ja fazia -
     extraida pra `registrar-evento --evento comprado` (achado independente:
@@ -4348,25 +4440,24 @@ def register_verdict_event(args: argparse.Namespace) -> None:
             "sobrescrito silenciosamente. Se foi engano de digitacao, corrija o arquivo a "
             f"mao: {path}"
         )
-    indice = VERDICT_EVENT_ORDER.index(args.evento)
-    for evento_anterior in VERDICT_EVENT_ORDER[:indice]:
-        data_anterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_anterior])
-        if data_anterior and args.data and args.data < data_anterior:
-            raise SystemExit(
-                f"{label} ({args.data}) e anterior a {VERDICT_EVENT_BULLET[evento_anterior]} "
-                f"({data_anterior}) - confira a data informada. Nada foi alterado."
-            )
-    for evento_posterior in VERDICT_EVENT_ORDER[indice + 1:]:
-        data_posterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_posterior])
-        if data_posterior and args.data and args.data > data_posterior:
-            raise SystemExit(
-                f"{label} ({args.data}) e posterior a {VERDICT_EVENT_BULLET[evento_posterior]} "
-                f"({data_posterior}) - confira a data informada. Nada foi alterado."
-            )
-    # A data EFETIVA (`--data` explicita ou `today()` no momento da 1a
-    # tentativa) so pode ser calculada uma vez - ver docstring. Quando nao
-    # ha `--data`, a checagem cronologica acima com valor ainda desconhecido
-    # e refeita depois de congelar, dentro do `with`, contra o valor real.
+    # A validacao de cronologia roda ANTES de qualquer operacao nova ser
+    # criada - `--data` omitida resolve pra `today()` aqui, o mesmo valor
+    # que sera congelado abaixo se a chamada passar. Uma chamada invalida
+    # (achado 3) nunca pode deixar journal pendente pra tras: sem isso,
+    # `tracked_operation` ja tinha criado e persistido o journal (situacao
+    # em_andamento) ANTES da checagem rodar dentro do `with`, e corrigir a
+    # data manualmente na chamada seguinte virava "argumento diferente"
+    # contra o journal invalido que a propria recusa deixou pendente. Numa
+    # RETOMADA legitima (mesmo op_id ja em_andamento), a validacao ja
+    # rodou de verdade na tentativa original - nao repete aqui: o
+    # calendario pode ter avancado, e re-checar com `today()` de agora
+    # arriscaria recusar uma retomada legitima por um efeito colateral do
+    # tempo, nao por dado realmente incompativel (isso e responsabilidade
+    # de `tracked_operation`/`_assinaturas_compativeis`).
+    if not retomando_propria:
+        erro = _erro_cronologia_evento(text, args.evento, args.data or today())
+        if erro:
+            raise SystemExit(erro + " Nada foi alterado.")
     projeto_dir = _projeto_da_confirmacao_de_compra(args.veredito) if args.evento == "comprado" else None
     assinatura = {"evento": args.evento, "data": args.data}
     recursos = {path}
@@ -4381,25 +4472,6 @@ def register_verdict_event(args: argparse.Namespace) -> None:
         recursos=recursos,
     ) as op:
         nova_data = op.detalhe["data_efetiva"]
-        if not args.data:
-            # `--data` nao foi passada: a checagem cronologica de cima usou
-            # so os limites conhecidos ANTES de resolver `nova_data` (podia
-            # nao ter comparado nada). Confere de novo, agora com o valor
-            # efetivo, ANTES de escrever - mesmas duas direcoes.
-            for evento_anterior in VERDICT_EVENT_ORDER[:indice]:
-                data_anterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_anterior])
-                if data_anterior and nova_data < data_anterior:
-                    raise SystemExit(
-                        f"{label} ({nova_data}) e anterior a {VERDICT_EVENT_BULLET[evento_anterior]} "
-                        f"({data_anterior}) - confira a data informada. Nada foi alterado."
-                    )
-            for evento_posterior in VERDICT_EVENT_ORDER[indice + 1:]:
-                data_posterior = extract_bullet(text, VERDICT_EVENT_BULLET[evento_posterior])
-                if data_posterior and nova_data > data_posterior:
-                    raise SystemExit(
-                        f"{label} ({nova_data}) e posterior a {VERDICT_EVENT_BULLET[evento_posterior]} "
-                        f"({data_posterior}) - confira a data informada. Nada foi alterado."
-                    )
 
         def _gravar_evento() -> None:
             texto_atual = path.read_text(encoding="utf-8")

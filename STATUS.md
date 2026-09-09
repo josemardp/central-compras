@@ -5,10 +5,10 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (09/09/2026, sessao 21)
+## AO RETOMAR — comece por aqui (09/09/2026, sessao 22)
 
-**Proximo passo:** o Josemar provavelmente vai pedir uma NOVA rodada de
-revisao independente da frente 6 (a 1a achou 5 falhas reais, ja
+**Proximo passo:** o Josemar provavelmente vai pedir mais uma rodada de
+revisao independente da frente 6 (a 2a achou 4 falhas reais, ja
 corrigidas nesta sessao). So depois disso passar limpa - mesmo padrao
 disciplinado que a frente 5 seguiu (6 rodadas com achado antes da 7a
 passar limpa) - considere a frente 6 "concluida sob reserva".
@@ -23,23 +23,109 @@ passar limpa) - considere a frente 6 "concluida sob reserva".
   (`migrar-produtos --aplicar`) continua **nao executada** contra a arvore
   real - so o preview foi conferido em cada rodada.
 - **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
-  sessao 20; a 1a revisao independente (Astra), sobre o commit `e564618`,
-  achou 5 falhas reais - todas corrigidas e testadas nesta sessao (21),
-  ver bloco abaixo. **Precisa de UMA rodada de revisao que passe limpa**
-  antes de considerar "concluida sob reserva" - nao presuma que esta e a
-  ultima rodada so porque os testes passam localmente (a frente 5 levou 7
-  rodadas). Padrao do achado desta rodada: os dois comandos (`decidir`,
-  `registrar-evento`) foram corrigidos isoladamente sem considerar a
-  INTERACAO entre eles (2 chamadas de decidir sobre o mesmo veredito,
-  registrar-evento sincronizando de volta pro projeto) nem RECUPERACAO de
-  falha no meio - antes de mexer de novo, pergunte "o que acontece se este
-  comando for chamado duas vezes, ou interrompido no meio, considerando
-  TODOS os outros comandos que tocam o mesmo veredito/projeto".
+  sessao 20; 2 rodadas de revisao independente (Astra) ja acharam 5 e
+  depois mais 4 falhas reais - todas corrigidas e testadas (sessoes 21 e
+  22), ver bloco abaixo. **Precisa de UMA rodada de revisao que passe
+  limpa** antes de considerar "concluida sob reserva" - nao presuma que
+  esta e a ultima rodada so porque os testes passam localmente (a frente
+  5 levou 7 rodadas). **Achado transversal desta 2a rodada, registrado
+  para nao se repetir**: `_assinaturas_compativeis` (mecanismo
+  COMPARTILHADO por TODO `tracked_operation` - `decidir`,
+  `registrar-evento`, `vincular-produto`, `aprender-veredito`), criada na
+  1a rodada pra tolerar evolucao de schema, comparava valores com `==` do
+  Python, que confunde `False` com `0` mesmo dentro de estruturas
+  aninhadas - uma correcao num mecanismo COMPARTILHADO pode quebrar
+  QUALQUER comando que passa por ele, nao so o que motivou a correcao;
+  antes de mexer em `tracked_operation`/`_assinaturas_compativeis`/
+  `_valores_equivalentes` de novo, rode a suite completa E pense em quem
+  MAIS usa esse mecanismo (`grep -n "tracked_operation(" scripts/central_compras.py`).
+  Os outros 3 achados desta rodada repetem o padrao ja visto: validar
+  ANTES de criar journal/escrever (nunca deixar pendencia por entrada
+  invalida), recuperar de evidencia PERSISTIDA em vez de exigir campo
+  novo no journal, e replicar o MESMO contrato de validacao em todo
+  caminho que grava o mesmo dado (aqui, cronologia em `decidir` E
+  `registrar-evento`).
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, 2a correcao da revisao independente (09/09/2026, sessao 22).**
+A Astra reproduziu 4 falhas reais contra o commit `3acc96a` (sessao 21,
+que corrigiu as 5 anteriores), com o script `astra_review_3acc96a.py` (6
+testes: 4 achados + 2 controles, todos reproduzidos ANTES de corrigir -
+o baseline confirmou 498 testes oficiais + 8 testes externos anteriores
+passando). As 4 viraram teste permanente em
+`tests/test_frente6_datas_veredito.py`
+(`TerceiraRevisaoIndependenteFrente6Test`: 8 testes - os 4 achados + 4
+controles).
+
+1. **Regressao transversal: `_assinaturas_compativeis` confundia `False`
+   com `0`.** A comparacao usava `==` do Python, que trata `bool` como
+   subclasse de `int` (`False == 0` e `True == 1` sao `True`) - inclusive
+   dentro de estruturas aninhadas como `requisitos_atendidos`. Um
+   `vincular-produto --requisito uso=false` interrompido antes de gravar
+   a participacao, retomado com `uso=0` (INTEIRO, nao bool), era aceito
+   como "mesma retomada" - a participacao gravada ficava com `uso=0`, que
+   `gate_eliminations` (checagem `is False`, nao `==`) nao corta, e o
+   candidato virava elegivel. Corrigido com `_valores_equivalentes`, uma
+   igualdade mais estrita (bool nunca equivale a int do mesmo valor,
+   recursiva em dict/list) usada em toda comparacao de assinatura -
+   beneficia TODO `tracked_operation` (`decidir`, `registrar-evento`,
+   `vincular-produto`, `aprender-veredito`), nao so o caminho que motivou
+   o achado.
+2. **Complemento de `decidir --comprado` nao recuperava `--data-compra`
+   explicita de journal de versao anterior.** `_decide_writes` so
+   consultava `op.detalhe.get("data_compra_efetiva")` - um journal real
+   criado pelo codigo do commit `e564618` (que ja tinha `--data-compra`,
+   mas ainda nao o campo `data_compra_efetiva` congelado, adicionado so
+   na rodada anterior) perdia a data explicita na retomada apos o
+   upgrade. Corrigido: `args.data_compra` explicita e o proprio dado de
+   ENTRADA da chamada (deterministico em qualquer tentativa, nao depende
+   de ter sido congelado nenhuma vez) - passa a ter prioridade sobre o
+   valor congelado, que so continua servindo pro caso implicito
+   (`--comprado` sem `--data-compra`, onde `today()` da 1a tentativa
+   ainda precisa ser preservado).
+3. **`registrar-evento` com `--data` omitida validava cronologia DEPOIS
+   de criar o journal.** A checagem cronologica so rodava com valor
+   conhecido quando `--data` era explicita; com `--data` omitida, a
+   unica checagem acontecia DENTRO do `tracked_operation`, ou seja, DEPOIS
+   do journal ja criado e persistido (`situacao: em_andamento`). Uma
+   recusa por cronologia impossivel (ex.: `entrega` com data-padrao hoje
+   depois de `inicio_uso` ontem) deixava esse journal pendente pra tras -
+   e corrigir a data manualmente na chamada seguinte (`--data ontem`)
+   virava "argumento diferente" contra o proprio journal invalido que a
+   recusa tinha deixado. Corrigido: a validacao roda ANTES de
+   `tracked_operation` ser chamado, usando `args.data or today()` (o
+   mesmo valor que seria congelado se a chamada passasse) - uma chamada
+   invalida nunca chega a criar journal nenhum. Pulada so numa retomada
+   legitima (`has_pending_operation` ja confirma que a validacao real
+   rodou na tentativa original).
+4. **Complemento de compra em `create_verdict` nao aplicava a validacao
+   cronologica de `registrar-evento`.** `inicio_uso` registrado ontem, e
+   `decidir --comprado --data-compra hoje` (posterior ao inicio de uso)
+   era aceito sem checagem - o MESMO dado (`Data da compra`) tinha
+   contratos DIFERENTES dependendo de qual comando gravava. Corrigido com
+   `_erro_cronologia_evento`, funcao unica compartilhada entre
+   `registrar-evento` e o complemento de `decidir` - recusa ANTES de
+   tocar em decisao.md/processo.md/snapshot/veredito, mesmo padrao do
+   achado 3 (pula a checagem numa retomada legitima de `decidir`).
+
+**Verificacao (sessao 22):** suite completa **506 testes, 0 falhas**
+(498 + 8 novos). Mutacao aplicada nas 4 correcoes de fundo, uma de cada
+vez, desfeita e restaurada em seguida: derrubou exatamente os testes do
+mecanismo mutado (1o: 2; 2o: 1; 3o: 2 - 1 falha direta + 1 efeito em
+cascata, mesma causa; 4o: 1), nenhum fora disso.
+`tests/test_participacoes.py` (que exercita `vincular-produto`, tambem
+afetado pela regressao transversal do achado 1) reconferido, 59 testes,
+0 falhas. `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a arvore
+real. Nenhuma migracao rodada contra produtos reais, pesos/gates
+intocados. Detalhe completo:
+`docs/plano-pendencias-auditoria-2026-09-06.md`, secao 6.
+
+## Sessao anterior (09/09/2026, sessao 21) — historico
 
 **Frente 6, 1a correcao da revisao independente (09/09/2026, sessao 21).**
 A Astra reproduziu 5 falhas reais contra o commit `e564618` (sessao 20,

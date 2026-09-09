@@ -1398,12 +1398,13 @@ de novo, vale reler o contrato inteiro desta seção antes de mexer.
 
 ## 6. Datas e vereditos
 
-**Estado: implementada (09/09/2026, sessão 20), corrigida em uma rodada de
-revisão independente da Astra (sessão 21 — 5 achados). Ainda falta UMA
-rodada de revisão que passe limpa antes de declarar "concluída sob
-reserva" — mesmo padrão disciplinado da frente 5 (6 rodadas com achado
-antes da 7ª passar limpa); não presuma que a 2ª rodada não vai achar mais
-nada.**
+**Estado: implementada (09/09/2026, sessão 20), corrigida em duas rodadas
+de revisão independente da Astra (sessão 21 — 5 achados; sessão 22 — 4
+achados, incluindo uma regressão transversal no mecanismo compartilhado
+de assinaturas). Ainda falta UMA rodada de revisão que passe limpa antes
+de declarar "concluída sob reserva" — mesmo padrão disciplinado da frente
+5 (6 rodadas com achado antes da 7ª passar limpa); não presuma que a 3ª
+rodada não vai achar mais nada.**
 
 **Contrato adotado:** decisão, compra/pagamento, entrega e início de uso
 são quatro fatos datados independentes. `decidir` fecha só a escolha —
@@ -1647,12 +1648,110 @@ real.
 **Fora do escopo desta correção, deliberadamente:** pesos/gates/
 classificação por estrela intocados; nenhuma migração rodada contra
 produtos reais; nenhuma infraestrutura externa tocada.
+**Essa correção introduziu, sem perceber na hora, a regressão transversal
+corrigida na 2ª revisão abaixo — `_assinaturas_compativeis` nasceu aqui,
+mas o próprio mecanismo tinha um bug.**
+
+### 2ª revisão independente (Astra, sessão 22, sobre o commit `3acc96a`) — 4 falhas
+
+**Achado 1 é uma REGRESSÃO TRANSVERSAL, registrada explicitamente por
+pedido do Josemar:** `_assinaturas_compativeis` — criada na 1ª revisão
+para tolerar evolução de schema entre journals de versões diferentes — é
+usada por TODO `tracked_operation`, não só `decidir`/`registrar-evento`.
+A comparação usava `==` do Python, que trata `bool` como subclasse de
+`int` (`False == 0`, `True == 1`), inclusive dentro de estruturas
+aninhadas. Isso afetava qualquer comando cuja assinatura carregasse um
+valor booleano — neste caso, `vincular-produto --requisito uso=false`:
+interrompido antes de gravar a participação, retomado com `--requisito
+uso=0` (um INTEIRO, não um booleano — dado de entrada genuinamente
+diferente), era aceito como "mesma retomada". A participação gravada
+ficava com `uso=0`; `gate_eliminations` só corta um requisito não
+atendido com `if valor is False` (identidade, não igualdade) — `0 is
+False` é `False` em Python — e o candidato virava elegível apesar do
+requisito não cumprido. Corrigido com `_valores_equivalentes`: igualdade
+mais estrita que `==`, que nunca trata `bool` como equivalente a `int`
+do mesmo valor, recursiva em `dict`/`list`/`tuple` (o mesmo furo escondido
+dentro de uma estrutura aninhada). Usada em toda comparação de valores
+PRESENTES dentro de `_assinaturas_compativeis` — a tolerância a "campo
+ausente = evolução de schema" continua existindo, mas agora só se aplica
+exatamente a isso, nunca a uma diferença de tipo/valor real entre dois
+campos que os dois lados já preenchiam.
+
+Os outros 3 achados repetem, em variações finas, os mesmos dois padrões
+já estabelecidos nas rodadas anteriores desta frente — "validar ANTES de
+criar journal/escrever" e "aplicar o MESMO contrato em todo caminho que
+grava o mesmo dado":
+
+2. **Complemento de `decidir --comprado` não recuperava `--data-compra`
+   explícita de journal de versão anterior.** `_decide_writes` só
+   consultava `op.detalhe.get("data_compra_efetiva")` — um journal real
+   criado pelo código do commit `e564618` (que já tinha `--data-compra`,
+   mas ainda não o campo `data_compra_efetiva` congelado, adicionado só
+   na 1ª revisão) perdia a data explícita na retomada após o upgrade.
+   Corrigido: `args.data_compra`, quando explícita, é o próprio dado de
+   ENTRADA da chamada — determinístico em qualquer tentativa, nunca
+   depende de ter sido congelado em `op.detalhe` — passa a ter prioridade
+   sobre o valor congelado. O valor congelado continua sendo a única
+   fonte para o caso IMPLÍCITO (`--comprado` sem `--data-compra`, onde
+   `today()` da 1ª tentativa precisa sobreviver a uma retomada em outro
+   dia — esse caso não muda).
+3. **`registrar-evento` com `--data` omitida validava cronologia DEPOIS
+   de criar o journal.** Com `--data` explícita, a checagem cronológica já
+   rodava antes de `tracked_operation`; com `--data` omitida, a única
+   checagem acontecia DENTRO do bloco `with`, ou seja, depois do journal
+   já criado e persistido em disco (`situação: em_andamento`). Uma
+   recusa por cronologia impossível (`entrega` com data padrão hoje
+   depois de `inicio_uso` ontem) deixava esse journal pendente para trás
+   — e corrigir a data manualmente na chamada seguinte (`--data ontem`)
+   virava "argumento diferente" contra o próprio journal inválido que a
+   recusa tinha deixado pendente. Corrigido: a validação passou a rodar
+   SEMPRE antes de `tracked_operation`, usando `args.data or today()` (o
+   mesmo valor que seria congelado se a chamada fosse aceita) — uma
+   chamada inválida nunca chega a criar journal nenhum. Pulada apenas
+   numa retomada legítima (`has_pending_operation` confirma que a
+   validação real já rodou na tentativa original — repeti-la arriscaria
+   recusar uma retomada legítima só porque o calendário avançou).
+4. **Complemento de compra em `create_verdict` não aplicava a validação
+   cronológica de `registrar-evento`.** `inicio_uso` registrado ontem, e
+   `decidir --comprado --data-compra hoje` (posterior ao início de uso)
+   era aceito sem checagem nenhuma — o MESMO dado (`Data da compra`) tinha
+   contratos diferentes dependendo de qual comando gravava. Corrigido com
+   `_erro_cronologia_evento`, função única extraída e compartilhada entre
+   `registrar-evento` e o complemento de `decidir` — recusa ANTES de
+   tocar em `decisao.md`/`processo.md`/snapshot/veredito, com o mesmo
+   cuidado do achado 3 (pula a checagem numa retomada legítima de
+   `decidir`, via `has_pending_operation`).
+
+### Testes (2ª revisão)
+
+`tests/test_frente6_datas_veredito.py`, `TerceiraRevisaoIndependenteFrente6Test`:
+8 testes — os 4 achados (reprodução real contra o commit `3acc96a`,
+confirmada ANTES da correção — script `astra_review_3acc96a.py`) e 4
+controles (retomada com o MESMO requisito continua funcionando e
+cortando o candidato pelo gate; correção de data após recusa por
+cronologia funciona sem obstáculo; complemento de compra com cronologia
+VÁLIDA continua funcionando; mais um teste direto da função
+`_valores_equivalentes` isolada, sem passar pela CLI). O achado 1 também
+foi reconferido contra `tests/test_participacoes.py` inteiro (59 testes,
+suíte que exercita `vincular-produto` extensivamente) — nenhuma
+regressão. Mutação aplicada nas 4 correções de fundo, uma de cada vez,
+desfeita e restaurada em seguida: derrubou exatamente os testes do
+mecanismo mutado (achado 1: 2 testes; achado 2: 1; achado 3: 2 — 1 falha
+direta + 1 efeito em cascata pela mesma causa; achado 4: 1), nenhum fora
+disso. Suíte completa depois da correção: **506 testes, 0 falhas** (498 +
+8 novos). `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a árvore
+real.
+
+**Fora do escopo desta correção, deliberadamente:** pesos/gates/
+classificação por estrela intocados; nenhuma migração rodada contra
+produtos reais; nenhuma infraestrutura externa tocada.
 
 ## 7. Validação e publicação
 
-**Estado (09/09/2026, sessão 21, reconciliado): feita integralmente para as
-frentes 2, 3, 4 e 5. Frente 6 implementada e com uma rodada de revisão
-corrigida, ainda sem rodada limpa.**
+**Estado (09/09/2026, sessão 22, reconciliado): feita integralmente para as
+frentes 2, 3, 4 e 5. Frente 6 implementada e com duas rodadas de revisão
+corrigidas, ainda sem rodada limpa.**
 
 Esta seção estava desatualizada desde a sessão 9-12: as frentes 3 (receptor
 Sheets, 3 rodadas de revisão + redeploy verificado na nuvem) e 4
@@ -1691,8 +1790,15 @@ revisado, fluxos testados no navegador quando aplicável, push para
   Astra (sessão 21) achou 5 falhas reais — sincronização de estado
   operacional ausente, complemento de veredito existente, congelamento de
   data em retomada, compatibilidade de schema no journal, cronologia
-  bidirecional — todas corrigidas com teste permanente + mutação, ver
-  seção 6. Suíte completa (498 testes) e as três checagens estritas
-  limpas em todas as rodadas. **Ainda falta UMA rodada de revisão
-  independente que passe limpa** — não presumir "concluída sob reserva"
-  até isso acontecer de verdade, mesmo padrão da frente 5.
+  bidirecional. 2ª revisão (sessão 22) achou mais 4 — incluindo uma
+  **regressão transversal** no mecanismo de comparação de assinaturas
+  (`_assinaturas_compativeis`, compartilhado por todo `tracked_operation`,
+  confundia `False` com `0`; afetava também `vincular-produto`, não só
+  `decidir`/`registrar-evento`), mais validação tardia demais em
+  `registrar-evento`, recuperação incompleta de journal antigo, e
+  cronologia não replicada no complemento de compra via `decidir`. Todas
+  corrigidas com teste permanente + mutação, ver seção 6. Suíte completa
+  (506 testes) e as três checagens estritas limpas em todas as rodadas.
+  **Ainda falta UMA rodada de revisão independente que passe limpa** —
+  não presumir "concluída sob reserva" até isso acontecer de verdade,
+  mesmo padrão da frente 5.

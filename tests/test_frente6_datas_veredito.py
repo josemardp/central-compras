@@ -762,5 +762,201 @@ class SegundaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertEqual(texto.count("- Data da compra:"), 1)
 
 
+class TerceiraRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
+    """Regressao dos 4 achados da 2a revisao independente (Astra) sobre o
+    commit `3acc96a` - cada teste aqui reproduziu uma falha real contra
+    aquele codigo antes da correcao (script `astra_review_3acc96a.py`).
+    Ver STATUS.md e docs/como-conferir-auditoria.md.
+
+    Raiz comum, registrada explicitamente porque e uma REGRESSAO
+    TRANSVERSAL: `_assinaturas_compativeis` (introduzida na 1a revisao,
+    usada por TODO `tracked_operation` - `decidir`, `registrar-evento`,
+    `vincular-produto`, `aprender-veredito`) comparava valores com `==` do
+    Python, que confunde `False` com `0` (achado 1) mesmo dentro de
+    estruturas aninhadas como `requisitos_atendidos`. Os achados 2 e 3 sao
+    o mesmo padrao de fundo dos pacotes anteriores (congelar o dado
+    EFETIVO, nao recriar journal para entrada invalida) reaberto por
+    detalhes finos que as rodadas anteriores nao cobriam; o achado 4 e o
+    contrato de cronologia de `registrar-evento` que nao tinha sido
+    replicado pro OUTRO caminho que grava `Data da compra`."""
+
+    def _decidir(self, project, pid="candidato", extra=()):
+        self.product(project, pid)
+        self.quote(project, pid, "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", pid,
+                  "--porque", "unico candidato", "--sem-perdedores", *extra)
+        return next(p for p in cc.VEREDITOS.glob("*.md") if pid in p.name)
+
+    # ---- achado 1: == confundia False com 0, inclusive aninhado ---------
+
+    def test_valores_equivalentes_distingue_bool_de_inteiro(self):
+        """Teste direto da funcao corrigida - False/0 e True/1 nunca sao
+        equivalentes, no topo nem dentro de dict/list aninhados (onde o
+        bug real acontecia, via `requisitos_atendidos`)."""
+        self.assertFalse(cc._valores_equivalentes(False, 0))
+        self.assertFalse(cc._valores_equivalentes(True, 1))
+        self.assertTrue(cc._valores_equivalentes(False, False))
+        self.assertTrue(cc._valores_equivalentes(0, 0))
+        self.assertFalse(cc._valores_equivalentes({"uso": False}, {"uso": 0}))
+        self.assertFalse(cc._valores_equivalentes(["a", False], ["a", 0]))
+        self.assertTrue(cc._valores_equivalentes({"uso": False, "n": 3}, {"uso": False, "n": 3}))
+
+    def test_vincular_produto_retomada_nao_confunde_requisito_false_com_zero(self):
+        """Achado 1, reproduzido no caminho real: `vincular-produto
+        --requisito uso=false` interrompido antes de gravar a participacao,
+        retomado com `uso=0` (int, nao bool) - tem que ser recusado como
+        argumento diferente, nunca aceito como "mesma retomada". Sem a
+        correcao, a participacao gravada tinha `uso=0` (nao corta o gate,
+        que so elimina com `is False`), reabilitando o candidato."""
+        origin, dest = self.project("origem"), self.project("destino")
+        self.product(origin)
+        args = ["vincular-produto", "--produto-id", "candidato", "--projeto", str(dest), "--requisito"]
+
+        def crash(ponto):
+            if ponto == "participacao:iniciado":
+                raise OSError("falha antes de gravar participacao")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args, "uso=false")
+
+        with self.assertRaisesRegex(SystemExit, "dados diferentes"):
+            self.cli(*args, "uso=0")
+        self.assertFalse(cc.participation_path(dest, "candidato").exists())
+
+    def test_controle_vincular_produto_retomada_com_mesmo_requisito_funciona(self):
+        """Controle: retomar com o MESMO requisito (`uso=false` de novo)
+        continua funcionando normalmente, e o gate continua cortando o
+        candidato (prova que a correcao nao afeta o caminho legitimo)."""
+        origin, dest = self.project("origem"), self.project("destino")
+        self.product(origin)
+        args = ["vincular-produto", "--produto-id", "candidato", "--projeto", str(dest), "--requisito"]
+
+        def crash(ponto):
+            if ponto == "participacao:iniciado":
+                raise OSError("falha antes de gravar participacao")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args, "uso=false")
+
+        self.cli(*args, "uso=false")
+        self.quote(dest, "candidato", "--fonte", "manual")
+        self.assertEqual(cc.compute_ranking(dest)[0], [])
+
+    # ---- achado 2: complemento nao usava a data-compra explicita persistida --
+
+    def test_upgrade_preserva_data_compra_explicita_de_journal_sem_campo_congelado(self):
+        """Journal real criado pelo codigo do commit `e564618` (que ja
+        tinha `--data-compra`, mas ainda nao `data_compra_efetiva`
+        congelado em `op.detalhe` - esse campo so existe desde a rodada
+        anterior), interrompido em `veredito:iniciado`, tem que preservar
+        a data EXPLICITA na retomada apos o upgrade - ela e o proprio dado
+        de entrada da chamada, nao depende de ter sido congelada."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        esperado = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado", "--data-compra", esperado]
+
+        script = self.root / "scripts" / "central_compras.py"
+        atual = script.read_bytes()
+        antigo = subprocess.run(
+            ["git", "show", "e564618:scripts/central_compras.py"],
+            cwd=REPO, capture_output=True, check=True,
+        ).stdout
+        script.write_bytes(antigo)
+        env = os.environ.copy()
+        env["CENTRAL_COMPRAS_TESTE_CRASH_APOS"] = "veredito:iniciado"
+        crash = subprocess.run(
+            [sys.executable, str(script), *args], cwd=self.root, env=env, capture_output=True, text=True,
+        )
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+
+        script.write_bytes(atual)
+        retry = subprocess.run(
+            [sys.executable, str(script), *args], cwd=self.root, capture_output=True, text=True,
+        )
+        self.assertEqual(retry.returncode, 0, retry.stderr)
+        self.assertFalse(cc.pending_operations([project]))
+        texto = next(cc.VEREDITOS.glob("*.md")).read_text(encoding="utf-8")
+        self.assertEqual(
+            cc.extract_bullet(texto, "Data da compra"), esperado,
+            "Upgrade completou a retomada mas perdeu a data explicita da compra",
+        )
+
+    # ---- achado 3: recusa por cronologia deixava journal pendente -------
+
+    def test_recusa_por_cronologia_com_data_default_nao_deixa_pendencia(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        ontem = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso", "--data", ontem)
+        antes = veredito.read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "posterior"):
+            self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+
+        self.assertEqual(veredito.read_bytes(), antes)
+        self.assertFalse(cc.pending_operations([cc.BASE]))
+
+    def test_corrigir_data_apos_recusa_por_cronologia_funciona(self):
+        """Consequencia direta do achado 3: como a recusa nao deixa
+        journal pendente, corrigir a data numa chamada seguinte (com
+        `--data` explicita e valida) e uma operacao NOVA normal, nunca
+        recusada como 'argumento diferente' contra uma pendencia que nao
+        deveria existir."""
+        project = self.project()
+        veredito = self._decidir(project)
+        ontem = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso", "--data", ontem)
+
+        with self.assertRaisesRegex(SystemExit, "posterior"):
+            self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+
+        self.cli("registrar-evento", str(veredito), "--evento", "entrega", "--data", ontem)
+
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data de entrega"), ontem)
+        self.assertFalse(cc.pending_operations([cc.BASE]))
+
+    # ---- achado 4: complemento de compra nao aplicava a cronologia ------
+
+    def test_decidir_comprado_complementar_recusa_cronologia_impossivel(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        ontem = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso", "--data", ontem)
+        caminhos = [veredito, project / "decisao.md", project / "processo.md", project / "briefing.md"]
+        antes = {p: p.read_bytes() for p in caminhos}
+
+        with self.assertRaisesRegex(SystemExit, "posterior"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "unico candidato", "--sem-perdedores", "--comprado", "--data-compra", cc.today())
+
+        self.assertEqual({p: p.read_bytes() for p in caminhos}, antes,
+                          "decidir recusado por cronologia nao pode ter alterado nenhum arquivo")
+        status = self.cli("status", str(project))
+        self.assertNotIn("Estado: comprado", status)
+
+    def test_controle_decidir_comprado_complementar_cronologia_valida_funciona(self):
+        """Controle: quando a data da compra e cronologicamente VALIDA
+        (anterior ao inicio de uso ja registrado), o complemento continua
+        funcionando normalmente - a correcao do achado 4 nao pode ter
+        travado o caminho legitimo."""
+        project = self.project()
+        veredito = self._decidir(project)
+        ontem = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        self.cli("registrar-evento", str(veredito), "--evento", "entrega", "--data", ontem)
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso", "--data", cc.today())
+
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores", "--comprado", "--data-compra", ontem)
+
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), ontem)
+        status = self.cli("status", str(project))
+        self.assertIn("Estado: comprado", status)
+
+
 if __name__ == "__main__":
     unittest.main()
