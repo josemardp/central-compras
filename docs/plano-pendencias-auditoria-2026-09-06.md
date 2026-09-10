@@ -1398,13 +1398,11 @@ de novo, vale reler o contrato inteiro desta seção antes de mexer.
 
 ## 6. Datas e vereditos
 
-**Estado: implementada (09/09/2026, sessão 20), corrigida em duas rodadas
-de revisão independente da Astra (sessão 21 — 5 achados; sessão 22 — 4
-achados, incluindo uma regressão transversal no mecanismo compartilhado
-de assinaturas). Ainda falta UMA rodada de revisão que passe limpa antes
-de declarar "concluída sob reserva" — mesmo padrão disciplinado da frente
-5 (6 rodadas com achado antes da 7ª passar limpa); não presuma que a 3ª
-rodada não vai achar mais nada.**
+**Estado: implementada (09/09/2026, sessão 20), corrigida após três rodadas
+de revisão independente da Astra (sessão 21: 5 achados; sessão 22: 4;
+sessão 23: 2, corrigidos em 10/09/2026 na sessão 24).
+Ainda falta UMA rodada de revisão que passe limpa antes de declarar
+"concluída sob reserva", mesmo requisito aplicado à frente 5.**
 
 **Contrato adotado:** decisão, compra/pagamento, entrega e início de uso
 são quatro fatos datados independentes. `decidir` fecha só a escolha —
@@ -1747,10 +1745,42 @@ real.
 classificação por estrela intocados; nenhuma migração rodada contra
 produtos reais; nenhuma infraestrutura externa tocada.
 
+### 3ª revisão independente (Astra, sessão 23, sobre `ad6a04a`): 2 falhas
+
+Correção na sessão 24 (10/09/2026). Os dois achados foram reproduzidos
+antes da correção e incorporados em `tests/test_frente6_datas_veredito.py`,
+classe `QuartaRevisaoIndependenteFrente6Test`, com journals produzidos
+pelas versões antigas reais em repositórios temporários.
+
+1. **Compra implícita trocava de data ao retomar após upgrade.** O journal
+   de `decidir --comprado` do commit `e564618`, interrompido antes do
+   veredito, não tinha `data_compra_efetiva`. O fallback para `today()`
+   gravava o dia da retomada. Agora `_data_compra_para_decidir` recupera
+   a evidência persistida em `veredito_nome` ou `iniciado_em` e recusa
+   quando não encontra data válida. Data explícita e campo efetivo
+   congelado mantêm prioridade.
+2. **Journal vazio de uma recusa antiga autorizava o evento inválido.**
+   `registrar-evento` no commit `3acc96a` podia recusar uma entrega
+   posterior ao início de uso e deixar `passos: {}`. A existência do
+   journal fazia o código seguinte pular a cronologia. Agora a retomada
+   legível é revalidada com sua data persistida antes de executar efeitos;
+   o evento inválido é recusado e a pendência preservada para
+   reconciliação. Isso substitui a suposição da 2ª correção de que
+   journal existente provava validação concluída.
+
+**Verificação:** 2 testes permanentes novos; os 4 testes externos de
+`%TEMP%\astra_review_ad6a04a.py` passam, incluindo retomada válida em outro
+dia e recusa nova sem journal. Suítes direcionadas: datas/veredito (51),
+recuperação (35) e participações (59), sem falhas. Suíte completa:
+**508 testes, 0 falhas**. As três checagens estritas e `git diff --check`
+passaram; a auditoria mantém o aviso do snapshot legado sem manifesto.
+Pesos/gates e histórico preservados; nenhuma migração real executada.
+**Ainda é necessária nova revisão independente sem achados.**
+
 ## 7. Validação e publicação
 
-**Estado (09/09/2026, sessão 22, reconciliado): feita integralmente para as
-frentes 2, 3, 4 e 5. Frente 6 implementada e com duas rodadas de revisão
+**Estado (10/09/2026, sessão 24): feita integralmente para as
+frentes 2, 3, 4 e 5. Frente 6 implementada e com três rodadas de revisão
 corrigidas, ainda sem rodada limpa.**
 
 Esta seção estava desatualizada desde a sessão 9-12: as frentes 3 (receptor
@@ -1797,8 +1827,10 @@ revisado, fluxos testados no navegador quando aplicável, push para
   `decidir`/`registrar-evento`), mais validação tardia demais em
   `registrar-evento`, recuperação incompleta de journal antigo, e
   cronologia não replicada no complemento de compra via `decidir`. Todas
-  corrigidas com teste permanente + mutação, ver seção 6. Suíte completa
-  (506 testes) e as três checagens estritas limpas em todas as rodadas.
+  corrigidas com teste permanente + mutação. A 3ª revisão (sessão 23)
+  achou mais 2 falhas de retomada após upgrade: data implícita de compra
+  substituída pelo dia atual e evento inválido aceito por journal vazio.
+  Corrigidas na sessão 24 com dois testes permanentes, ver seção 6.
   **Ainda falta UMA rodada de revisão independente que passe limpa** —
   não presumir "concluída sob reserva" até isso acontecer de verdade,
   mesmo padrão da frente 5.

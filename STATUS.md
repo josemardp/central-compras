@@ -5,12 +5,12 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (09/09/2026, sessao 23)
+## AO RETOMAR — comece por aqui (10/09/2026, sessao 24)
 
-**Proximo passo:** mandar o Claude Code corrigir as 2 falhas reais
-achadas pela 3a revisao independente da frente 6 sobre o commit
-`ad6a04a` (ver bloco da sessao 23 abaixo). Nao declarar a frente 6
-concluida ainda: depois da correcao, precisa de nova revisao
+**Proximo passo:** submeter a correcao da sessao 24 a uma nova revisao
+independente da frente 6. Os 2 achados sobre `ad6a04a` foram corrigidos
+(ver bloco abaixo). Nao declarar a frente 6
+concluida ainda: precisa de nova revisao
 independente que passe limpa antes de considerar "concluida sob reserva".
 
 **Pendencias / bloqueios:**
@@ -26,7 +26,7 @@ independente que passe limpa antes de considerar "concluida sob reserva".
   sessao 20; 3 rodadas de revisao independente (Astra) ja acharam 5,
   depois 4, e agora mais 2 falhas reais. As 2 primeiras rodadas foram
   corrigidas e testadas nos commits `3acc96a` e `ad6a04a`; a 3a rodada
-  (sessao 23) ainda esta pendente de correcao. **Nao considere a frente
+  (sessao 23) foi corrigida na sessao 24. **Nao considere a frente
   6 encerrada depois de apenas rodar a suite local** - a frente 5 levou
   7 rodadas ate uma revisao passar limpa. **Achado transversal da 2a
   rodada, registrado para nao se repetir**: `_assinaturas_compativeis`
@@ -51,6 +51,31 @@ independente que passe limpa antes de considerar "concluida sob reserva".
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, 3a correcao da revisao independente (10/09/2026, sessao 24).**
+Os 2 achados da sessao 23 foram reproduzidos antes da correcao e viraram
+testes permanentes em `tests/test_frente6_datas_veredito.py`, classe
+`QuartaRevisaoIndependenteFrente6Test`.
+
+- `decidir --comprado` implicito recupera a data de journal antigo pelo
+  nome congelado do veredito ou por `iniciado_em`, quando falta
+  `data_compra_efetiva`. Sem evidencia valida, recusa a retomada;
+  nao usa mais o dia atual como ultimo recurso.
+- `registrar-evento` revalida a cronologia de journals pendentes legiveis
+  com a data persistida. Um journal antigo vazio, deixado por uma recusa,
+  nao autoriza a gravacao do evento invalido; continua pendente para
+  reconciliacao manual. Journals ilegiveis mantem a recusa existente.
+
+**Verificacao:** os 4 testes externos de
+`%TEMP%\astra_review_ad6a04a.py` passaram (2 achados + 2 controles).
+Os testes direcionados de datas/veredito (51), recuperacao (35) e
+participacoes (59) passaram. Suite completa: **508 testes, 0 falhas**.
+`auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` passaram; a auditoria
+continua sinalizando o snapshot legado sem manifesto de entradas.
+Nenhuma migracao real, alteracao de pesos/gates ou reescrita de historico.
+Detalhes na secao 6 de `docs/plano-pendencias-auditoria-2026-09-06.md`.
+**Frente 6 ainda nao concluida: falta nova revisao independente limpa.**
 
 **Frente 6, 3a revisao independente (09/09/2026, sessao 23).**
 A Astra revisou o commit `ad6a04a` depois da 2a correcao da frente 6.

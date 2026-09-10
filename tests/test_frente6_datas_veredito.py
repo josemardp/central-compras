@@ -14,6 +14,7 @@ docs/como-conferir-auditoria.md).
 """
 
 import datetime as dt
+import json
 import os
 import subprocess
 import sys
@@ -956,6 +957,105 @@ class TerceiraRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), ontem)
         status = self.cli("status", str(project))
         self.assertIn("Estado: comprado", status)
+
+
+class QuartaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
+    """Regressao dos 2 achados da 3a revisao independente (Astra) sobre o
+    commit `ad6a04a`.
+
+    Os dois casos sao de retomada apos upgrade: journal antigo nao pode virar
+    autorizacao para inventar data nova nem para executar uma entrada que a
+    propria versao antiga ja tinha recusado."""
+
+    def _decidir(self, project, pid="candidato", extra=()):
+        self.product(project, pid)
+        self.quote(project, pid, "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", pid,
+                  "--porque", "unico candidato", "--sem-perdedores", *extra)
+        return next(p for p in cc.VEREDITOS.glob("*.md") if pid in p.name)
+
+    def test_upgrade_preserva_data_compra_implicita_de_journal_antigo(self):
+        """Journal real criado pelo commit `e564618` com `--comprado` e sem
+        `--data-compra`, interrompido antes de criar o veredito, nao tinha
+        `data_compra_efetiva`. A retomada atual deve recuperar a data da
+        tentativa original pela evidencia persistida (`veredito_nome`), nunca
+        cair em `today()` do dia da retomada."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+
+        script = self.root / "scripts" / "central_compras.py"
+        atual = script.read_bytes()
+        antigo = subprocess.run(
+            ["git", "show", "e564618:scripts/central_compras.py"],
+            cwd=REPO, capture_output=True, check=True,
+        ).stdout
+        script.write_bytes(antigo)
+        env = os.environ.copy()
+        env["CENTRAL_COMPRAS_TESTE_CRASH_APOS"] = "veredito:iniciado"
+        crash = subprocess.run(
+            [sys.executable, str(script), *args], cwd=self.root, env=env, capture_output=True, text=True,
+        )
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+
+        journal = next((project / ".operacoes").glob("*.json"))
+        registro = json.loads(journal.read_text(encoding="utf-8"))
+        veredito_nome = registro["detalhe"]["veredito_nome"]
+        data_original = veredito_nome[:10]
+        data_retomada = (dt.date.fromisoformat(data_original) + dt.timedelta(days=1)).isoformat()
+
+        script.write_bytes(atual)
+        with patch.object(cc, "today", return_value=data_retomada):
+            self.cli(*args)
+
+        self.assertFalse(cc.pending_operations([project]))
+        texto = (cc.VEREDITOS / veredito_nome).read_text(encoding="utf-8")
+        self.assertEqual(
+            cc.extract_bullet(texto, "Data da compra"), data_original,
+            "Retomada em outro dia nao pode transformar compra implicita antiga na data do retry",
+        )
+
+    def test_upgrade_recusa_journal_antigo_de_evento_sem_passos_e_cronologia_invalida(self):
+        """No commit `3acc96a`, `registrar-evento --evento entrega` sem
+        `--data` podia recusar tarde demais e deixar journal pendente vazio.
+        Retomar esse journal na versao atual precisa validar a data congelada
+        real da tentativa, nao tratar `passos: {}` como prova de validacao."""
+        project = self.project()
+        veredito = self._decidir(project)
+        ontem = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso", "--data", ontem)
+        antes = veredito.read_bytes()
+
+        script = self.root / "scripts" / "central_compras.py"
+        atual = script.read_bytes()
+        antigo = subprocess.run(
+            ["git", "show", "3acc96a:scripts/central_compras.py"],
+            cwd=REPO, capture_output=True, check=True,
+        ).stdout
+        script.write_bytes(antigo)
+        recusa_antiga = subprocess.run(
+            [sys.executable, str(script), "registrar-evento", str(veredito), "--evento", "entrega"],
+            cwd=self.root, capture_output=True, text=True,
+        )
+        self.assertNotEqual(recusa_antiga.returncode, 0, recusa_antiga.stderr)
+        script.write_bytes(atual)
+
+        pendentes = cc.pending_operations([cc.BASE])
+        self.assertEqual(len(pendentes), 1)
+        self.assertEqual(pendentes[0]["op_id"], f"registrar-evento:{veredito.name}:entrega")
+        self.assertEqual(pendentes[0]["passos"], {}, "pre-condicao: journal antigo ficou sem efeito tentado")
+
+        with self.assertRaisesRegex(SystemExit, "posterior"):
+            self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+
+        self.assertEqual(veredito.read_bytes(), antes)
+
+        journal = next((cc.BASE / ".operacoes").glob("*.json"))
+        journal.unlink()
+        self.cli("registrar-evento", str(veredito), "--evento", "entrega", "--data", ontem)
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data de entrega"), ontem)
 
 
 if __name__ == "__main__":

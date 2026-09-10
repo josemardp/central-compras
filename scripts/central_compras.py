@@ -503,6 +503,10 @@ class OperationHandle:
         orfao) a cada retry."""
         return self._registro["detalhe"]
 
+    @property
+    def iniciado_em(self) -> str:
+        return str(self._registro.get("iniciado_em") or "")
+
     def concluido(self, passo: str) -> bool:
         return self._registro["passos"].get(passo, {}).get("situacao") == "concluido"
 
@@ -886,6 +890,17 @@ def has_pending_operation(scope: Path, op_id: str, kind: str) -> bool:
     except JournalPrecisaReconciliacao:
         return True  # journal ilegivel: trata como pendente, nao como ausente.
     return bool(registro and registro.get("kind") == kind and registro.get("situacao") == "em_andamento")
+
+
+def pending_operation_record(scope: Path, op_id: str, kind: str) -> dict[str, Any] | None:
+    """Devolve o journal pendente legivel desta operacao, se existir."""
+    try:
+        registro = _ler_journal(_operation_path(scope, op_id))
+    except JournalPrecisaReconciliacao:
+        return None
+    if registro and registro.get("kind") == kind and registro.get("situacao") == "em_andamento":
+        return registro
+    return None
 
 
 def pending_operations(scopes: list[Path]) -> list[dict[str, Any]]:
@@ -3834,6 +3849,38 @@ def decide(args: argparse.Namespace) -> None:
                         obrigatorios, perdedores, briefing_meta, op)
 
 
+def _iso_date_prefix(value: Any) -> str | None:
+    texto = str(value or "")[:10]
+    try:
+        dt.date.fromisoformat(texto)
+    except ValueError:
+        return None
+    return texto
+
+
+def _data_compra_para_decidir(args: argparse.Namespace, op: "OperationHandle") -> str | None:
+    if not args.comprado:
+        return None
+    if args.data_compra:
+        return args.data_compra
+    congelada = op.detalhe.get("data_compra_efetiva")
+    if congelada:
+        return congelada
+    # Compatibilidade com journals da frente 6 antes de `data_compra_efetiva`:
+    # o nome do veredito ja era congelado na tentativa original e comecava pela
+    # data que `--comprado` implicito usou. `iniciado_em` fica como segunda
+    # evidencia persistida. Nunca cai em `today()` da retomada.
+    for evidencia in (op.detalhe.get("veredito_nome"), op.iniciado_em):
+        data = _iso_date_prefix(evidencia)
+        if data:
+            return data
+    raise SystemExit(
+        "Nao da para retomar `decidir --comprado`: o journal antigo nao contem "
+        "data da compra efetiva, nome de veredito datado nem `iniciado_em` valido. "
+        "Confira a operacao pendente manualmente antes de prosseguir."
+    )
+
+
 def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado, minima,
                     obrigatorios, perdedores, briefing_meta, op: "OperationHandle") -> None:
     # O caminho do snapshot vem congelado em `op.detalhe`: numa retomada e o
@@ -4046,19 +4093,7 @@ def _decide_writes(args, project, quote, quote_hash, product, cortes, ranqueado,
     # o veredito com o template em branco - apagando um D+30 que o Josemar
     # tivesse preenchido na janela entre a falha e a retomada.
     verdict_path = VEREDITOS / op.detalhe["veredito_nome"]
-    # Achado 2: um `--data-compra` EXPLICITO e o mesmo valor em QUALQUER
-    # tentativa (e o proprio dado de entrada, nao um calculo dependente de
-    # `today()`) - nao depende de ter sido congelado em `op.detalhe`
-    # nenhuma vez, entao vale SEMPRE que presente, inclusive num journal
-    # de uma versao anterior que nem tinha o campo `data_compra_efetiva`
-    # (evidencia persistida na propria chamada, nao no journal). So cai
-    # pro valor congelado (implicito, `today()` da 1a tentativa) quando
-    # nao ha data explicita - e so recorre a `today()` de agora como
-    # ultimo recurso, se nem isso sobreviveu (journal legado demais).
-    data_compra_final = (
-        (args.data_compra or op.detalhe.get("data_compra_efetiva") or today())
-        if args.comprado else None
-    )
+    data_compra_final = _data_compra_para_decidir(args, op)
     op.executar_uma_vez(
         "veredito",
         lambda: create_verdict(project, args.produto_id, product, quote,
@@ -4382,6 +4417,30 @@ def _projeto_da_confirmacao_de_compra(veredito: str) -> Path | None:
     return projeto_dir
 
 
+def _data_evento_para_validacao(registro: dict[str, Any] | None, args: argparse.Namespace) -> str:
+    if registro is None:
+        return args.data or today()
+    detalhe = registro.get("detalhe") or {}
+    data = detalhe.get("data_efetiva")
+    if data and _iso_date_prefix(data):
+        return data
+    try:
+        assinatura = json.loads(registro.get("assinatura_fingerprint") or "{}")
+    except (TypeError, ValueError):
+        assinatura = {}
+    data_assinatura = assinatura.get("data") if isinstance(assinatura, dict) else None
+    if data_assinatura and _iso_date_prefix(data_assinatura):
+        return data_assinatura
+    data_inicio = _iso_date_prefix(registro.get("iniciado_em"))
+    if data_inicio:
+        return data_inicio
+    raise SystemExit(
+        "Nao da para retomar `registrar-evento`: o journal antigo nao contem "
+        "`data_efetiva`, data explicita na assinatura nem `iniciado_em` valido. "
+        "Confira a operacao pendente manualmente antes de prosseguir."
+    )
+
+
 def register_verdict_event(args: argparse.Namespace) -> None:
     """`registrar-evento`: grava, num veredito ja existente, a data em que
     a compra foi paga, o produto chegou, ou o uso comecou de verdade -
@@ -4432,7 +4491,9 @@ def register_verdict_event(args: argparse.Namespace) -> None:
     text = path.read_text(encoding="utf-8")
     label = VERDICT_EVENT_BULLET[args.evento]
     op_id = f"registrar-evento:{path.name}:{args.evento}"
-    retomando_propria = has_pending_operation(BASE, op_id, "registrar-evento")
+    registro_pendente = pending_operation_record(BASE, op_id, "registrar-evento")
+    pendencia_propria_ilegivel = registro_pendente is None and has_pending_operation(BASE, op_id, "registrar-evento")
+    retomando_propria = registro_pendente is not None or pendencia_propria_ilegivel
     existente = extract_bullet(text, label)
     if existente and not retomando_propria:
         raise SystemExit(
@@ -4440,22 +4501,15 @@ def register_verdict_event(args: argparse.Namespace) -> None:
             "sobrescrito silenciosamente. Se foi engano de digitacao, corrija o arquivo a "
             f"mao: {path}"
         )
-    # A validacao de cronologia roda ANTES de qualquer operacao nova ser
-    # criada - `--data` omitida resolve pra `today()` aqui, o mesmo valor
-    # que sera congelado abaixo se a chamada passar. Uma chamada invalida
-    # (achado 3) nunca pode deixar journal pendente pra tras: sem isso,
-    # `tracked_operation` ja tinha criado e persistido o journal (situacao
-    # em_andamento) ANTES da checagem rodar dentro do `with`, e corrigir a
-    # data manualmente na chamada seguinte virava "argumento diferente"
-    # contra o journal invalido que a propria recusa deixou pendente. Numa
-    # RETOMADA legitima (mesmo op_id ja em_andamento), a validacao ja
-    # rodou de verdade na tentativa original - nao repete aqui: o
-    # calendario pode ter avancado, e re-checar com `today()` de agora
-    # arriscaria recusar uma retomada legitima por um efeito colateral do
-    # tempo, nao por dado realmente incompativel (isso e responsabilidade
-    # de `tracked_operation`/`_assinaturas_compativeis`).
-    if not retomando_propria:
-        erro = _erro_cronologia_evento(text, args.evento, args.data or today())
+    # A validacao de cronologia roda ANTES de criar operacao nova e tambem
+    # numa retomada legivel, usando a data efetiva congelada no journal. A
+    # existencia de um journal pendente nao prova que a tentativa antiga ja
+    # validou tudo: versoes anteriores podiam recusar tarde demais e deixar
+    # `passos: {}` para tras. O cuidado e nunca revalidar retomada com
+    # `today()` novo - a data precisa vir do proprio journal.
+    if not pendencia_propria_ilegivel:
+        data_para_validacao = _data_evento_para_validacao(registro_pendente, args)
+        erro = _erro_cronologia_evento(text, args.evento, data_para_validacao)
         if erro:
             raise SystemExit(erro + " Nada foi alterado.")
     projeto_dir = _projeto_da_confirmacao_de_compra(args.veredito) if args.evento == "comprado" else None
