@@ -1058,5 +1058,236 @@ class QuartaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data de entrega"), ontem)
 
 
+class QuintaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
+    """Achado da 4a revisao independente (sessao 25, commit 825d945):
+    `decidir --comprado` como "2a chamada" (achado 2 da 1a revisao, pra
+    complementar um veredito ja criado em vez de recusar) so funcionava
+    quando as duas chamadas caiam no MESMO dia. `veredito_nome_candidato`
+    era sempre recalculado com `today()`; em outro dia isso nao batia com
+    o veredito real - criava um segundo veredito orfao e pulava a
+    checagem de cronologia do achado 4 (ela olhava para um arquivo que
+    nao existia). Reproduzido antes da correcao em
+    `%TEMP%\\revisao_frente6_ee1c21d.py`. Corrigido com
+    `_veredito_existente_para`: localiza o veredito pela IDENTIDADE
+    (bullets `Projeto`/`Produto ID`), nunca pelo nome do arquivo."""
+
+    def _decidir(self, project, pid="candidato", extra=()):
+        self.product(project, pid)
+        self.quote(project, pid, "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", pid,
+                  "--porque", "unico candidato", "--sem-perdedores", *extra)
+        return next(p for p in cc.VEREDITOS.glob("*.md") if pid in p.name)
+
+    def _status(self, project):
+        return self.cli("status", str(project))
+
+    # ---- complemento em dia diferente: cria 2 vereditos em vez de 1 ------
+
+    def test_complemento_em_dia_diferente_localiza_e_complementa_o_veredito_real(self):
+        dia1 = "2026-01-01"
+        dia2 = "2026-01-05"
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            self._decidir(project)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), "")
+
+        with patch.object(cc, "today", return_value=dia2):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "unico candidato", "--sem-perdedores", "--comprado")
+
+        vereditos = list(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(len(vereditos), 1,
+                          f"BUG: criou {len(vereditos)} vereditos em vez de complementar o existente")
+        self.assertEqual(vereditos[0].name, veredito.name)
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), dia2)
+        self.assertIn("Estado: comprado", self._status(project))
+
+    def test_complemento_em_dia_diferente_com_data_compra_explicita(self):
+        dia1 = "2026-04-01"
+        dia2 = "2026-04-10"
+        data_compra_real = "2026-04-08"
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            self._decidir(project)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+
+        with patch.object(cc, "today", return_value=dia2):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "unico candidato", "--sem-perdedores", "--comprado",
+                      "--data-compra", data_compra_real)
+
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 1)
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), data_compra_real)
+
+    def test_complemento_em_dia_diferente_preserva_avaliacoes_existentes(self):
+        """So `Data da compra` em branco e preenchida - D+30/D+180 ja
+        respondidos (ou qualquer outro conteudo humano) continuam
+        intactos, sem exigir `--force-veredito`, mesmo com o complemento
+        acontecendo dias depois."""
+        dia1 = "2026-05-01"
+        dia2 = "2026-05-20"
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            self._decidir(project)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        cc.atomic_write_text(
+            veredito,
+            cc.replace_or_append_bullet(veredito.read_text(encoding="utf-8"), "D+30 resumo", "MARCADOR_PRESERVAR"),
+        )
+
+        with patch.object(cc, "today", return_value=dia2):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "unico candidato", "--sem-perdedores", "--comprado")
+
+        texto = veredito.read_text(encoding="utf-8")
+        self.assertIn("MARCADOR_PRESERVAR", texto)
+        self.assertEqual(cc.extract_bullet(texto, "Data da compra"), dia2)
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 1)
+
+    # ---- complemento em dia diferente: pulava a cronologia do achado 4 ---
+
+    def test_complemento_em_dia_diferente_recusa_cronologia_impossivel_sem_efeitos(self):
+        dia1 = "2026-02-01"
+        d_entrega = "2026-02-02"
+        d_inicio_uso = "2026-02-03"
+        d_compra_tardia = "2026-02-10"  # posterior ao inicio de uso - impossivel
+
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            self._decidir(project)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        with patch.object(cc, "today", return_value=d_entrega):
+            self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+        with patch.object(cc, "today", return_value=d_inicio_uso):
+            self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso")
+
+        texto_antes = veredito.read_text(encoding="utf-8")
+        decisao_antes = (project / "decisao.md").read_bytes()
+        processo_antes = (project / "processo.md").read_bytes()
+        status_antes = self._status(project)
+
+        with patch.object(cc, "today", return_value=d_compra_tardia):
+            with self.assertRaisesRegex(SystemExit, "posterior"):
+                self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                          "unico candidato", "--sem-perdedores", "--comprado")
+
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 1, "nao pode ter criado um 2o veredito")
+        self.assertEqual(veredito.read_text(encoding="utf-8"), texto_antes)
+        self.assertEqual((project / "decisao.md").read_bytes(), decisao_antes)
+        self.assertEqual((project / "processo.md").read_bytes(), processo_antes)
+        self.assertEqual(self._status(project), status_antes)
+        self.assertFalse(cc.pending_operations([project]))
+
+    # ---- ambiguidade: nunca escolher um veredito arbitrariamente ---------
+
+    def test_ambiguidade_entre_vereditos_recusa_antes_de_qualquer_escrita(self):
+        project = self.project()
+        veredito1 = self._decidir(project)
+        veredito2 = cc.VEREDITOS / f"{cc.today()}-duplicado-{project.name}-candidato.md"
+        veredito2.write_text(veredito1.read_text(encoding="utf-8"), encoding="utf-8")
+
+        veredito1_antes = veredito1.read_bytes()
+        veredito2_antes = veredito2.read_bytes()
+        decisao_antes = (project / "decisao.md").read_bytes()
+        processo_antes = (project / "processo.md").read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "Mais de um veredito"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "unico candidato", "--sem-perdedores", "--comprado")
+
+        self.assertEqual(veredito1.read_bytes(), veredito1_antes)
+        self.assertEqual(veredito2.read_bytes(), veredito2_antes)
+        self.assertEqual((project / "decisao.md").read_bytes(), decisao_antes)
+        self.assertEqual((project / "processo.md").read_bytes(), processo_antes)
+        self.assertFalse(cc.pending_operations([project]))
+
+    # ---- --force-veredito continua descartando o conteudo de proposito ---
+
+    def test_force_veredito_em_dia_diferente_reseta_o_mesmo_veredito_sem_duplicar(self):
+        dia1 = "2026-06-01"
+        dia2 = "2026-06-15"
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            self._decidir(project)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        cc.atomic_write_text(
+            veredito,
+            cc.replace_or_append_bullet(veredito.read_text(encoding="utf-8"), "D+30 resumo", "SERA_DESCARTADO"),
+        )
+
+        with patch.object(cc, "today", return_value=dia2):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+
+        vereditos = list(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(len(vereditos), 1, "force-veredito em outro dia nao pode criar um segundo arquivo")
+        self.assertEqual(vereditos[0].name, veredito.name, "tem que resetar o MESMO veredito, nao criar outro")
+        texto = veredito.read_text(encoding="utf-8")
+        self.assertNotIn("SERA_DESCARTADO", texto, "force-veredito tem que descartar o conteudo antigo")
+        self.assertEqual(cc.extract_bullet(texto, "Data da compra"), dia2)
+
+    # ---- falha intermediaria no complemento e retomada em outro dia ------
+
+    def test_falha_intermediaria_no_complemento_e_retomada_em_outro_dia_preserva_veredito_correto(self):
+        """Falha durante um complemento de compra (2a chamada, em dia
+        diferente da 1a decisao) tem que retomar mirando o MESMO veredito
+        real - nunca recalcular um novo pelo dia da retomada - e
+        preservar a data CONGELADA na tentativa que falhou, nunca a do
+        dia em que a retomada acontece."""
+        dia1 = "2026-03-01"
+        dia2 = "2026-03-05"
+        dia3 = "2026-03-09"
+
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            self._decidir(project)
+        veredito_original = next(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(cc.extract_bullet(veredito_original.read_text(encoding="utf-8"), "Data da compra"), "")
+
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+
+        def crash(ponto):
+            if ponto == "veredito:iniciado":
+                raise OSError("falha durante o complemento")
+
+        with patch.object(cc, "today", return_value=dia2), \
+                patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        journal = next((project / ".operacoes").glob("*.json"))
+        registro = json.loads(journal.read_text(encoding="utf-8"))
+        self.assertEqual(
+            registro["detalhe"]["veredito_nome"], veredito_original.name,
+            "o journal da tentativa que falhou tem que ter congelado o veredito REAL (dia1), nao um novo (dia2)",
+        )
+        self.assertEqual(registro["detalhe"]["data_compra_efetiva"], dia2)
+
+        with patch.object(cc, "today", return_value=dia3):
+            self.cli(*args)
+
+        self.assertFalse(cc.pending_operations([project]))
+        vereditos = sorted(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(len(vereditos), 1, "retomada em outro dia nao pode criar um segundo veredito")
+        self.assertEqual(
+            cc.extract_bullet(veredito_original.read_text(encoding="utf-8"), "Data da compra"), dia2,
+            "a retomada tem que gravar a data CONGELADA da tentativa que falhou (dia2), "
+            "nunca a do dia em que a retomada de fato acontece (dia3)",
+        )
+
+    # ---- controle: complemento no MESMO dia continua funcionando ---------
+
+    def test_controle_complemento_no_mesmo_dia_continua_funcionando(self):
+        project = self.project()
+        self._decidir(project)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores", "--comprado")
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 1)
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+
+
 if __name__ == "__main__":
     unittest.main()

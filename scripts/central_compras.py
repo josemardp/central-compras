@@ -3655,6 +3655,45 @@ Tarefa: monte perguntas de veredito D+30 e D+180 para extrair aprendizado reutil
     print(textwrap.dedent(prompt).strip())
 
 
+def _veredito_existente_para(project: Path, produto_id: str) -> Path | None:
+    """Localiza o veredito ja existente desta decisao, pela IDENTIDADE
+    gravada no CONTEUDO (bullets `Projeto`/`Produto ID`) - nunca pelo nome
+    do arquivo, que comeca pela data de quem o CRIOU e por isso nao serve
+    para reidentificar o mesmo veredito numa chamada de OUTRO dia (achado
+    da 4a revisao independente da frente 6: `decidir --comprado` como "2a
+    chamada", so pra confirmar uma compra que chegou depois da decisao, so
+    complementava o veredito existente quando a 2a chamada caia no MESMO
+    dia da 1a - em outro dia, `{today()}-{projeto}-{produto}.md` nunca
+    batia com o arquivo real).
+
+    Devolve `None` quando nenhum veredito bate essa identidade - decisao
+    nova, ainda sem veredito, comportamento inalterado. Levanta
+    `SystemExit` quando MAIS DE UM bate - nunca escolhe um dos dois
+    arbitrariamente; a ambiguidade e reportada aqui, ANTES de qualquer
+    escrita (journal, decisao.md, processo.md, veredito), para
+    reconciliacao manual. Vereditos standalone (`novo-veredito`, sem
+    `Produto ID` gravado) nunca entram aqui - a comparacao exige o campo
+    preenchido e igual ao `produto_id` desta chamada.
+    """
+    if not produto_id or not VEREDITOS.is_dir():
+        return None
+    encontrados = []
+    for candidato in sorted(VEREDITOS.glob("*.md")):
+        texto = candidato.read_text(encoding="utf-8")
+        if (extract_bullet(texto, "Projeto") == project.name
+                and extract_bullet(texto, "Produto ID") == produto_id):
+            encontrados.append(candidato)
+    if len(encontrados) > 1:
+        nomes = ", ".join(p.name for p in encontrados)
+        raise SystemExit(
+            f"Mais de um veredito encontrado para {project.name}/{produto_id}: {nomes}.\n"
+            "Nao da para saber qual e o veredito desta decisao sem ambiguidade - nada foi "
+            "alterado. Confira o conteudo de cada arquivo e renomeie ou apague manualmente "
+            "o duplicado indevido antes de continuar."
+        )
+    return encontrados[0] if encontrados else None
+
+
 def decide(args: argparse.Namespace) -> None:
     if args.data_compra and not args.comprado:
         raise SystemExit(
@@ -3797,18 +3836,44 @@ def decide(args: argparse.Namespace) -> None:
     }
     instante = dt.datetime.now().strftime("%Y%m%dT%H%M%S%f")
     snapshot_rel_candidato = f"snapshots/{instante}-{slugify(args.produto_id)}"
+    op_id = f"decidir:{args.produto_id}"
     # O nome do veredito e congelado AQUI (nao recalculado dentro de
     # `_decide_writes`) pelo mesmo motivo do snapshot: numa retomada, tem
     # que ser o MESMO arquivo da tentativa que falhou, nao um recalculado
-    # com `today()` de um dia diferente.
-    veredito_nome_candidato = f"{today()}-{project.name}-{args.produto_id}.md"
+    # com `today()` de um dia diferente - `tracked_operation` ja garante
+    # isso reusando `op.detalhe` congelado, entao o candidato calculado
+    # aqui so importa para uma operacao NOVA.
+    #
+    # Achado da 4a revisao independente: numa chamada NOVA que NAO e
+    # retomada (`decidir --comprado` como "2a chamada", pra so confirmar
+    # uma compra que chegou depois da decisao - o fluxo mais comum, ja que
+    # raramente se paga no mesmo instante que se decide), o candidato
+    # `{today()}-{projeto}-{produto}.md` so bate com o veredito JA
+    # existente quando as duas chamadas caem no MESMO DIA. Em outro dia,
+    # sem isso, criava um segundo veredito orfao (em vez de complementar o
+    # real) e a checagem de cronologia do achado 4 (abaixo) olhava para um
+    # arquivo que nao existia, pulando a validacao inteira. Corrigido:
+    # localiza o veredito existente por IDENTIDADE (`Projeto`/`Produto ID`
+    # gravados no CONTEUDO, nunca pelo nome do arquivo) via
+    # `_veredito_existente_para` - so quando esta chamada NAO e retomada
+    # (numa retomada de verdade, o nome congelado em `op.detalhe` sempre
+    # vence, e procurar de novo so arriscaria uma ambiguidade irrelevante
+    # bloquear uma retomada legitima).
+    retomando_decisao = has_pending_operation(project, op_id, "decidir")
+    if retomando_decisao:
+        veredito_nome_candidato = f"{today()}-{project.name}-{args.produto_id}.md"
+    else:
+        veredito_existente_atual = _veredito_existente_para(project, args.produto_id)
+        veredito_nome_candidato = (
+            veredito_existente_atual.name if veredito_existente_atual is not None
+            else f"{today()}-{project.name}-{args.produto_id}.md"
+        )
     # Mesmo principio para `Data da compra`: `--comprado` sem `--data-compra`
     # explicita cai em `today()`, mas isso so pode ser calculado UMA VEZ, na
     # 1a tentativa - uma interrupcao antes de `create_verdict` rodar e uma
     # retomada em outro dia nao pode trocar a data da confirmacao original
     # pela data da retomada. `None` quando nao comprado (nunca fabrica).
     data_compra_efetiva = (args.data_compra or today()) if args.comprado else None
-    op_id = f"decidir:{args.produto_id}"
     # Achado 4: `decidir --comprado` pode COMPLEMENTAR um veredito ja
     # existente (achado da rodada anterior) - mas isso tem que respeitar o
     # MESMO contrato de cronologia que `registrar-evento` ja aplica pros
@@ -3818,8 +3883,11 @@ def decide(args: argparse.Namespace) -> None:
     # achado 3 em `registrar-evento`: nunca deixa journal pendente pra
     # tras por causa de uma entrada invalida, e pula a checagem numa
     # retomada legitima (o calendario pode ter avancado; a validacao real
-    # ja rodou na tentativa original).
-    if args.comprado and not has_pending_operation(project, op_id, "decidir"):
+    # ja rodou na tentativa original). Com o candidato agora corrigido
+    # (acima), `veredito_existente` aponta pro arquivo REAL quando existe
+    # um, em qualquer dia - nao so quando a chamada cai no mesmo dia da
+    # criacao.
+    if args.comprado and not retomando_decisao:
         veredito_existente = VEREDITOS / veredito_nome_candidato
         if veredito_existente.exists():
             erro = _erro_cronologia_evento(

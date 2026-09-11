@@ -1398,12 +1398,13 @@ de novo, vale reler o contrato inteiro desta seção antes de mexer.
 
 ## 6. Datas e vereditos
 
-**Estado: implementada (09/09/2026, sessão 20), corrigida após três rodadas
-de revisão independente da Astra (sessão 21: 5 achados; sessão 22: 4;
-sessão 23: 2, corrigidos em 10/09/2026 na sessão 24). Uma 4ª rodada
-(sessão 25, 11/09/2026) achou mais 1 falha real, ainda não corrigida.
-Ainda falta UMA rodada de revisão que passe limpa antes de declarar
-"concluída sob reserva", mesmo requisito aplicado à frente 5.**
+**Estado: implementada (09/09/2026, sessão 20), corrigida após quatro
+rodadas de revisão independente (sessão 21: 5 achados; sessão 22: 4;
+sessão 23: 2, corrigidos em 10/09/2026 na sessão 24; sessão 25: 1,
+corrigido na própria sessão 25, 11/09/2026). Ainda falta UMA rodada de
+revisão que passe limpa antes de declarar "concluída sob reserva", mesmo
+requisito aplicado à frente 5 — nenhuma correção desta frente conseguiu
+isso até agora.**
 
 **Contrato adotado:** decisão, compra/pagamento, entrega e início de uso
 são quatro fatos datados independentes. `decidir` fecha só a escolha —
@@ -1867,12 +1868,73 @@ histórico intocados. **Frente 6 continua aberta — falta corrigir este
 achado e submeter a mais uma rodada de revisão independente sem
 achados.**
 
+### Correção do achado da 4ª revisão (sessão 25, 11/09/2026, commit `825d945`)
+
+**Causa raiz confirmada:** `veredito_nome_candidato` em `decide()` era
+sempre reconstruído a partir de `today()`, mesmo quando a chamada era uma
+2ª decisão legítima (não uma retomada) sobre um produto já decidido em
+outro dia. `today()` só é uma identidade válida para nomear um veredito
+**novo** — nunca serve para reencontrar um veredito **já existente**.
+
+**Corrigido:** função nova `_veredito_existente_para(project, produto_id)`
+localiza o veredito já existente de uma decisão pela IDENTIDADE gravada
+no CONTEÚDO (bullets `Projeto`/`Produto ID`), nunca pelo nome do arquivo.
+`decide()` passou a usar essa função — só numa chamada NOVA, nunca numa
+retomada de verdade, onde `op.detalhe` congelado continua sempre
+vencendo — para decidir `veredito_nome_candidato`: se já existe um
+veredito para este projeto+produto, reusa o MESMO nome, em qualquer dia;
+senão, mantém o comportamento antigo (`{today()}-{projeto}-{produto}.md`,
+decisão nova). Como a checagem de cronologia do achado 4, a declaração de
+`recursos=` da operação e a gravação em `_decide_writes` todas dependem
+do MESMO `veredito_nome_candidato`, uma única correção na origem resolveu
+os dois efeitos do achado ao mesmo tempo (duplicata + cronologia pulada).
+
+Mais de um veredito batendo a mesma identidade (cenário de
+corrupção/duplicação manual, inclusive resquício do próprio bug antes
+desta correção) é recusado com `SystemExit` claro ANTES de qualquer
+escrita — nunca escolhe um arquivo arbitrariamente. `--force-veredito` em
+dia diferente passou a resetar o MESMO veredito encontrado (antes criava
+outro arquivo, o próprio sintoma do bug) — comportamento mais coerente
+com o propósito documentado da flag, protegido por teste.
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`QuintaRevisaoIndependenteFrente6Test`, 8 testes:
+
+- complemento em dia diferente localiza e complementa o veredito real,
+  com data implícita e com `--data-compra` explícita;
+- preserva avaliações/`D+30` já preenchidos ao complementar em outro dia;
+- recusa cronologia impossível sem nenhum efeito colateral (veredito,
+  `decisao.md`, `processo.md` e `status` do projeto bit-a-bit inalterados);
+- ambiguidade entre vereditos recusa antes de qualquer escrita;
+- `--force-veredito` em dia diferente reseta o mesmo veredito sem duplicar;
+- falha intermediária no complemento com retomada em outro dia (o journal
+  congela o veredito e a data REAIS da tentativa que falhou; a retomada
+  num 3º dia não inventa nem duplica nada);
+- controle de que o complemento no MESMO dia continua funcionando
+  (comportamento pré-existente, achado 2 da 1ª revisão).
+
+Confirmado que os 7 testes que exercitam o achado **falham sem a
+correção** (`git stash` isolando só `scripts/central_compras.py`, suíte
+rodada, `git stash pop`) — só o teste de controle (mesmo dia) já passava
+antes. Os 2 cenários de `%TEMP%\revisao_frente6_ee1c21d.py` também passam
+agora e continuam salvos ali, preservados para a próxima revisão.
+
+**Verificação:** baseline antes de qualquer mudança: suíte completa
+**508 testes, 0 falhas**. Depois da correção + testes novos: **516
+testes, 0 falhas** (508 + 8). `auditar-decisoes --strict` (só o aviso
+legado já conhecido), `operacoes-pendentes --strict` (nenhuma pendente),
+`checar-segredos --strict` (limpo) e `git diff --check` (limpo)
+passaram. Processos de compra HB20S (`produtos/autopecas/*`,
+`projetos/2026-hb20s-*`) conferidos intactos. Nenhuma migração rodada,
+pesos/gates/histórico intocados, nenhuma infraestrutura externa tocada.
+**Frente 6 continua aberta — falta submeter esta correção a uma rodada de
+revisão independente que passe limpa.**
+
 ## 7. Validação e publicação
 
 **Estado (11/09/2026, sessão 25): feita integralmente para as
-frentes 2, 3, 4 e 5. Frente 6 implementada, com três rodadas de revisão
-corrigidas e uma 4ª rodada com 1 achado ainda não corrigido — continua
-sem rodada limpa.**
+frentes 2, 3, 4 e 5. Frente 6 implementada, com quatro rodadas de revisão
+corrigidas — continua sem uma rodada limpa.**
 
 Esta seção estava desatualizada desde a sessão 9-12: as frentes 3 (receptor
 Sheets, 3 rodadas de revisão + redeploy verificado na nuvem) e 4
@@ -1923,9 +1985,11 @@ revisado, fluxos testados no navegador quando aplicável, push para
   substituída pelo dia atual e evento inválido aceito por journal vazio.
   Corrigidas na sessão 24 com dois testes permanentes, ver seção 6. Uma 4ª
   revisão (sessão 25) achou mais 1 falha — a "2ª chamada de `decidir
-  --comprado`" só complementa o veredito existente quando as duas
-  chamadas caem no mesmo dia; em dia diferente cria um segundo veredito
-  órfão e pula a checagem de cronologia do achado 4. Ainda não corrigida.
-  **Ainda falta UMA rodada de revisão independente que passe limpa** —
-  não presumir "concluída sob reserva" até isso acontecer de verdade,
-  mesmo padrão da frente 5.
+  --comprado`" só complementava o veredito existente quando as duas
+  chamadas caiam no mesmo dia; em dia diferente criava um segundo
+  veredito órfão e pulava a checagem de cronologia do achado 4. Corrigida
+  na própria sessão 25 com `_veredito_existente_para` (localiza o
+  veredito pela identidade gravada no conteúdo, nunca pelo nome do
+  arquivo) e 8 testes permanentes, ver seção 6. **Ainda falta UMA rodada
+  de revisão independente que passe limpa** — não presumir "concluída sob
+  reserva" até isso acontecer de verdade, mesmo padrão da frente 5.

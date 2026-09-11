@@ -7,12 +7,10 @@
 
 ## AO RETOMAR — comece por aqui (11/09/2026, sessao 25)
 
-**Proximo passo:** corrigir o achado abaixo (2a chamada de `decidir
---comprado` em dia diferente cria um segundo veredito e pula a
-cronologia), reproduzir os 2 cenarios ANTES de corrigir, virar teste
-permanente, rodar suite completa + as 4 checagens estritas, e submeter a
-correcao a MAIS uma rodada de revisao independente. So declarar "frente
-6 concluida sob reserva" quando uma rodada passar sem achado.
+**Proximo passo:** submeter a correcao desta sessao (bloco abaixo) a MAIS
+uma rodada de revisao independente da frente 6. So declarar "frente 6
+concluida sob reserva" quando uma rodada passar sem achado - nenhuma
+correcao anterior desta frente conseguiu isso ainda.
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -25,12 +23,13 @@ correcao a MAIS uma rodada de revisao independente. So declarar "frente
   real - so o preview foi conferido em cada rodada.
 - **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
   sessao 20; 4 rodadas de revisao independente ja acharam 5, depois 4,
-  depois 2, e agora mais 1 falha real (sessao 25, ver bloco abaixo). As 3
-  primeiras rodadas foram corrigidas nos commits `3acc96a`, `ad6a04a` e
-  `aaa02f0`. **Nao considere a frente 6 encerrada depois de apenas rodar
-  a suite local** - a frente 5 levou 7 rodadas ate uma revisao passar
-  limpa. **Achado transversal da 2a rodada, registrado para nao se
-  repetir**: `_assinaturas_compativeis` (mecanismo COMPARTILHADO por TODO
+  depois 2, depois 1 falha real, todas corrigidas - as 3 primeiras nos
+  commits `3acc96a`, `ad6a04a` e `aaa02f0`, a 4a (sessao 25) no bloco
+  abaixo. **Nao considere a frente 6 encerrada depois de apenas rodar a
+  suite local** - a frente 5 levou 7 rodadas ate uma revisao passar
+  limpa, e esta frente ja teve 4 rodadas seguidas achando falha nova.
+  **Achado transversal da 2a rodada, registrado para nao se repetir**:
+  `_assinaturas_compativeis` (mecanismo COMPARTILHADO por TODO
   `tracked_operation` - `decidir`, `registrar-evento`, `vincular-produto`,
   `aprender-veredito`), criada na 1a rodada pra tolerar evolucao de
   schema, comparava valores com `==` do Python, que confunde `False` com
@@ -40,21 +39,74 @@ correcao a MAIS uma rodada de revisao independente. So declarar "frente
   `tracked_operation`/`_assinaturas_compativeis`/`_valores_equivalentes`
   de novo, rode a suite completa E pense em quem MAIS usa esse mecanismo
   (`grep -n "tracked_operation(" scripts/central_compras.py`).
-  **Achado novo da sessao 25, registrado para nao se repetir**: o nome do
-  arquivo de veredito (`veredito_nome_candidato` em `decide()`) e sempre
-  recalculado com `today()`, mesmo quando a chamada e uma 2a decisao
-  legitima (nao uma retomada) sobre um produto ja decidido em outro dia -
-  isso faz o mecanismo de "complementar veredito existente" (achado 2 da
-  1a revisao) e a checagem de cronologia (achado 4 da 2a revisao) os dois
-  olharem para um arquivo que ainda nao existe, em vez do veredito real.
-  Qualquer novo `--comprado`/`--data-compra` que dependa de encontrar o
-  veredito JA CRIADO precisa localiza-lo pelo par projeto+produto (glob),
-  nunca reconstruir o nome a partir da data da chamada atual.
+  **Achado da 4a rodada, registrado para nao se repetir**: o nome do
+  arquivo de veredito nunca pode ser reconstruido a partir da data da
+  chamada atual (`today()-projeto-produto.md`) quando a intencao e
+  encontrar um veredito JA CRIADO em outro dia - `today()` so serve pra
+  nomear um veredito NOVO. Qualquer caminho que precise localizar o
+  veredito de uma decisao (complementar campo, validar cronologia,
+  declarar recurso) tem que usar `_veredito_existente_para` (por
+  IDENTIDADE - bullets `Projeto`/`Produto ID` - nunca por nome de
+  arquivo), a mesma funcao que corrigiu isto na sessao 25.
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, correcao do achado da 4a revisao independente (11/09/2026,
+sessao 25).** Achado registrado no commit `825d945` (bloco seguinte,
+abaixo, preservado como historico): "2a chamada de `decidir --comprado`"
+em dia diferente da 1a criava um segundo veredito orfao e pulava a
+validacao de cronologia do achado 4.
+
+**Corrigido:** funcao nova `_veredito_existente_para(project, produto_id)`
+localiza o veredito ja existente de uma decisao pela IDENTIDADE gravada
+no CONTEUDO (bullets `Projeto`/`Produto ID`), nunca pelo nome do arquivo.
+`decide()` usa essa funcao (so numa chamada NOVA, nunca numa retomada de
+verdade - `op.detalhe` congelado continua sempre vencendo) para decidir o
+`veredito_nome_candidato`: se ja existe um veredito para este
+projeto+produto, reusa o MESMO nome (em qualquer dia); senao, mantem o
+comportamento antigo (`{today()}-{projeto}-{produto}.md`, decisao nova).
+Como a checagem de cronologia do achado 4, a declaracao de `recursos=` da
+operacao e a gravacao em `_decide_writes` todas dependem do MESMO
+`veredito_nome_candidato`, a correcao numa unica origem resolveu os dois
+efeitos do achado ao mesmo tempo. Mais de um veredito batendo a mesma
+identidade (cenario de corrupcao/duplicacao manual) e recusado ANTES de
+qualquer escrita - `SystemExit` claro, nunca escolha arbitraria.
+`--force-veredito` em dia diferente agora reseta o MESMO veredito
+encontrado (comportamento mais coerente que o antigo, que criava outro
+arquivo) - comportamento intencional, protegido por teste.
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`QuintaRevisaoIndependenteFrente6Test`, 8 testes - complemento em dia
+diferente localiza e complementa o veredito real (implicito e com
+`--data-compra` explicita), preserva avaliacoes/D+30 ja preenchidos,
+recusa cronologia impossivel sem nenhum efeito colateral (veredito,
+decisao.md, processo.md e status do projeto bit-a-bit inalterados),
+ambiguidade entre vereditos recusa antes de qualquer escrita,
+`--force-veredito` em dia diferente reseta o mesmo veredito sem duplicar,
+falha intermediaria no complemento com retomada em outro dia (journal
+congela o veredito e a data REAIS, retomada em dia 3 nao inventa nem
+duplica nada), e controle de que o complemento no MESMO dia continua
+funcionando. Verificado que os 7 testes que exercitam o achado FALHAM sem
+a correcao (`git stash` so do `scripts/central_compras.py`, suite
+rodada, `git stash pop`) - so o teste de controle (mesmo dia) passava
+antes. Os 2 cenarios de `%TEMP%\revisao_frente6_ee1c21d.py` tambem
+passam agora e continuam la, preservados para a proxima revisao.
+
+**Verificacao:** baseline ANTES de tocar em qualquer coisa: suite
+completa **508 testes, 0 falhas** (identica a sessao anterior). Depois da
+correcao + testes novos: **516 testes, 0 falhas** (508 + 8).
+`auditar-decisoes --strict` (so o aviso legado ja conhecido),
+`operacoes-pendentes --strict` (nenhuma pendente), `checar-segredos
+--strict` (limpo) e `git diff --check` (limpo) passaram. Processos de
+compra HB20S (`produtos/autopecas/*`,
+`projetos/2026-hb20s-*`) conferidos intactos (`git status` limpo neles).
+Nenhuma migracao rodada, pesos/gates/historico intocados, nenhuma
+infraestrutura externa tocada. **Frente 6 ainda nao concluida: falta
+submeter esta correcao a uma rodada de revisao independente que passe
+limpa.**
 
 **Frente 6, 4a revisao independente (11/09/2026, sessao 25, sobre o commit
 `ee1c21d` - codigo identico a `aaa02f0`; o commit seguinte so acrescentou
