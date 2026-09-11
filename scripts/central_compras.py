@@ -4059,18 +4059,27 @@ def decide(args: argparse.Namespace) -> None:
                 candidato = VEREDITOS / nome_congelado
                 if candidato.exists():
                     veredito_alvo_validacao = candidato
-            if veredito_alvo_validacao is not None and args.comprado and not args.force_veredito:
-                # achado 1 so grava "Data da compra" - se ela ja bate com o
-                # valor CONGELADO (nunca recalculado com o dia da retomada),
-                # a escrita ja aconteceu e nao ha mais nada a proteger aqui;
-                # sem evidencia nenhuma da data congelada, trata como AINDA
-                # NAO escrito (mais seguro validar de mais do que presumir).
-                data_congelada = _data_compra_efetiva_de_journal(
-                    detalhe_pendente, registro_pendente.get("iniciado_em") or "", args.data_compra,
-                )
-                if data_congelada:
-                    texto_pendente = veredito_alvo_validacao.read_text(encoding="utf-8")
-                    veredito_ja_escrito = extract_bullet(texto_pendente, "Data da compra") == data_congelada
+            # Achado I da 7a revisao independente: comparar o conteudo
+            # (`Data da compra` ja bate com o valor CONGELADO) nunca prova
+            # que foi ESTA operacao pendente quem escreveu - um valor
+            # IDENTICO vindo de qualquer outra origem (edicao manual e a
+            # via realista, ja que a trava de recursos bloqueia qualquer
+            # OUTRO comando de escrever no mesmo veredito enquanto esta
+            # operacao esta pendente) enganava essa comparacao e deixava a
+            # compra ser confirmada sem NENHUMA validacao. A prova real e
+            # o proprio JOURNAL: `passos["veredito"]["situacao"] ==
+            # "concluido"` so fica assim depois que `create_verdict`
+            # retornou com sucesso E `_concluir` persistiu isso. Enquanto
+            # nao concluido, a checagem SEMPRE roda de novo -
+            # `create_verdict` e uma sobrescrita/complemento idempotente
+            # (`executar_uma_vez`), entao revalidar nunca risca duplicar
+            # nada: se a escrita ja tinha acontecido e nada mudou, a
+            # revalidacao da o MESMO resultado; se algo mudou (ou o valor
+            # veio de uma edicao nunca validada), a recusa aqui e o
+            # comportamento CORRETO.
+            veredito_ja_escrito = (
+                (registro_pendente.get("passos") or {}).get("veredito", {}).get("situacao") == "concluido"
+            )
     if veredito_alvo_validacao is not None:
         if args.force_veredito:
             erro_export = _erro_force_veredito_apagaria_exportacao(veredito_alvo_validacao)
@@ -4799,6 +4808,44 @@ def _erro_divergencia_financeira_decisao(texto_veredito: str, texto_decisao: str
     )
 
 
+def _erro_evidencia_financeira_insuficiente(texto_decisao: str, veredito: Path, projeto_dir: Path) -> str | None:
+    """Achado II da 7a revisao independente: `decisao.md` sem os campos
+    MINIMOS que o formato ATUAL sempre grava deixa
+    `_evidencia_financeira_da_decisao` toda vazia - `_divergencias_financeiras`
+    nunca acha divergencia quando um dos lados esta vazio (nunca inventa
+    valor onde nao ha evidencia, de proposito), mas isso significa que a
+    compra seria confirmada com QUALQUER preco no veredito, sem checagem
+    nenhuma e sem avisar ninguem que a checagem nao pode rodar.
+
+    Campos minimos (formato REAL que `_capturar` grava, nunca exigindo
+    nada redundante): `Cotacao usada` (cobre Vendedor e Loja, que e so a
+    parte antes de " / ") e UM dos dois rotulos de custo - `Custo total
+    confirmado` (cotacao manual) ou `Custo total estimado (fonte=web)`
+    (cotacao web) - MUTUAMENTE EXCLUSIVOS, `_capturar` nunca grava os
+    dois juntos, entao exigir os dois seria recusar todo `decisao.md`
+    valido com cotacao web. `None` quando a evidencia e suficiente."""
+    tem_cotacao = bool(extract_bullet(texto_decisao, "Cotacao usada"))
+    tem_custo = bool(
+        extract_bullet(texto_decisao, "Custo total confirmado")
+        or extract_bullet(texto_decisao, "Custo total estimado (fonte=web)")
+    )
+    if tem_cotacao and tem_custo:
+        return None
+    faltando = []
+    if not tem_cotacao:
+        faltando.append("Cotacao usada")
+    if not tem_custo:
+        faltando.append("Custo total confirmado/Custo total estimado (fonte=web)")
+    return (
+        f"`decisao.md` de {projeto_dir.name} nao tem evidencia financeira suficiente para "
+        f"confirmar esta compra com seguranca - falta: {', '.join(faltando)}.\n"
+        f"Arquivo: {veredito}. Nada foi alterado.\n"
+        "Isso normalmente significa um `decisao.md` de formato antigo ou corrompido. Confira "
+        "manualmente e corrija a mao, ou rode `decidir` de novo para este produto (gera um "
+        "`decisao.md` no formato atual) antes de confirmar a compra por aqui."
+    )
+
+
 def _mensagem_recusa_financeira_registrar_evento(veredito: Path, erro_financeiro: str) -> str:
     """Achado D aplicado tambem aqui: nunca sugere editar `cotacoes.csv`
     (append-only) nem apagar o veredito como solucao automatica - o
@@ -4854,11 +4901,19 @@ def register_verdict_event(args: argparse.Namespace) -> None:
     atual nem recalcula ranking, so usa a evidencia ja persistida. Duas
     vereditos com a MESMA identidade (Projeto/Produto ID) tambem recusam
     aqui como ambiguidade (`_veredito_existente_para`, mesmo criterio de
-    `decide()`) - nunca escolhe um dos dois por suposicao. As duas
-    checagens rodam ANTES de `tracked_operation`, e sao puladas quando o
-    passo "evento" ja escreveu de verdade (mesmo principio do achado A em
-    `decide()`: nao ha mais nada a proteger, e bloquear travaria pra
-    sempre uma retomada cujo efeito ja aconteceu).
+    `decide()`) - nunca escolhe um dos dois por suposicao. Achado II da 7a
+    revisao independente: `decisao.md` sem os campos financeiros minimos
+    (formato legado/corrompido) recusa explicitamente em vez de confirmar
+    a compra sem checagem nenhuma (`_erro_evidencia_financeira_insuficiente`).
+
+    As checagens rodam ANTES de `tracked_operation`, e sao puladas so
+    quando o proprio JOURNAL prova que o passo "evento" ja CONCLUIU
+    (achado I da 7a revisao independente: comparar so o CONTEUDO - "o
+    campo ja bate com o valor congelado" - nao prova que foi esta
+    operacao pendente quem escreveu; um valor identico vindo de outra
+    origem enganava a checagem antiga). Enquanto nao concluido, as
+    checagens sempre rodam de novo - `_gravar_evento` e uma sobrescrita
+    cega, entao revalidar nunca risca duplicar nada.
 
     Quando ha projeto associado, este comando grava DOIS arquivos por fora
     do proprio veredito (`processo.md`, `briefing.md`) - por isso roda
@@ -4901,19 +4956,42 @@ def register_verdict_event(args: argparse.Namespace) -> None:
         if erro:
             raise SystemExit(erro + " Nada foi alterado.")
     projeto_dir = _projeto_da_confirmacao_de_compra(args.veredito) if args.evento == "comprado" else None
-    # Achado C da 6a revisao independente: mesmo padrao do achado 1/A em
-    # `decide()` - so roda quando ha ASSOCIACAO clara com uma decisao
-    # (projeto_dir resolvido; veredito historico/standalone/ambiguo nunca
-    # entra aqui, so o aviso de sempre) e quando o passo "evento" AINDA NAO
-    # escreveu de verdade (`existente` vazio na tentativa original, ou a
-    # data ja gravada ainda nao bate com o que esta chamada pretende
-    # confirmar - nunca bloqueia um efeito ja irreversivel).
+    # Achado I da 7a revisao independente: "o campo ja bate com o valor
+    # congelado" (a checagem antiga, `existente != data_para_validacao`)
+    # NUNCA prova que foi ESTA operacao pendente quem escreveu aquele
+    # valor - um valor IDENTICO vindo de qualquer outra origem (edicao
+    # manual e a via realista, ja que a trava de recursos ja bloqueia
+    # qualquer OUTRO comando de escrever no mesmo veredito/projeto
+    # enquanto esta operacao esta pendente) enganava a comparacao e
+    # deixava a compra ser confirmada sem NENHUMA validacao financeira
+    # rodar. A prova real de que o passo "evento" ja produziu seu efeito
+    # e o proprio JOURNAL, nunca o conteudo: `passos["evento"]["situacao"]
+    # == "concluido"` so fica assim depois que `_gravar_evento` retornou
+    # com sucesso E `_concluir` persistiu isso (`OperationHandle.executar_uma_vez`).
+    # Enquanto nao concluido, a checagem SEMPRE roda de novo - `_gravar_evento`
+    # e uma sobrescrita cega (mesmo padrao de `executar_uma_vez` em geral),
+    # entao revalidar nunca risca duplicar nada: se a escrita ja tinha
+    # acontecido e nada mudou desde entao, a revalidacao da o MESMO
+    # resultado (passa de novo, sem custo real); se algo mudou (decisao.md
+    # divergiu nesse meio tempo, ou o valor veio de uma edicao nunca
+    # validada), a recusa aqui e o comportamento CORRETO - nunca deixamos
+    # passar por coincidencia de conteudo.
+    passo_evento_concluido = bool(
+        registro_pendente and (registro_pendente.get("passos") or {}).get("evento", {}).get("situacao") == "concluido"
+    )
     if (
         args.evento == "comprado" and projeto_dir is not None
-        and not pendencia_propria_ilegivel and existente != data_para_validacao
+        and not pendencia_propria_ilegivel and not passo_evento_concluido
     ):
         _veredito_existente_para(projeto_dir, extract_bullet(text, "Produto ID"))
         texto_decisao = (projeto_dir / "decisao.md").read_text(encoding="utf-8")
+        # Achado II: `decisao.md` sem os campos financeiros minimos deixa
+        # a comparacao abaixo cega (nunca acha divergencia quando falta
+        # evidencia de um lado) - recusa explicita em vez de confirmar
+        # silenciosamente.
+        erro_evidencia = _erro_evidencia_financeira_insuficiente(texto_decisao, path, projeto_dir)
+        if erro_evidencia:
+            raise SystemExit(erro_evidencia)
         erro_financeiro = _erro_divergencia_financeira_decisao(text, texto_decisao)
         if erro_financeiro:
             raise SystemExit(_mensagem_recusa_financeira_registrar_evento(path, erro_financeiro))

@@ -5,19 +5,13 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (11/09/2026, sessao 31)
+## AO RETOMAR — comece por aqui (11/09/2026, sessao 32)
 
-**Proximo passo:** corrigir os 2 achados confirmados pela 7a revisao
-independente da frente 6 (bloco abaixo, sessao 31, cobrindo em conjunto
-os commits `68c3dbf` e `822096b`) - a mesma "prova de escrita ja
-realizada" usada pelos achados A e C pode ser enganada por um valor
-coincidente vindo de OUTRA origem (achado I), e `decisao.md` sem
-evidencia financeira completa deixa a checagem cega sem avisar ninguem
-(achado II). So depois submeter a MAIS uma rodada de revisao
-independente. So declarar "frente 6 concluida sob reserva" quando uma
-rodada passar sem achado NOVO - nenhuma correcao anterior desta frente
-conseguiu uma rodada limpa ainda (7 rodadas seguidas ja acharam falha
-nova).
+**Proximo passo:** submeter a frente 6 inteira (todas as correcoes ate
+aqui, sessoes 29-32) a MAIS uma rodada de revisao independente. So
+declarar "frente 6 concluida sob reserva" quando uma rodada passar sem
+achado NOVO - nenhuma correcao anterior desta frente conseguiu uma
+rodada limpa ainda (7 rodadas seguidas ja acharam falha nova).
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -30,27 +24,28 @@ nova).
   real - so o preview foi conferido em cada rodada.
 - **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
   sessao 20; 7 rodadas de revisao independente ja acharam 5, depois 4,
-  depois 2, depois 1, depois 2, depois 3, depois 2 falhas reais - as 6
-  primeiras corrigidas nos commits `3acc96a`, `ad6a04a`, `aaa02f0`,
-  `e048ad6`, `1c8b503` e nos blocos das sessoes 29 (achados A/B/D) e 30
-  (achado C); a 7a (sessao 31, sobre `68c3dbf`+`822096b` em conjunto) esta
-  no bloco abaixo, **ainda sem correcao**. **Nao considere a frente 6
+  depois 2, depois 1, depois 2, depois 3, depois 2 falhas reais - TODAS
+  corrigidas agora, nos commits `3acc96a`, `ad6a04a`, `aaa02f0`,
+  `e048ad6`, `1c8b503` e nos blocos das sessoes 29 (achados A/B/D), 30
+  (achado C) e 32 (achados I/II) abaixo. **Nao considere a frente 6
   encerrada depois de apenas rodar a suite local** - a frente 5 levou 7
   rodadas ate uma revisao passar limpa, e esta frente ja teve 7 rodadas
   seguidas achando falha nova.
-  **Achado da 7a revisao independente, registrado para nao se repetir**:
-  a "prova de que esta operacao pendente ja escreveu o campo", usada
-  tanto pelo achado A (`decide()`) quanto pelo achado C
-  (`registrar-evento`), e "o campo ja bate com o valor CONGELADO no
-  journal" - mas isso NUNCA prova que FOI ESTA operacao quem escreveu.
-  Um valor identico vindo de QUALQUER outra origem (edicao manual e a
-  via mais realista, ja que o proprio mecanismo de trava de recursos
-  bloqueia qualquer OUTRO comando de escrever no mesmo veredito/projeto
-  enquanto a operacao esta pendente) engana a checagem e pula a validacao
-  financeira. Qualquer skip futuro baseado em "campo ja bate" precisa
-  trocar por uma prova mais forte - o proprio journal ja tem essa prova
-  (`registro["passos"][passo]["situacao"] == "concluido"`), so nao estava
-  sendo usada pra essa decisao.
+  **Achado da 7a revisao independente, corrigido na sessao 32**: a
+  "prova de que esta operacao pendente ja escreveu o campo", usada tanto
+  pelo achado A (`decide()`) quanto pelo achado C (`registrar-evento`),
+  era "o campo ja bate com o valor CONGELADO no journal" - mas isso
+  NUNCA provava que FOI ESTA operacao quem escreveu. Um valor identico
+  vindo de QUALQUER outra origem (edicao manual e a via mais realista, ja
+  que o proprio mecanismo de trava de recursos bloqueia qualquer OUTRO
+  comando de escrever no mesmo veredito/projeto enquanto a operacao esta
+  pendente) enganava a checagem e pulava a validacao financeira. Trocado
+  por uma prova mais forte: o proprio journal
+  (`registro["passos"][passo]["situacao"] == "concluido"`) - qualquer
+  checagem nova que precise saber "esta operacao ja produziu este
+  efeito" tem que usar essa mesma fonte, nunca comparar o CONTEUDO atual
+  contra um valor esperado (conteudo pode vir de qualquer lugar; o
+  journal so avança quando a PROPRIA operacao terminou de verdade).
   **Achado da 6a revisao independente, corrigido na sessao 29**: as
   checagens novas da sessao 27 (`_erro_divergencia_financeira_veredito`,
   `_erro_force_veredito_apagaria_exportacao`) so rodavam quando
@@ -121,6 +116,99 @@ nova).
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, correcao dos achados I e II da 7a revisao independente
+(11/09/2026, sessao 32).** Achados registrados no commit `d72da8b` (bloco
+seguinte, abaixo, preservado como historico). Baseline confirmado ANTES
+de tocar em qualquer coisa: suite completa **561 testes, 0 falhas**,
+identica a sessao 31.
+
+**Corrigido (achado I, mesma causa raiz em `decide()` e
+`registrar-evento`):**
+
+1. A "prova de escrita ja realizada" deixou de ser "o campo ja bate com
+   o valor congelado" (comparacao de CONTEUDO, enganavel por qualquer
+   origem externa) e passou a ser o proprio JOURNAL:
+   `registro["passos"][passo]["situacao"] == "concluido"` (`passo` =
+   `"veredito"` em `decide()`, `"evento"` em `registrar-evento`). So essa
+   flag prova que a PROPRIA operacao pendente completou o efeito -
+   `_concluir()` (dentro de `OperationHandle.executar_uma_vez`) so marca
+   isso DEPOIS que a escrita retornou com sucesso.
+2. **Reproduzida a variante em `decide()` antes de estender a correcao
+   pra la** (pedido explicito): `Valor pago` corrompido diretamente no
+   veredito + `Data da compra` editada com o mesmo valor congelado
+   enganava a mesma checagem no achado A - confirmado, mesma causa raiz,
+   corrigida junto.
+3. **Preservado**: retomada de passo comprovadamente concluido continua
+   pulando a revalidacao (`test_passo_evento_concluido_nao_e_bloqueado_por_decisao_divergente_depois`,
+   `test_decidir_passo_veredito_concluido_nao_e_bloqueado_por_divergencia_depois`);
+   recuperacao apos escrita efetiva SEM marcacao de conclusao, quando as
+   evidencias sao suficientes (nada mudou desde a escrita), continua
+   completando sem duplicar bullet nem bloquear
+   (`test_recuperacao_apos_escrita_sem_conclusao_sem_divergencia_completa_normalmente`);
+   destino, data e identidade continuam sempre os persistidos (nenhuma
+   mudanca em como `op.detalhe` e congelado); validacao de assinatura e
+   bloqueio de recursos do `tracked_operation` intocados.
+4. **Mudanca de contrato inevitavel, documentada**: quando a escrita ja
+   aconteceu mas o journal AINDA NAO marcou "concluido" (crash exatamente
+   nessa janela estreita) E algo divergiu nesse meio tempo (decisao.md
+   mudou, ou o valor veio de uma edicao nunca validada), a retomada agora
+   RECUSA em vez de completar silenciosamente - "nao ha evidencia
+   suficiente para distinguir escrita legitima de alteracao externa
+   incompativel" (pedido explicito). Antes desta correcao, esse caso
+   dependia so da comparacao de conteudo e podia passar despercebido;
+   agora fica pendente para reconciliacao manual, nunca repete escrita as
+   cegas (`test_escrita_sem_conclusao_com_divergencia_legitima_e_recusada`).
+   Isso NAO enfraquece nenhum teste anterior - so fecha uma lacuna que
+   nenhum teste cobria antes.
+
+**Corrigido (achado II, so `registrar-evento`):** `_erro_evidencia_financeira_insuficiente`
+- nova funcao, recusa ANTES de qualquer escrita quando `decisao.md` nao
+tem os campos MINIMOS que o formato ATUAL sempre grava (`Cotacao usada`
++ UM dos dois rotulos de custo, `Custo total confirmado` OU `Custo total
+estimado (fonte=web)` - MUTUAMENTE EXCLUSIVOS no formato real, nunca
+exigidos os dois juntos, pra nao recusar toda decisao com cotacao web).
+Cobre ausencia total e parcial (so falta `Cotacao usada`, so falta
+`Custo total...`). Nunca inventa valor, nunca consulta ranking/preco
+atual, nunca toca em historico. Contrato de standalone/historico
+preservado - a checagem nova so roda quando ha ASSOCIACAO clara (mesma
+condicao ja existente).
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`OitavaRevisaoIndependenteFrente6Test`, 13 testes - reproducao original
+do achado I (edicao externa com valor coincidente + decisao divergente),
+variante do achado I em `decidir`, os 4 estados do passo (nao iniciado,
+escrito sem conclusao com/sem divergencia, concluido) em `registrar-evento`,
+controle equivalente em `decidir` (passo concluido nao bloqueado por
+divergencia depois), controle de journal antigo (`68c3dbf`) ainda
+recusando corretamente, os 3 cenarios do achado II (ausencia total,
+parcial de cada campo), controle de cotacao web (evidencia suficiente
+com so um dos rotulos de custo), e controle de standalone/historico
+nunca rodando a checagem nova. Cotacoes com `--data` explicita
+(deterministicas, sem depender do relogio real) em todos os testes que
+envolvem `cotar`. `tests/revisao_independente_68c3dbf_822096b.py`
+removido (conteudo migrado).
+
+Confirmado com `git stash` (so `scripts/central_compras.py`) que 6 dos
+testes-armadilha falham sem a correcao (as 3 reproducoes do achado I -
+registrar-evento, decidir, escrita-sem-conclusao-com-divergencia - e os
+3 cenarios do achado II); o 7o teste (journal com passo nunca tentado)
+passa em ambos os codigos por coincidencia de construcao (o conteudo
+tambem estava vazio naquele cenario especifico) - documentado no proprio
+teste, nao e um teste-armadilha para este achado especificamente, so
+confirma robustez do novo design. Nenhum dos outros 6 controles foi
+afetado pelo stash.
+
+**Verificacao:** suite completa **574 testes, 0 falhas** (561 + 13
+novos). `auditar-decisoes --strict` (so o aviso legado ja conhecido),
+`operacoes-pendentes --strict` (nenhuma pendente), `checar-segredos
+--strict` (limpo) e `git diff --check` (limpo) passaram contra a arvore
+real. `git status --short` mostrou so os 3 arquivos esperados (script,
+teste oficial, remocao do arquivo externo). Nenhuma migracao rodada,
+pesos/gates/historico intocados, processos HB20S e infraestrutura
+externa intactos. **Frente 6 continua aberta - falta submeter TODAS as
+correcoes (sessoes 29-32) a uma rodada de revisao independente que passe
+limpa.**
 
 **Frente 6, 7a revisao independente (11/09/2026, sessao 31, cobrindo em
 conjunto os commits `68c3dbf` e `822096b`) - 2 achados confirmados, nao

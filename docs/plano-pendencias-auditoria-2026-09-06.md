@@ -1406,9 +1406,8 @@ confirmadas + 1 observação, corrigidas em 11/09/2026 na sessão 27; sessão
 28: 3 falhas confirmadas + 1 observação de wording — achados A, B e D
 corrigidos em 11/09/2026 na sessão 29; achado C, deixado deliberadamente
 em aberto na sessão 29 como pergunta de escopo, decidido pelo Josemar e
-implementado em 11/09/2026 na sessão 30). A 7ª rodada (sessão 31,
-11/09/2026, cobrindo em conjunto os commits `68c3dbf` e `822096b`) achou
-mais 2 falhas confirmadas, **ainda não corrigidas**. Ainda falta UMA
+implementado em 11/09/2026 na sessão 30; sessão 31: 2 falhas confirmadas
+(achados I e II), corrigidas em 11/09/2026 na sessão 32). Ainda falta UMA
 rodada de revisão que passe limpa antes de declarar "concluída sob
 reserva", mesmo requisito aplicado à frente 5 — nenhuma correção desta
 frente conseguiu isso até agora (7 rodadas seguidas achando falha nova).
@@ -2526,6 +2525,67 @@ migração rodada, pesos/gates/histórico intocados, processos HB20S e
 infraestrutura externa intactos. **Frente 6 continua aberta — falta
 corrigir os achados I e II e submeter mais uma rodada de revisão
 independente.**
+
+### Correção dos achados I e II da 7ª revisão (sessão 32, 11/09/2026, commit apos `d72da8b`)
+
+**Corrigido (achado I, mesma causa raiz em `decide()` e
+`registrar-evento`):**
+
+1. A "prova de escrita já realizada" deixou de ser "o campo já bate com
+   o valor congelado" (comparação de CONTEÚDO, enganável por qualquer
+   origem externa) e passou a ser o próprio JOURNAL:
+   `registro["passos"][passo]["situacao"] == "concluido"` (`passo` =
+   `"veredito"` em `decide()`, `"evento"` em `registrar-evento`). Só essa
+   flag prova que a PRÓPRIA operação pendente completou o efeito.
+2. Reproduzida a variante em `decide()` antes de estender a correção
+   (pedido explícito): `Valor pago` corrompido diretamente no veredito +
+   `Data da compra` editada com o valor congelado enganava a mesma
+   checagem no achado A — confirmado, mesma causa raiz, corrigida junto.
+3. Preservado: retomada de passo comprovadamente concluído continua
+   pulando a revalidação; recuperação após escrita efetiva SEM marcação
+   de conclusão, quando as evidências são suficientes (nada mudou desde
+   a escrita), continua completando sem duplicar bullet nem bloquear;
+   destino, data e identidade continuam sempre os persistidos; validação
+   de assinatura e bloqueio de recursos do `tracked_operation` intocados.
+4. **Mudança de contrato inevitável, documentada**: quando a escrita já
+   aconteceu mas o journal ainda não marcou "concluído" E algo divergiu
+   nesse meio tempo, a retomada agora RECUSA em vez de completar
+   silenciosamente — "não há evidência suficiente para distinguir
+   escrita legítima de alteração externa incompatível" (pedido
+   explícito). Fica pendente para reconciliação manual, nunca repete
+   escrita às cegas. Isso não enfraquece nenhum teste anterior — só fecha
+   uma lacuna que nenhum teste cobria antes.
+
+**Corrigido (achado II, só `registrar-evento`):** `_erro_evidencia_financeira_insuficiente`
+recusa antes de qualquer escrita quando `decisao.md` não tem os campos
+mínimos que o formato atual sempre grava (`Cotação usada` + um dos dois
+rótulos de custo — mutuamente exclusivos, nunca exigidos os dois
+juntos). Cobre ausência total e parcial. Nunca inventa valor, nunca
+consulta ranking/preço atual. Contrato de standalone/histórico
+preservado.
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`OitavaRevisaoIndependenteFrente6Test`, 13 testes — reprodução do achado
+I (registrar-evento e a variante em decidir), os 4 estados do passo (não
+iniciado, escrito sem conclusão com/sem divergência, concluído), controle
+de journal antigo (`68c3dbf`), os 3 cenários do achado II, controle de
+cotação web, controle de standalone/histórico. Cotações com `--data`
+explícita (determinísticas) em todos os testes. Arquivo externo de
+reprodução removido (conteúdo migrado).
+
+Confirmado com `git stash` que 6 dos 7 testes-armadilha falham sem a
+correção (o 7º passa em ambos os códigos por coincidência de construção
+daquele cenário específico, documentado no próprio teste). Nenhum dos
+outros 6 controles foi afetado.
+
+**Verificação:** suíte completa **574 testes, 0 falhas** (561 + 13
+novos). `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a árvore
+real. `git status --short` mostrou só os 3 arquivos esperados. Nenhuma
+migração rodada, pesos/gates/histórico intocados, processos HB20S e
+infraestrutura externa intactos. **Frente 6 continua aberta — falta
+submeter TODAS as correções (sessões 29-32) a uma rodada de revisão
+independente que passe limpa.**
 
 ## 7. Validação e publicação
 
