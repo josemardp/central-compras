@@ -1405,11 +1405,13 @@ corrigido na própria sessão 25, 11/09/2026; sessão 26: 2 falhas
 confirmadas + 1 observação, corrigidas em 11/09/2026 na sessão 27; sessão
 28: 3 falhas confirmadas + 1 observação de wording — achados A, B e D
 corrigidos em 11/09/2026 na sessão 29; achado C, deixado deliberadamente
-em aberto na sessão 29 como pergunta de escopo, **decidido pelo Josemar e
-implementado em 11/09/2026 na sessão 30**). Ainda falta UMA rodada de
-revisão que passe limpa antes de declarar "concluída sob reserva", mesmo
-requisito aplicado à frente 5 — nenhuma correção desta frente conseguiu
-isso até agora (6 rodadas seguidas achando falha nova).
+em aberto na sessão 29 como pergunta de escopo, decidido pelo Josemar e
+implementado em 11/09/2026 na sessão 30). A 7ª rodada (sessão 31,
+11/09/2026, cobrindo em conjunto os commits `68c3dbf` e `822096b`) achou
+mais 2 falhas confirmadas, **ainda não corrigidas**. Ainda falta UMA
+rodada de revisão que passe limpa antes de declarar "concluída sob
+reserva", mesmo requisito aplicado à frente 5 — nenhuma correção desta
+frente conseguiu isso até agora (7 rodadas seguidas achando falha nova).
 
 **Contrato adotado:** decisão, compra/pagamento, entrega e início de uso
 são quatro fatos datados independentes. `decidir` fecha só a escolha —
@@ -2420,6 +2422,110 @@ migração rodada, pesos/gates/histórico intocados, processos HB20S e
 infraestrutura externa intactos. **Frente 6 continua aberta — falta
 submeter as correções das sessões 29 E 30 (achados A, B, C, D) a uma
 rodada de revisão independente que passe limpa.**
+
+### 7ª revisão independente (sessão 31, 11/09/2026, cobrindo em conjunto os commits `68c3dbf` e `822096b`) — 2 achados confirmados
+
+Revisão adversarial, sem alterar código de produção. Roteiro: evidência
+financeira ausente; identidade da decisão (A→B→A, operações
+interrompidas); reconhecimento de escrita já realizada vs dado
+coincidente de outra origem; compatibilidade com journals antigos
+(`decidir` e `registrar-evento`); associação e ambiguidade; regressão na
+extração compartilhada `_divergencias_financeiras` e no teste corrigido
+de cotações no mesmo segundo. Baseline: suíte completa **561 testes, 0
+falhas**, idêntica à sessão 30. 4 testes novos em
+`tests/revisao_independente_68c3dbf_822096b.py` (fora da suíte oficial —
+achados ainda não corrigidos).
+
+**Achado I (confirmado): "escrita já realizada" é confundida com "dado
+coincidente de outra origem".** Tanto o achado A (`decide()`) quanto o
+achado C (`registrar-evento`) pulam a revalidação numa retomada quando
+"o campo já bate com o valor CONGELADO no journal pendente" — mas isso
+nunca prova que foi ESTA operação pendente quem escreveu aquele valor.
+Teste
+`test_valor_preexistente_de_edicao_manual_engana_a_checagem_e_confirma_compra_incompativel`:
+`registrar-evento --evento comprado` interrompido antes de gravar
+(journal congela `data_efetiva`=hoje); antes da retomada, o veredito é
+editado à mão com `Data da compra: hoje` (o mesmo valor congelado, por
+coincidência) e `decisao.md` passa a refletir uma cotação bem diferente
+(R$999 em vez de R$200). Retomando: a checagem financeira é pulada, a
+compra é confirmada e o projeto marcado "comprado" com o veredito
+mostrando um preço nunca validado.
+
+**Calibração de risco:** a exploração via CLI puro é bloqueada pela
+própria trava de recursos (`_bloquear_se_recursos_conflitantes`) —
+qualquer comando que tentasse tocar no mesmo veredito/projeto enquanto a
+operação está pendente já é recusado (confirmado tentando construir o
+cenário via `cotar`/`decidir` reais). A via realista é edição manual
+durante a janela de interrupção — risco residual que `tracked_operation`
+já reconhece como não coberto tecnicamente. Mesmo assim, o impacto
+justifica correção. A mesma fragilidade existe no achado A — não
+reproduzida separadamente com o mesmo realismo (exigiria corromper
+`Valor pago` diretamente, já que a cotação usada na checagem de
+`decide()` é sempre a cotação viva, protegida pelo hash da assinatura) —
+mas a causa raiz é a mesma.
+
+**Achado II (confirmado): evidência financeira ausente em `decisao.md`
+torna a checagem do achado C cega, sem avisar ninguém.** Teste
+`test_decisao_sem_evidencia_financeira_completa_deixa_a_checagem_cega`:
+`decisao.md` sem `Cotação usada`/`Custo total confirmado` (formato
+legado ou corrompido) faz `_evidencia_financeira_da_decisao` devolver
+tudo vazio — `_divergencias_financeiras` nunca acha divergência (por
+design, nunca inventa valor), mas isso também significa que a compra é
+confirmada com qualquer preço no veredito, sem aviso de que a checagem
+não pôde validar nada. Sob o código atual, `decisao.md` sempre tem esses
+campos — não alcançável por uso normal do CLI hoje, só por formato
+legado/corrompido; mesmo assim é uma lacuna real de defesa em
+profundidade.
+
+**Hipóteses descartadas:** journal antigo (`68c3dbf`, antes do achado C)
+de `registrar-evento`, retomado com o código atual, já recusa
+corretamente divergência financeira quando a escrita ainda não aconteceu
+— o achado C nasceu robusto a isso porque sua guarda nunca dependeu de
+`retomando_decisao`; veredito renomeado continua protegido (busca por
+identidade de conteúdo); a trava de recursos é o que restringe a
+exploração do achado I a edição manual; a extração compartilhada
+`_divergencias_financeiras` não enfraqueceu nenhuma asserção existente
+(561 testes, 0 falhas); a correção do teste flaky de cotações no mesmo
+segundo não alterou nenhuma asserção.
+
+**Limitações:** não reproduzi separadamente a variante do achado I em
+`decide()` com o mesmo grau de realismo — mesma causa raiz, recomendado
+corrigir junto. Não explorei todas as combinações de "passo não
+iniciado/escrita sem marcação/passo concluído/dado preexistente" — foquei
+na de maior impacto; as demais já cobertas pelos testes oficiais.
+
+**Prompt de correção recomendado (escopo fechado aos achados I e II):**
+
+1. Substituir "campo já bate com o valor congelado" por uma prova mais
+   forte — usar `registro["passos"][passo]["situacao"] == "concluido"`
+   (`passo` = `"veredito"` em `decide()` ou `"evento"` em
+   `registrar-evento`) como sinal primário para pular a revalidação.
+   Quando não concluído, sempre revalidar — `executar_uma_vez` reescreve
+   de forma idempotente, revalidar nunca duplica nada; se a validação
+   falhar após uma escrita real mas não marcada concluída, a operação
+   fica pendente para reconciliação manual em vez de aceitar dado nunca
+   verificado. Aplicar em `decide()` e `register_verdict_event` juntos.
+2. Quando a evidência financeira resultar em todos os campos vazios, não
+   tratar como "sem divergência" silenciosamente — recusar com mensagem
+   clara em vez de confirmar a compra sem checagem nenhuma.
+
+Reproduzir os 2 achados de `tests/revisao_independente_68c3dbf_822096b.py`
+antes de corrigir; depois, mover para `tests/test_frente6_datas_veredito.py`
+como teste permanente. Rodar suíte completa e as quatro checagens
+estritas. Não mexer em pesos/gates, não rodar migração real, não
+reescrever vereditos/snapshots históricos, não tocar infraestrutura
+externa nem os processos HB20S. Não declarar a frente 6 concluída nesta
+correção.
+
+**Verificação:** nada alterado no código de produção. Baseline: suíte
+completa **561 testes, 0 falhas**, idêntica à sessão 30.
+`auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a árvore
+real. `git status --short` mostrou só o arquivo de teste novo. Nenhuma
+migração rodada, pesos/gates/histórico intocados, processos HB20S e
+infraestrutura externa intactos. **Frente 6 continua aberta — falta
+corrigir os achados I e II e submeter mais uma rodada de revisão
+independente.**
 
 ## 7. Validação e publicação
 
