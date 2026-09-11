@@ -5,17 +5,14 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (11/09/2026, sessao 29)
+## AO RETOMAR — comece por aqui (11/09/2026, sessao 30)
 
-**Proximo passo:** submeter a correcao desta sessao (bloco abaixo) a MAIS
-uma rodada de revisao independente da frente 6. O achado C da 6a revisao
-(`registrar-evento --evento comprado` nunca confere preco) continua
-ABERTO de proposito - e pergunta de escopo para o Josemar, nao foi
-implementado. So declarar "frente 6 concluida sob reserva" quando uma
-rodada passar sem achado NOVO (achado C pendente de decisao nao conta
-como "limpa", mas tambem nao bloqueia sozinho - depende do que o Josemar
-decidir) - nenhuma correcao anterior desta frente conseguiu uma rodada
-limpa ainda (6 rodadas seguidas ja acharam falha nova).
+**Proximo passo:** submeter a frente 6 inteira (correcoes das sessoes 29 E
+30 - achados A, B, C, D da 6a revisao independente) a MAIS uma rodada de
+revisao independente. So declarar "frente 6 concluida sob reserva" quando
+uma rodada passar sem achado NOVO - nenhuma correcao anterior desta
+frente conseguiu uma rodada limpa ainda (6 rodadas seguidas ja acharam
+falha nova).
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -28,17 +25,15 @@ limpa ainda (6 rodadas seguidas ja acharam falha nova).
   real - so o preview foi conferido em cada rodada.
 - **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
   sessao 20; 6 rodadas de revisao independente ja acharam 5, depois 4,
-  depois 2, depois 1, depois 2, depois 3 falhas reais - as 6 primeiras
-  corrigidas nos commits `3acc96a`, `ad6a04a`, `aaa02f0`, `e048ad6`,
-  `1c8b503` e o bloco desta sessao (abaixo, sessao 29, achados A/B e
-  mensagem D da 6a revisao). **Achado C da 6a revisao continua ABERTO,
-  deliberadamente** - expansao de escopo de `registrar-evento` (nunca
-  teve nocao de preco, por design), registrado como pergunta ao Josemar,
-  nao decisao tecnica automatica; reproducao preservada em
-  `tests/revisao_independente_1c8b503.py`. **Nao considere a frente 6
-  encerrada depois de apenas rodar a suite local** - a frente 5 levou 7
-  rodadas ate uma revisao passar limpa, e esta frente ja teve 6 rodadas
-  seguidas achando falha nova.
+  depois 2, depois 1, depois 2, depois 3 falhas reais - todas corrigidas
+  agora, nos commits `3acc96a`, `ad6a04a`, `aaa02f0`, `e048ad6`, `1c8b503`
+  e os blocos das sessoes 29 (achados A/B/D) e 30 (achado C) abaixo.
+  **Decisao de escopo do Josemar para o achado C (sessao 30)**:
+  `registrar-evento --evento comprado` TAMBEM deve impedir compra
+  confirmada com dado financeiro incompativel - implementado, ver bloco
+  abaixo. **Nao considere a frente 6 encerrada depois de apenas rodar a
+  suite local** - a frente 5 levou 7 rodadas ate uma revisao passar
+  limpa, e esta frente ja teve 6 rodadas seguidas achando falha nova.
   **Achado da 6a revisao independente, corrigido na sessao 29**: as
   checagens novas da sessao 27 (`_erro_divergencia_financeira_veredito`,
   `_erro_force_veredito_apagaria_exportacao`) so rodavam quando
@@ -56,6 +51,20 @@ limpa ainda (6 rodadas seguidas ja acharam falha nova).
   protegido por codigo (ver bloco da sessao 29 abaixo) - mas o PRINCIPIO
   continua valendo para qualquer validacao nova que venha a ser
   adicionada so no caminho de chamada nova desta frente.
+  **Achado C, fechado na sessao 30 (decisao de escopo do Josemar)**:
+  `registrar-evento --evento comprado` e um caminho de escrita
+  TOTALMENTE separado de `decidir --comprado`, mas grava o MESMO dado
+  (`Data da compra`) - uma validacao nova adicionada so num dos dois
+  caminhos que gravam o mesmo fato deixa o outro descoberto. A evidencia
+  disponivel tambem e DIFERENTE em cada caminho: `decidir` tem uma
+  cotacao FRESCA em maos (esta prestes a grava-la); `registrar-evento` so
+  tem o veredito e o projeto associado, entao a evidencia certa e o que
+  `decisao.md` JA TEM CONGELADO pra aquela decisao - nunca preco atual
+  nem ranking recalculado. Qualquer caminho NOVO que venha a gravar dado
+  financeiro/vendedor num veredito precisa pensar em qual das duas fontes
+  de evidencia (cotacao fresca vs `decisao.md` congelado) se aplica, e
+  reaproveitar `_divergencias_financeiras`/`_campos_financeiros_veredito`
+  em vez de reinventar a comparacao.
   **Achado transversal da 2a rodada, registrado para nao se repetir**:
   `_assinaturas_compativeis` (mecanismo COMPARTILHADO por TODO
   `tracked_operation` - `decidir`, `registrar-evento`, `vincular-produto`,
@@ -95,6 +104,99 @@ limpa ainda (6 rodadas seguidas ja acharam falha nova).
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, fechamento do achado C - decisao de escopo do Josemar
+(11/09/2026, sessao 30).** Partindo do commit `68c3dbf`. O Josemar decidiu:
+`registrar-evento --evento comprado` TAMBEM deve impedir que a compra
+seja confirmada com dados financeiros incompativeis com a decisao
+correspondente - fechando o gap que ficara deliberadamente aberto na
+sessao 29. Baseline confirmado ANTES de tocar em qualquer coisa: suite
+completa **546 testes, 0 falhas**, identica a sessao 29; achado C
+reproduzido de novo em `tests/revisao_independente_1c8b503.py` (ainda
+falhava/reproduzia o defeito, confirmando que nada tinha mudado desde o
+registro).
+
+**Corrigido, reaproveitando as validacoes existentes:**
+
+1. Comparacao financeira extraida em funcoes puras compartilhadas -
+   `_campos_financeiros_veredito` (le os 3 campos do veredito) e
+   `_divergencias_financeiras` (compara contra qualquer fonte de
+   evidencia) - usadas tanto pelo achado 1/A em `decide()` (evidencia:
+   cotacao fresca) quanto pelo achado C novo em `registrar-evento`
+   (evidencia: `decisao.md`). Nenhuma logica de comparacao duplicada.
+2. `_evidencia_financeira_da_decisao(texto_decisao)`: extrai `Valor
+   pago`/`Vendedor`/`Loja` equivalentes dos bullets que `decisao.md` JA
+   TEM CONGELADOS (`Cotacao usada`, `Custo total confirmado`/`Custo total
+   estimado (fonte=web)`) - escritos UMA VEZ por `_capturar`, nunca
+   recalculados depois. `registrar-evento` NUNCA consulta preco atual nem
+   recalcula ranking - contrato explicito do Josemar (item 2).
+3. **Associacao validada ANTES de confirmar e sincronizar** (item 1): a
+   checagem nova so roda quando `_projeto_da_confirmacao_de_compra` (a
+   MESMA funcao ja usada pra decidir se sincroniza `processo.md`/
+   `briefing.md`) resolve um projeto - veredito HISTORICO (decisao
+   substituida por outro produto), STANDALONE (`novo-veredito`, sem
+   `Produto ID`) ou com projeto AUSENTE (deletado/renomeado) nunca entram
+   na checagem financeira, exatamente como ja nunca entravam na
+   sincronizacao de estado (item 5, comportamento preservado).
+4. **Associacao AMBIGUA tambem recusa** (item 3): reaproveita
+   `_veredito_existente_para` (mesmo criterio de ambiguidade de
+   `decide()`) - 2+ vereditos com a mesma identidade Projeto/Produto ID
+   recusam ANTES de comparar preco, nunca escolhem um dos dois por
+   suposicao.
+5. **Passo "evento" ja escrito nao trava a retomada** (item 6, mesmo
+   padrao do achado A): a checagem e pulada quando `Data da compra` no
+   veredito ja bate com o valor que esta chamada gravaria (frozen via
+   `_data_evento_para_validacao`, ja usada pela checagem de cronologia -
+   reaproveitada, nao recalculada) - nada mais a proteger, nunca bloqueia
+   um efeito ja concluido. Destino, data e evidencia continuam sempre os
+   persistidos, nunca recalculados numa retomada.
+6. Mensagem nova, `_mensagem_recusa_financeira_registrar_evento` - mesmo
+   cuidado do achado D: nunca sugere editar `cotacoes.csv`, `--force-
+   veredito` so citado como ultimo recurso via `decidir`.
+
+**Nao alterado, de proposito:** `_erro_cronologia_evento` e os eventos
+`entrega`/`inicio_uso` continuam exatamente como estavam - nenhuma
+necessidade demonstrada de mexer neles; a checagem de cronologia
+continua rodando ANTES da checagem financeira nova, ambas ativas ao
+mesmo tempo (testado).
+
+**Achado colateral corrigido de passagem:** um teste da sessao 29
+(`test_mensagem_financeira_nunca_sugere_editar_cotacoes_csv`) flacava
+por causa do mesmo problema ja conhecido de `data_coleta` (relogio real,
+resolucao de segundo, duas cotacoes em sequencia rapida podem empatar) -
+fixado com `--data` explicita, mesmo padrao ja usado em
+`SextaRevisaoIndependenteFrente6Test`. Descoberto porque a suite completa
+rodou vermelha uma vez nesta sessao (falha isolada, nao relacionada ao
+achado C) - confirmado estavel em 3 execucoes isoladas apos a correcao.
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`AchadoCRegistrarEventoCompradoTest`, 15 testes - reproducao original
+(A→B→A com cotacao diferente), confirmacao legitima com dados
+compativeis, cotacao nova POSTERIOR a decisao sem alterar a evidencia
+congelada (prova do item 2), divergencias isoladas de preco/vendedor/
+loja, associacao ausente/ambigua/historico/standalone (4 variantes),
+recusa preserva avaliacao e exportacao ja existentes, falha intermediaria
+com retomada (dados compativeis - nao bloqueia; dados incompativeis
+desde o inicio - continua recusando), e controles de que cronologia e
+entrega/inicio_uso continuam intocados. `tests/revisao_independente_1c8b503.py`
+removido (conteudo migrado).
+
+Confirmado com `git stash` (so `scripts/central_compras.py`) que
+exatamente 6 testes falham (`AssertionError`, achado nunca recusado) e 1
+erra com a excecao ERRADA propagando (`OSError` em vez de `SystemExit` -
+sem a checagem nova, a chamada segue ate o crash injetado) sem a
+correcao - 7 no total, nenhum dos outros 8 controles afetado.
+
+**Verificacao:** suite completa **561 testes, 0 falhas** (546 + 15
+novos). `auditar-decisoes --strict` (so o aviso legado ja conhecido),
+`operacoes-pendentes --strict` (nenhuma pendente), `checar-segredos
+--strict` (limpo) e `git diff --check` (limpo) passaram contra a arvore
+real. `git status --short` mostrou so os 3 arquivos esperados (script,
+teste oficial, remocao do arquivo externo). Nenhuma migracao rodada,
+pesos/gates/historico intocados, processos HB20S e infraestrutura
+externa intactos. **Frente 6 continua aberta - falta submeter as
+correcoes das sessoes 29 E 30 (achados A, B, C, D) a uma rodada de
+revisao independente que passe limpa.**
 
 **Frente 6, correcao dos achados A e B e da mensagem D da 6a revisao
 independente (11/09/2026, sessao 29).** Achados registrados no commit

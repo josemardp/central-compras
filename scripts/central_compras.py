@@ -3733,6 +3733,33 @@ def _erro_force_veredito_apagaria_exportacao(veredito_existente: Path) -> str | 
     )
 
 
+def _campos_financeiros_veredito(texto: str) -> dict[str, str]:
+    """Os 3 campos financeiros/vendedor ja gravados num veredito, no MESMO
+    formato usado por `create_verdict` ao grava-los - ponto UNICO
+    reaproveitado por toda comparacao de divergencia financeira desta
+    frente (achado 1 em `decide()`, achado C em `registrar-evento`)."""
+    return {
+        "Valor pago": extract_bullet(texto, "Valor pago"),
+        "Vendedor": extract_bullet(texto, "Vendedor"),
+        "Loja": extract_bullet(texto, "Loja"),
+    }
+
+
+def _divergencias_financeiras(atual: dict[str, str], esperado: dict[str, str]) -> list[tuple[str, str, str]]:
+    """Compara campos financeiros JA GRAVADOS (`atual`) contra o que
+    deveriam ser, dada uma fonte de evidencia (`esperado`) - cotacao
+    fresca (achado 1) ou o que `decisao.md` ja tem congelado (achado C).
+    So evidencia PRESENTE dos dois lados conta: ausencia (label vazio, de
+    qualquer lado) nunca vira divergencia - nunca inventa valor onde nao
+    ha evidencia (docs/como-conferir-auditoria.md: proveniencia)."""
+    divergencias = []
+    for label, valor_novo in esperado.items():
+        valor_antigo = atual.get(label, "")
+        if valor_antigo and valor_novo and valor_antigo != valor_novo:
+            divergencias.append((label, valor_antigo, valor_novo))
+    return divergencias
+
+
 def _erro_divergencia_financeira_veredito(texto: str, quote: dict[str, Any]) -> str | None:
     """`None` se os dados financeiros/vendedor ja gravados num veredito
     EXISTENTE batem com a cotacao desta chamada - senao, a mensagem pronta
@@ -3747,21 +3774,18 @@ def _erro_divergencia_financeira_veredito(texto: str, quote: dict[str, Any]) -> 
     pago`/`Vendedor`/`Loja`. Sem esta checagem, a data da compra fica
     certa ao lado de um preco/loja obsoletos da PRIMEIRA vez que este
     produto foi decidido - nunca o que de fato foi pago agora."""
-    divergencias = []
     esperado = {
         "Valor pago": brl(quote.get("custo_total")),
         "Vendedor": f"{quote.get('loja')} / {quote.get('vendedor')}",
         "Loja": quote.get("loja") or "",
     }
-    for label, valor_novo in esperado.items():
-        valor_antigo = extract_bullet(texto, label)
-        if valor_antigo and valor_antigo != valor_novo:
-            divergencias.append(f"  - {label}: {valor_antigo} (veredito) vs {valor_novo} (cotacao desta decisao)")
+    divergencias = _divergencias_financeiras(_campos_financeiros_veredito(texto), esperado)
     if not divergencias:
         return None
+    linhas = [f"  - {l}: {a} (veredito) vs {n} (cotacao desta decisao)" for l, a, n in divergencias]
     return (
         "O veredito encontrado para este projeto/produto tem dados diferentes da cotacao usada "
-        "nesta decisao:\n" + "\n".join(divergencias) + "\n"
+        "nesta decisao:\n" + "\n".join(linhas) + "\n"
         "Isso normalmente significa que esta e uma decisao DIFERENTE sobre o mesmo produto (preco "
         "mudou, trocou de loja, ou e uma compra nova depois de uma anterior abandonada) - nao uma "
         "confirmacao tardia da MESMA compra. Complementar silenciosamente gravaria a data da compra "
@@ -4728,6 +4752,68 @@ def _data_evento_para_validacao(registro: dict[str, Any] | None, args: argparse.
     )
 
 
+def _evidencia_financeira_da_decisao(texto_decisao: str) -> dict[str, str]:
+    """Evidencia financeira JA CONGELADA em `decisao.md` no momento em que
+    `decidir` rodou pela ULTIMA vez neste projeto (bullets `Cotacao
+    usada`/`Custo total confirmado`/`Custo total estimado (fonte=web)`,
+    escritos uma unica vez por `_capturar`, nunca recalculados depois) -
+    NUNCA preco atual nem ranking recalculado (achado C da 6a revisao
+    independente: ao contrario do achado 1 em `decide()`, que compara
+    contra uma cotacao FRESCA porque esta prestes a gravar essa mesma
+    cotacao, `registrar-evento` so tem a data - a evidencia disponivel e o
+    que a DECISAO correspondente ja registrou, nunca uma consulta nova).
+    Mesmo formato de `_campos_financeiros_veredito`, pra a comparacao ser
+    direta. Campo ausente em `decisao.md` (formato antigo, ou nenhuma
+    decisao ainda) devolve string vazia - nunca inventa valor."""
+    cotacao_usada = extract_bullet(texto_decisao, "Cotacao usada")
+    loja = cotacao_usada.split(" / ", 1)[0].strip() if " / " in cotacao_usada else ""
+    custo = (
+        extract_bullet(texto_decisao, "Custo total confirmado")
+        or extract_bullet(texto_decisao, "Custo total estimado (fonte=web)")
+    )
+    return {"Valor pago": custo, "Vendedor": cotacao_usada, "Loja": loja}
+
+
+def _erro_divergencia_financeira_decisao(texto_veredito: str, texto_decisao: str) -> str | None:
+    """Achado C da 6a revisao independente: `registrar-evento --evento
+    comprado` grava a data de pagamento, mas nunca comparava preco contra
+    NADA - um veredito com `Valor pago`/`Vendedor`/`Loja` obsoletos (de
+    uma decisao ANTERIOR sobre o mesmo produto, o mesmo cenario do achado
+    1/A em `decide()`, so que confirmado por este caminho em vez de
+    `decidir --comprado`) podia ter a compra confirmada silenciosamente.
+    `None` se os dados financeiros do veredito batem com o que
+    `decisao.md` ja tem congelado para a decisao correspondente - senao, a
+    mensagem pronta (sem o "Nada foi alterado" final)."""
+    divergencias = _divergencias_financeiras(
+        _campos_financeiros_veredito(texto_veredito), _evidencia_financeira_da_decisao(texto_decisao),
+    )
+    if not divergencias:
+        return None
+    linhas = [f"  - {l}: {a} (veredito) vs {n} (decisao.md)" for l, a, n in divergencias]
+    return (
+        "O veredito tem dados financeiros diferentes do que `decisao.md` tem registrado para a "
+        "decisao ABERTA deste produto:\n" + "\n".join(linhas) + "\n"
+        "Isso normalmente significa que o veredito ficou com dados de uma decisao ANTERIOR sobre "
+        "o mesmo produto (preco mudou, trocou de loja) - confirmar a compra aqui gravaria a data "
+        "certa ao lado de um preco/vendedor que nao correspondem a decisao atual."
+    )
+
+
+def _mensagem_recusa_financeira_registrar_evento(veredito: Path, erro_financeiro: str) -> str:
+    """Achado D aplicado tambem aqui: nunca sugere editar `cotacoes.csv`
+    (append-only) nem apagar o veredito como solucao automatica - o
+    caminho de reconciliacao e sempre `decidir` (com --force-veredito se
+    precisar descartar o veredito antigo de proposito, recusado
+    automaticamente se houver avaliacao ja exportada, ver achado 2/B)."""
+    return (
+        erro_financeiro + f"\nArquivo: {veredito}. Nada foi alterado.\n"
+        "Confira manualmente qual dado esta certo - o veredito ou `decisao.md` do projeto "
+        "correspondente. Se o veredito estiver com preco de uma decisao anterior sobre o mesmo "
+        "produto, use `decidir` (--force-veredito se precisar descartar o conteudo antigo do "
+        "veredito de proposito) para alinha-lo a decisao atual antes de confirmar a compra por aqui."
+    )
+
+
 def register_verdict_event(args: argparse.Namespace) -> None:
     """`registrar-evento`: grava, num veredito ja existente, a data em que
     a compra foi paga, o produto chegou, ou o uso comecou de verdade -
@@ -4758,6 +4844,21 @@ def register_verdict_event(args: argparse.Namespace) -> None:
     decisao ABERTA agora (`_projeto_da_confirmacao_de_compra`); um veredito
     de produto ja substituido por outra decisao, ou um `novo-veredito`
     standalone sem `Produto ID`, nunca mexe no estado do projeto - so avisa.
+
+    Achado C da 6a revisao independente: pela MESMA associacao acima (so
+    quando `_projeto_da_confirmacao_de_compra` resolve um projeto - nunca
+    para veredito historico/standalone/sem associacao clara, que so avisa
+    e segue como antes), tambem confere se os dados financeiros ja
+    gravados no veredito (achado 1/A) batem com o que `decisao.md` tem
+    CONGELADO para essa decisao - `registrar-evento` nunca consulta preco
+    atual nem recalcula ranking, so usa a evidencia ja persistida. Duas
+    vereditos com a MESMA identidade (Projeto/Produto ID) tambem recusam
+    aqui como ambiguidade (`_veredito_existente_para`, mesmo criterio de
+    `decide()`) - nunca escolhe um dos dois por suposicao. As duas
+    checagens rodam ANTES de `tracked_operation`, e sao puladas quando o
+    passo "evento" ja escreveu de verdade (mesmo principio do achado A em
+    `decide()`: nao ha mais nada a proteger, e bloquear travaria pra
+    sempre uma retomada cujo efeito ja aconteceu).
 
     Quando ha projeto associado, este comando grava DOIS arquivos por fora
     do proprio veredito (`processo.md`, `briefing.md`) - por isso roda
@@ -4800,6 +4901,22 @@ def register_verdict_event(args: argparse.Namespace) -> None:
         if erro:
             raise SystemExit(erro + " Nada foi alterado.")
     projeto_dir = _projeto_da_confirmacao_de_compra(args.veredito) if args.evento == "comprado" else None
+    # Achado C da 6a revisao independente: mesmo padrao do achado 1/A em
+    # `decide()` - so roda quando ha ASSOCIACAO clara com uma decisao
+    # (projeto_dir resolvido; veredito historico/standalone/ambiguo nunca
+    # entra aqui, so o aviso de sempre) e quando o passo "evento" AINDA NAO
+    # escreveu de verdade (`existente` vazio na tentativa original, ou a
+    # data ja gravada ainda nao bate com o que esta chamada pretende
+    # confirmar - nunca bloqueia um efeito ja irreversivel).
+    if (
+        args.evento == "comprado" and projeto_dir is not None
+        and not pendencia_propria_ilegivel and existente != data_para_validacao
+    ):
+        _veredito_existente_para(projeto_dir, extract_bullet(text, "Produto ID"))
+        texto_decisao = (projeto_dir / "decisao.md").read_text(encoding="utf-8")
+        erro_financeiro = _erro_divergencia_financeira_decisao(text, texto_decisao)
+        if erro_financeiro:
+            raise SystemExit(_mensagem_recusa_financeira_registrar_evento(path, erro_financeiro))
     assinatura = {"evento": args.evento, "data": args.data}
     recursos = {path}
     if projeto_dir:

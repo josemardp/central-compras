@@ -2075,9 +2075,18 @@ class SetimaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
     # ---- achado D: mensagem nunca sugere editar cotacoes.csv --------------
 
     def test_mensagem_financeira_nunca_sugere_editar_cotacoes_csv(self):
+        # `data_coleta` vem do relogio real (resolucao de SEGUNDO) - fixar
+        # `--data` com horarios distintos no mesmo dia real evita que as
+        # duas cotacoes empatem no mesmo segundo e o desempate por preco
+        # mais barato (proposital em `latest_quotes`) mascare a divergencia
+        # que este teste precisa forcar.
+        hoje = dt.date.today().isoformat()
         project = self.project()
-        veredito = self._decidir(project)
-        self.quote(project, "candidato", "--fonte", "manual", "--preco", "999")
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual", "--data", f"{hoje}T09:00:00")
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        self.quote(project, "candidato", "--fonte", "manual", "--preco", "999", "--data", f"{hoje}T10:00:00")
         with self.assertRaises(SystemExit) as ctx:
             self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
                       "de novo", "--sem-perdedores", "--comprado")
@@ -2085,6 +2094,325 @@ class SetimaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertNotIn("corrija a cotacao/veredito", mensagem)
         self.assertIn("cotacao NOVA", mensagem)
         self.assertIn("nunca editar a linha antiga em cotacoes.csv", mensagem)
+
+
+class AchadoCRegistrarEventoCompradoTest(ambiente.RepoTestCase):
+    """Fecha o achado C da 6a revisao independente (decisao de escopo do
+    Josemar, sessao apos `68c3dbf`): `registrar-evento --evento comprado`
+    tambem impede confirmar a compra com dados financeiros incompativeis
+    com a decisao correspondente. Reproduzido primeiro em
+    `tests/revisao_independente_1c8b503.py` (removido depois de
+    incorporado aqui).
+
+    Contrato: a evidencia e SEMPRE o que `decisao.md` ja tem CONGELADO
+    para a decisao aberta deste produto (`_evidencia_financeira_da_decisao`)
+    - nunca preco atual nem ranking recalculado. So roda quando ha
+    ASSOCIACAO clara (`_projeto_da_confirmacao_de_compra`, a MESMA usada
+    pra sincronizar estado) - veredito historico, standalone ou sem
+    projeto associado nunca entra na checagem, so o aviso de sempre.
+    Identidade duplicada (2+ vereditos com o mesmo Projeto/Produto ID)
+    recusa como ambiguidade, reaproveitando `_veredito_existente_para`
+    (mesmo criterio de `decide()`). Roda so quando o passo "evento" ainda
+    nao escreveu de verdade - reaplica numa retomada, mas nunca bloqueia
+    um efeito ja concluido."""
+
+    def _decidir(self, project, pid="candidato", extra=()):
+        self.product(project, pid)
+        self.quote(project, pid, "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", pid,
+                  "--porque", "unico candidato", "--sem-perdedores", *extra)
+        return next(p for p in cc.VEREDITOS.glob("*.md") if pid in p.name)
+
+    # ---- reproducao original: A -> B -> A com cotacao diferente ---------
+
+    def test_a_b_a_com_cotacao_diferente_e_recusado_ao_confirmar_por_registrar_evento(self):
+        dia1, dia2, dia3 = "2026-01-01", "2026-01-02", "2026-01-20"
+        hoje = dt.date.today().isoformat()
+
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            self.product(project, "candidato-a")
+            self.product(project, "candidato-b")
+            self.quote(project, "candidato-a", "--fonte", "manual", "--data", f"{hoje}T09:00:00")
+            self.cli("decidir", str(project), "--produto-id", "candidato-a",
+                      "--porque", "primeira escolha", "--sem-perdedores")
+        veredito_a = next(p for p in cc.VEREDITOS.glob("*.md")
+                           if cc.extract_bullet(p.read_text(encoding="utf-8"), "Produto ID") == "candidato-a")
+
+        with patch.object(cc, "today", return_value=dia2):
+            self.quote(project, "candidato-b", "--fonte", "manual", "--data", f"{hoje}T09:30:00")
+            self.cli("decidir", str(project), "--produto-id", "candidato-b", "--porque",
+                      "troquei de ideia", "--perdedores", "candidato-a: desisti por enquanto")
+
+        with patch.object(cc, "today", return_value=dia3):
+            self.quote(project, "candidato-a", "--fonte", "manual", "--preco", "999", "--loja", "LojaNova",
+                       "--data", f"{hoje}T10:00:00")
+            self.cli("decidir", str(project), "--produto-id", "candidato-a", "--porque",
+                      "reconsiderei, escolhi A de novo com cotacao nova",
+                      "--perdedores", "candidato-b: nao entregou")
+
+        texto_antes = veredito_a.read_bytes()
+        decisao_antes = (project / "decisao.md").read_bytes()
+        processo_antes = (project / "processo.md").read_bytes()
+        with patch.object(cc, "today", return_value=dia3):
+            with self.assertRaisesRegex(SystemExit, "dados financeiros diferentes"):
+                self.cli("registrar-evento", str(veredito_a), "--evento", "comprado")
+
+        self.assertEqual(veredito_a.read_bytes(), texto_antes, "veredito nao pode ter sido alterado")
+        self.assertEqual((project / "decisao.md").read_bytes(), decisao_antes)
+        self.assertEqual((project / "processo.md").read_bytes(), processo_antes)
+        self.assertFalse(cc.pending_operations([project]))
+        self.assertFalse(cc.pending_operations([cc.BASE]))
+        status = self.cli("status", str(project))
+        self.assertNotIn("Estado: comprado", status)
+
+    # ---- confirmacao legitima, dados compativeis -------------------------
+
+    def test_confirmacao_com_dados_compativeis_funciona_normalmente(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+        texto = veredito.read_text(encoding="utf-8")
+        self.assertEqual(cc.extract_bullet(texto, "Data da compra"), cc.today())
+        status = self.cli("status", str(project))
+        self.assertIn("Estado: comprado", status)
+
+    # ---- requisito 2: nunca consulta preco atual/ranking recalculado ----
+
+    def test_cotacao_nova_apos_a_decisao_nao_altera_a_evidencia_congelada(self):
+        """Uma cotacao NOVA e adicionada depois de `decidir` (sem chamar
+        `decidir` de novo) - `decisao.md` continua com a cotacao ORIGINAL
+        congelada, e a confirmacao por `registrar-evento` continua
+        funcionando normalmente porque a comparacao e sempre contra
+        `decisao.md`, nunca contra a cotacao mais recente/ranking."""
+        project = self.project()
+        veredito = self._decidir(project)
+        decisao_antes = (project / "decisao.md").read_bytes()
+
+        self.quote(project, "candidato", "--fonte", "manual", "--preco", "999", "--loja", "LojaNova")
+
+        self.assertEqual((project / "decisao.md").read_bytes(), decisao_antes,
+                         "pre-condicao: decisao.md nao muda so por causa de uma cotacao nova")
+        self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+        texto = veredito.read_text(encoding="utf-8")
+        self.assertEqual(cc.extract_bullet(texto, "Data da compra"), cc.today())
+        self.assertEqual(cc.extract_bullet(texto, "Valor pago"), cc.brl(200.0),
+                         "Valor pago continua o da decisao ORIGINAL - nunca a cotacao nova nao decidida")
+
+    # ---- divergencias isoladas: preco, vendedor, loja --------------------
+
+    def _preparar_divergencia(self, mutar_quote):
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        # Simula uma decisao POSTERIOR sobre o mesmo produto que trocou so
+        # 1 campo, sobrescrevendo decisao.md diretamente - representa uma
+        # divergencia isolada sem depender de timing de cotacao real.
+        texto_decisao = (project / "decisao.md").read_text(encoding="utf-8")
+        texto_decisao = mutar_quote(texto_decisao)
+        cc.atomic_write_text(project / "decisao.md", texto_decisao)
+        return project, veredito
+
+    def test_divergencia_isolada_de_preco_e_recusada(self):
+        project, veredito = self._preparar_divergencia(
+            lambda t: cc.replace_or_append_bullet(t, "Custo total confirmado", cc.brl(350.0))
+        )
+        with self.assertRaisesRegex(SystemExit, "Valor pago"):
+            self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), "")
+
+    def test_divergencia_isolada_de_loja_e_recusada(self):
+        project, veredito = self._preparar_divergencia(
+            lambda t: cc.replace_or_append_bullet(t, "Cotacao usada", "LojaNova / V")
+        )
+        with self.assertRaisesRegex(SystemExit, "Loja"):
+            self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), "")
+
+    def test_divergencia_isolada_de_vendedor_e_recusada(self):
+        project, veredito = self._preparar_divergencia(
+            lambda t: cc.replace_or_append_bullet(t, "Cotacao usada", "Amazon / OutroVendedor")
+        )
+        with self.assertRaisesRegex(SystemExit, "Vendedor"):
+            self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), "")
+
+    # ---- associacao ausente, ambigua, historico e standalone -------------
+
+    def test_associacao_historico_nao_confere_preco_so_avisa(self):
+        """Veredito de uma decisao ja SUBSTITUIDA por outra (produto
+        diferente) - `_projeto_da_confirmacao_de_compra` devolve `None`,
+        a checagem financeira nova nem roda, comportamento preservado
+        (so avisa, nao sincroniza estado)."""
+        project = self.project()
+        veredito_antigo = self._decidir(project, pid="antigo")
+        self.product(project, "novo")
+        self.quote(project, "novo", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "novo", "--porque",
+                  "troquei de ideia", "--perdedores", "antigo: troquei de ideia")
+
+        saida = self.cli("registrar-evento", str(veredito_antigo), "--evento", "comprado")
+        self.assertIn("NAO foi alterado", saida)
+        self.assertEqual(
+            cc.extract_bullet(veredito_antigo.read_text(encoding="utf-8"), "Data da compra"), cc.today(),
+        )
+        status = self.cli("status", str(project))
+        self.assertNotIn("Estado: comprado", status)
+
+    def test_associacao_standalone_nao_confere_preco_so_avisa(self):
+        """`novo-veredito` (sem `Produto ID`) - `_projeto_da_confirmacao_de_compra`
+        nunca resolve projeto pra ele, a checagem financeira nova nem
+        roda."""
+        project = self.project()
+        self.cli("novo-veredito", str(project))
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        saida = self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+        self.assertIn("NAO foi alterado", saida)
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+
+    def test_associacao_ausente_projeto_nao_existe_nao_confere_preco(self):
+        """Veredito com `Projeto` apontando pra um projeto que nao existe
+        mais (renomeado/apagado) - `_projeto_da_confirmacao_de_compra`
+        devolve `None` (projeto_dir.is_dir() falha), checagem nova nem
+        roda."""
+        project = self.project()
+        veredito = self._decidir(project)
+        texto = cc.replace_or_append_bullet(
+            veredito.read_text(encoding="utf-8"), "Projeto", "projeto-que-nao-existe-mais"
+        )
+        cc.atomic_write_text(veredito, texto)
+        saida = self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+        self.assertIn("NAO foi alterado", saida)
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+
+    def test_associacao_ambigua_com_veredito_duplicado_e_recusada(self):
+        """2 vereditos com a MESMA identidade (Projeto/Produto ID) -
+        reaproveita `_veredito_existente_para`, mesmo criterio de
+        ambiguidade de `decide()` - nunca escolhe um dos dois por
+        suposicao."""
+        project = self.project()
+        veredito1 = self._decidir(project)
+        veredito2 = cc.VEREDITOS / f"{cc.today()}-duplicado-{project.name}-candidato.md"
+        veredito2.write_text(veredito1.read_text(encoding="utf-8"), encoding="utf-8")
+
+        with self.assertRaisesRegex(SystemExit, "Mais de um veredito"):
+            self.cli("registrar-evento", str(veredito1), "--evento", "comprado")
+
+        self.assertEqual(cc.extract_bullet(veredito1.read_text(encoding="utf-8"), "Data da compra"), "")
+        self.assertEqual(cc.extract_bullet(veredito2.read_text(encoding="utf-8"), "Data da compra"), "")
+        self.assertFalse(cc.pending_operations([project]))
+        self.assertFalse(cc.pending_operations([cc.BASE]))
+
+    # ---- recusa nao deixa journal, preserva avaliacoes/exportacoes -------
+
+    def test_recusa_preserva_avaliacao_e_exportacao_ja_existentes(self):
+        """A recusa por divergencia financeira nao pode mexer em NADA do
+        veredito - inclusive um D+30 ja preenchido/exportado antes (cenario
+        estrutural: a avaliacao existe, a compra so esta sendo confirmada
+        tarde e com dado incompativel)."""
+        project = self.project()
+        veredito = self._decidir(project)
+        self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso")
+        self.cli("preencher-veredito", str(veredito), "--fase", "d30",
+                  "--nota-arrependimento", "9", "--compraria-de-novo", "sim", "--resumo", "foi bem")
+        self.cli("aprender-veredito", str(veredito), "--fase", "d30", "--licao", "confirmar garantia")
+        # "Comprado" nunca foi registrado ainda (fluxo incomum, mas valido:
+        # o Josemar pode ter esquecido `decidir --comprado` na hora).
+        cc.atomic_write_text(
+            project / "decisao.md",
+            cc.replace_or_append_bullet(
+                (project / "decisao.md").read_text(encoding="utf-8"), "Custo total confirmado", cc.brl(999.0),
+            ),
+        )
+        texto_antes = veredito.read_bytes()
+        licoes_antes = (cc.BASE / "licoes.md").read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "dados financeiros diferentes"):
+            self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+        self.assertEqual((cc.BASE / "licoes.md").read_bytes(), licoes_antes)
+
+    # ---- falha intermediaria com retomada ---------------------------------
+
+    def test_falha_entre_gravar_evento_e_sincronizar_projeto_nao_e_bloqueada_pela_checagem_nova(self):
+        """Mesmo cenario ja coberto em `SegundaRevisaoIndependenteFrente6Test`
+        (falha ENTRE gravar o evento e sincronizar o projeto), com dados
+        COMPATIVEIS - a checagem financeira nova, ao rodar de novo na
+        retomada, reconhece que o passo "evento" ja escreveu (a data ja
+        bate com o valor congelado) e NAO bloqueia a conclusao legitima."""
+        project = self.project()
+        veredito = self._decidir(project)
+
+        def crash(ponto):
+            if ponto == "estado_projeto:iniciado":
+                raise OSError("falha entre gravar o evento e sincronizar o projeto")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+        self.assertNotIn("Estado: comprado", self.cli("status", str(project)))
+        self.assertTrue(cc.pending_operations([cc.BASE]))
+
+        self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        self.assertIn("Estado: comprado", self.cli("status", str(project)))
+        self.assertFalse(cc.pending_operations([cc.BASE]))
+
+    def test_retomada_de_evento_ainda_nao_escrito_ainda_recusa_por_divergencia(self):
+        """Falha ANTES de `_gravar_evento` rodar, com dados JA
+        incompativeis desde o inicio - a retomada tem que continuar
+        recusando (o passo "evento" nunca escreveu), nunca deixar passar
+        so porque virou uma retomada."""
+        project = self.project()
+        veredito = self._decidir(project)
+        cc.atomic_write_text(
+            project / "decisao.md",
+            cc.replace_or_append_bullet(
+                (project / "decisao.md").read_text(encoding="utf-8"), "Custo total confirmado", cc.brl(999.0),
+            ),
+        )
+
+        def crash(ponto):
+            if ponto == "evento:iniciado":
+                raise OSError("falha antes de gravar o evento")
+
+        # A propria 1a tentativa ja recusa antes de chegar perto do crash
+        # simulado (a checagem roda ANTES de `tracked_operation`) - prova
+        # que nao ha journal pendente nenhum pra "retomar" depois.
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaisesRegex(SystemExit, "dados financeiros diferentes"):
+                self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        self.assertFalse(cc.pending_operations([cc.BASE]))
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), "")
+
+    # ---- controles: cronologia e outros eventos continuam intocados ------
+
+    def test_controle_cronologia_continua_ativa_junto_da_checagem_financeira(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        ontem = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso", "--data", ontem)
+        with self.assertRaisesRegex(SystemExit, "e posterior a Data de inicio de uso"):
+            self.cli("registrar-evento", str(veredito), "--evento", "comprado", "--data", cc.today())
+
+    def test_controle_entrega_e_inicio_uso_continuam_sem_checagem_financeira(self):
+        """`entrega`/`inicio_uso` nunca tiveram e continuam sem checagem
+        financeira - o achado C e especifico de `--evento comprado`."""
+        project = self.project()
+        veredito = self._decidir(project)
+        self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso")
+        texto = veredito.read_text(encoding="utf-8")
+        self.assertTrue(cc.extract_bullet(texto, "Data de entrega"))
+        self.assertTrue(cc.extract_bullet(texto, "Data de inicio de uso"))
 
 
 if __name__ == "__main__":
