@@ -5,13 +5,14 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (10/09/2026, sessao 24)
+## AO RETOMAR — comece por aqui (11/09/2026, sessao 25)
 
-**Proximo passo:** submeter a correcao da sessao 24 a uma nova revisao
-independente da frente 6. Os 2 achados sobre `ad6a04a` foram corrigidos
-(ver bloco abaixo). Nao declarar a frente 6
-concluida ainda: precisa de nova revisao
-independente que passe limpa antes de considerar "concluida sob reserva".
+**Proximo passo:** corrigir o achado abaixo (2a chamada de `decidir
+--comprado` em dia diferente cria um segundo veredito e pula a
+cronologia), reproduzir os 2 cenarios ANTES de corrigir, virar teste
+permanente, rodar suite completa + as 4 checagens estritas, e submeter a
+correcao a MAIS uma rodada de revisao independente. So declarar "frente
+6 concluida sob reserva" quando uma rodada passar sem achado.
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -23,34 +24,131 @@ independente que passe limpa antes de considerar "concluida sob reserva".
   (`migrar-produtos --aplicar`) continua **nao executada** contra a arvore
   real - so o preview foi conferido em cada rodada.
 - **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
-  sessao 20; 3 rodadas de revisao independente (Astra) ja acharam 5,
-  depois 4, e agora mais 2 falhas reais. As 2 primeiras rodadas foram
-  corrigidas e testadas nos commits `3acc96a` e `ad6a04a`; a 3a rodada
-  (sessao 23) foi corrigida na sessao 24. **Nao considere a frente
-  6 encerrada depois de apenas rodar a suite local** - a frente 5 levou
-  7 rodadas ate uma revisao passar limpa. **Achado transversal da 2a
-  rodada, registrado para nao se repetir**: `_assinaturas_compativeis`
-  (mecanismo
-  COMPARTILHADO por TODO `tracked_operation` - `decidir`,
-  `registrar-evento`, `vincular-produto`, `aprender-veredito`), criada na
-  1a rodada pra tolerar evolucao de schema, comparava valores com `==` do
-  Python, que confunde `False` com `0` mesmo dentro de estruturas
-  aninhadas - uma correcao num mecanismo COMPARTILHADO pode quebrar
-  QUALQUER comando que passa por ele, nao so o que motivou a correcao;
-  antes de mexer em `tracked_operation`/`_assinaturas_compativeis`/
-  `_valores_equivalentes` de novo, rode a suite completa E pense em quem
-  MAIS usa esse mecanismo (`grep -n "tracked_operation(" scripts/central_compras.py`).
-  Os outros 3 achados desta rodada repetem o padrao ja visto: validar
-  ANTES de criar journal/escrever (nunca deixar pendencia por entrada
-  invalida), recuperar de evidencia PERSISTIDA em vez de exigir campo
-  novo no journal, e replicar o MESMO contrato de validacao em todo
-  caminho que grava o mesmo dado (aqui, cronologia em `decidir` E
-  `registrar-evento`).
+  sessao 20; 4 rodadas de revisao independente ja acharam 5, depois 4,
+  depois 2, e agora mais 1 falha real (sessao 25, ver bloco abaixo). As 3
+  primeiras rodadas foram corrigidas nos commits `3acc96a`, `ad6a04a` e
+  `aaa02f0`. **Nao considere a frente 6 encerrada depois de apenas rodar
+  a suite local** - a frente 5 levou 7 rodadas ate uma revisao passar
+  limpa. **Achado transversal da 2a rodada, registrado para nao se
+  repetir**: `_assinaturas_compativeis` (mecanismo COMPARTILHADO por TODO
+  `tracked_operation` - `decidir`, `registrar-evento`, `vincular-produto`,
+  `aprender-veredito`), criada na 1a rodada pra tolerar evolucao de
+  schema, comparava valores com `==` do Python, que confunde `False` com
+  `0` mesmo dentro de estruturas aninhadas - uma correcao num mecanismo
+  COMPARTILHADO pode quebrar QUALQUER comando que passa por ele, nao so o
+  que motivou a correcao; antes de mexer em
+  `tracked_operation`/`_assinaturas_compativeis`/`_valores_equivalentes`
+  de novo, rode a suite completa E pense em quem MAIS usa esse mecanismo
+  (`grep -n "tracked_operation(" scripts/central_compras.py`).
+  **Achado novo da sessao 25, registrado para nao se repetir**: o nome do
+  arquivo de veredito (`veredito_nome_candidato` em `decide()`) e sempre
+  recalculado com `today()`, mesmo quando a chamada e uma 2a decisao
+  legitima (nao uma retomada) sobre um produto ja decidido em outro dia -
+  isso faz o mecanismo de "complementar veredito existente" (achado 2 da
+  1a revisao) e a checagem de cronologia (achado 4 da 2a revisao) os dois
+  olharem para um arquivo que ainda nao existe, em vez do veredito real.
+  Qualquer novo `--comprado`/`--data-compra` que dependa de encontrar o
+  veredito JA CRIADO precisa localiza-lo pelo par projeto+produto (glob),
+  nunca reconstruir o nome a partir da data da chamada atual.
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, 4a revisao independente (11/09/2026, sessao 25, sobre o commit
+`ee1c21d` - codigo identico a `aaa02f0`; o commit seguinte so acrescentou
+processos de compra HB20S e produtos de autopecas, sem tocar codigo) - 1
+achado.**
+
+Revisao adversarial (sem corrigir), focada em: recuperacao de operacoes
+interrompidas, journals de versoes anteriores, preservacao da data
+original, validacao cronologica em todos os caminhos de escrita, e
+efeitos colaterais em outros comandos que compartilham `tracked_operation`
+e comparacao de assinaturas (`vincular-produto`, `aprender-veredito`
+revisados, sem novo furo).
+
+**O achado.** "2a chamada de `decidir --comprado`" (o caminho que o
+achado 2 da 1a revisao corrigiu para COMPLEMENTAR um veredito ja criado
+em vez de recusar) so funciona quando as duas chamadas acontecem no
+MESMO DIA. `veredito_nome_candidato` em `decide()`
+(`f"{today()}-{projeto}-{produto_id}.md"`) e recalculado a cada chamada -
+numa 2a chamada legitima em OUTRO dia (o fluxo normal: decidir hoje,
+confirmar a compra dias depois), o nome computado nao bate com o veredito
+real, ja existente. Dois efeitos:
+
+1. Em vez de complementar, `create_verdict` cria um SEGUNDO veredito, em
+   branco, com o nome do dia da 2a chamada - o veredito original fica
+   orfao, sem `Data da compra`, e os dois aparecem como linhas separadas
+   no `dashboard` (`verdict_summaries` itera `VEREDITOS.glob("*.md")` sem
+   deduplicar por projeto+produto).
+2. Mais grave: a checagem de cronologia do achado 4 (`decide()`, bloco
+   `if args.comprado and not has_pending_operation(...)`) tambem olha
+   para esse nome errado (arquivo que ainda nao existe) - a validacao e
+   silenciosamente pulada. Uma "Data da compra" registrada DEPOIS de uma
+   "Data de inicio de uso" ja registrada no veredito real passa sem
+   nenhum aviso, furando exatamente o contrato de cronologia bidirecional
+   que o achado 4 pretendia fechar.
+
+Classificado como BUG CONFIRMADO, nao decisao de proposito: o
+comportamento e silencioso e incorreto (cria duplicata + pula validacao),
+nao uma recusa deliberada com mensagem clara - contraria o proprio
+contrato documentado da frente 6.
+
+**Reproducao** (testes novos, ambiente isolado via `ambiente.RepoTestCase`
+- copia config/templates/scripts para diretorio temporario, nunca toca a
+arvore real; script salvo em `%TEMP%\revisao_frente6_ee1c21d.py`, 2
+testes):
+- `test_complemento_em_dia_diferente_cria_segundo_veredito`: `decidir`
+  sem `--comprado` em 2026-01-01, `decidir --comprado` em 2026-01-05 (via
+  `patch.object(cc, "today", ...)`) - esperado 1 veredito complementado;
+  OBSERVADO 2 vereditos (`2026-01-01-...md` sem `Data da compra`,
+  `2026-01-05-...md` com `Data da compra` e todo o resto em branco).
+- `test_complemento_em_dia_diferente_ignora_cronologia_ja_registrada`:
+  mesmo cenario, com `registrar-evento --evento entrega` (02/02) e
+  `--evento inicio_uso` (03/02) ja gravados no veredito real antes de
+  `decidir --comprado` em 10/02 (POSTERIOR ao inicio de uso) - esperado
+  `SystemExit` recusando; OBSERVADO aceito sem erro, cria o 2o veredito
+  com `Data da compra: 2026-02-10`, cronologicamente impossivel frente ao
+  `Data de inicio de uso: 2026-02-03` do veredito real.
+
+**Impacto para o Josemar, em uma frase:** se ele decidir um produto num
+dia e so confirmar a compra (`decidir --comprado`) dias depois - o fluxo
+mais comum, ja que raramente paga no mesmo instante que decide - o
+sistema pode criar um veredito fantasma e aceitar uma data de compra
+impossivel sem avisar, comprometendo os lembretes D+30/D+180 e a
+evidencia da decisao.
+
+**Prompt de correcao recomendado (escopo fechado a este achado):**
+antes de calcular `veredito_nome_candidato` com `today()` em `decide()`,
+procurar se ja existe um veredito para este projeto+produto (`glob` por
+`*-{project.name}-{args.produto_id}.md` em `VEREDITOS`, mesmo padrao que
+`create_verdict` ja usa para o caso same-day) e, se existir exatamente
+um, usar o nome dele como candidato em vez de recalcular - preservando a
+logica de complementar sem sobrescrever ja existente em `create_verdict`.
+Ajustar a checagem de cronologia do achado 4 para olhar esse mesmo
+arquivo real, nunca o nome ainda-nao-criado. Mais de um arquivo batendo
+o glob (cenario legado/corrompido) deve recusar com mensagem clara, nunca
+escolher arbitrariamente. `--force-veredito` continua criando do zero,
+documentado. Reproduzir os 2 cenarios ACIMA antes de corrigir, virar
+teste permanente; manter passando o controle de complemento NO MESMO dia
+(`test_decidir_comprado_depois_complementa_veredito_existente`). Rodar
+suite completa, `auditar-decisoes --strict`, `operacoes-pendentes
+--strict`, `checar-segredos --strict` e `git diff --check`. Nao mexer em
+pesos/gates, nao rodar migracao real, nao reescrever vereditos/snapshots
+historicos, nao tocar infraestrutura externa. Nao declarar a frente 6
+concluida nesta correcao - ainda falta uma rodada de revisao
+independente que passe limpa.
+
+**Verificacao desta rodada (sessao 25):** baseline ANTES de tocar em
+qualquer coisa (nada foi alterado no codigo de producao nesta revisao):
+suite completa **508 testes, 0 falhas**, identica ao numero da sessao 24
+(HEAD `ee1c21d` tem o mesmo codigo de `aaa02f0` - o commit entre os dois
+so acrescentou dados de produtos/processos). `auditar-decisoes --strict`
+(so o aviso legado ja conhecido do snapshot sem manifesto),
+`operacoes-pendentes --strict` (nenhuma pendente), `checar-segredos
+--strict` (limpo) e `git diff --check` (limpo) passaram. Nenhuma
+migracao rodada, pesos/gates/historico intocados.
 
 **Frente 6, 3a correcao da revisao independente (10/09/2026, sessao 24).**
 Os 2 achados da sessao 23 foram reproduzidos antes da correcao e viraram

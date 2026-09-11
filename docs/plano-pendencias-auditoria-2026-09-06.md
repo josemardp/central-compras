@@ -1400,7 +1400,8 @@ de novo, vale reler o contrato inteiro desta seção antes de mexer.
 
 **Estado: implementada (09/09/2026, sessão 20), corrigida após três rodadas
 de revisão independente da Astra (sessão 21: 5 achados; sessão 22: 4;
-sessão 23: 2, corrigidos em 10/09/2026 na sessão 24).
+sessão 23: 2, corrigidos em 10/09/2026 na sessão 24). Uma 4ª rodada
+(sessão 25, 11/09/2026) achou mais 1 falha real, ainda não corrigida.
 Ainda falta UMA rodada de revisão que passe limpa antes de declarar
 "concluída sob reserva", mesmo requisito aplicado à frente 5.**
 
@@ -1777,11 +1778,101 @@ passaram; a auditoria mantém o aviso do snapshot legado sem manifesto.
 Pesos/gates e histórico preservados; nenhuma migração real executada.
 **Ainda é necessária nova revisão independente sem achados.**
 
+### 4ª revisão independente (sessão 25, 11/09/2026, sobre o commit `ee1c21d`) — 1 achado
+
+`ee1c21d` tem código idêntico a `aaa02f0` (o commit intermediário só
+acrescentou processos de compra HB20S e produtos de autopeças, sem tocar
+`scripts/central_compras.py`). Revisão adversarial, sem corrigir: rodou a
+suíte como baseline, examinou as três correções anteriores procurando
+lacunas não cobertas pelos testes existentes, com foco em recuperação de
+operações interrompidas, journals de versões anteriores, preservação da
+data original, validação cronológica em todos os caminhos de escrita, e
+efeitos colaterais em outros comandos que compartilham `tracked_operation`
+e comparação de assinaturas (`vincular-produto`, `aprender-veredito`
+revisados — comportamento consistente com a correção da 2ª revisão, sem
+novo furo).
+
+**O achado.** A "2ª chamada de `decidir --comprado`" — o caminho que o
+achado 2 da 1ª revisão corrigiu para COMPLEMENTAR um veredito já criado em
+vez de recusar — só funciona quando as duas chamadas acontecem no MESMO
+DIA. `veredito_nome_candidato` em `decide()`
+(`f"{today()}-{projeto}-{produto_id}.md"`) é recalculado a cada chamada
+nova (não-retomada); numa 2ª chamada legítima em OUTRO dia — decidir hoje,
+confirmar a compra dias depois, o fluxo mais comum — o nome computado não
+bate com o veredito real já existente. O teste que cobriu o achado 2
+(`test_decidir_comprado_depois_complementa_veredito_existente`) faz as
+duas chamadas em sequência sem mockar `today()`, ou seja, sempre no mesmo
+dia real — por isso a lacuna nunca apareceu antes.
+
+Dois efeitos reproduzidos:
+
+1. Em vez de complementar, `create_verdict` cria um SEGUNDO veredito, em
+   branco, com o nome do dia da 2ª chamada — o veredito original fica
+   órfão, sem `Data da compra`, e os dois aparecem como linhas separadas
+   no `dashboard` (`verdict_summaries` itera `VEREDITOS.glob("*.md")` sem
+   deduplicar por projeto+produto).
+2. Mais grave: a checagem de cronologia do achado 4 (2ª revisão), em
+   `decide()` (`if args.comprado and not has_pending_operation(...)`),
+   também olha para esse nome errado — a validação é silenciosamente
+   pulada. Uma `Data da compra` registrada DEPOIS de uma `Data de início
+   de uso` já registrada no veredito real passa sem nenhum aviso, furando
+   exatamente o contrato de cronologia bidirecional que o achado 4
+   pretendia fechar.
+
+Classificado como **bug confirmado**, não decisão de propósito: o
+comportamento é silencioso e incorreto (cria duplicata + pula validação),
+nunca uma recusa deliberada com mensagem clara — contraria o próprio
+contrato documentado desta frente.
+
+**Reprodução:** `%TEMP%\revisao_frente6_ee1c21d.py`, 2 testes via
+`ambiente.RepoTestCase` (ambiente isolado — cópia de
+config/templates/scripts em diretório temporário, nunca a árvore real).
+
+- `test_complemento_em_dia_diferente_cria_segundo_veredito`: `decidir` sem
+  `--comprado` em 2026-01-01, `decidir --comprado` em 2026-01-05 (via
+  `patch.object(cc, "today", ...)`) — esperado 1 veredito complementado;
+  observado 2 vereditos (o de 01/01 sem `Data da compra`, o de 01/05 com
+  `Data da compra` e todo o resto em branco).
+- `test_complemento_em_dia_diferente_ignora_cronologia_ja_registrada`:
+  mesmo cenário, com `entrega` (02/02) e `inicio_uso` (03/02) já
+  registrados no veredito real antes de `decidir --comprado` em 10/02
+  (posterior ao início de uso) — esperado `SystemExit` recusando;
+  observado aceito sem erro.
+
+**Prompt de correção recomendado (escopo fechado a este achado):** antes
+de calcular `veredito_nome_candidato` com `today()` em `decide()`,
+procurar se já existe um veredito para este projeto+produto (`glob` por
+`*-{project.name}-{args.produto_id}.md` em `VEREDITOS`, mesmo padrão que
+`create_verdict` já usa para o caso same-day) e, se existir exatamente
+um, usar o nome dele como candidato em vez de recalcular — preservando a
+lógica de complementar sem sobrescrever já existente em `create_verdict`.
+Ajustar a checagem de cronologia do achado 4 para olhar esse mesmo
+arquivo real, nunca o nome ainda-não-criado. Mais de um arquivo batendo o
+glob (cenário legado/corrompido) deve recusar com mensagem clara, nunca
+escolher arbitrariamente. `--force-veredito` continua criando do zero,
+documentado. Reproduzir os 2 cenários acima antes de corrigir, virar
+teste permanente; manter passando o controle de complemento no MESMO dia.
+Rodar suíte completa e as quatro checagens estritas. Não mexer em
+pesos/gates, não rodar migração real, não reescrever vereditos/snapshots
+históricos, não tocar infraestrutura externa. Não declarar a frente 6
+concluída nesta correção.
+
+**Verificação desta rodada:** nada foi alterado no código de produção.
+Baseline: suíte completa **508 testes, 0 falhas**, idêntica à da sessão
+24 (código de `ee1c21d` = código de `aaa02f0`). `auditar-decisoes
+--strict` (só o aviso legado já conhecido), `operacoes-pendentes
+--strict` (nenhuma pendente), `checar-segredos --strict` (limpo) e `git
+diff --check` (limpo) passaram. Nenhuma migração rodada, pesos/gates/
+histórico intocados. **Frente 6 continua aberta — falta corrigir este
+achado e submeter a mais uma rodada de revisão independente sem
+achados.**
+
 ## 7. Validação e publicação
 
-**Estado (10/09/2026, sessão 24): feita integralmente para as
-frentes 2, 3, 4 e 5. Frente 6 implementada e com três rodadas de revisão
-corrigidas, ainda sem rodada limpa.**
+**Estado (11/09/2026, sessão 25): feita integralmente para as
+frentes 2, 3, 4 e 5. Frente 6 implementada, com três rodadas de revisão
+corrigidas e uma 4ª rodada com 1 achado ainda não corrigido — continua
+sem rodada limpa.**
 
 Esta seção estava desatualizada desde a sessão 9-12: as frentes 3 (receptor
 Sheets, 3 rodadas de revisão + redeploy verificado na nuvem) e 4
@@ -1830,7 +1921,11 @@ revisado, fluxos testados no navegador quando aplicável, push para
   corrigidas com teste permanente + mutação. A 3ª revisão (sessão 23)
   achou mais 2 falhas de retomada após upgrade: data implícita de compra
   substituída pelo dia atual e evento inválido aceito por journal vazio.
-  Corrigidas na sessão 24 com dois testes permanentes, ver seção 6.
+  Corrigidas na sessão 24 com dois testes permanentes, ver seção 6. Uma 4ª
+  revisão (sessão 25) achou mais 1 falha — a "2ª chamada de `decidir
+  --comprado`" só complementa o veredito existente quando as duas
+  chamadas caem no mesmo dia; em dia diferente cria um segundo veredito
+  órfão e pula a checagem de cronologia do achado 4. Ainda não corrigida.
   **Ainda falta UMA rodada de revisão independente que passe limpa** —
   não presumir "concluída sob reserva" até isso acontecer de verdade,
   mesmo padrão da frente 5.
