@@ -2609,10 +2609,25 @@ class OitavaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertTrue(cc.pending_operations([cc.BASE]))
         self.assertNotIn("Estado: comprado", self.cli("status", str(project)))
 
-    def test_journal_com_passo_nunca_tentado_ainda_valida(self):
-        """Journal pendente onde o passo "evento" nunca sequer comecou
-        (`passos: {}}`) - o mesmo tratamento de "nao concluido": a
-        checagem financeira roda normalmente."""
+    def test_journal_com_passo_nunca_tentado_e_valor_coincidente_ainda_recusa(self):
+        """Journal pendente onde o passo "evento" nem chegou a ser anotado
+        como "tentando" (`passos: {}`, journal de uma versao ainda mais
+        antiga que o achado I) - COM um valor coincidente ja presente no
+        veredito (nao so o caso trivial de conteudo vazio).
+
+        8a revisao independente, achado de qualidade de teste: a versao
+        anterior deste teste so testava `passos: {}` com o veredito AINDA
+        em branco - nesse caso, tanto o design ANTIGO (comparar conteudo)
+        quanto o NOVO (olhar o journal) concordam trivialmente que "nao
+        foi escrito", entao o teste passava com ou sem a correcao do
+        achado I, sem provar qual mecanismo estava decidindo. Fortalecido
+        aqui: o veredito recebe o MESMO valor que seria escrito (edicao
+        externa, simulando uma versao ainda mais antiga que gravava sem
+        journal nenhum), o que faria o design ANTIGO pular a checagem por
+        coincidencia de conteudo - confirmado contra o codigo do commit
+        `d72da8b` (antes desta correcao) que esse cenario reproduzia o
+        achado I de verdade (compra confirmada, projeto marcado comprado,
+        com Valor pago R$200 nunca validado contra decisao.md R$999)."""
         project = self.project()
         veredito = self._decidir(project)
 
@@ -2631,16 +2646,25 @@ class OitavaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         registro["passos"] = {}
         cc.atomic_write_text(journal, json.dumps(registro, ensure_ascii=True, indent=2, sort_keys=True) + "\n")
 
+        # Valor COINCIDENTE ja presente no veredito - o proprio cenario
+        # que o design antigo (comparacao de conteudo) tratava como "ja
+        # escrito por esta operacao".
+        cc.atomic_write_text(
+            veredito,
+            cc.replace_or_append_bullet(veredito.read_text(encoding="utf-8"), "Data da compra", cc.today()),
+        )
         cc.atomic_write_text(
             project / "decisao.md",
             cc.replace_or_append_bullet(
                 (project / "decisao.md").read_text(encoding="utf-8"), "Custo total confirmado", cc.brl(999.0),
             ),
         )
+        texto_antes = veredito.read_bytes()
 
         with self.assertRaisesRegex(SystemExit, "dados financeiros diferentes"):
             self.cli("registrar-evento", str(veredito), "--evento", "comprado")
-        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), "")
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+        self.assertNotIn("Estado: comprado", self.cli("status", str(project)))
 
     def test_controle_journal_antigo_68c3dbf_retomado_ainda_recusa_divergencia_financeira(self):
         """Controle publicado na 7a revisao: journal de `registrar-evento`
@@ -2765,8 +2789,82 @@ class OitavaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         # ja tinha passado na 1a tentativa, nao e bloqueada retroativamente.
         self.cli(*args)
 
-        self.assertFalse(cc.pending_operations([project]))
-        self.assertIn("Estado: comprado", self.cli("status", str(project)))
+    def test_decidir_escrita_sem_conclusao_com_divergencia_externa_e_recusada(self):
+        """Simetria com `registrar-evento`
+        (`test_escrita_sem_conclusao_com_divergencia_legitima_e_recusada`):
+        crash bem entre `create_verdict` escrever e o journal marcar
+        "concluido" (passo continua "tentando"), com `Valor pago`
+        corrompido diretamente no veredito nesse meio tempo - "evidencia
+        insuficiente para distinguir escrita legitima de alteracao
+        externa incompativel" tem que recusar, mesmo em `decide()`."""
+        project = self.project()
+        veredito = self._decidir(project)
+
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "de novo", "--sem-perdedores", "--comprado"]
+
+        def crash(ponto):
+            if ponto == "veredito:executado":
+                raise OSError("falha logo apos gravar, antes de marcar concluido")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        journal = next((project / ".operacoes").glob("*.json"))
+        registro = json.loads(journal.read_text(encoding="utf-8"))
+        self.assertEqual(registro["passos"]["veredito"]["situacao"], "tentando",
+                         "pre-condicao: escrita ja aconteceu, mas journal ainda nao marcou concluido")
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today(),
+                         "pre-condicao: create_verdict ja tinha gravado a data antes do crash")
+
+        cc.atomic_write_text(
+            veredito, cc.replace_or_append_bullet(veredito.read_text(encoding="utf-8"), "Valor pago", cc.brl(1.0)),
+        )
+        texto_antes = veredito.read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "dados diferentes da cotacao"):
+            self.cli(*args)
+
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+        self.assertTrue(cc.pending_operations([project]))
+
+    def test_decidir_journal_com_passo_nunca_tentado_e_valor_coincidente_ainda_recusa(self):
+        """Simetria com `registrar-evento`
+        (`test_journal_com_passo_nunca_tentado_e_valor_coincidente_ainda_recusa`):
+        journal simulando uma versao ainda mais antiga (`passos: {}`) com
+        um valor coincidente ja presente no veredito - o design antigo
+        (comparacao de conteudo) pularia a checagem por coincidencia; o
+        atual (olha o proprio journal) nao."""
+        project = self.project()
+        veredito = self._decidir(project)
+
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "de novo", "--sem-perdedores", "--comprado"]
+
+        def crash(ponto):
+            if ponto == "veredito:iniciado":
+                raise OSError("falha antes de gravar o veredito")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        journal = next((project / ".operacoes").glob("*.json"))
+        registro = json.loads(journal.read_text(encoding="utf-8"))
+        registro["passos"] = {}
+        cc.atomic_write_text(journal, json.dumps(registro, ensure_ascii=True, indent=2, sort_keys=True) + "\n")
+
+        texto = veredito.read_text(encoding="utf-8")
+        texto = cc.replace_or_append_bullet(texto, "Data da compra", cc.today())
+        texto = cc.replace_or_append_bullet(texto, "Valor pago", cc.brl(1.0))
+        cc.atomic_write_text(veredito, texto)
+        texto_antes = veredito.read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "dados diferentes da cotacao"):
+            self.cli(*args)
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+        self.assertTrue(cc.pending_operations([project]), "recusa numa retomada preserva a pendencia")
 
     # ---- achado II: evidencia financeira insuficiente ----------------------
 
@@ -2790,6 +2888,36 @@ class OitavaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertEqual(veredito.read_bytes(), texto_antes)
         self.assertFalse(cc.pending_operations([cc.BASE]))
         self.assertNotIn("Estado: comprado", self.cli("status", str(project)))
+
+    def test_evidencia_insuficiente_surgida_apos_interrupcao_preserva_pendencia(self):
+        """Foco 5 do roteiro: a checagem de evidencia (achado II) tambem
+        roda numa retomada (nao so numa chamada nova) - se a evidencia
+        ficar insuficiente nesse meio tempo, a recusa preserva o journal
+        pendente intocado, sem nenhuma escrita nova."""
+        project = self.project()
+        veredito = self._decidir(project)
+
+        def crash(ponto):
+            if ponto == "evento:iniciado":
+                raise OSError("falha antes de gravar o evento")
+
+        with patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        decisao_path = project / "decisao.md"
+        texto_decisao = re.sub(r"(?m)^- Cotacao usada:.*$", "", decisao_path.read_text(encoding="utf-8"))
+        cc.atomic_write_text(decisao_path, texto_decisao)
+        journal = next((cc.BASE / ".operacoes").glob("*.json"))
+        journal_antes = journal.read_bytes()
+        texto_antes = veredito.read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "nao tem evidencia financeira suficiente"):
+            self.cli("registrar-evento", str(veredito), "--evento", "comprado")
+
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+        self.assertEqual(journal.read_bytes(), journal_antes)
+        self.assertTrue(cc.pending_operations([cc.BASE]))
 
     def test_evidencia_parcial_falta_so_cotacao_usada_e_recusada(self):
         project = self.project()

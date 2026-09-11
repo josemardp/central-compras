@@ -1398,19 +1398,21 @@ de novo, vale reler o contrato inteiro desta seção antes de mexer.
 
 ## 6. Datas e vereditos
 
-**Estado: implementada (09/09/2026, sessão 20), corrigida após seis
-rodadas de revisão independente (sessão 21: 5 achados; sessão 22: 4;
-sessão 23: 2, corrigidos em 10/09/2026 na sessão 24; sessão 25: 1,
-corrigido na própria sessão 25, 11/09/2026; sessão 26: 2 falhas
-confirmadas + 1 observação, corrigidas em 11/09/2026 na sessão 27; sessão
-28: 3 falhas confirmadas + 1 observação de wording — achados A, B e D
-corrigidos em 11/09/2026 na sessão 29; achado C, deixado deliberadamente
-em aberto na sessão 29 como pergunta de escopo, decidido pelo Josemar e
-implementado em 11/09/2026 na sessão 30; sessão 31: 2 falhas confirmadas
-(achados I e II), corrigidas em 11/09/2026 na sessão 32). Ainda falta UMA
-rodada de revisão que passe limpa antes de declarar "concluída sob
-reserva", mesmo requisito aplicado à frente 5 — nenhuma correção desta
-frente conseguiu isso até agora (7 rodadas seguidas achando falha nova).
+**Estado: CONCLUÍDA SOB RESERVA (11/09/2026, sessão 33).** Implementada
+(09/09/2026, sessão 20), corrigida após sete rodadas de revisão
+independente (sessão 21: 5 achados; sessão 22: 4; sessão 23: 2,
+corrigidos em 10/09/2026 na sessão 24; sessão 25: 1, corrigido na própria
+sessão 25, 11/09/2026; sessão 26: 2 falhas confirmadas + 1 observação,
+corrigidas em 11/09/2026 na sessão 27; sessão 28: 3 falhas confirmadas +
+1 observação de wording — achados A, B e D corrigidos em 11/09/2026 na
+sessão 29; achado C, deixado deliberadamente em aberto na sessão 29 como
+pergunta de escopo, decidido pelo Josemar e implementado em 11/09/2026 na
+sessão 30; sessão 31: 2 falhas confirmadas (achados I e II), corrigidas
+em 11/09/2026 na sessão 32). A 8ª revisão independente (sessão 33, sobre
+o commit `a6eb7dc`) passou limpa — nenhum achado de produção novo, só um
+gap de qualidade de teste fechado (ver seção abaixo). Mesmo padrão da
+frente 5: "sob reserva" porque uma rodada limpa não é garantia formal de
+ausência de bugs.
 
 **Contrato adotado:** decisão, compra/pagamento, entrega e início de uso
 são quatro fatos datados independentes. `decidir` fecha só a escolha —
@@ -2587,11 +2589,124 @@ infraestrutura externa intactos. **Frente 6 continua aberta — falta
 submeter TODAS as correções (sessões 29-32) a uma rodada de revisão
 independente que passe limpa.**
 
+### 8ª revisão independente (sessão 33, 11/09/2026, sobre o commit `a6eb7dc`, cobrindo as correções das sessões 29-32) — passou limpa
+
+Revisão adversarial, sem alterar código de produção. Baseline: suíte
+completa **574 testes, 0 falhas**, idêntica à sessão 32. Roteiro cobriu
+os 5 pontos pedidos: recuperação em `decidir`/`registrar-evento` nos 5
+estados (passo não iniciado, escrita sem conclusão registrada, passo
+concluído com etapas posteriores pendentes, alteração externa
+incompatível durante a interrupção, journals reais de versões
+anteriores); confirmação financeira nos dois caminhos (preço/vendedor/
+loja, A→B→A, evidência ausente total/parcial, formatos manual/web);
+exportações (D+30/D+180/legado não apagados nem duplicados por chamadas
+novas/retomadas); qualidade do teste-armadilha "passo nunca tentado" da
+sessão 32; efeitos e mensagens (recusas novas não escrevem journal,
+retomadas preservam a pendência, mensagens nunca recomendam reescrever
+histórico).
+
+**Nenhum achado de produção confirmado.** O design atual (achados I/II,
+commit `a6eb7dc`) se sustentou contra todos os cenários do roteiro: a
+checagem por `situacao == "concluido"` no journal (não por conteúdo)
+prova corretamente "esta operação concluiu o efeito" nos dois caminhos
+(`decide()`/`registrar-evento`); a recusa por evidência
+insuficiente/incompatível numa retomada preserva a pendência e não
+escreve nada (confirmado byte a byte); as proteções de exportação
+(`_erro_force_veredito_apagaria_exportacao`) continuam self-healing e não
+regrediram (11/11 testes da 7ª revisão, `SetimaRevisaoIndependenteFrente6Test`,
+reconfirmados passando); as mensagens de recusa
+(`_mensagem_recusa_financeira_chamada_nova`,
+`_mensagem_recusa_financeira_registrar_evento`,
+`_mensagem_recusa_pendente_decidir`) seguem sem sugerir editar
+`cotacoes.csv` ou apagar evidência, só apontam `--force-veredito`/
+`operacoes-pendentes` como último recurso.
+
+A recusa para reconciliação manual quando há evidência insuficiente ou
+incompatível (pedido explícito da sessão 32) foi testada de novo aqui
+como contrato deliberado, não relatada como bug.
+
+**Achado de qualidade de teste (prioridade 4 do roteiro), não é bug de
+produção — fechado nesta sessão.** O teste
+`test_journal_com_passo_nunca_tentado_ainda_valida` (da
+`OitavaRevisaoIndependenteFrente6Test`, sessão 32) documentava
+explicitamente que passava com E sem a correção "por coincidência de
+construção" — o veredito ficava vazio nesse cenário, então tanto o
+design ANTIGO (comparar conteúdo) quanto o NOVO (olhar o journal)
+concordavam trivialmente que não havia nada para comparar. Isso deixava
+uma obrigação real sem cobertura: um valor COINCIDENTE (escrito por
+edição externa, batendo por acaso com o que a operação escreveria) nunca
+foi exercitado para esse estado específico do passo ("nunca tentado").
+
+Fortalecido: o teste agora grava um valor coincidente ("Data da compra")
+no veredito antes de corromper o `decisao.md`, renomeado para
+`test_journal_com_passo_nunca_tentado_e_valor_coincidente_ainda_recusa`.
+Um teste simétrico equivalente foi acrescentado para `decidir`
+(`test_decidir_journal_com_passo_nunca_tentado_e_valor_coincidente_ainda_recusa`)
+— cenário nunca coberto separadamente pela sessão 32 para esse lado.
+Confirmado com `git show d72da8b` (código anterior à correção do achado
+I), rodado isolado num tempdir próprio via subprocess: os dois cenários
+reproduzem o achado I de verdade sob o código antigo (retorno 0, valor
+corrompido nunca detectado, projeto marcado "comprado"); sob o código
+atual (`a6eb7dc`), os dois recusam corretamente.
+
+Dois testes adicionais fecham a simetria restante encontrada durante a
+mesma inspeção:
+- `test_decidir_escrita_sem_conclusao_com_divergencia_externa_e_recusada`:
+  reproduz em `decidir` o cenário "escrita realizada sem conclusão
+  registrada + divergência externa" que já existia só do lado
+  `registrar-evento` (item 4 da correção da sessão 32) — confirmado
+  reproduzindo sob `d72da8b` (retorno 0, valor corrompido nunca
+  revalidado) e recusando sob o código atual.
+- `test_evidencia_insuficiente_surgida_apos_interrupcao_preserva_pendencia`:
+  confirma que a recusa do achado II (evidência financeira insuficiente)
+  também preserva a pendência intacta (journal e veredito byte a byte)
+  quando a evidência insuficiente só existe numa retomada, não numa
+  chamada nova — fecha o ponto 5 do roteiro.
+
+**Hipóteses descartadas:** journals reais de versões anteriores
+(`68c3dbf`, antes do achado C), retomados contra o código atual,
+continuam recusando corretamente (controle já existente, reconfirmado);
+nenhuma regressão nas proteções de exportação (11/11); nenhuma regressão
+nos controles de standalone/histórico da confirmação financeira; a
+extração compartilhada `_divergencias_financeiras`/
+`_campos_financeiros_veredito` não abriu brecha nova nos dois caminhos.
+
+**Limitações:** revisão focada nos 5 pontos pedidos, sem ampliar escopo a
+funcionalidades novas nem a resistência irrestrita a adulteração de
+arquivos, como instruído. Não explorei combinações adicionais de estados
+além das do roteiro — as combinações não cobertas aqui já estavam
+cobertas pelos testes oficiais anteriores (sessões 29-32).
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`OitavaRevisaoIndependenteFrente6Test`, agora com 16 testes (13 da sessão
+32 + 3 novos desta revisão; 1 renomeado e fortalecido). Nenhum arquivo de
+reprodução externo criado — os 3 cenários novos já nasceram como teste
+permanente, confirmados como teste-armadilha genuíno (falham sob
+`d72da8b`, passam sob o código atual) antes de entrar na suíte oficial.
+
+**Verificação:** suíte completa **577 testes, 0 falhas** (574 + 3
+líquidos novos). `auditar-decisoes --strict` (só o aviso legado já
+conhecido), `operacoes-pendentes --strict` (nenhuma pendente),
+`checar-segredos --strict` (limpo) e `git diff --check` (limpo) passaram
+contra a árvore real. `git status --short` mostrou só
+`tests/test_frente6_datas_veredito.py` — nenhum arquivo de produção
+tocado, consistente com "revisão apenas". Nenhuma migração rodada,
+pesos/gates/histórico intocados, processos HB20S e infraestrutura
+externa intactos.
+
+**Frente 6 concluída sob reserva.** Primeira rodada de revisão
+independente desta frente que não encontrou nenhum achado de produção
+novo (as 7 rodadas anteriores, sessões 21-31, acharam 5, 4, 2, 1, 2, 3 e
+2 falhas reais, respectivamente, todas corrigidas). "Sob reserva" pelo
+mesmo motivo da frente 5: nenhuma garantia formal de ausência de bugs, só
+de que o roteiro adversarial pedido não achou nenhum nesta rodada.
+
 ## 7. Validação e publicação
 
-**Estado (11/09/2026, sessão 25): feita integralmente para as
-frentes 2, 3, 4 e 5. Frente 6 implementada, com quatro rodadas de revisão
-corrigidas — continua sem uma rodada limpa.**
+**Estado (11/09/2026, sessão 33): feita integralmente para as frentes 2,
+3, 4, 5 e 6. Todas as seis frentes concluídas (2, 3 e 4 sem ressalva; 5 e
+6 concluídas sob reserva, mesmo critério: uma rodada de revisão
+independente passou limpa, sem garantia formal de ausência de bugs).**
 
 Esta seção estava desatualizada desde a sessão 9-12: as frentes 3 (receptor
 Sheets, 3 rodadas de revisão + redeploy verificado na nuvem) e 4
@@ -2647,6 +2762,10 @@ revisado, fluxos testados no navegador quando aplicável, push para
   veredito órfão e pulava a checagem de cronologia do achado 4. Corrigida
   na própria sessão 25 com `_veredito_existente_para` (localiza o
   veredito pela identidade gravada no conteúdo, nunca pelo nome do
-  arquivo) e 8 testes permanentes, ver seção 6. **Ainda falta UMA rodada
-  de revisão independente que passe limpa** — não presumir "concluída sob
-  reserva" até isso acontecer de verdade, mesmo padrão da frente 5.
+  arquivo) e 8 testes permanentes. Sessão 26 achou mais 2 + 1 observação,
+  corrigidas na sessão 27; sessão 28 achou mais 3 + 1 observação de
+  wording (achados A/B/D corrigidos na sessão 29, achado C decidido pelo
+  Josemar e implementado na sessão 30); sessão 31 achou mais 2 (achados
+  I/II), corrigidas na sessão 32. **A 8ª revisão independente (sessão 33,
+  sobre o commit `a6eb7dc`) passou limpa — concluída sob reserva**, mesmo
+  padrão da frente 5, ver seção 6.

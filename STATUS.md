@@ -5,13 +5,14 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (11/09/2026, sessao 32)
+## AO RETOMAR — comece por aqui (11/09/2026, sessao 33)
 
-**Proximo passo:** submeter a frente 6 inteira (todas as correcoes ate
-aqui, sessoes 29-32) a MAIS uma rodada de revisao independente. So
-declarar "frente 6 concluida sob reserva" quando uma rodada passar sem
-achado NOVO - nenhuma correcao anterior desta frente conseguiu uma
-rodada limpa ainda (7 rodadas seguidas ja acharam falha nova).
+**Proximo passo:** as 6 frentes deste plano de auditoria estao todas
+concluidas (2, 3 e 4 sem ressalva; 5 e 6 concluidas sob reserva). Nao ha
+pendencia aberta de revisao no momento - se surgir trabalho novo neste
+repositorio, comece por ele; se for pedida mais uma rodada de revisao das
+frentes 5 ou 6, **nao presuma que vai passar so porque passou da ultima
+vez** (mesmo aviso de sempre, ainda vale).
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -22,15 +23,18 @@ rodada limpa ainda (7 rodadas seguidas ja acharam falha nova).
   secao 5 do plano. Migracao de produtos legados
   (`migrar-produtos --aplicar`) continua **nao executada** contra a arvore
   real - so o preview foi conferido em cada rodada.
-- **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
-  sessao 20; 7 rodadas de revisao independente ja acharam 5, depois 4,
-  depois 2, depois 1, depois 2, depois 3, depois 2 falhas reais - TODAS
-  corrigidas agora, nos commits `3acc96a`, `ad6a04a`, `aaa02f0`,
+- **Frente 6 (datas/veredito): CONCLUIDA SOB RESERVA (sessao 33).**
+  Implementada na sessao 20; 7 rodadas de revisao independente acharam 5,
+  depois 4, depois 2, depois 1, depois 2, depois 3, depois 2 falhas reais
+  - TODAS corrigidas, nos commits `3acc96a`, `ad6a04a`, `aaa02f0`,
   `e048ad6`, `1c8b503` e nos blocos das sessoes 29 (achados A/B/D), 30
-  (achado C) e 32 (achados I/II) abaixo. **Nao considere a frente 6
-  encerrada depois de apenas rodar a suite local** - a frente 5 levou 7
-  rodadas ate uma revisao passar limpa, e esta frente ja teve 7 rodadas
-  seguidas achando falha nova.
+  (achado C) e 32 (achados I/II) abaixo. **A 8a revisao independente
+  (sessao 33, sobre o commit `a6eb7dc`, cobrindo as sessoes 29-32) passou
+  limpa** - nenhum achado de producao novo, so um gap de qualidade de
+  teste fechado (teste-armadilha que passava com e sem a correcao por
+  coincidencia de construcao; ver bloco da sessao 33 abaixo). Mesmo
+  padrao da frente 5: "sob reserva" nao e garantia formal de ausencia de
+  bugs, so o resultado limpo do roteiro adversarial pedido.
   **Achado da 7a revisao independente, corrigido na sessao 32**: a
   "prova de que esta operacao pendente ja escreveu o campo", usada tanto
   pelo achado A (`decide()`) quanto pelo achado C (`registrar-evento`),
@@ -116,6 +120,95 @@ rodada limpa ainda (7 rodadas seguidas ja acharam falha nova).
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, 8a revisao independente (11/09/2026, sessao 33, sobre o
+commit `a6eb7dc`, cobrindo as correcoes das sessoes 29-32) - passou
+limpa, revisao apenas, nada alterado na producao.**
+
+Baseline confirmado ANTES de qualquer edicao: suite completa **574
+testes, 0 falhas**, identica a sessao 32. Roteiro cobriu os 5 pontos
+pedidos: recuperacao em `decidir`/`registrar-evento` nos 5 estados (passo
+nao iniciado, escrita sem conclusao registrada, passo concluido com
+etapas posteriores pendentes, alteracao externa incompativel durante a
+interrupcao, journals reais de versoes anteriores); confirmacao
+financeira nos dois caminhos; exportacoes (D+30/D+180/legado); qualidade
+do teste-armadilha "passo nunca tentado" da sessao 32; efeitos e
+mensagens.
+
+**Nenhum achado de producao confirmado.** O design da sessao 32 (checagem
+por `situacao == "concluido"` no journal, nunca por conteudo) se sustentou
+contra todos os cenarios do roteiro nos dois caminhos
+(`decide()`/`registrar-evento`); a recusa por evidencia
+insuficiente/incompativel numa retomada preserva a pendencia e nao
+escreve nada (confirmado byte a byte); protecoes de exportacao
+reconfirmadas sem regressao (11/11 testes,
+`SetimaRevisaoIndependenteFrente6Test`); mensagens de recusa seguem sem
+sugerir editar `cotacoes.csv` ou apagar evidencia. A recusa para
+reconciliacao manual (pedido explicito da sessao 32) foi testada de novo
+como contrato deliberado, nao relatada como bug.
+
+**Achado de qualidade de teste (prioridade 4 do roteiro), nao e bug de
+producao - fechado nesta sessao.** O teste
+`test_journal_com_passo_nunca_tentado_ainda_valida` (sessao 32) passava
+com E sem a correcao "por coincidencia de construcao" - o veredito ficava
+vazio nesse cenario, entao tanto o design antigo (comparar conteudo)
+quanto o novo (olhar o journal) concordavam trivialmente que nao havia
+nada para comparar. Um valor COINCIDENTE (edicao externa batendo por
+acaso com o que a operacao escreveria) nunca foi exercitado nesse estado
+especifico do passo.
+
+Fortalecido: renomeado para
+`test_journal_com_passo_nunca_tentado_e_valor_coincidente_ainda_recusa`,
+agora grava um valor coincidente ("Data da compra") antes de corromper o
+`decisao.md`. Teste simetrico acrescentado em `decidir`
+(`test_decidir_journal_com_passo_nunca_tentado_e_valor_coincidente_ainda_recusa`).
+Confirmado com `git show d72da8b` (codigo anterior a correcao do achado
+I), rodado isolado num tempdir proprio via subprocess: os dois cenarios
+reproduzem o achado I de verdade sob o codigo antigo (retorno 0, valor
+corrompido nunca detectado); sob o codigo atual, os dois recusam
+corretamente.
+
+Dois testes adicionais fecharam a simetria restante encontrada durante a
+inspecao:
+- `test_decidir_escrita_sem_conclusao_com_divergencia_externa_e_recusada`
+  (simetria em `decidir` do item 4 da correcao da sessao 32, so existia em
+  `registrar-evento`) - confirmado reproduzindo sob `d72da8b` e recusando
+  sob o codigo atual.
+- `test_evidencia_insuficiente_surgida_apos_interrupcao_preserva_pendencia`
+  (achado II tambem preserva a pendencia intacta numa retomada, nao so
+  numa chamada nova).
+
+**Hipoteses descartadas:** journals antigos (`68c3dbf`) continuam
+recusando corretamente contra o codigo atual; nenhuma regressao nas
+protecoes de exportacao nem nos controles de standalone/historico da
+confirmacao financeira; `_divergencias_financeiras`/
+`_campos_financeiros_veredito` (extracao compartilhada) nao abriram brecha
+nova.
+
+**Limitacoes:** revisao focada nos 5 pontos pedidos, sem ampliar escopo a
+funcionalidades novas nem a resistencia irrestrita a adulteracao de
+arquivos. Combinacoes de estados nao cobertas aqui ja estavam cobertas
+pelos testes oficiais anteriores.
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`OitavaRevisaoIndependenteFrente6Test`, agora com 16 testes (13 da sessao
+32 + 3 novos; 1 renomeado e fortalecido). Nenhum arquivo de reproducao
+externo criado - os 3 cenarios novos ja nasceram como teste permanente,
+confirmados como teste-armadilha genuino (falham sob `d72da8b`, passam
+sob o codigo atual) antes de entrar na suite oficial.
+
+**Verificacao:** suite completa **577 testes, 0 falhas** (574 + 3
+liquidos novos). `auditar-decisoes --strict` (so o aviso legado ja
+conhecido), `operacoes-pendentes --strict` (nenhuma pendente),
+`checar-segredos --strict` (limpo) e `git diff --check` (limpo) passaram
+contra a arvore real. `git status --short` mostrou so
+`tests/test_frente6_datas_veredito.py` - nenhum arquivo de producao
+tocado. Nenhuma migracao rodada, pesos/gates/historico intocados,
+processos HB20S e infraestrutura externa intactos.
+
+**Frente 6 concluida sob reserva.** Primeira rodada de revisao
+independente desta frente sem achado de producao novo (7 rodadas
+anteriores acharam 5, 4, 2, 1, 2, 3 e 2 falhas reais, todas corrigidas).
 
 **Frente 6, correcao dos achados I e II da 7a revisao independente
 (11/09/2026, sessao 32).** Achados registrados no commit `d72da8b` (bloco
