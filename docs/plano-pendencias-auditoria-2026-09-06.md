@@ -1402,11 +1402,13 @@ de novo, vale reler o contrato inteiro desta seção antes de mexer.
 rodadas de revisão independente (sessão 21: 5 achados; sessão 22: 4;
 sessão 23: 2, corrigidos em 10/09/2026 na sessão 24; sessão 25: 1,
 corrigido na própria sessão 25, 11/09/2026; sessão 26: 2 falhas
-confirmadas + 1 observação, corrigidas em 11/09/2026 na sessão 27). Ainda
-falta UMA rodada de revisão que passe limpa antes de declarar "concluída
-sob reserva", mesmo requisito aplicado à frente 5 — nenhuma correção
-desta frente conseguiu isso até agora (5 rodadas seguidas achando falha
-nova).
+confirmadas + 1 observação, corrigidas em 11/09/2026 na sessão 27). A 6ª
+rodada (sessão 28, 11/09/2026, sobre o commit `1c8b503`) achou mais 3
+falhas confirmadas + 1 observação de wording, **ainda não corrigidas**.
+Ainda falta UMA rodada de revisão que passe limpa antes de declarar
+"concluída sob reserva", mesmo requisito aplicado à frente 5 — nenhuma
+correção desta frente conseguiu isso até agora (6 rodadas seguidas
+achando falha nova).
 
 **Contrato adotado:** decisão, compra/pagamento, entrega e início de uso
 são quatro fatos datados independentes. `decidir` fecha só a escolha —
@@ -2162,6 +2164,112 @@ migração rodada, pesos/gates/histórico intocados, processos HB20S e
 infraestrutura externa intactos. **Frente 6 continua aberta — falta
 submeter esta correção a uma rodada de revisão independente que passe
 limpa.**
+
+### 6ª revisão independente (sessão 28, 11/09/2026, sobre o commit `1c8b503`) — 3 achados confirmados + 1 observação de wording
+
+Revisão adversarial, sem alterar código de produção. Roteiro: journals de
+versões anteriores retomados com o código atual (as checagens da sessão
+27 são puladas numa retomada — diferenciar passo já concluído de escrita
+ainda não realizada); todos os caminhos que gravam os mesmos dados
+(`decidir` com/sem `--comprado`, `registrar-evento --evento comprado`,
+A→B→A); proteção das exportações (D+30/D+180/legado, chamada nova e
+retomada); o diff de `test_rev7_bugA`; recusas/controles legítimos
+(mensagens respeitando cotações append-only). Baseline: suíte completa
+**535 testes, 0 falhas**, idêntica à sessão 27. 5 testes novos em
+`tests/revisao_independente_1c8b503.py` (fora da suíte oficial —
+achados ainda não corrigidos).
+
+**Causa raiz comum dos achados A e B:** `_erro_divergencia_financeira_veredito`/
+`_erro_force_veredito_apagaria_exportacao` (sessão 27) só rodam quando
+`not retomando_decisao`. Um journal criado por código ANTERIOR a essas
+checagens, retomado com o código atual, nunca as vê — mesmo padrão já
+visto no achado 3 da 2ª revisão e nos achados da 3ª revisão (validação
+nova precisa também se aplicar à retomada de um journal antigo).
+
+**Achado A (confirmado):** journal do commit `e048ad6`, retomado com o
+código atual, pula a checagem financeira. `decidir candidato` (código
+`e048ad6`, cotação Q1=R$200) cria o veredito; cotação nova Q2=R$999
+adicionada; `decidir candidato --comprado` (ainda `e048ad6`) interrompido
+antes de `create_verdict` rodar — journal congela o nome do veredito,
+que continua com Q1. Retomando com `1c8b503`: `retomando_decisao=True`
+pula a checagem — grava `Data da compra` certa ao lado de `Valor pago`
+obsoleto (R$200, nunca R$999). Teste
+`test_journal_antigo_e048ad6_bypassa_checagem_financeira_e_grava_preco_obsoleto`.
+
+**Achado B (confirmado, mais grave):** journal do commit `e048ad6`,
+retomado com o código atual, pula a proteção de exportação. Veredito com
+D+30 exportado (marcador + `licoes.md`); `decidir candidato
+--force-veredito` (`e048ad6`) interrompido antes de `create_verdict`
+rodar. Retomando com `1c8b503`: pula a checagem, `create_verdict` roda
+com `force=True` e apaga o D+30 exportado (marcador e resumo). `licoes.md`
+(append-only) preserva a linha já gravada — só o veredito perde a
+evidência local. Teste
+`test_journal_antigo_e048ad6_bypassa_protecao_de_exportacao_e_apaga_d30`.
+
+**Achado C (confirmado, gap mais amplo — não é journal antigo):**
+`registrar-evento --evento comprado` (caminho documentado desde a sessão
+20) nunca confere preço — a checagem da sessão 27 vive só dentro de
+`decide()`. Decide A (Q1=R$200), decide B, reconsidera e decide A de novo
+SEM `--comprado` (cotação nova Q3=R$999 — `decisao.md` reflete Q3, mas
+`create_verdict` sem `--comprado` não toca no veredito). Confirmando via
+`registrar-evento <veredito> --evento comprado`: grava a data certa, mas
+`register_verdict_event` (`scripts/central_compras.py:4627`) nunca leu
+cotação nenhuma — `Valor pago` continua R$200 (Q1), nunca R$999 (Q3).
+Reproduz com o código atual do início ao fim, sem journal envolvido.
+Teste `test_registrar_evento_comprado_apos_redecisao_grava_data_certa_com_preco_obsoleto`.
+
+**Achado D (observação de wording, menor):** a mensagem de recusa do
+achado 1 da sessão 27 (`scripts/central_compras.py:3981`, "corrija a
+cotação/veredito se for a MESMA compra") pode ser lida como "edite a
+linha em `cotacoes.csv`", contrariando cotações append-only (CLAUDE.md,
+item 2). Nenhum código viola o princípio — só a orientação textual é
+ambígua.
+
+**Hipóteses descartadas** (comportamento já correto): chamada nova com
+`--force-veredito` sobre veredito exportado continua recusada sem journal;
+um journal do commit `e048ad6` cujo passo `veredito` JÁ CONCLUIU (crash
+depois de `create_verdict` gravar, só faltando o passo seguinte) continua
+retomável normalmente com o código atual — esse controle é a restrição de
+aceite que a correção dos achados A/B precisa respeitar; diff de
+`test_rev7_bugA` preservou integralmente o bloqueio por recurso e a
+recuperação da própria exportação interrompida; complemento válido e
+retomada válida (já na suíte oficial) reconferidos sem regressão.
+
+**Prompt de correção recomendado (escopo fechado aos achados A e B):**
+
+1. Em `decide()`, quando `retomando_decisao`, ler o journal pendente
+   (`pending_operation_record`) e checar se o passo `veredito` já está
+   `concluido`. Se sim, pular as duas checagens (preserva
+   `test_journal_com_passo_veredito_ja_concluido_continua_retomavel`). Se
+   não (passo ausente ou `"tentando"` — o caso dos achados A e B), rodar
+   as MESMAS duas funções contra `VEREDITOS / registro["detalhe"]["veredito_nome"]`,
+   antes de `tracked_operation` reabrir o journal.
+2. Achado C é uma expansão de escopo de `registrar-evento` (nunca teve
+   noção de preço, por design) — **levar ao Josemar como pergunta antes
+   de implementar**, não decisão técnica automática.
+3. Achado D: reescrever a mensagem para nunca sugerir editar
+   `cotacoes.csv` — deixar explícito que a correção é via nova cotação
+   (linha nova) ou edição direta do veredito.
+
+Reproduzir os achados A e B de `tests/revisao_independente_1c8b503.py`
+antes de corrigir (já reproduzidos, arquivo preservado); depois, mover
+para `tests/test_frente6_datas_veredito.py`, classe nova
+`SetimaRevisaoIndependenteFrente6Test`, junto dos 2 controles. Achado C
+fica como pergunta pendente. Achado D pode ser corrigido junto. Rodar
+suíte completa e as quatro checagens estritas. Não mexer em pesos/gates,
+não rodar migração real, não reescrever vereditos/snapshots históricos,
+não tocar infraestrutura externa nem os processos HB20S. Não declarar a
+frente 6 concluída nesta correção.
+
+**Verificação:** nada alterado no código de produção. Baseline: suíte
+completa **535 testes, 0 falhas**, idêntica à sessão 27.
+`auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a árvore
+real. `git status --short` mostrou só o arquivo de teste novo. Nenhuma
+migração rodada, pesos/gates/histórico intocados, processos HB20S e
+infraestrutura externa intactos. **Frente 6 continua aberta — falta
+corrigir os achados A e B, decidir o escopo do achado C com o Josemar, e
+submeter mais uma rodada de revisão independente.**
 
 ## 7. Validação e publicação
 
