@@ -1289,5 +1289,464 @@ class QuintaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
 
 
+class SextaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
+    """Regressao dos 2 achados confirmados da 5a revisao independente
+    (sessao 26, sobre o commit `e048ad6`) - reproduzidos primeiro em
+    `tests/revisao_independente_e048ad6.py` (script externo daquela
+    sessao, removido depois de incorporado aqui). Os testes daquele
+    arquivo PASSAVAM com o defeito presente; aqui eles exigem o
+    comportamento CORRETO (recusa antes de qualquer escrita).
+
+    Raiz comum: `_veredito_existente_para` (`e048ad6`) acha o veredito
+    certo por IDENTIDADE (Projeto/Produto ID) em qualquer dia, mas nao
+    confere se a decisao que o criou ainda e a mesma que esta chamada -
+    uma decisao intermediaria de OUTRO produto no mesmo projeto nao
+    invalida o veredito antigo aos olhos dela."""
+
+    def _decidir(self, project, pid="candidato", extra=()):
+        self.product(project, pid)
+        self.quote(project, pid, "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", pid,
+                  "--porque", "unico candidato", "--sem-perdedores", *extra)
+        return next(p for p in cc.VEREDITOS.glob("*.md") if pid in p.name)
+
+    # ---- achado 1: complemento com dados financeiros divergentes --------
+
+    def test_redecidir_apos_decisao_intermediaria_com_cotacao_nova_e_recusado(self):
+        """Cenario real: decide A, muda de ideia e decide B, reconsidera e
+        decide A de novo semanas depois - com uma cotacao NOVA (preco/loja
+        diferentes). Antes da correcao, isso complementava silenciosamente
+        o veredito antigo de A com `Data da compra` certa e `Valor pago`/
+        `Vendedor`/`Loja` obsoletos da 1a vez. Agora tem que recusar antes
+        de qualquer escrita."""
+        dia1, dia2, dia3 = "2026-01-01", "2026-01-02", "2026-01-20"
+
+        # `data_coleta` da cotacao vem do relogio real (`now_iso()`, nunca
+        # mockado por `patch.object(cc, "today", ...)`) - fixado
+        # explicitamente com `--data` (horarios distintos no mesmo dia real)
+        # para a ordem entre as duas cotacoes de candidato-a nunca depender
+        # da velocidade real de execucao do teste.
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            self.product(project, "candidato-a")
+            self.product(project, "candidato-b")
+            self.quote(project, "candidato-a", "--fonte", "manual", "--data", self._hora_hoje("09:00:00"))
+            self.cli("decidir", str(project), "--produto-id", "candidato-a",
+                      "--porque", "primeira escolha", "--sem-perdedores")
+        veredito_a = next(p for p in cc.VEREDITOS.glob("*.md")
+                           if cc.extract_bullet(p.read_text(encoding="utf-8"), "Produto ID") == "candidato-a")
+        texto_antes = veredito_a.read_bytes()
+
+        with patch.object(cc, "today", return_value=dia2):
+            self.quote(project, "candidato-b", "--fonte", "manual", "--data", self._hora_hoje("09:30:00"))
+            self.cli("decidir", str(project), "--produto-id", "candidato-b", "--porque",
+                      "troquei de ideia", "--perdedores", "candidato-a: desisti por enquanto")
+
+        with patch.object(cc, "today", return_value=dia3):
+            self.quote(project, "candidato-a", "--fonte", "manual", "--preco", "999", "--loja", "LojaNova",
+                       "--data", self._hora_hoje("10:00:00"))
+            # Capturado so agora (depois de `cotar`, que legitimamente
+            # atualiza a proxima acao sugerida em processo.md) - o que
+            # importa e que a RECUSA em si nao altere mais nada daqui pra
+            # frente, nao que o estado do projeto tenha ficado congelado
+            # desde a decisao de B.
+            decisao_antes = (project / "decisao.md").read_bytes()
+            processo_antes = (project / "processo.md").read_bytes()
+            with self.assertRaisesRegex(SystemExit, "dados diferentes da cotacao"):
+                self.cli("decidir", str(project), "--produto-id", "candidato-a", "--porque",
+                          "reconsiderei, escolhi A de novo com cotacao nova", "--comprado",
+                          "--perdedores", "candidato-b: nao entregou")
+
+        self.assertEqual(veredito_a.read_bytes(), texto_antes, "veredito de A nao pode ter sido tocado")
+        self.assertEqual((project / "decisao.md").read_bytes(), decisao_antes)
+        self.assertEqual((project / "processo.md").read_bytes(), processo_antes)
+        self.assertFalse(cc.pending_operations([project]), "recusa nao pode deixar journal pendente")
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 2, "nenhum veredito novo foi criado pela recusa")
+
+    def test_controle_redecidir_apos_decisao_intermediaria_com_mesma_cotacao_complementa(self):
+        """Controle: sem cotacao nova (o caso comum - confirmar a compra
+        dias depois da MESMA cotacao), o complemento continua funcionando
+        mesmo com uma decisao intermediaria de outro produto no meio."""
+        dia1, dia2, dia3 = "2026-01-01", "2026-01-02", "2026-01-20"
+
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            self.product(project, "candidato-a")
+            self.product(project, "candidato-b")
+            self.quote(project, "candidato-a", "--fonte", "manual")
+            self.cli("decidir", str(project), "--produto-id", "candidato-a",
+                      "--porque", "primeira escolha", "--sem-perdedores")
+        veredito_a = next(p for p in cc.VEREDITOS.glob("*.md")
+                           if cc.extract_bullet(p.read_text(encoding="utf-8"), "Produto ID") == "candidato-a")
+
+        with patch.object(cc, "today", return_value=dia2):
+            self.quote(project, "candidato-b", "--fonte", "manual")
+            self.cli("decidir", str(project), "--produto-id", "candidato-b", "--porque",
+                      "troquei de ideia", "--perdedores", "candidato-a: desisti por enquanto")
+
+        with patch.object(cc, "today", return_value=dia3):
+            self.cli("decidir", str(project), "--produto-id", "candidato-a", "--porque",
+                      "reconsiderei, escolhi A de novo", "--comprado",
+                      "--perdedores", "candidato-b: nao entregou")
+
+        texto = veredito_a.read_text(encoding="utf-8")
+        self.assertEqual(cc.extract_bullet(texto, "Data da compra"), dia3)
+        self.assertEqual(cc.extract_bullet(texto, "Valor pago"), cc.brl(200.0))
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 2)
+
+    # `data_coleta` vem de `now_iso()` (relogio real, nunca mockado por
+    # `patch.object(cc, "today", ...)`), com resolucao de SEGUNDO - duas
+    # chamadas de `self.quote(...)` em sequencia rapida podem cair no MESMO
+    # segundo e empatar. Sem controlar isso, a escolha da cotacao mais
+    # recente (`latest_quotes`) desempata pela mais BARATA (proposital,
+    # documentado na propria funcao), o que mascarava justamente a
+    # divergencia que estes testes precisam forcar - por isso os 4 testes
+    # abaixo fixam `--data` com horarios DISTINTOS no MESMO dia real (nunca
+    # vencida, nunca dependente da velocidade da maquina rodando o teste).
+    def _hora_hoje(self, hhmmss: str) -> str:
+        return f"{dt.date.today().isoformat()}T{hhmmss}"
+
+    def test_mudanca_isolada_de_preco_e_recusada(self):
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual", "--data", self._hora_hoje("09:00:00"))
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        texto_antes = veredito.read_bytes()
+        self.quote(project, "candidato", "--fonte", "manual", "--preco", "350",
+                   "--data", self._hora_hoje("10:00:00"))
+        with self.assertRaisesRegex(SystemExit, "Valor pago"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "de novo", "--sem-perdedores", "--comprado")
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+
+    def test_mudanca_isolada_de_loja_e_recusada(self):
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual", "--data", self._hora_hoje("09:00:00"))
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        texto_antes = veredito.read_bytes()
+        self.quote(project, "candidato", "--fonte", "manual", "--loja", "LojaNova",
+                   "--data", self._hora_hoje("10:00:00"))
+        with self.assertRaisesRegex(SystemExit, "Loja"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "de novo", "--sem-perdedores", "--comprado")
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+
+    def test_mudanca_isolada_de_vendedor_e_recusada(self):
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual", "--data", self._hora_hoje("09:00:00"))
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        texto_antes = veredito.read_bytes()
+        self.quote(project, "candidato", "--fonte", "manual", "--vendedor", "OutroVendedor",
+                   "--data", self._hora_hoje("10:00:00"))
+        with self.assertRaisesRegex(SystemExit, "Vendedor"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "de novo", "--sem-perdedores", "--comprado")
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+
+    def test_force_veredito_ignora_divergencia_financeira_e_reseta_do_zero(self):
+        """Controle: com --force-veredito, a divergencia de preco e
+        irrelevante - o conteudo inteiro e descartado de proposito (a
+        protecao aqui e a do achado 2, nao a do achado 1)."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual", "--data", self._hora_hoje("09:00:00"))
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.quote(project, "candidato", "--fonte", "manual", "--preco", "999", "--loja", "LojaNova",
+                   "--data", self._hora_hoje("10:00:00"))
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "de novo", "--sem-perdedores", "--comprado", "--force-veredito")
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Valor pago"), cc.brl(999.0))
+
+    # ---- achado 2: --force-veredito nao pode apagar exportacao ----------
+
+    def _decidir_e_exportar_d30(self, project, pid="candidato"):
+        veredito = self._decidir(project, pid)
+        self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso")
+        self.cli("preencher-veredito", str(veredito), "--fase", "d30",
+                  "--nota-arrependimento", "9", "--compraria-de-novo", "sim",
+                  "--resumo", "Otimo produto, avaliacao real de 30 dias de uso.")
+        self.cli("aprender-veredito", str(veredito), "--fase", "d30",
+                  "--licao", "Marca A entrega no prazo e o produto funciona bem.")
+        return veredito
+
+    def test_force_veredito_e_recusado_quando_d30_ja_foi_exportado_em_outro_dia(self):
+        dia1, dia_force = "2026-02-01", "2026-06-01"
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            veredito = self._decidir_e_exportar_d30(project)
+        texto_antes = veredito.read_bytes()
+        licoes_antes = (cc.BASE / "licoes.md").read_bytes()
+
+        with patch.object(cc, "today", return_value=dia_force):
+            with self.assertRaisesRegex(SystemExit, "ja tem aprendizado exportado"):
+                self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                          "refazendo do zero", "--sem-perdedores", "--force-veredito")
+
+        self.assertEqual(veredito.read_bytes(), texto_antes, "avaliacao D+30 tem que continuar intacta")
+        self.assertEqual((cc.BASE / "licoes.md").read_bytes(), licoes_antes)
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 1)
+        self.assertFalse(cc.pending_operations([project]))
+
+    def test_force_veredito_e_recusado_quando_d30_ja_foi_exportado_no_mesmo_dia(self):
+        """O mesmo achado 2, mas no MESMO dia - a protecao nao pode
+        depender de dias terem passado."""
+        project = self.project()
+        veredito = self._decidir_e_exportar_d30(project)
+        texto_antes = veredito.read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "ja tem aprendizado exportado"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "refazendo do zero", "--sem-perdedores", "--force-veredito")
+
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+
+    def test_force_veredito_e_recusado_quando_d180_ja_foi_exportado(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso")
+        self.cli("preencher-veredito", str(veredito), "--fase", "d180",
+                  "--nota-arrependimento", "8", "--compraria-de-novo", "sim",
+                  "--resumo", "Continua bom depois de 6 meses.")
+        self.cli("aprender-veredito", str(veredito), "--fase", "d180",
+                  "--licao", "Continua funcionando bem depois de 6 meses de uso.")
+        texto_antes = veredito.read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "ja tem aprendizado exportado"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "refazendo do zero", "--sem-perdedores", "--force-veredito")
+
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+
+    def test_force_veredito_e_recusado_com_marcador_legado_sem_fase(self):
+        """Veredito real de antes da frente 6 separar D+30 de D+180 (so o
+        marcador generico `## Aprendizado exportado`, sem fase) tambem
+        precisa ser protegido - a checagem nao pode depender do formato
+        novo de marcador."""
+        project = self.project()
+        veredito = self._decidir(project)
+        texto = veredito.read_text(encoding="utf-8")
+        texto += "\n## Aprendizado exportado\n\n- Data: 2025-01-01\n- Marca: Marca A\n"
+        cc.atomic_write_text(veredito, texto)
+        texto_antes = veredito.read_bytes()
+
+        with self.assertRaisesRegex(SystemExit, "ja tem aprendizado exportado"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "refazendo do zero", "--sem-perdedores", "--force-veredito")
+
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+
+    def test_controle_force_veredito_sem_exportacao_continua_resetando_em_outro_dia(self):
+        """Controle: sem nenhuma fase exportada, --force-veredito continua
+        funcionando exatamente como o contrato ja documentado (reseta o
+        MESMO veredito, mesmo em outro dia - comportamento intencional de
+        `e048ad6`, preservado)."""
+        dia1, dia2 = "2026-06-01", "2026-06-15"
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            veredito = self._decidir(project)
+        cc.atomic_write_text(
+            veredito,
+            cc.replace_or_append_bullet(veredito.read_text(encoding="utf-8"), "D+30 resumo", "SERA_DESCARTADO"),
+        )
+
+        with patch.object(cc, "today", return_value=dia2):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+
+        vereditos = list(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(len(vereditos), 1)
+        self.assertEqual(vereditos[0], veredito)
+        texto = veredito.read_text(encoding="utf-8")
+        self.assertNotIn("SERA_DESCARTADO", texto)
+        self.assertEqual(cc.extract_bullet(texto, "Data da compra"), dia2)
+
+    def test_controle_force_veredito_sem_veredito_existente_continua_criando_normalmente(self):
+        """Controle: `--force-veredito` numa decisao genuinamente NOVA
+        (nenhum veredito existente para este produto+projeto) nunca pode
+        ser bloqueado pela checagem de exportacao - nao ha nada para
+        proteger."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 1)
+
+    # ---- achado 3 (observacao): cronologia continua ativa, sem mudanca --
+
+    def test_observacao_force_veredito_com_comprado_ainda_e_bloqueado_pela_cronologia_sem_exportacao(self):
+        """A checagem de cronologia do achado 4 (2a revisao) NAO foi
+        alterada por esta correcao - continua recusando `--force-veredito
+        --comprado` quando a nova data e cronologicamente impossivel
+        contra o conteudo ainda nao substituido, mesmo sem nenhuma fase
+        exportada (achado 3, classificado como observacao, nao como bug:
+        mantido de proposito, ver STATUS.md e a secao 6 do plano)."""
+        dia1 = "2026-02-01"
+        dia_entrega = "2026-02-03"
+        dia_inicio_uso = "2026-02-05"
+        dia_force = "2026-06-01"
+
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            veredito = self._decidir(project)
+        with patch.object(cc, "today", return_value=dia_entrega):
+            self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+        with patch.object(cc, "today", return_value=dia_inicio_uso):
+            self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso")
+
+        with patch.object(cc, "today", return_value=dia_force):
+            with self.assertRaisesRegex(SystemExit, "posterior"):
+                self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                          "refazendo do zero", "--sem-perdedores", "--comprado", "--force-veredito")
+
+        self.assertIn("Data de entrega", veredito.read_text(encoding="utf-8"))
+        self.assertFalse(cc.pending_operations([project]))
+
+    # ---- retomada legitima nao pode ser bloqueada pelas novas checagens -
+
+    def test_retomada_legitima_de_complemento_com_mesma_cotacao_nao_e_bloqueada(self):
+        """Uma falha DURANTE um complemento legitimo (mesma cotacao,
+        segunda chamada dias depois) e retomada num 3o dia nao pode ser
+        barrada pela checagem financeira nova - `retomando_decisao` pula
+        as duas checagens novas, exatamente como ja pulava a busca por
+        identidade."""
+        dia1, dia2, dia3 = "2026-03-01", "2026-03-05", "2026-03-09"
+        with patch.object(cc, "today", return_value=dia1):
+            project = self.project()
+            veredito = self._decidir(project)
+
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+
+        def crash(ponto):
+            if ponto == "veredito:iniciado":
+                raise OSError("falha durante o complemento")
+
+        with patch.object(cc, "today", return_value=dia2), \
+                patch.object(cc, "_crash_de_teste_se_pedido", side_effect=crash):
+            with self.assertRaises(OSError):
+                self.cli(*args)
+
+        with patch.object(cc, "today", return_value=dia3):
+            self.cli(*args)
+
+        self.assertFalse(cc.pending_operations([project]))
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 1)
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), dia2)
+
+    def test_journal_antigo_pre_e048ad6_retomado_nao_aciona_as_novas_checagens(self):
+        """Journal real criado pelo codigo do commit `ee1c21d` (antes de
+        `e048ad6` existir - sem `_veredito_existente_para` nem as
+        checagens novas), interrompido em `veredito:iniciado`, tem que
+        continuar retomavel normalmente com o codigo atual - mesmo que o
+        veredito encontrado tivesse (hipoteticamente) alguma divergencia,
+        a retomada usa o nome JA CONGELADO no journal, nunca refaz a busca
+        nem as checagens novas."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+
+        script = self.root / "scripts" / "central_compras.py"
+        atual = script.read_bytes()
+        antigo = subprocess.run(
+            ["git", "show", "ee1c21d:scripts/central_compras.py"],
+            cwd=REPO, capture_output=True, check=True,
+        ).stdout
+        script.write_bytes(antigo)
+        env = os.environ.copy()
+        env["CENTRAL_COMPRAS_TESTE_CRASH_APOS"] = "veredito:iniciado"
+        crash = subprocess.run(
+            [sys.executable, str(script), *args], cwd=self.root, env=env, capture_output=True, text=True,
+        )
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+
+        script.write_bytes(atual)
+        retry = subprocess.run(
+            [sys.executable, str(script), *args], cwd=self.root, capture_output=True, text=True,
+        )
+        self.assertEqual(retry.returncode, 0, retry.stderr)
+        self.assertFalse(cc.pending_operations([project]))
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+
+    # ---- hipoteses descartadas na 5a revisao (mecanismo ja robusto) -----
+    # Cobertura de `_veredito_existente_para` exercitada na 5a revisao
+    # independente sem achar bug nenhum - migrada para a suite oficial
+    # como protecao permanente, nao como reproducao de achado.
+
+    def test_veredito_renomeado_manualmente_ainda_e_encontrado_por_identidade(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        novo_nome = cc.VEREDITOS / "veredito-renomeado-a-mao.md"
+        veredito.rename(novo_nome)
+
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores", "--comprado")
+
+        self.assertEqual(len(list(cc.VEREDITOS.glob("*.md"))), 1,
+                          "renomear o arquivo nao pode fazer o sistema criar um 2o veredito")
+        self.assertEqual(cc.extract_bullet(novo_nome.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+
+    def test_veredito_com_produto_id_divergente_do_conteudo_nao_e_confundido(self):
+        project = self.project()
+        veredito_outro = self._decidir(project, pid="outro-produto")
+
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--comprado", "--perdedores", "outro-produto: motivo")
+
+        vereditos = list(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(len(vereditos), 2, "produto_id diferente tem que gerar um veredito PROPRIO")
+        self.assertEqual(
+            cc.extract_bullet(veredito_outro.read_text(encoding="utf-8"), "Data da compra"), "",
+            "veredito do OUTRO produto nao pode ter sido tocado",
+        )
+
+    def test_veredito_standalone_sem_produto_id_nunca_e_reaproveitado(self):
+        project = self.project()
+        self.cli("novo-veredito", str(project))
+        veredito_standalone = next(cc.VEREDITOS.glob("*.md"))
+
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores", "--comprado")
+
+        vereditos = list(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(len(vereditos), 2, "decidir tem que criar um veredito PROPRIO, nunca usar o standalone")
+        self.assertEqual(
+            cc.extract_bullet(veredito_standalone.read_text(encoding="utf-8"), "Data da compra"), "",
+        )
+
+    def test_mensagem_de_ambiguidade_nomeia_os_arquivos_reais_para_resolucao_manual(self):
+        project = self.project()
+        veredito1 = self._decidir(project)
+        veredito2 = cc.VEREDITOS / f"{cc.today()}-duplicado-{project.name}-candidato.md"
+        veredito2.write_text(veredito1.read_text(encoding="utf-8"), encoding="utf-8")
+
+        with self.assertRaises(SystemExit) as ctx:
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "unico candidato", "--sem-perdedores", "--comprado")
+
+        mensagem = str(ctx.exception)
+        self.assertIn(veredito1.name, mensagem)
+        self.assertIn(veredito2.name, mensagem)
+
+
 if __name__ == "__main__":
     unittest.main()

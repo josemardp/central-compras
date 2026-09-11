@@ -3694,6 +3694,81 @@ def _veredito_existente_para(project: Path, produto_id: str) -> Path | None:
     return encontrados[0] if encontrados else None
 
 
+_MARCADORES_EXPORTACAO_VEREDITO = {
+    "D+30": "## Aprendizado exportado D+30",
+    "D+180": "## Aprendizado exportado D+180",
+    "legado": "## Aprendizado exportado\n",
+}
+
+
+def _fases_exportadas_do_veredito(texto: str) -> list[str]:
+    """Fases (`D+30`/`D+180`) ou o marcador legado (sem fase, de antes da
+    frente 6 separar D+30 de D+180) que `aprender-veredito` ja gravou neste
+    veredito - unico ponto usado para nunca deixar `--force-veredito`
+    apagar uma avaliacao ja exportada para a base de conhecimento (marca,
+    loja, `licoes.md`) sem aviso nenhum (achado 2 da 5a revisao
+    independente: antes de `e048ad6`, `--force-veredito` num dia diferente
+    criava um arquivo NOVO, deixando o antigo - com o marcador - intacto;
+    depois, passou a resetar o MESMO arquivo por identidade, destruindo
+    esse historico em silencio)."""
+    return [fase for fase, marcador in _MARCADORES_EXPORTACAO_VEREDITO.items() if marcador in texto]
+
+
+def _erro_force_veredito_apagaria_exportacao(veredito_existente: Path) -> str | None:
+    """`None` se `--force-veredito` pode resetar este arquivo sem perda -
+    senao, a mensagem pronta (sem `--force` de contorno: a unica saida e
+    reconciliar a mao, o mesmo padrao ja usado para ambiguidade de
+    identidade acima)."""
+    fases = _fases_exportadas_do_veredito(veredito_existente.read_text(encoding="utf-8"))
+    if not fases:
+        return None
+    return (
+        f"{veredito_existente.name} ja tem aprendizado exportado para a base de conhecimento "
+        f"({', '.join(fases)}) - marca, loja e/ou `licoes.md` ja receberam essa avaliacao.\n"
+        "--force-veredito apagaria o conteudo (nota, resumo, licao) e o marcador que impede "
+        "reexportar a MESMA licao numa proxima chamada de `aprender-veredito` - nada foi alterado.\n"
+        "Confira o que ja foi exportado (procure o texto da licao em base-conhecimento/licoes.md e "
+        f"nas pastas marcas/lojas) antes de decidir se ainda quer descartar {veredito_existente.name}; "
+        "se decidir que sim, apague o arquivo manualmente."
+    )
+
+
+def _erro_divergencia_financeira_veredito(texto: str, quote: dict[str, Any]) -> str | None:
+    """`None` se os dados financeiros/vendedor ja gravados num veredito
+    EXISTENTE batem com a cotacao desta chamada - senao, a mensagem pronta
+    (sem o "Nada foi alterado" final, quem chama decide o resto da frase).
+
+    Achado 1 da 5a revisao independente: `_veredito_existente_para` acha o
+    veredito certo por identidade (Projeto/Produto ID) em QUALQUER dia,
+    mesmo que uma decisao de OUTRO produto tenha acontecido no meio
+    (`decidir A`, `decidir B`, `decidir A` de novo semanas depois com uma
+    cotacao nova) - mas `create_verdict`, quando o arquivo ja existe e nao
+    ha `--force-veredito`, so complementa `Data da compra`, nunca `Valor
+    pago`/`Vendedor`/`Loja`. Sem esta checagem, a data da compra fica
+    certa ao lado de um preco/loja obsoletos da PRIMEIRA vez que este
+    produto foi decidido - nunca o que de fato foi pago agora."""
+    divergencias = []
+    esperado = {
+        "Valor pago": brl(quote.get("custo_total")),
+        "Vendedor": f"{quote.get('loja')} / {quote.get('vendedor')}",
+        "Loja": quote.get("loja") or "",
+    }
+    for label, valor_novo in esperado.items():
+        valor_antigo = extract_bullet(texto, label)
+        if valor_antigo and valor_antigo != valor_novo:
+            divergencias.append(f"  - {label}: {valor_antigo} (veredito) vs {valor_novo} (cotacao desta decisao)")
+    if not divergencias:
+        return None
+    return (
+        "O veredito encontrado para este projeto/produto tem dados diferentes da cotacao usada "
+        "nesta decisao:\n" + "\n".join(divergencias) + "\n"
+        "Isso normalmente significa que esta e uma decisao DIFERENTE sobre o mesmo produto (preco "
+        "mudou, trocou de loja, ou e uma compra nova depois de uma anterior abandonada) - nao uma "
+        "confirmacao tardia da MESMA compra. Complementar silenciosamente gravaria a data da compra "
+        "certa ao lado de um preco/vendedor errados."
+    )
+
+
 def decide(args: argparse.Namespace) -> None:
     if args.data_compra and not args.comprado:
         raise SystemExit(
@@ -3860,6 +3935,7 @@ def decide(args: argparse.Namespace) -> None:
     # vence, e procurar de novo so arriscaria uma ambiguidade irrelevante
     # bloquear uma retomada legitima).
     retomando_decisao = has_pending_operation(project, op_id, "decidir")
+    veredito_existente_atual: Path | None = None
     if retomando_decisao:
         veredito_nome_candidato = f"{today()}-{project.name}-{args.produto_id}.md"
     else:
@@ -3868,6 +3944,45 @@ def decide(args: argparse.Namespace) -> None:
             veredito_existente_atual.name if veredito_existente_atual is not None
             else f"{today()}-{project.name}-{args.produto_id}.md"
         )
+    # Achados 1 e 2 da 5a revisao independente: achar o veredito certo por
+    # IDENTIDADE (acima) nao prova que esta chamada ainda e a MESMA decisao
+    # que o criou - as duas checagens abaixo recusam ANTES de tocar em
+    # qualquer arquivo (journal incluido, por isso rodam antes de
+    # `tracked_operation`), nunca deixam `create_verdict`/`--force-veredito`
+    # decidir sozinho o que fazer com um veredito que nao bate.
+    if not retomando_decisao and veredito_existente_atual is not None:
+        if args.force_veredito:
+            # Achado 2: antes de e048ad6, --force-veredito num dia diferente
+            # criava um arquivo NOVO - o antigo, com qualquer D+30/D+180 ja
+            # exportado, ficava intocado. Agora ele mira o MESMO arquivo por
+            # identidade; sem esta checagem, reseta silenciosamente um
+            # historico ja exportado para a base de conhecimento e reabre a
+            # porta para `aprender-veredito` duplicar a mesma licao (o
+            # marcador que evita reexportacao e o que seria apagado).
+            erro_export = _erro_force_veredito_apagaria_exportacao(veredito_existente_atual)
+            if erro_export:
+                raise SystemExit(erro_export)
+        elif args.comprado:
+            # Achado 1: `create_verdict` (mais abaixo) so complementa `Data
+            # da compra` quando o arquivo ja existe - nunca atualiza `Valor
+            # pago`/`Vendedor`/`Loja`. Sem esta checagem, uma redecisao
+            # legitima (`decidir A`, `decidir B`, `decidir A` de novo com
+            # cotacao nova) grava a data da compra CERTA ao lado de um
+            # preco/loja OBSOLETOS da primeira vez que o produto foi
+            # decidido. Nao se aplica com --force-veredito: ali o conteudo
+            # inteiro e descartado de proposito (guardado pela checagem
+            # acima), entao divergencia de preco e irrelevante.
+            erro_financeiro = _erro_divergencia_financeira_veredito(
+                veredito_existente_atual.read_text(encoding="utf-8"), quote
+            )
+            if erro_financeiro:
+                raise SystemExit(
+                    erro_financeiro + f"\nArquivo: {veredito_existente_atual}. Nada foi alterado.\n"
+                    "Confira manualmente qual dado esta certo - corrija a cotacao/veredito se for a "
+                    "MESMA compra, ou repita com --force-veredito se for de fato uma decisao nova "
+                    "(isso descarta o conteudo anterior deste veredito por completo, avaliacoes "
+                    "ja exportadas incluidas - recusado automaticamente se houver alguma, ver acima)."
+                )
     # Mesmo principio para `Data da compra`: `--comprado` sem `--data-compra`
     # explicita cai em `today()`, mas isso so pode ser calculado UMA VEZ, na
     # 1a tentativa - uma interrupcao antes de `create_verdict` rodar e uma

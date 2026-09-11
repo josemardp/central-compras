@@ -963,10 +963,23 @@ class OperationRecoveryTest(ambiente.RepoTestCase):
         self.assertIn("Aprendizado exportado D+30", veredito.read_text(encoding="utf-8"))
         self.assertEqual(cc.pending_operations([cc.BASE]), [])
 
-        # SO agora decidir --force-veredito pode rodar (e legitimamente
-        # recria o veredito, que e o proposito declarado da flag).
-        self.cli("decidir", str(project), "--produto-id", "candidato",
-                 "--porque", "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+        # Ate a 5a revisao independente da frente 6, este teste terminava
+        # aqui confirmando que `decidir --force-veredito` voltava a
+        # funcionar assim que a pendencia de `aprender-veredito` acabava -
+        # a exportacao concluida e o proprio marcador `Aprendizado
+        # exportado D+30` que ela acabou de gravar nunca eram considerados.
+        # Achado 2 (correcao desta sessao, commit apos `b8a1e24`): agora que
+        # a exportacao esta CONCLUIDA (nao mais pendente), `--force-veredito`
+        # continua bloqueado - por um motivo DIFERENTE do de antes (marcador
+        # ja exportado, nao mais recurso reivindicado por outra operacao) -
+        # ate reconciliacao manual. Ver `_erro_force_veredito_apagaria_exportacao`
+        # e a secao 6 de docs/plano-pendencias-auditoria-2026-09-06.md.
+        texto_apos_exportacao = veredito.read_text(encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "ja tem aprendizado exportado"):
+            self.cli("decidir", str(project), "--produto-id", "candidato",
+                     "--porque", "unico candidato", "--sem-perdedores", "--comprado", "--force-veredito")
+        self.assertEqual(veredito.read_text(encoding="utf-8"), texto_apos_exportacao,
+                         "recusa por exportacao ja concluida nao pode alterar o veredito")
 
     def test_rev7_bugB_retomada_de_decidir_nao_recria_veredito_ja_criado(self):
         project = self.project()

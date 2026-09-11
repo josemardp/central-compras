@@ -5,17 +5,13 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (11/09/2026, sessao 26)
+## AO RETOMAR — comece por aqui (11/09/2026, sessao 27)
 
-**Proximo passo:** corrigir os 2 achados confirmados pela 5a revisao
-independente da frente 6 (bloco abaixo, sessao 26, sobre o commit
-`e048ad6`) - complemento silencioso com dado financeiro obsoleto, e
-`--force-veredito` apagando avaliacao D+30/D+180 ja exportada sem aviso -
-usando o prompt de correcao de escopo fechado registrado la. So depois
-submeter a MAIS uma rodada de revisao independente. So declarar "frente 6
+**Proximo passo:** submeter a correcao desta sessao (bloco abaixo) a MAIS
+uma rodada de revisao independente da frente 6. So declarar "frente 6
 concluida sob reserva" quando uma rodada passar sem achado - nenhuma
-correcao anterior desta frente conseguiu isso ainda (agora 5 rodadas
-seguidas achando falha nova).
+correcao anterior desta frente conseguiu isso ainda (5 rodadas seguidas ja
+acharam falha nova).
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -28,9 +24,9 @@ seguidas achando falha nova).
   real - so o preview foi conferido em cada rodada.
 - **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
   sessao 20; 5 rodadas de revisao independente ja acharam 5, depois 4,
-  depois 2, depois 1, depois 2 falhas reais - as 4 primeiras corrigidas
-  nos commits `3acc96a`, `ad6a04a`, `aaa02f0` e `e048ad6`; a 5a (sessao
-  26, sobre `e048ad6`) esta no bloco abaixo, **ainda sem correcao**.
+  depois 2, depois 1, depois 2 falhas reais - as 5 corrigidas nos commits
+  `3acc96a`, `ad6a04a`, `aaa02f0`, `e048ad6` e o bloco desta sessao
+  (abaixo, sessao 27, sobre os 2 achados confirmados da 5a revisao).
   **Nao considere a frente 6 encerrada depois de apenas rodar a suite
   local** - a frente 5 levou 7 rodadas ate uma revisao passar limpa, e
   esta frente ja teve 5 rodadas seguidas achando falha nova.
@@ -54,7 +50,7 @@ seguidas achando falha nova).
   declarar recurso) tem que usar `_veredito_existente_para` (por
   IDENTIDADE - bullets `Projeto`/`Produto ID` - nunca por nome de
   arquivo), a mesma funcao que corrigiu isto na sessao 25.
-  **Achado da 5a revisao independente, registrado para nao se repetir**:
+  **Achado da 5a revisao independente, corrigido na sessao 27**:
   `_veredito_existente_para` encontra o veredito certo por identidade, mas
   NUNCA confere se a decisao que o criou ainda e a mesma que esta
   chamada - uma decisao INTERMEDIARIA de OUTRO produto no mesmo projeto
@@ -63,12 +59,123 @@ seguidas achando falha nova).
   veredito encontrado por ela (`create_verdict`, `--force-veredito`)
   precisa considerar que os dados da cotacao atual podem ja nao bater
   com os do veredito achado - nao dar como certo que "mesma identidade"
-  significa "mesma decisao em andamento".
+  significa "mesma decisao em andamento". Agora protegido por codigo
+  (`_erro_divergencia_financeira_veredito`,
+  `_erro_force_veredito_apagaria_exportacao`, ver bloco da sessao 27), nao
+  so por licao registrada - mas o PRINCIPIO continua valendo para qualquer
+  caminho NOVO que venha a reaproveitar um veredito por identidade.
 - Frentes 2 e 3 continuam "concluidas sob reserva" - ja levaram 7 e 3
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, correcao dos 2 achados da 5a revisao independente (11/09/2026,
+sessao 27).** Achados registrados no commit `b8a1e24` (bloco seguinte,
+abaixo, preservado como historico). Baseline confirmado ANTES de tocar em
+qualquer coisa: suite completa **516 testes, 0 falhas**, os 9 testes de
+`tests/revisao_independente_e048ad6.py` rodados isoladamente (PASSAVAM com
+o defeito presente - reproduziam o comportamento errado, nao o correto).
+
+**Corrigido:**
+
+1. **Achado 1 (complemento com dado financeiro obsoleto).** Funcao nova
+   `_erro_divergencia_financeira_veredito(texto, quote)` compara `Valor
+   pago`/`Vendedor`/`Loja` ja gravados no veredito encontrado por
+   `_veredito_existente_para` contra a cotacao desta chamada - usada em
+   `decide()`, so quando NAO e retomada, NAO e `--force-veredito`, e HA
+   `--comprado` (o unico caminho onde `create_verdict` de fato grava algo
+   no complemento). Qualquer divergencia recusa ANTES de `tracked_operation`
+   (journal, decisao.md, processo.md, snapshot e veredito todos intocados),
+   nomeando o arquivo e cada campo divergente (valor antigo vs novo). Nao
+   sobrescreve o fato historico nem recomenda `--force-veredito` como
+   solucao padrao - so cita a flag como ultimo recurso, com o custo dela
+   explicito na propria mensagem (descarta o veredito inteiro). Quando a
+   cotacao NAO mudou (o caso comum: confirmar a compra dias depois da
+   MESMA cotacao, inclusive com uma decisao intermediaria de outro produto
+   no meio), o complemento continua funcionando exatamente como antes.
+2. **Achado 2 (force-veredito apaga exportacao ja concluida), mais grave.**
+   Funcao nova `_fases_exportadas_do_veredito(texto)` detecta os
+   marcadores `## Aprendizado exportado D+30`, `## Aprendizado exportado
+   D+180` e o legado `## Aprendizado exportado` (sem fase, de vereditos
+   anteriores a essa separacao). `_erro_force_veredito_apagaria_exportacao`
+   usa isso para recusar `--force-veredito` ANTES de qualquer escrita
+   sempre que o veredito encontrado ja tem QUALQUER fase exportada - no
+   MESMO dia ou em outro, com ou sem `--comprado` junto. **Sem flag de
+   contorno**, a pedido explicito do Josemar: a unica saida e reconciliar
+   a mao (conferir o que ja foi exportado em `licoes.md`/marcas/lojas e
+   apagar o arquivo manualmente se ainda quiser descartar). Sem nenhuma
+   fase exportada, `--force-veredito` continua resetando o MESMO veredito
+   normalmente, comportamento documentado de `e048ad6` preservado.
+3. **Achado 3 (observacao) permanece INTOCADO, de proposito.** A checagem
+   de cronologia do achado 4 (2a revisao) continua recusando `decidir
+   --comprado --force-veredito` quando a nova data e cronologicamente
+   impossivel contra o conteudo AINDA NAO substituido do veredito antigo -
+   mesmo sem nenhuma exportacao pendente. O Josemar pediu explicitamente
+   para nao remover essa validacao so para destravar o reset; a
+   inconsistencia de usabilidade (recusar por causa de dado que o proprio
+   reset ia descartar) fica documentada, nao corrigida.
+
+**Sugestao da auditoria (5a revisao) que NAO foi adotada como estava, e
+por que:**
+- O prompt de correcao original (registrado no commit `b8a1e24`) cogitava
+  "exigir confirmacao extra explicita (novo flag, a definir)" para o
+  achado 2. O Josemar pediu explicitamente, nesta sessao, para NAO criar
+  essa flag - a recusa e incondicional. Decisao dele, nao ajuste tecnico.
+- O mesmo prompt original tambem sugeria "pular a checagem de cronologia
+  quando --force-veredito for usado E o veredito antigo nao tiver fase
+  exportada" (resolveria o achado 3 junto). O Josemar pediu explicitamente
+  para NAO mexer nessa validacao nesta correcao - ela continua ativa
+  mesmo no caso sem exportacao (ver achado 3 acima), documentada como
+  observacao separada dos 2 bugs confirmados, nao como pendencia a fechar.
+
+**Achado colateral descoberto ao corrigir:** um teste JA EXISTENTE,
+`test_rev7_bugA_decidir_force_veredito_e_bloqueado_com_aprendizagem_pendente`
+(`tests/test_operation_recovery.py`, da 7a revisao independente de OUTRA
+frente, commit `4908c02`), terminava afirmando que `decidir
+--force-veredito` "SO agora... pode rodar" depois de um `aprender-veredito`
+pendente terminar de exportar - exatamente o cenario que o achado 2 agora
+recusa de proposito (a exportacao acabou de ser CONCLUIDA, nao mais
+pendente). Atualizado para exigir a recusa NOVA (por exportacao ja
+concluida, nao mais por recurso reivindicado) em vez do sucesso antigo -
+mudanca de contrato deliberada desta sessao, nao regressao.
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`SextaRevisaoIndependenteFrente6Test`, 19 testes - os 2 achados
+reproduzidos primeiro em `tests/revisao_independente_e048ad6.py` (script
+externo da sessao 26, incorporado aqui e REMOVIDO do repositorio: o
+mesmo cenario que la provava o defeito, aqui exige a recusa). Cobertura:
+redecisao com cotacao nova apos decisao intermediaria (recusada) e com a
+MESMA cotacao (continua complementando); mudanca isolada de preco, loja e
+vendedor (cada uma sozinha ja recusa); force-veredito ignora divergencia
+financeira de proposito (protecao e a do achado 2, nao a do achado 1);
+force-veredito recusado com D+30 exportado (mesmo dia e outro dia), D+180
+exportado, e marcador legado sem fase; controles de force-veredito sem
+exportacao (continua resetando) e sem veredito existente (continua
+criando); achado 3 preservado como observacao (cronologia ainda bloqueia
+sem exportacao); retomada legitima de complemento (mesma cotacao) nao e
+bloqueada pelas checagens novas; journal real do commit `ee1c21d` (antes
+de `e048ad6` existir) continua retomavel. Mais 4 testes das "hipoteses
+descartadas" da 5a revisao (veredito renomeado, identidade divergente,
+veredito standalone, mensagem de ambiguidade nomeia os arquivos) migrados
+como protecao permanente, sem achado.
+
+Confirmado com `git stash` (so `scripts/central_compras.py`) que
+exatamente os 8 testes que exercitam os 2 achados falham sem a correcao
+(4 de divergencia financeira + 4 de exportacao), nenhum dos outros 11 -
+os controles, a observacao e os testes de resumo/journal antigo passam
+igual, com ou sem a correcao.
+
+**Verificacao:** suite completa **535 testes, 0 falhas** (516 + 19 novos).
+`auditar-decisoes --strict` (so o aviso legado ja conhecido),
+`operacoes-pendentes --strict` (nenhuma pendente), `checar-segredos
+--strict` (limpo) e `git diff --check` (limpo) passaram contra a arvore
+real. `git status --short` mostrou so os 4 arquivos esperados (script,
+teste de frente 6, teste de recuperacao de operacao reconciliado,
+remocao do script externo) - processos HB20S e infraestrutura externa
+intocados. Nenhuma migracao rodada, pesos/gates/historico intocados.
+**Frente 6 continua aberta - falta submeter esta correcao a uma rodada de
+revisao independente que passe limpa.**
 
 **Frente 6, 5a revisao independente (11/09/2026, sessao 26, sobre o
 commit `e048ad6`) - 2 achados confirmados + 1 observacao, nao corrigidos
