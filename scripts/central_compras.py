@@ -3769,6 +3769,47 @@ def _erro_divergencia_financeira_veredito(texto: str, quote: dict[str, Any]) -> 
     )
 
 
+def _mensagem_recusa_financeira_chamada_nova(veredito: Path, erro_financeiro: str) -> str:
+    """Achado D da 6a revisao independente: a orientacao NUNCA pode soar
+    como "edite a linha da cotacao em `cotacoes.csv`" - cotacoes sao
+    append-only (principio 2 do CLAUDE.md e do
+    `docs/como-conferir-auditoria.md`); preco corrigido e SEMPRE cotacao
+    NOVA, nunca edicao de uma linha historica. Tambem nunca trata
+    `--force-veredito` como solucao automatica - so cita a flag com o
+    custo dela explicito (descarta o veredito inteiro), nunca como
+    recomendacao padrao."""
+    return (
+        erro_financeiro + f"\nArquivo: {veredito}. Nada foi alterado.\n"
+        "Confira manualmente qual dado esta certo. Se for a MESMA compra e o preco mudou, "
+        "registre uma cotacao NOVA (`cotar`, nunca editar a linha antiga em cotacoes.csv - "
+        "cotacoes sao append-only) ou corrija o veredito a mao; se for de fato uma decisao "
+        "nova sobre o mesmo produto, repita com --force-veredito (descarta o conteudo anterior "
+        "deste veredito por completo, avaliacoes ja exportadas incluidas - recusado "
+        "automaticamente se houver alguma, ver acima)."
+    )
+
+
+def _mensagem_recusa_pendente_decidir(op_id: str, erro: str) -> str:
+    """Achados A/B da 6a revisao independente: a mesma recusa financeira/de
+    exportacao, mas encontrada ao RETOMAR um journal pendente (nao numa
+    chamada nova) - o veredito desta operacao ainda nao tinha sido escrito
+    quando ela foi interrompida. A orientacao aqui e deliberadamente
+    diferente da chamada nova: repetir com os mesmos argumentos so
+    reabriria o MESMO journal e encontraria o MESMO problema (a cotacao
+    congelada na assinatura nao muda sozinha) - a unica saida real e
+    reconciliar a mao. Nunca sugere apagar o journal como primeiro passo
+    (evidencia da pendencia), so depois de conferir que nada se perde."""
+    return (
+        erro + f"\nIsso apareceu ao retomar uma operacao 'decidir' pendente ({op_id!r}) - o "
+        "veredito desta operacao ainda nao tinha sido escrito quando ela foi interrompida. "
+        "Nada foi alterado agora.\n"
+        "Rode `operacoes-pendentes` para ver o journal completo, confira o veredito e a "
+        "cotacao envolvidos a mao, e reconcilie manualmente antes de continuar - apagar o "
+        "arquivo do journal e um ultimo recurso, so depois de confirmar que nada relevante "
+        "seria perdido."
+    )
+
+
 def decide(args: argparse.Namespace) -> None:
     if args.data_compra and not args.comprado:
         raise SystemExit(
@@ -3950,38 +3991,79 @@ def decide(args: argparse.Namespace) -> None:
     # qualquer arquivo (journal incluido, por isso rodam antes de
     # `tracked_operation`), nunca deixam `create_verdict`/`--force-veredito`
     # decidir sozinho o que fazer com um veredito que nao bate.
-    if not retomando_decisao and veredito_existente_atual is not None:
+    #
+    # Achados A e B da 6a revisao independente: as duas checagens acima so
+    # rodavam numa chamada NOVA (`not retomando_decisao`) - um journal
+    # criado por uma versao ANTERIOR a elas (antes da sessao 27), retomado
+    # com o codigo atual, nunca as via, porque a retomada so reusa
+    # `op.detalhe` congelado sem revalidar nada. Agora tambem rodam numa
+    # retomada, contra o MESMO arquivo que `create_verdict` escreveria (o
+    # nome vem do proprio journal pendente, NUNCA recalculado com
+    # `today()` nem substituido pela cotacao mais recente do ranking - a
+    # cotacao usada na validacao e sempre `quote`, a mesma que o resto
+    # desta chamada usa, protegida pelo proprio `quote_sha256` da
+    # assinatura) - MAS so quando o passo "veredito" ainda nao escreveu de
+    # verdade. Sem essa condicao, uma retomada cujo efeito ja aconteceu
+    # (mesmo sob codigo antigo, sem a checagem) e so falta um passo
+    # POSTERIOR (ex.: `timeline_veredito`) ficaria presa pra sempre, sem
+    # solucao - a checagem nao pode desfazer uma escrita que ja aconteceu,
+    # so evitar uma NOVA. Para o achado 2 (exportacao), reaplicar a
+    # checagem sem essa condicao e seguro mesmo quando o passo ja rodou:
+    # se `--force-veredito` ja tiver apagado os marcadores, a checagem
+    # simplesmente nao acha nada pra proteger e deixa a retomada seguir -
+    # nunca bloqueia um efeito que ja e irreversivel de qualquer jeito.
+    # Os DOIS caminhos (chamada nova, retomada) usam as MESMAS duas
+    # funcoes de checagem - nunca uma logica separada que poderia divergir.
+    if not retomando_decisao:
+        veredito_alvo_validacao = veredito_existente_atual
+        veredito_ja_escrito = False
+    else:
+        veredito_alvo_validacao = None
+        veredito_ja_escrito = False
+        # `pending_operation_record` (ao contrario de `has_pending_operation`)
+        # devolve `None` pra journal ausente OU ilegivel - nesses casos nao
+        # ha registro confiavel de onde validar, entao nada aqui roda; a
+        # entrada em `tracked_operation` mais abaixo ja recusa journal
+        # ilegivel com sua propria mensagem clara (contrato existente,
+        # preservado) - journal ausente/ilegivel nunca autoriza escrita
+        # por suposicao, mas tambem nao inventamos uma checagem sem base.
+        registro_pendente = pending_operation_record(project, op_id, "decidir")
+        if registro_pendente is not None:
+            detalhe_pendente = registro_pendente.get("detalhe") or {}
+            nome_congelado = detalhe_pendente.get("veredito_nome")
+            if nome_congelado:
+                candidato = VEREDITOS / nome_congelado
+                if candidato.exists():
+                    veredito_alvo_validacao = candidato
+            if veredito_alvo_validacao is not None and args.comprado and not args.force_veredito:
+                # achado 1 so grava "Data da compra" - se ela ja bate com o
+                # valor CONGELADO (nunca recalculado com o dia da retomada),
+                # a escrita ja aconteceu e nao ha mais nada a proteger aqui;
+                # sem evidencia nenhuma da data congelada, trata como AINDA
+                # NAO escrito (mais seguro validar de mais do que presumir).
+                data_congelada = _data_compra_efetiva_de_journal(
+                    detalhe_pendente, registro_pendente.get("iniciado_em") or "", args.data_compra,
+                )
+                if data_congelada:
+                    texto_pendente = veredito_alvo_validacao.read_text(encoding="utf-8")
+                    veredito_ja_escrito = extract_bullet(texto_pendente, "Data da compra") == data_congelada
+    if veredito_alvo_validacao is not None:
         if args.force_veredito:
-            # Achado 2: antes de e048ad6, --force-veredito num dia diferente
-            # criava um arquivo NOVO - o antigo, com qualquer D+30/D+180 ja
-            # exportado, ficava intocado. Agora ele mira o MESMO arquivo por
-            # identidade; sem esta checagem, reseta silenciosamente um
-            # historico ja exportado para a base de conhecimento e reabre a
-            # porta para `aprender-veredito` duplicar a mesma licao (o
-            # marcador que evita reexportacao e o que seria apagado).
-            erro_export = _erro_force_veredito_apagaria_exportacao(veredito_existente_atual)
+            erro_export = _erro_force_veredito_apagaria_exportacao(veredito_alvo_validacao)
             if erro_export:
-                raise SystemExit(erro_export)
-        elif args.comprado:
-            # Achado 1: `create_verdict` (mais abaixo) so complementa `Data
-            # da compra` quando o arquivo ja existe - nunca atualiza `Valor
-            # pago`/`Vendedor`/`Loja`. Sem esta checagem, uma redecisao
-            # legitima (`decidir A`, `decidir B`, `decidir A` de novo com
-            # cotacao nova) grava a data da compra CERTA ao lado de um
-            # preco/loja OBSOLETOS da primeira vez que o produto foi
-            # decidido. Nao se aplica com --force-veredito: ali o conteudo
-            # inteiro e descartado de proposito (guardado pela checagem
-            # acima), entao divergencia de preco e irrelevante.
+                raise SystemExit(
+                    erro_export if not retomando_decisao
+                    else _mensagem_recusa_pendente_decidir(op_id, erro_export)
+                )
+        elif args.comprado and not veredito_ja_escrito:
             erro_financeiro = _erro_divergencia_financeira_veredito(
-                veredito_existente_atual.read_text(encoding="utf-8"), quote
+                veredito_alvo_validacao.read_text(encoding="utf-8"), quote
             )
             if erro_financeiro:
                 raise SystemExit(
-                    erro_financeiro + f"\nArquivo: {veredito_existente_atual}. Nada foi alterado.\n"
-                    "Confira manualmente qual dado esta certo - corrija a cotacao/veredito se for a "
-                    "MESMA compra, ou repita com --force-veredito se for de fato uma decisao nova "
-                    "(isso descarta o conteudo anterior deste veredito por completo, avaliacoes "
-                    "ja exportadas incluidas - recusado automaticamente se houver alguma, ver acima)."
+                    _mensagem_recusa_financeira_chamada_nova(veredito_alvo_validacao, erro_financeiro)
+                    if not retomando_decisao
+                    else _mensagem_recusa_pendente_decidir(op_id, erro_financeiro)
                 )
     # Mesmo principio para `Data da compra`: `--comprado` sem `--data-compra`
     # explicita cai em `today()`, mas isso so pode ser calculado UMA VEZ, na
@@ -4041,22 +4123,44 @@ def _iso_date_prefix(value: Any) -> str | None:
     return texto
 
 
-def _data_compra_para_decidir(args: argparse.Namespace, op: "OperationHandle") -> str | None:
-    if not args.comprado:
-        return None
-    if args.data_compra:
-        return args.data_compra
-    congelada = op.detalhe.get("data_compra_efetiva")
+def _data_compra_efetiva_de_journal(
+    detalhe: dict[str, Any], iniciado_em: str, data_compra_explicita: str | None,
+) -> str | None:
+    """Recupera a `Data da compra` EFETIVA de uma operacao `decidir` a
+    partir do que ja foi persistido - nunca do dia atual da retomada.
+    `None` quando nao ha evidencia nenhuma (chamador decide o que fazer:
+    `_data_compra_para_decidir` recusa a retomada; a checagem de retomada
+    dos achados A/B da 6a revisao, mais abaixo em `decide()`, trata "sem
+    evidencia" como "nao da pra confirmar que ja foi escrito", entao roda
+    a validacao normalmente em vez de presumir que pode pular).
+
+    Extraida de `_data_compra_para_decidir` (que so acrescenta a recusa)
+    para ser reaproveitada tambem por uma checagem PURA, sem precisar de
+    um `OperationHandle` (que so existe depois de `tracked_operation`
+    reabrir o journal - tarde demais pra recusar antes de qualquer
+    escrita)."""
+    if data_compra_explicita:
+        return data_compra_explicita
+    congelada = detalhe.get("data_compra_efetiva")
     if congelada:
         return congelada
     # Compatibilidade com journals da frente 6 antes de `data_compra_efetiva`:
     # o nome do veredito ja era congelado na tentativa original e comecava pela
     # data que `--comprado` implicito usou. `iniciado_em` fica como segunda
     # evidencia persistida. Nunca cai em `today()` da retomada.
-    for evidencia in (op.detalhe.get("veredito_nome"), op.iniciado_em):
+    for evidencia in (detalhe.get("veredito_nome"), iniciado_em):
         data = _iso_date_prefix(evidencia)
         if data:
             return data
+    return None
+
+
+def _data_compra_para_decidir(args: argparse.Namespace, op: "OperationHandle") -> str | None:
+    if not args.comprado:
+        return None
+    resultado = _data_compra_efetiva_de_journal(op.detalhe, op.iniciado_em, args.data_compra)
+    if resultado:
+        return resultado
     raise SystemExit(
         "Nao da para retomar `decidir --comprado`: o journal antigo nao contem "
         "data da compra efetiva, nome de veredito datado nem `iniciado_em` valido. "

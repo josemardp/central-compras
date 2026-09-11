@@ -1398,17 +1398,17 @@ de novo, vale reler o contrato inteiro desta seção antes de mexer.
 
 ## 6. Datas e vereditos
 
-**Estado: implementada (09/09/2026, sessão 20), corrigida após cinco
+**Estado: implementada (09/09/2026, sessão 20), corrigida após seis
 rodadas de revisão independente (sessão 21: 5 achados; sessão 22: 4;
 sessão 23: 2, corrigidos em 10/09/2026 na sessão 24; sessão 25: 1,
 corrigido na própria sessão 25, 11/09/2026; sessão 26: 2 falhas
-confirmadas + 1 observação, corrigidas em 11/09/2026 na sessão 27). A 6ª
-rodada (sessão 28, 11/09/2026, sobre o commit `1c8b503`) achou mais 3
-falhas confirmadas + 1 observação de wording, **ainda não corrigidas**.
-Ainda falta UMA rodada de revisão que passe limpa antes de declarar
-"concluída sob reserva", mesmo requisito aplicado à frente 5 — nenhuma
-correção desta frente conseguiu isso até agora (6 rodadas seguidas
-achando falha nova).
+confirmadas + 1 observação, corrigidas em 11/09/2026 na sessão 27; sessão
+28: 3 falhas confirmadas + 1 observação de wording — achados A, B e D
+corrigidos em 11/09/2026 na sessão 29, **achado C deixado deliberadamente
+em aberto** como pergunta de escopo ao Josemar). Ainda falta UMA rodada
+de revisão que passe limpa antes de declarar "concluída sob reserva",
+mesmo requisito aplicado à frente 5 — nenhuma correção desta frente
+conseguiu isso até agora (6 rodadas seguidas achando falha nova).
 
 **Contrato adotado:** decisão, compra/pagamento, entrega e início de uso
 são quatro fatos datados independentes. `decidir` fecha só a escolha —
@@ -2270,6 +2270,85 @@ migração rodada, pesos/gates/histórico intocados, processos HB20S e
 infraestrutura externa intactos. **Frente 6 continua aberta — falta
 corrigir os achados A e B, decidir o escopo do achado C com o Josemar, e
 submeter mais uma rodada de revisão independente.**
+
+### Correção dos achados A, B e D da 6ª revisão (sessão 29, 11/09/2026, commit apos `b748809`)
+
+**Causa raiz confirmada:** `_erro_divergencia_financeira_veredito`/
+`_erro_force_veredito_apagaria_exportacao` (sessão 27) só rodavam quando
+`not retomando_decisao`. Um journal criado por uma versão anterior a
+elas, retomado com o código atual, nunca as via — mesmo padrão do achado
+3 da 2ª revisão e dos achados da 3ª revisão desta frente.
+
+**Corrigido:**
+
+1. As duas checagens agora também rodam numa retomada. O alvo vem do
+   próprio journal pendente (`pending_operation_record(...)["detalhe"]["veredito_nome"]`)
+   — nunca recalculado com `today()`, nem substituído pela cotação mais
+   recente do ranking (a cotação usada é sempre `quote`, a mesma variável
+   que o resto de `decide()` usa, protegida pelo `quote_sha256` da
+   própria assinatura). Chamada nova e retomada usam as MESMAS duas
+   funções — nunca lógica separada.
+2. **Passo já concluído não trava a retomada (achado 1/financeiro).** Se
+   `Data da compra` já bate com o valor CONGELADO
+   (`_data_compra_efetiva_de_journal`, extraída de
+   `_data_compra_para_decidir` para funcionar sem um `OperationHandle`),
+   a escrita já aconteceu — a checagem financeira é pulada, não há mais
+   nada a proteger. Sem evidência da data congelada, trata como ainda não
+   escrito (mais seguro validar de mais).
+3. **Exportação (achado 2) é auto-suficiente.** Reaplicar sem condição
+   nenhuma é seguro mesmo com o passo já concluído: se `--force-veredito`
+   já apagou os marcadores, a checagem não acha nada para proteger e
+   deixa a retomada seguir.
+4. **Interrupção entre a escrita efetiva e a marcação de "concluído"**
+   (crash em `veredito:executado`, antes de `_concluir`): coberta pelos
+   dois pontos acima — o passo continua `"tentando"` no journal, mas o
+   conteúdo já reflete a escrita real; a checagem financeira reconhece
+   isso e não repete nem bloqueia; a de exportação continua
+   auto-suficiente.
+5. **Journal ausente, ilegível ou incompleto não autoriza escrita por
+   suposição.** `pending_operation_record` devolve `None` para journal
+   ilegível — a checagem nova simplesmente não roda, e `tracked_operation`
+   continua recusando com sua mensagem de journal ilegível de sempre
+   (contrato existente preservado).
+6. **Recusas preservam journal e arquivos, nunca recomendam apagar
+   evidência como solução.** Mensagem nova,
+   `_mensagem_recusa_pendente_decidir`: explica a pendência, aponta
+   `operacoes-pendentes`, só cita apagar o journal como último recurso.
+
+**Corrigido (achado D):** `_mensagem_recusa_financeira_chamada_nova`
+reescrita — nunca mais sugere "corrija a cotação/veredito" (podia ser
+lida como editar `cotacoes.csv`). Agora diz explicitamente "registre uma
+cotação NOVA (`cotar`, nunca editar a linha antiga — cotações são
+append-only)"; `--force-veredito` continua citado só como último recurso.
+
+**Não implementado nesta sessão, de propósito:** achado C
+(`registrar-evento --evento comprado` nunca confere preço) — expansão de
+escopo de `registrar-evento`, não correção pontual. Reprodução preservada
+em `tests/revisao_independente_1c8b503.py`, aguardando decisão do
+Josemar: ele quer essa checagem também em `registrar-evento`, ou prefere
+que `Valor pago` só seja confiável quando a compra passa por `decidir
+--comprado`/complemento?
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`SetimaRevisaoIndependenteFrente6Test`, 11 testes — achados A e B
+(financeiro, D+30, D+180, marcador legado), controle de cotação igual,
+os 2 controles já publicados (passo já concluído; chamada nova com
+exportação sem journal), as 2 janelas de interrupção "escrita efetiva
+antes de concluir", journal ilegível preserva a recusa existente, e a
+mensagem D nunca sugere editar `cotacoes.csv`.
+
+Confirmado com `git stash` (só `scripts/central_compras.py`) que
+exatamente os 5 testes que exercitam os achados A, B e D falham sem a
+correção, nenhum dos outros 6.
+
+**Verificação:** suíte completa **546 testes, 0 falhas** (535 + 11
+novos). `auditar-decisoes --strict`, `operacoes-pendentes --strict`,
+`checar-segredos --strict` e `git diff --check` limpos contra a árvore
+real. `git status --short` mostrou só os 3 arquivos esperados. Nenhuma
+migração rodada, pesos/gates/histórico intocados, processos HB20S e
+infraestrutura externa intactos. **Frente 6 continua aberta — falta
+decidir o escopo do achado C com o Josemar e submeter esta correção a uma
+rodada de revisão independente.**
 
 ## 7. Validação e publicação
 

@@ -5,18 +5,17 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (11/09/2026, sessao 28)
+## AO RETOMAR — comece por aqui (11/09/2026, sessao 29)
 
-**Proximo passo:** corrigir os achados confirmados pela 6a revisao
-independente da frente 6 (bloco abaixo, sessao 28, sobre o commit
-`1c8b503`) - journal de versao anterior (`e048ad6`) que, ao ser retomado
-com o codigo atual, PULA as duas checagens novas da sessao 27 (financeira
-e de exportacao); e `registrar-evento --evento comprado`, um caminho
-inteiramente separado de `decidir`, que nunca confere preco. So depois
-submeter a MAIS uma rodada de revisao independente. So declarar "frente 6
-concluida sob reserva" quando uma rodada passar sem achado - nenhuma
-correcao anterior desta frente conseguiu isso ainda (6 rodadas seguidas ja
-acharam falha nova).
+**Proximo passo:** submeter a correcao desta sessao (bloco abaixo) a MAIS
+uma rodada de revisao independente da frente 6. O achado C da 6a revisao
+(`registrar-evento --evento comprado` nunca confere preco) continua
+ABERTO de proposito - e pergunta de escopo para o Josemar, nao foi
+implementado. So declarar "frente 6 concluida sob reserva" quando uma
+rodada passar sem achado NOVO (achado C pendente de decisao nao conta
+como "limpa", mas tambem nao bloqueia sozinho - depende do que o Josemar
+decidir) - nenhuma correcao anterior desta frente conseguiu uma rodada
+limpa ainda (6 rodadas seguidas ja acharam falha nova).
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -29,28 +28,34 @@ acharam falha nova).
   real - so o preview foi conferido em cada rodada.
 - **Frente 6 (datas/veredito): AINDA NAO CONCLUIDA.** Implementada na
   sessao 20; 6 rodadas de revisao independente ja acharam 5, depois 4,
-  depois 2, depois 1, depois 2, depois 3 falhas reais - as 5 primeiras
-  corrigidas nos commits `3acc96a`, `ad6a04a`, `aaa02f0`, `e048ad6` e
-  `1c8b503`; a 6a (sessao 28, sobre `1c8b503`) esta no bloco abaixo,
-  **ainda sem correcao**. **Nao considere a frente 6 encerrada depois de
-  apenas rodar a suite local** - a frente 5 levou 7 rodadas ate uma
-  revisao passar limpa, e esta frente ja teve 6 rodadas seguidas achando
-  falha nova.
-  **Achado da 6a revisao independente, registrado para nao se repetir**:
-  as checagens novas da sessao 27
-  (`_erro_divergencia_financeira_veredito`,
-  `_erro_force_veredito_apagaria_exportacao`) so rodam quando
+  depois 2, depois 1, depois 2, depois 3 falhas reais - as 6 primeiras
+  corrigidas nos commits `3acc96a`, `ad6a04a`, `aaa02f0`, `e048ad6`,
+  `1c8b503` e o bloco desta sessao (abaixo, sessao 29, achados A/B e
+  mensagem D da 6a revisao). **Achado C da 6a revisao continua ABERTO,
+  deliberadamente** - expansao de escopo de `registrar-evento` (nunca
+  teve nocao de preco, por design), registrado como pergunta ao Josemar,
+  nao decisao tecnica automatica; reproducao preservada em
+  `tests/revisao_independente_1c8b503.py`. **Nao considere a frente 6
+  encerrada depois de apenas rodar a suite local** - a frente 5 levou 7
+  rodadas ate uma revisao passar limpa, e esta frente ja teve 6 rodadas
+  seguidas achando falha nova.
+  **Achado da 6a revisao independente, corrigido na sessao 29**: as
+  checagens novas da sessao 27 (`_erro_divergencia_financeira_veredito`,
+  `_erro_force_veredito_apagaria_exportacao`) so rodavam quando
   `not retomando_decisao` - um journal criado por uma versao ANTERIOR do
-  codigo (sem essas checagens) e retomado com a versao ATUAL pula as duas
-  por completo, porque a retomada nunca reexecuta validacao nenhuma, so
-  usa o dado ja congelado. Isso e o MESMO padrao ja visto 2 vezes antes
-  nesta frente (achado 3 da 2a revisao, achados da 3a revisao): uma
-  validacao nova, adicionada so no caminho de chamada NOVA, tem que
-  tambem ser aplicada na retomada de um journal ANTIGO que nunca a viu -
+  codigo (sem essas checagens) e retomado com a versao ATUAL pulava as
+  duas por completo, porque a retomada nunca reexecutava validacao
+  nenhuma, so usava o dado ja congelado. Mesmo padrao ja visto 2 vezes
+  antes nesta frente (achado 3 da 2a revisao, achados da 3a revisao): uma
+  validacao nova, adicionada so no caminho de chamada NOVA, tambem
+  precisa ser aplicada na retomada de um journal ANTIGO que nunca a viu -
   mas SO quando o passo que ela protege AINDA NAO foi concluido
   (`registro["passos"]["veredito"]["situacao"] != "concluido"`); bloquear
   incondicionalmente prenderia pra sempre uma operacao cujo efeito ja
-  aconteceu, so por causa de um passo POSTERIOR ainda pendente.
+  aconteceu, so por causa de um passo POSTERIOR ainda pendente. Agora
+  protegido por codigo (ver bloco da sessao 29 abaixo) - mas o PRINCIPIO
+  continua valendo para qualquer validacao nova que venha a ser
+  adicionada so no caminho de chamada nova desta frente.
   **Achado transversal da 2a rodada, registrado para nao se repetir**:
   `_assinaturas_compativeis` (mecanismo COMPARTILHADO por TODO
   `tracked_operation` - `decidir`, `registrar-evento`, `vincular-produto`,
@@ -90,6 +95,104 @@ acharam falha nova).
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
 - Nenhum passo manual pendente do Josemar neste momento.
+
+**Frente 6, correcao dos achados A e B e da mensagem D da 6a revisao
+independente (11/09/2026, sessao 29).** Achados registrados no commit
+`b748809` (bloco seguinte, abaixo, preservado como historico). Baseline
+confirmado ANTES de tocar em qualquer coisa: suite completa **535 testes,
+0 falhas**, identica a sessao 28.
+
+**Corrigido (achados A e B, mesma causa raiz - `decide()`):**
+
+1. As duas checagens da sessao 27 (`_erro_divergencia_financeira_veredito`,
+   `_erro_force_veredito_apagaria_exportacao`) agora tambem rodam numa
+   RETOMADA (`retomando_decisao`), nao so numa chamada nova. O alvo da
+   validacao vem do proprio journal pendente
+   (`pending_operation_record(project, op_id, "decidir")["detalhe"]["veredito_nome"]`)
+   - NUNCA recalculado com `today()`, nem substituido pela cotacao mais
+   recente do ranking (a cotacao usada e sempre `quote`, a mesma variavel
+   que o resto de `decide()` ja usa, protegida pelo `quote_sha256` da
+   propria assinatura). Os DOIS caminhos (chamada nova, retomada) chamam
+   as MESMAS duas funcoes - nunca uma logica separada.
+2. **Passo ja concluido nao trava a retomada (achado 1/financeiro).**
+   Se `Data da compra` no veredito congelado ja bate com o valor CONGELADO
+   (`_data_compra_efetiva_de_journal`, extraida de `_data_compra_para_decidir`
+   pra ser reaproveitada sem precisar de um `OperationHandle`), a escrita
+   ja aconteceu e a checagem financeira e pulada - nao ha mais nada a
+   proteger, e bloquear so travaria pra sempre uma operacao cujo efeito
+   ja e irreversivel. Sem evidencia da data congelada, trata como AINDA
+   NAO escrito (mais seguro validar de mais do que presumir).
+3. **Exportacao (achado 2) e auto-suficiente, nao precisa da mesma
+   distincao.** Reaplicar a checagem de exportacao sem condicao nenhuma
+   e seguro mesmo quando o passo ja rodou: se `--force-veredito` ja tiver
+   apagado os marcadores, a checagem simplesmente nao acha nada pra
+   proteger e deixa a retomada seguir - nunca bloqueia um efeito que ja e
+   irreversivel de qualquer jeito.
+4. **Interrupcao entre a escrita efetiva e a marcacao de "concluido" no
+   journal** (`_crash_de_teste_se_pedido("veredito:executado")`, ANTES de
+   `_concluir("veredito")`): coberta pelos dois pontos acima - o
+   `passo_veredito` continua `"tentando"` no journal, mas o CONTEUDO ja
+   reflete a escrita real; a checagem financeira reconhece isso (Data da
+   compra ja bate) e nao repete nem bloqueia; a de exportacao continua
+   auto-suficiente.
+5. **Journal ausente, ilegivel ou incompleto nao autoriza escrita por
+   suposicao.** `pending_operation_record` (ao contrario de
+   `has_pending_operation`) devolve `None` pra journal ilegivel - nesse
+   caso a checagem nova simplesmente nao roda (nao ha registro confiavel
+   pra validar contra), e a entrada em `tracked_operation` mais abaixo
+   continua recusando com a mensagem de journal ilegivel de sempre,
+   contrato existente preservado, journal nunca sobrescrito.
+6. **Recusas preservam journal e arquivos, nunca recomendam apagar
+   evidencia como solucao.** Mensagem nova,
+   `_mensagem_recusa_pendente_decidir`: explica que a pendencia veio de
+   retomar uma operacao 'decidir' cujo veredito ainda nao tinha sido
+   escrito, aponta `operacoes-pendentes` para ver o journal completo, e
+   so cita apagar o journal como ULTIMO recurso, depois de conferir que
+   nada relevante se perde - nunca como primeiro passo.
+
+**Corrigido (achado D, wording):** `_mensagem_recusa_financeira_chamada_nova`
+reescrita - nunca mais sugere "corrija a cotacao/veredito" (podia ser lida
+como editar `cotacoes.csv`, append-only). Agora diz explicitamente
+"registre uma cotacao NOVA (`cotar`, nunca editar a linha antiga em
+cotacoes.csv - cotacoes sao append-only)"; `--force-veredito` continua
+citado so como ultimo recurso, com o custo explicito, nunca como
+recomendacao automatica.
+
+**Nao implementado nesta sessao, de proposito:** achado C
+(`registrar-evento --evento comprado` nunca confere preco) - expansao de
+escopo de `registrar-evento`, nao correcao pontual. Reproducao preservada
+em `tests/revisao_independente_1c8b503.py` (fora da suite oficial),
+aguardando decisao do Josemar sobre o contrato (ver pergunta registrada
+na secao 6 do plano).
+
+**Testes:** `tests/test_frente6_datas_veredito.py`,
+`SetimaRevisaoIndependenteFrente6Test`, 11 testes - os achados A e B
+(reproduzidos primeiro em `tests/revisao_independente_1c8b503.py`,
+incorporados aqui, arquivo externo trimado so pro achado C); controle de
+cotacao igual continua retomavel; os 2 controles ja publicados na 6a
+revisao (passo ja concluido continua retomavel; chamada nova com
+exportacao continua recusada sem journal); as 2 janelas de interrupcao
+"escrita efetiva antes de concluir" (lado financeiro e lado exportacao);
+journal ilegivel preserva a recusa existente; e a mensagem D nunca sugere
+editar `cotacoes.csv`. D+30, D+180 e o marcador legado cobertos
+separadamente para o achado B.
+
+Confirmado com `git stash` (so `scripts/central_compras.py`) que
+exatamente os 5 testes que exercitam os achados A, B e D falham sem a
+correcao (financeiro, D+30, D+180, legado, mensagem), nenhum dos outros 6
+(controles e janelas de interrupcao, que ja funcionavam antes por razoes
+independentes da correcao).
+
+**Verificacao:** suite completa **546 testes, 0 falhas** (535 + 11
+novos). `auditar-decisoes --strict` (so o aviso legado ja conhecido),
+`operacoes-pendentes --strict` (nenhuma pendente), `checar-segredos
+--strict` (limpo) e `git diff --check` (limpo) passaram contra a arvore
+real. `git status --short` mostrou so os 3 arquivos esperados (script,
+teste oficial, arquivo externo trimado). Nenhuma migracao rodada,
+pesos/gates/historico intocados, processos HB20S e infraestrutura externa
+intactos. **Frente 6 continua aberta - falta decidir o escopo do achado C
+com o Josemar e submeter esta correcao a uma rodada de revisao
+independente.**
 
 **Frente 6, 6a revisao independente (11/09/2026, sessao 28, sobre o
 commit `1c8b503`) - 3 achados confirmados + 1 observacao de wording, nao

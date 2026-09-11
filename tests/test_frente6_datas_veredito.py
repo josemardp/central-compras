@@ -1748,5 +1748,344 @@ class SextaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertIn(veredito2.name, mensagem)
 
 
+class SetimaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
+    """Regressao dos achados A e B da 6a revisao independente (sobre o
+    commit `1c8b503`) - reproduzidos primeiro em
+    `tests/revisao_independente_1c8b503.py` (script externo daquela
+    sessao, removido depois de incorporado aqui). Os testes daquele
+    arquivo PASSAVAM com o defeito presente (retomada de journal ANTIGO
+    ignorava as checagens da 5a revisao); aqui eles exigem o comportamento
+    CORRETO (recusa antes de qualquer escrita, preservando journal e
+    arquivos) ou a preservacao explicita dos controles ja publicados.
+
+    Raiz comum: `_erro_divergencia_financeira_veredito`/
+    `_erro_force_veredito_apagaria_exportacao` (5a revisao) so rodavam
+    quando `not retomando_decisao` - um journal de uma versao ANTERIOR a
+    elas, retomado com o codigo atual, nunca as via. Corrigido: as duas
+    tambem rodam numa retomada, contra o arquivo congelado no proprio
+    journal pendente (`pending_operation_record`), MAS so quando o passo
+    "veredito" ainda nao escreveu de verdade (achado 1) - achado 2
+    continua seguro mesmo depois de escrito, porque a ausencia dos
+    marcadores de exportacao e auto-suficiente (nada resta pra proteger)."""
+
+    def _decidir(self, project, pid="candidato", extra=()):
+        self.product(project, pid)
+        self.quote(project, pid, "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", pid,
+                  "--porque", "unico candidato", "--sem-perdedores", *extra)
+        return next(p for p in cc.VEREDITOS.glob("*.md") if pid in p.name)
+
+    def _script_com_codigo(self, commit):
+        script = self.root / "scripts" / "central_compras.py"
+        atual = script.read_bytes()
+        antigo = subprocess.run(
+            ["git", "show", f"{commit}:scripts/central_compras.py"],
+            cwd=REPO, capture_output=True, check=True,
+        ).stdout
+        return script, atual, antigo
+
+    def _rodar(self, script, args, crash_apos=None):
+        env = os.environ.copy()
+        if crash_apos:
+            env["CENTRAL_COMPRAS_TESTE_CRASH_APOS"] = crash_apos
+        return subprocess.run(
+            [sys.executable, str(script), *args], cwd=self.root, env=env, capture_output=True, text=True,
+        )
+
+    # ---- achado A: journal antigo bypassava a checagem financeira -------
+
+    def test_journal_antigo_e048ad6_retomado_recusa_divergencia_financeira_e_preserva_tudo(self):
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual",
+                   "--data", f"{dt.date.today().isoformat()}T09:00:00")
+
+        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script.write_bytes(antigo_e048ad6)
+        primeira = self._rodar(script, ["decidir", str(project), "--produto-id", "candidato",
+                                         "--porque", "primeira escolha", "--sem-perdedores"])
+        self.assertEqual(primeira.returncode, 0, primeira.stderr)
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Valor pago"), cc.brl(200.0))
+
+        self.quote(project, "candidato", "--fonte", "manual", "--preco", "999", "--loja", "LojaNova",
+                   "--data", f"{dt.date.today().isoformat()}T10:00:00")
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "reconsiderei com cotacao nova", "--sem-perdedores", "--comprado"]
+        crash = self._rodar(script, args, crash_apos="veredito:iniciado")
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+        texto_antes_da_retomada = veredito.read_bytes()
+        journal = next((project / ".operacoes").glob("*.json"))
+        journal_antes = journal.read_bytes()
+
+        script.write_bytes(atual)
+        retomada = self._rodar(script, args)
+        # CORRIGIDO: a retomada de um journal antigo, com dado financeiro
+        # que nao bate, e recusada - nunca grava a data da compra ao lado
+        # de um preco obsoleto.
+        self.assertNotEqual(retomada.returncode, 0,
+                            "retomada com divergencia financeira tem que ser recusada")
+        self.assertIn("dados diferentes da cotacao", retomada.stdout + retomada.stderr)
+        self.assertEqual(veredito.read_bytes(), texto_antes_da_retomada, "veredito nao pode ter sido alterado")
+        self.assertEqual(journal.read_bytes(), journal_antes, "journal pendente tem que ser preservado intocado")
+        self.assertTrue(cc.pending_operations([project]), "a operacao continua pendente para reconciliacao")
+
+    def test_controle_journal_antigo_com_mesma_cotacao_continua_retomavel(self):
+        """Controle: quando a cotacao da retomada bate com a do veredito
+        (o caso comum), um journal antigo continua sendo retomado
+        normalmente - a correcao do achado A nao pode travar o caminho
+        legitimo."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+
+        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script.write_bytes(antigo_e048ad6)
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+        crash = self._rodar(script, args, crash_apos="veredito:iniciado")
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+
+        script.write_bytes(atual)
+        retomada = self._rodar(script, args)
+        self.assertEqual(retomada.returncode, 0, retomada.stderr)
+        self.assertFalse(cc.pending_operations([project]))
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.assertTrue(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"))
+
+    # ---- achado B: journal antigo bypassava a protecao de exportacao ----
+
+    def _veredito_com_exportacao(self, fase):
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        self.cli("registrar-evento", str(veredito), "--evento", "entrega")
+        self.cli("registrar-evento", str(veredito), "--evento", "inicio_uso")
+        self.cli("preencher-veredito", str(veredito), "--fase", fase,
+                  "--nota-arrependimento", "9", "--compraria-de-novo", "sim",
+                  "--resumo", "Avaliacao real registrada.")
+        self.cli("aprender-veredito", str(veredito), "--fase", fase,
+                  "--licao", "Licao real desta avaliacao.")
+        return project, veredito
+
+    def _assert_journal_antigo_preserva_exportacao(self, fase, marcador):
+        project, veredito = self._veredito_com_exportacao(fase)
+        texto_com_fase = veredito.read_text(encoding="utf-8")
+        self.assertIn(marcador, texto_com_fase)
+        licoes_antes = (cc.BASE / "licoes.md").read_bytes()
+
+        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script.write_bytes(antigo_e048ad6)
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "refazendo do zero", "--sem-perdedores", "--force-veredito"]
+        crash = self._rodar(script, args, crash_apos="veredito:iniciado")
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+        texto_antes_da_retomada = veredito.read_bytes()
+        journal = next((project / ".operacoes").glob("*.json"))
+        journal_antes = journal.read_bytes()
+
+        script.write_bytes(atual)
+        retomada = self._rodar(script, args)
+        # CORRIGIDO: a retomada de um journal antigo com --force-veredito
+        # sobre um veredito ja exportado e recusada - nunca apaga a
+        # avaliacao nem o marcador que evita reexportar a mesma licao.
+        self.assertNotEqual(retomada.returncode, 0,
+                            "retomada que apagaria exportacao ja concluida tem que ser recusada")
+        self.assertIn("ja tem aprendizado exportado", retomada.stdout + retomada.stderr)
+        self.assertEqual(veredito.read_bytes(), texto_antes_da_retomada, "veredito nao pode ter sido alterado")
+        self.assertEqual(journal.read_bytes(), journal_antes, "journal pendente tem que ser preservado intocado")
+        self.assertEqual((cc.BASE / "licoes.md").read_bytes(), licoes_antes)
+        self.assertTrue(cc.pending_operations([project]))
+
+    def test_journal_antigo_e048ad6_retomado_recusa_apagar_exportacao_d30(self):
+        self._assert_journal_antigo_preserva_exportacao("d30", "Aprendizado exportado D+30")
+
+    def test_journal_antigo_e048ad6_retomado_recusa_apagar_exportacao_d180(self):
+        self._assert_journal_antigo_preserva_exportacao("d180", "Aprendizado exportado D+180")
+
+    def test_journal_antigo_e048ad6_retomado_recusa_apagar_exportacao_marcador_legado(self):
+        """Marcador legado (sem fase, de vereditos anteriores a essa
+        separacao) - escrito a mao, ja que nenhum caminho atual do CLI
+        grava esse formato, so vereditos reais anteriores a essa mudanca."""
+        project, veredito = self._veredito_com_exportacao("d30")
+        texto = veredito.read_text(encoding="utf-8")
+        texto = texto.replace("## Aprendizado exportado D+30", "## Aprendizado exportado")
+        cc.atomic_write_text(veredito, texto)
+        self.assertIn("## Aprendizado exportado\n", veredito.read_text(encoding="utf-8"))
+        licoes_antes = (cc.BASE / "licoes.md").read_bytes()
+
+        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script.write_bytes(antigo_e048ad6)
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "refazendo do zero", "--sem-perdedores", "--force-veredito"]
+        crash = self._rodar(script, args, crash_apos="veredito:iniciado")
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+        texto_antes_da_retomada = veredito.read_bytes()
+
+        script.write_bytes(atual)
+        retomada = self._rodar(script, args)
+        self.assertNotEqual(retomada.returncode, 0)
+        self.assertIn("ja tem aprendizado exportado", retomada.stdout + retomada.stderr)
+        self.assertEqual(veredito.read_bytes(), texto_antes_da_retomada)
+        self.assertEqual((cc.BASE / "licoes.md").read_bytes(), licoes_antes)
+
+    # ---- controles publicados: nao podem regredir com esta correcao -----
+
+    def test_controle_journal_com_passo_veredito_ja_concluido_continua_retomavel(self):
+        """Controle ja publicado na 6a revisao: um journal cujo passo
+        "veredito" JA CONCLUIU (escrita real ja aconteceu, sob codigo
+        antigo ou novo - so falta um passo POSTERIOR) continua retomavel
+        normalmente - a correcao dos achados A/B nao pode travar pra
+        sempre uma operacao cujo efeito ja aconteceu."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+
+        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script.write_bytes(antigo_e048ad6)
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "de novo", "--sem-perdedores", "--comprado"]
+        # Crash DEPOIS do passo "veredito" concluir, ANTES do proximo
+        # passo (timeline_veredito) - journal fica com "veredito":
+        # {"situacao": "concluido"}.
+        crash = self._rodar(script, args, crash_apos="timeline_veredito:iniciado")
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+        journal = next((project / ".operacoes").glob("*.json"))
+        registro = json.loads(journal.read_text(encoding="utf-8"))
+        self.assertEqual(registro["passos"]["veredito"]["situacao"], "concluido")
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today())
+
+        script.write_bytes(atual)
+        retomada = self._rodar(script, args)
+        self.assertEqual(retomada.returncode, 0, retomada.stderr)
+        self.assertFalse(cc.pending_operations([project]))
+
+    def test_controle_chamada_nova_com_exportacao_continua_recusada_sem_journal(self):
+        """Controle ja publicado: uma chamada NOVA (sem journal nenhum)
+        sobre um veredito ja exportado continua recusada de cara, sem
+        criar journal - a correcao dos achados A/B (que passou a ler o
+        journal pendente) nao pode mudar o caminho de chamada nova."""
+        project, veredito = self._veredito_com_exportacao("d30")
+        texto_antes = veredito.read_bytes()
+        with self.assertRaisesRegex(SystemExit, "ja tem aprendizado exportado"):
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "de novo", "--sem-perdedores", "--force-veredito")
+        self.assertFalse(cc.pending_operations([project]))
+        self.assertEqual(veredito.read_bytes(), texto_antes)
+
+    # ---- janela de interrupcao: escrita ja efetiva, journal ainda "tentando" --
+
+    def test_interrupcao_apos_escrever_data_da_compra_e_antes_de_concluir_nao_repete_nem_bloqueia(self):
+        """Crash ENTRE `create_verdict` gravar de verdade e o journal
+        marcar o passo "veredito" como concluido (`_crash_de_teste_se_pedido`
+        entre `executar()` e `_concluir`) - a retomada tem que reconhecer
+        que a escrita ja aconteceu (Data da compra ja bate com o valor
+        CONGELADO) e completar o resto da operacao, sem re-bloquear por
+        divergencia (nada mudou) nem duplicar o bullet."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "de novo", "--sem-perdedores", "--comprado"]
+        script = self.root / "scripts" / "central_compras.py"
+        crash = self._rodar(script, args, crash_apos="veredito:executado")
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+        journal = next((project / ".operacoes").glob("*.json"))
+        registro = json.loads(journal.read_text(encoding="utf-8"))
+        self.assertEqual(registro["passos"]["veredito"]["situacao"], "tentando",
+                         "pre-condicao: escrita ja aconteceu, mas journal ainda nao marcou concluido")
+        self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), cc.today(),
+                         "pre-condicao: create_verdict ja tinha gravado a data antes do crash")
+
+        retomada = self._rodar(script, args)
+        self.assertEqual(retomada.returncode, 0, retomada.stderr)
+        self.assertFalse(cc.pending_operations([project]))
+        texto_final = veredito.read_text(encoding="utf-8")
+        self.assertEqual(texto_final.count("- Data da compra:"), 1, "nao pode ter duplicado o bullet")
+        self.assertEqual(cc.extract_bullet(texto_final, "Data da compra"), cc.today())
+
+    def test_interrupcao_apos_force_veredito_escrever_e_antes_de_concluir_nao_bloqueia_sem_exportacao(self):
+        """Mesma janela, lado do achado 2: crash logo depois de
+        `--force-veredito` reescrever o arquivo (sem nenhuma exportacao
+        pendente pra proteger), antes do journal marcar concluido - a
+        retomada tem que completar normalmente (a checagem de exportacao
+        e auto-suficiente: sem marcador, nada bloqueia, com ou sem
+        journal envolvido)."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                  "unico candidato", "--sem-perdedores")
+        veredito = next(cc.VEREDITOS.glob("*.md"))
+        cc.atomic_write_text(
+            veredito,
+            cc.replace_or_append_bullet(veredito.read_text(encoding="utf-8"), "D+30 resumo", "MARCADOR"),
+        )
+
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "de novo", "--sem-perdedores", "--force-veredito"]
+        script = self.root / "scripts" / "central_compras.py"
+        crash = self._rodar(script, args, crash_apos="veredito:executado")
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+        self.assertNotIn("MARCADOR", veredito.read_text(encoding="utf-8"),
+                         "pre-condicao: force ja tinha reescrito o arquivo antes do crash")
+
+        retomada = self._rodar(script, args)
+        self.assertEqual(retomada.returncode, 0, retomada.stderr)
+        self.assertFalse(cc.pending_operations([project]))
+
+    # ---- journal ilegivel: contrato existente preservado ------------------
+
+    def test_journal_ilegivel_continua_recusado_pela_mensagem_existente(self):
+        """Requisito 6 do roteiro: journal ausente/ilegivel/incompleto
+        nunca pode autorizar escrita por suposicao. A correcao dos achados
+        A/B le o journal pendente ANTES de `tracked_operation`, mas para
+        um journal ILEGIVEL isso devolve `None` (contrato ja existente de
+        `pending_operation_record`) - a checagem nova simplesmente nao
+        roda, e o proprio `tracked_operation` continua recusando com sua
+        mensagem de journal ilegivel de sempre, sem nenhuma escrita."""
+        project = self.project()
+        self.product(project, "candidato")
+        self.quote(project, "candidato", "--fonte", "manual")
+        args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
+                "unico candidato", "--sem-perdedores", "--comprado"]
+        script = self.root / "scripts" / "central_compras.py"
+        crash = self._rodar(script, args, crash_apos="veredito:iniciado")
+        self.assertEqual(crash.returncode, 70, crash.stderr)
+
+        journal = next((project / ".operacoes").glob("*.json"))
+        journal.write_text("{isto nao e json valido", encoding="utf-8")
+
+        retomada = self._rodar(script, args)
+        self.assertNotEqual(retomada.returncode, 0)
+        self.assertIn("nao pode ser lido com confianca", retomada.stdout + retomada.stderr)
+        self.assertEqual(journal.read_text(encoding="utf-8"), "{isto nao e json valido",
+                         "journal ilegivel tem que ser preservado intocado, nunca sobrescrito")
+
+    # ---- achado D: mensagem nunca sugere editar cotacoes.csv --------------
+
+    def test_mensagem_financeira_nunca_sugere_editar_cotacoes_csv(self):
+        project = self.project()
+        veredito = self._decidir(project)
+        self.quote(project, "candidato", "--fonte", "manual", "--preco", "999")
+        with self.assertRaises(SystemExit) as ctx:
+            self.cli("decidir", str(project), "--produto-id", "candidato", "--porque",
+                      "de novo", "--sem-perdedores", "--comprado")
+        mensagem = str(ctx.exception)
+        self.assertNotIn("corrija a cotacao/veredito", mensagem)
+        self.assertIn("cotacao NOVA", mensagem)
+        self.assertIn("nunca editar a linha antiga em cotacoes.csv", mensagem)
+
+
 if __name__ == "__main__":
     unittest.main()
