@@ -1,0 +1,3 @@
+produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+universal-15640,Fechadura Dianteira Direita Universal Automotive 15640 Eletrica,72.8,0.501,1.0,0.728,0.5,0.5,elegivel,,,web,0.75,0,nao,conveniencia; aderencia,215.0,0.0,,0.0,215.0
+mobis-81320-1s021,Fechadura Dianteira Direita Genuina Hyundai Mobis 81320-1S021,70.1,0.784,0.581,0.728,0.5,0.5,elegivel,,,web,0.75,0,nao,conveniencia; aderencia,370.3,0.0,,0.0,370.3
