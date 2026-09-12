@@ -506,12 +506,16 @@ subprocessos reais, sem `git stash`.
 
 ## 3. Receptor do Google Sheets
 
-**Estado: 3ª rodada de revisão do Codex sobre o commit `c5018dc` achou mais 2
-ajustes (1 no Code.gs, 1 no cliente Python) — corrigidos e testados
-localmente (07/09/2026), redeploy do Code.gs em andamento.** Mesma lição da
-frente 2: **não declare esta frente concluída "para sempre" só porque
-algumas rodadas já passaram — a próxima revisão pode achar outra lacuna** —
-leia esta seção inteira antes de mexer.
+**Estado: concluída sob reserva (07/09/2026).** 3ª rodada de revisão do
+Codex sobre o commit `c5018dc` achou mais 2 ajustes (1 no Code.gs, 1 no
+cliente Python) — corrigidos, testados localmente e implantados em
+produção como **Versão 13** (redeploy verificado na planilha real, ver
+subseção "3ª rodada" abaixo). Nenhuma rodada seguinte confirmou "sem
+achado" — as 3 rodadas anteriores acharam lacuna nova cada uma, por isso
+"sob reserva", mesmo padrão da frente 2. Mesma lição: **não declare esta
+frente concluída "para sempre" só porque algumas rodadas já passaram — a
+próxima revisão pode achar outra lacuna** — leia esta seção inteira antes
+de mexer.
 
 ### 1ª rodada (commits `84ecb64` + `d6246b6`) — histórico
 
@@ -2703,17 +2707,42 @@ de que o roteiro adversarial pedido não achou nenhum nesta rodada.
 
 ## 7. Validação e publicação
 
-**Estado (11/09/2026, sessão 33): feita integralmente para as frentes 2,
-3, 4, 5 e 6. Todas as seis frentes concluídas (2, 3 e 4 sem ressalva; 5 e
-6 concluídas sob reserva, mesmo critério: uma rodada de revisão
-independente passou limpa, sem garantia formal de ausência de bugs).**
+**Estado (11/09/2026, sessão 34 — fechamento documental do plano): as 6
+frentes estão encerradas, mas com respaldos DIFERENTES — nenhuma é "sem
+ressalva" por ter passado uma rodada de revisão adversarial. Correção
+desta sessão: o resumo anterior (sessão 33) dizia "2, 3 e 4 sem
+ressalva", inconsistente com o estado próprio de cada seção abaixo
+(seção 2 já se declarava "concluída sob reserva" desde 07/09; seção 3
+nunca teve uma rodada final confirmada limpa; seção 4 nunca teve rodada
+nenhuma). Corrigido sem reescrever o histórico de nenhuma seção — só a
+marca de estado atual.**
+
+- **Frentes 5 e 6**: concluídas sob reserva com o respaldo mais forte —
+  uma rodada de revisão independente adversarial (Astra) passou limpa
+  depois de várias rodadas anteriores corrigidas (frente 5: commit
+  `5998a15`; frente 6: commit `a6eb7dc`, sessão 33, **última verificação
+  registrada: suíte completa 577 testes, 0 falhas**).
+- **Frentes 2 e 3**: concluídas sob reserva também, mas sem uma rodada
+  final que tenha passado limpa registrada — cada rodada do Codex achou
+  lacuna nova (7 na frente 2, 3 na frente 3), a última foi corrigida, e
+  nenhuma rodada seguinte confirmou "sem achado". Respaldo mais fraco que
+  o das frentes 5/6.
+- **Frente 4**: implementada e testada (18 testes + 1 mutação dirigida),
+  mas nunca passou por uma rodada de revisão independente adversarial.
+  Não é "sob reserva" no mesmo sentido das outras (nenhuma rodada achou
+  nada porque nenhuma rodada rodou) nem "sem ressalva" (nunca foi
+  hostilmente testada) — registrado como vazio de evidência, não como
+  rótulo inventado.
+
+**Migração real de produtos legados** (`migrar-produtos --aplicar`,
+frente 5) continua **não executada** contra a árvore real.
 
 Esta seção estava desatualizada desde a sessão 9-12: as frentes 3 (receptor
 Sheets, 3 rodadas de revisão + redeploy verificado na nuvem) e 4
 (proveniência, 18 testes + verificação no painel) já tinham completado o
 checklist inteiro nas próprias seções acima, mas nunca foi marcado aqui.
-Corrigido agora, sem reescrever o histórico de cada seção — só a marca
-desta.
+Corrigido na sessão 25, sem reescrever o histórico de cada seção — só a
+marca desta.
 
 Checklist por frente, quando implementada: problema reproduzido → correção →
 teste direcionado → doc/STATUS.md atualizados → commit coerente → (no fim de
@@ -2721,12 +2750,17 @@ todas as frentes de uma sessão) suíte completa, scanner de segredos, diff
 revisado, fluxos testados no navegador quando aplicável, push para
 `origin/main`.
 
-- **Frente 2** (recuperação de operações): feito, 7 rodadas de revisão, ver
-  seção 2.
-- **Frente 3** (receptor Sheets): feito, Versão 13 implantada e verificada
-  na planilha real, ver seção 3.
-- **Frente 4** (proveniência): feito, 18 testes, verificado no painel com
-  dados sintéticos, ver seção 4.
+- **Frente 2** (recuperação de operações): feito, **concluída sob
+  reserva** — 7 rodadas de revisão do Codex, cada uma achando lacuna
+  nova, última corrigida; nenhuma rodada seguinte confirmou "sem
+  achado", ver seção 2.
+- **Frente 3** (receptor Sheets): feito, **concluída sob reserva** —
+  Versão 13 implantada e verificada na planilha real, mas 3 rodadas de
+  revisão do Codex acharam lacuna nova cada uma; nenhuma rodada seguinte
+  confirmou "sem achado", ver seção 3.
+- **Frente 4** (proveniência): feito, 18 testes + 1 mutação dirigida,
+  verificado no painel com dados sintéticos — **nunca revisada por uma
+  rodada adversarial independente** (nem Codex nem Astra), ver seção 4.
 - **Frente 5** (produtos reutilizados): **concluída sob reserva** (sessão
   13 implementou; seis rodadas de revisão independente da Astra acharam 6,
   depois 3, depois mais 3, depois mais 4, depois mais 2 (perda de dados) e

@@ -5,14 +5,42 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (11/09/2026, sessao 33)
+## AO RETOMAR — comece por aqui (11/09/2026, sessao 34 - fechamento documental)
 
-**Proximo passo:** as 6 frentes deste plano de auditoria estao todas
-concluidas (2, 3 e 4 sem ressalva; 5 e 6 concluidas sob reserva). Nao ha
-pendencia aberta de revisao no momento - se surgir trabalho novo neste
-repositorio, comece por ele; se for pedida mais uma rodada de revisao das
-frentes 5 ou 6, **nao presuma que vai passar so porque passou da ultima
-vez** (mesmo aviso de sempre, ainda vale).
+**O plano de auditoria de 06/09/2026 esta encerrado nas 6 frentes.**
+Nenhuma frente e "sem ressalva" por ter passado uma rodada de revisao
+adversarial - essa correcao substitui um resumo da sessao 33 que dizia
+"2, 3 e 4 sem ressalva", inconsistente com o restante deste arquivo e do
+plano (corrigido nesta sessao, sem reescrever historico):
+- **Frentes 5 e 6**: **concluidas sob reserva**, com o respaldo mais
+  forte que este processo produz - uma rodada de revisao independente
+  adversarial (Astra) passou limpa depois de varias rodadas anteriores
+  corrigidas (frente 5: commit `5998a15`; frente 6: commit `a6eb7dc`,
+  sessao 33, **ultima verificacao registrada: suite completa 577 testes,
+  0 falhas**).
+- **Frentes 2 e 3**: **concluidas sob reserva** tambem, mas SEM uma rodada
+  final que tenha passado limpa registrada - cada rodada de revisao do
+  Codex achou lacuna nova (7 rodadas na frente 2, 3 na frente 3), a
+  ultima foi corrigida, e nenhuma rodada seguinte confirmou "sem achado".
+  Mais fraca que o respaldo das frentes 5/6; nao vire "sem ressalva" sem
+  uma rodada assim acontecer de verdade.
+- **Frente 4**: implementada e testada (18 testes + 1 mutacao dirigida),
+  mas nunca passou por uma rodada de revisao independente adversarial
+  (nenhum Codex/Astra revisou esta frente). Nao e "sob reserva" no
+  mesmo sentido das outras quatro (nenhuma rodada achou nada porque
+  nenhuma rodada rodou) nem "sem ressalva" (nunca foi hostilmente
+  testada) - registrar esse vazio de evidencia, nao inventar rotulo.
+
+**Migracao real de produtos legados** (`migrar-produtos --aplicar`,
+frente 5) continua **nao executada** contra a arvore real - so o preview
+foi conferido em cada rodada.
+
+**Proximo passo: retomar o uso normal da Central de Compras e as compras
+pendentes do Josemar.** Nao inicie nova rodada de auditoria por conta
+propria. Se ele pedir mais uma rodada de revisao de qualquer frente,
+trate como pedido novo - **nao presuma que vai passar so porque passou
+da ultima vez** (mesmo aviso de sempre, ainda vale, principalmente pras
+frentes 2/3/4 acima).
 
 **Pendencias / bloqueios:**
 - **Frente 5 (produtos reutilizados): CONCLUIDA SOB RESERVA** - a 7a
@@ -119,6 +147,9 @@ vez** (mesmo aviso de sempre, ainda vale).
   rodadas de revisao do Codex respectivamente, cada uma achando lacuna
   nova. Se pedirem revisao de novo, **nao presuma que passou so porque
   passou antes**; leia as secoes 2 e 3 do plano inteiras antes de mexer.
+- Frente 4 (proveniencia): implementada e testada (sessao 6, 07/09/2026),
+  nunca revisada por uma rodada adversarial independente. Se pedirem
+  revisao desta frente, trate como a PRIMEIRA rodada, nao como retomada.
 - Nenhum passo manual pendente do Josemar neste momento.
 
 **Frente 6, 8a revisao independente (11/09/2026, sessao 33, sobre o
