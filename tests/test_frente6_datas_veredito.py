@@ -594,7 +594,7 @@ class SegundaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
     # ---- achado 4: assinatura de decidir perdia compatibilidade ----------
 
     def test_journal_de_versao_anterior_a_data_compra_continua_retomavel(self):
-        """Journal real criado pelo codigo do commit `5998a15` (a versao
+        """Journal real criado pelo codigo do commit `6d3e334` (a versao
         anterior a frente 6 inteira - sem `--data-compra`, sem os campos
         `data_compra`/`data_compra_efetiva` na assinatura/detalhe),
         interrompido em `veredito:iniciado`, tem que continuar retomavel
@@ -610,7 +610,7 @@ class SegundaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         script = self.root / "scripts" / "central_compras.py"
         atual = script.read_bytes()
         antigo = subprocess.run(
-            ["git", "show", "5998a15:scripts/central_compras.py"],
+            ["git", "show", "6d3e334:scripts/central_compras.py"],
             cwd=REPO, capture_output=True, check=True,
         ).stdout
         script.write_bytes(antigo)
