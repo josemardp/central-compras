@@ -392,7 +392,7 @@ class RegistroAntigoCompatibilidadeTest(ambiente.RepoTestCase):
 
 class SegundaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
     """Regressao dos 5 achados da 2a revisao independente (Astra) sobre o
-    commit `e564618` - cada teste aqui reproduziu uma falha real contra
+    commit `8e86884` - cada teste aqui reproduziu uma falha real contra
     aquele codigo antes da correcao (script `astra_review_e564618.py`).
     Ver STATUS.md e docs/como-conferir-auditoria.md.
 
@@ -766,7 +766,7 @@ class SegundaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
 
 class TerceiraRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
     """Regressao dos 4 achados da 2a revisao independente (Astra) sobre o
-    commit `3acc96a` - cada teste aqui reproduziu uma falha real contra
+    commit `c117cee` - cada teste aqui reproduziu uma falha real contra
     aquele codigo antes da correcao (script `astra_review_3acc96a.py`).
     Ver STATUS.md e docs/como-conferir-auditoria.md.
 
@@ -849,7 +849,7 @@ class TerceiraRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
     # ---- achado 2: complemento nao usava a data-compra explicita persistida --
 
     def test_upgrade_preserva_data_compra_explicita_de_journal_sem_campo_congelado(self):
-        """Journal real criado pelo codigo do commit `e564618` (que ja
+        """Journal real criado pelo codigo do commit `8e86884` (que ja
         tinha `--data-compra`, mas ainda nao `data_compra_efetiva`
         congelado em `op.detalhe` - esse campo so existe desde a rodada
         anterior), interrompido em `veredito:iniciado`, tem que preservar
@@ -865,7 +865,7 @@ class TerceiraRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         script = self.root / "scripts" / "central_compras.py"
         atual = script.read_bytes()
         antigo = subprocess.run(
-            ["git", "show", "e564618:scripts/central_compras.py"],
+            ["git", "show", "8e86884:scripts/central_compras.py"],
             cwd=REPO, capture_output=True, check=True,
         ).stdout
         script.write_bytes(antigo)
@@ -976,7 +976,7 @@ class QuartaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         return next(p for p in cc.VEREDITOS.glob("*.md") if pid in p.name)
 
     def test_upgrade_preserva_data_compra_implicita_de_journal_antigo(self):
-        """Journal real criado pelo commit `e564618` com `--comprado` e sem
+        """Journal real criado pelo commit `8e86884` com `--comprado` e sem
         `--data-compra`, interrompido antes de criar o veredito, nao tinha
         `data_compra_efetiva`. A retomada atual deve recuperar a data da
         tentativa original pela evidencia persistida (`veredito_nome`), nunca
@@ -990,7 +990,7 @@ class QuartaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         script = self.root / "scripts" / "central_compras.py"
         atual = script.read_bytes()
         antigo = subprocess.run(
-            ["git", "show", "e564618:scripts/central_compras.py"],
+            ["git", "show", "8e86884:scripts/central_compras.py"],
             cwd=REPO, capture_output=True, check=True,
         ).stdout
         script.write_bytes(antigo)
@@ -1019,7 +1019,7 @@ class QuartaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         )
 
     def test_upgrade_recusa_journal_antigo_de_evento_sem_passos_e_cronologia_invalida(self):
-        """No commit `3acc96a`, `registrar-evento --evento entrega` sem
+        """No commit `c117cee`, `registrar-evento --evento entrega` sem
         `--data` podia recusar tarde demais e deixar journal pendente vazio.
         Retomar esse journal na versao atual precisa validar a data congelada
         real da tentativa, nao tratar `passos: {}` como prova de validacao."""
@@ -1032,7 +1032,7 @@ class QuartaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         script = self.root / "scripts" / "central_compras.py"
         atual = script.read_bytes()
         antigo = subprocess.run(
-            ["git", "show", "3acc96a:scripts/central_compras.py"],
+            ["git", "show", "c117cee:scripts/central_compras.py"],
             cwd=REPO, capture_output=True, check=True,
         ).stdout
         script.write_bytes(antigo)
@@ -1292,13 +1292,13 @@ class QuintaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
 
 class SextaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
     """Regressao dos 2 achados confirmados da 5a revisao independente
-    (sessao 26, sobre o commit `e048ad6`) - reproduzidos primeiro em
+    (sessao 26, sobre o commit `6e613d7`) - reproduzidos primeiro em
     `tests/revisao_independente_e048ad6.py` (script externo daquela
     sessao, removido depois de incorporado aqui). Os testes daquele
     arquivo PASSAVAM com o defeito presente; aqui eles exigem o
     comportamento CORRETO (recusa antes de qualquer escrita).
 
-    Raiz comum: `_veredito_existente_para` (`e048ad6`) acha o veredito
+    Raiz comum: `_veredito_existente_para` (`6e613d7`) acha o veredito
     certo por IDENTIDADE (Projeto/Produto ID) em qualquer dia, mas nao
     confere se a decisao que o criou ainda e a mesma que esta chamada -
     uma decisao intermediaria de OUTRO produto no mesmo projeto nao
@@ -1552,7 +1552,7 @@ class SextaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         """Controle: sem nenhuma fase exportada, --force-veredito continua
         funcionando exatamente como o contrato ja documentado (reseta o
         MESMO veredito, mesmo em outro dia - comportamento intencional de
-        `e048ad6`, preservado)."""
+        `6e613d7`, preservado)."""
         dia1, dia2 = "2026-06-01", "2026-06-15"
         with patch.object(cc, "today", return_value=dia1):
             project = self.project()
@@ -1648,8 +1648,8 @@ class SextaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertEqual(cc.extract_bullet(veredito.read_text(encoding="utf-8"), "Data da compra"), dia2)
 
     def test_journal_antigo_pre_e048ad6_retomado_nao_aciona_as_novas_checagens(self):
-        """Journal real criado pelo codigo do commit `ee1c21d` (antes de
-        `e048ad6` existir - sem `_veredito_existente_para` nem as
+        """Journal real criado pelo codigo do commit `3032436` (antes de
+        `6e613d7` existir - sem `_veredito_existente_para` nem as
         checagens novas), interrompido em `veredito:iniciado`, tem que
         continuar retomavel normalmente com o codigo atual - mesmo que o
         veredito encontrado tivesse (hipoteticamente) alguma divergencia,
@@ -1664,7 +1664,7 @@ class SextaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         script = self.root / "scripts" / "central_compras.py"
         atual = script.read_bytes()
         antigo = subprocess.run(
-            ["git", "show", "ee1c21d:scripts/central_compras.py"],
+            ["git", "show", "3032436:scripts/central_compras.py"],
             cwd=REPO, capture_output=True, check=True,
         ).stdout
         script.write_bytes(antigo)
@@ -1801,7 +1801,7 @@ class SetimaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.quote(project, "candidato", "--fonte", "manual",
                    "--data", f"{dt.date.today().isoformat()}T09:00:00")
 
-        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script, atual, antigo_e048ad6 = self._script_com_codigo("6e613d7")
         script.write_bytes(antigo_e048ad6)
         primeira = self._rodar(script, ["decidir", str(project), "--produto-id", "candidato",
                                          "--porque", "primeira escolha", "--sem-perdedores"])
@@ -1840,7 +1840,7 @@ class SetimaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.product(project, "candidato")
         self.quote(project, "candidato", "--fonte", "manual")
 
-        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script, atual, antigo_e048ad6 = self._script_com_codigo("6e613d7")
         script.write_bytes(antigo_e048ad6)
         args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
                 "unico candidato", "--sem-perdedores", "--comprado"]
@@ -1878,7 +1878,7 @@ class SetimaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertIn(marcador, texto_com_fase)
         licoes_antes = (cc.BASE / "licoes.md").read_bytes()
 
-        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script, atual, antigo_e048ad6 = self._script_com_codigo("6e613d7")
         script.write_bytes(antigo_e048ad6)
         args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
                 "refazendo do zero", "--sem-perdedores", "--force-veredito"]
@@ -1918,7 +1918,7 @@ class SetimaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         self.assertIn("## Aprendizado exportado\n", veredito.read_text(encoding="utf-8"))
         licoes_antes = (cc.BASE / "licoes.md").read_bytes()
 
-        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script, atual, antigo_e048ad6 = self._script_com_codigo("6e613d7")
         script.write_bytes(antigo_e048ad6)
         args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
                 "refazendo do zero", "--sem-perdedores", "--force-veredito"]
@@ -1948,7 +1948,7 @@ class SetimaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
                   "unico candidato", "--sem-perdedores")
         veredito = next(cc.VEREDITOS.glob("*.md"))
 
-        script, atual, antigo_e048ad6 = self._script_com_codigo("e048ad6")
+        script, atual, antigo_e048ad6 = self._script_com_codigo("6e613d7")
         script.write_bytes(antigo_e048ad6)
         args = ["decidir", str(project), "--produto-id", "candidato", "--porque",
                 "de novo", "--sem-perdedores", "--comprado"]
@@ -2099,7 +2099,7 @@ class SetimaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
 
 class AchadoCRegistrarEventoCompradoTest(ambiente.RepoTestCase):
     """Fecha o achado C da 6a revisao independente (decisao de escopo do
-    Josemar, sessao apos `68c3dbf`): `registrar-evento --evento comprado`
+    Josemar, sessao apos `ab569bb`): `registrar-evento --evento comprado`
     tambem impede confirmar a compra com dados financeiros incompativeis
     com a decisao correspondente. Reproduzido primeiro em
     `tests/revisao_independente_1c8b503.py` (removido depois de
@@ -2418,7 +2418,7 @@ class AchadoCRegistrarEventoCompradoTest(ambiente.RepoTestCase):
 
 class OitavaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
     """Corrige os achados I e II da 7a revisao independente (sobre os
-    commits `68c3dbf`+`822096b` em conjunto), registrados no commit
+    commits `ab569bb`+`822096b` em conjunto), registrados no commit
     `d72da8b`. Reproduzido primeiro em
     `tests/revisao_independente_68c3dbf_822096b.py` (removido depois de
     incorporado aqui).
@@ -2668,7 +2668,7 @@ class OitavaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
 
     def test_controle_journal_antigo_68c3dbf_retomado_ainda_recusa_divergencia_financeira(self):
         """Controle publicado na 7a revisao: journal de `registrar-evento`
-        do commit `68c3dbf` (antes do achado C existir), retomado com o
+        do commit `ab569bb` (antes do achado C existir), retomado com o
         codigo atual, continua recusando divergencia financeira quando a
         escrita ainda nao aconteceu - a correcao do achado I preserva
         isso."""
@@ -2679,7 +2679,7 @@ class OitavaRevisaoIndependenteFrente6Test(ambiente.RepoTestCase):
         script = self.root / "scripts" / "central_compras.py"
         atual = script.read_bytes()
         antigo_68c3dbf = subprocess.run(
-            ["git", "show", "68c3dbf:scripts/central_compras.py"],
+            ["git", "show", "ab569bb:scripts/central_compras.py"],
             cwd=REPO, capture_output=True, check=True,
         ).stdout
         script.write_bytes(antigo_68c3dbf)

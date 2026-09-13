@@ -608,7 +608,7 @@ class RevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
 
 class SegundaRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
     """Regressao dos 3 achados da 2a revisao independente (Astra) sobre o
-    commit `fcdb6f9` - cada teste aqui reproduziu uma falha real contra
+    commit `7bb8528` - cada teste aqui reproduziu uma falha real contra
     aquele codigo antes da correcao. Ver STATUS.md e
     docs/como-conferir-auditoria.md. Os 3 primeiros sao as falhas; os 3
     seguintes sao controles que ja passavam e continuam passando."""
@@ -846,14 +846,14 @@ class TerceiraRevisaoIndependenteFrente5Test(ambiente.RepoTestCase):
         journal `em_andamento` comecado por uma versao anterior do comando
         (antes desses campos existirem) nao tem essas chaves - a retomada
         quebrava com `KeyError` em vez de reconciliar. Reproduzido com o
-        codigo real do commit `fcdb6f9` (versao anterior a esta correcao)
+        codigo real do commit `7bb8528` (versao anterior a esta correcao)
         via subprocesso, criando uma pendencia de verdade antes de trocar
         para o codigo atual."""
         a, b, args = self._setup_vinculo()
         sandbox_code = self.root / "scripts" / "central_compras.py"
         current = sandbox_code.read_bytes()
         old = subprocess.run(
-            ["git", "show", "fcdb6f9:scripts/central_compras.py"],
+            ["git", "show", "7bb8528:scripts/central_compras.py"],
             cwd=ambiente.ROOT, capture_output=True, check=True,
         ).stdout
         sandbox_code.write_bytes(old)
