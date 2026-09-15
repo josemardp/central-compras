@@ -3,13 +3,18 @@
 ## Estado atual
 
 - Estado: pesquisando
-- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
-- Decisao aberta: Pulseira Silicone Trava-Clique (Generic) lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
+- Proxima acao: nenhum candidato ativo; reabra a necessidade ou cadastre novo candidato se a compra voltar
+- Decisao aberta: nenhuma; necessidade encerrada pelo usuario em 2026-09-15.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-15 | descarte | Descartado pulseira-aco-inox | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
+| 2026-09-15 | descarte | Descartado pulseira-nylon | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
+| 2026-09-15 | descarte | Descartado pulseira-silicone-xdfind | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
+| 2026-09-15 | descarte | Descartado pulseira-silicone-travaclique | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
+| 2026-09-15 | encerramento | Encerrar processo sem compra | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
 | 2026-09-04 | comparacao | Pulseira Silicone Trava-Clique (Generic) e a unica elegivel: R$27,99, 4.5 estrelas, 146 avaliacoes. | xDfind (R$18,76) tem so 13 avaliacoes, abaixo do minimo de 20. Nylon e aco inox custam mais que o teto de R$60 e tem 0-1 avaliacao (risco alto de produto sem historico). |
 | 2026-09-04 | cotacao | Cotacao registrada para pulseira-aco-inox | Amazon / fonte=web / custo_total=110.16 |
 | 2026-09-04 | cotacao | Cotacao registrada para pulseira-nylon | Amazon / fonte=web / custo_total=97.19 |

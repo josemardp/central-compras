@@ -5,6 +5,40 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## AO RETOMAR — comece por aqui (15/09/2026, atualizacao operacional)
+
+Josemar informou nesta sessao:
+- **Pulseira Huawei Band 9**: nao precisa mais. Todos os candidatos do
+  projeto `2026-pulseira-para-huawei-band-9` foram descartados com motivo
+  explicito ("necessidade encerrada pelo usuario em 2026-09-15; compra nao e
+  mais necessaria").
+- **Fone bluetooth para chamadas / JBL**: tambem nao precisa mais. Todos os
+  candidatos do projeto `2026-fone-bluetooth-para-chamadas` foram descartados
+  com o mesmo motivo. A validacao ainda preserva o erro historico da cotacao
+  antiga do JBL (`nota` com `n_avaliacoes=0`), mas o `status` nao deve mais
+  pedir confirmacao manual nem recotacao desse projeto porque nao ha candidato
+  ativo.
+- **Relogio Huawei Band 11 Pro**: compra ja registrada. Josemar informou que
+  o inicio de uso foi no "domingo retrasado"; com data atual 15/09/2026, isso
+  foi registrado como **2026-09-06**. O veredito recalculou os lembretes para
+  **D+30 em 2026-10-06** e **D+180 em 2027-03-05**.
+
+Tambem foi corrigida a orientacao do comando `status`:
+- projeto comprado nao reabre trabalho de cotacao/recotacao nem mostra
+  "Decisao aberta" antiga; aponta para veredito pos-compra;
+- projeto com todos os candidatos descartados mostra "nenhum candidato ativo"
+  e nao sugere `promover-cotacao`;
+- `dashboard`/`reuse_stats` ignoram pastas orfas dentro de `projetos/` sem
+  `briefing.md`, como os processos pessoais removidos do Git.
+
+Dashboard local regenerado: `dashboard/index.html` mostra 6 projetos validos.
+Verificacao executada apos as alteracoes: `python -m unittest discover -s tests`
+com **580 testes, 0 falhas**.
+
+Proximo passo operacional: acompanhar o uso real do Huawei Band 11 Pro e
+preencher o veredito D+30 em **2026-10-06**. Os projetos de fone e pulseira
+ficam fora da fila de compra ativa enquanto a necessidade nao voltar.
+
 ## AO RETOMAR — comece por aqui (11/09/2026, sessao 34 - fechamento documental)
 
 **O plano de auditoria de 06/09/2026 esta encerrado nas 6 frentes.**

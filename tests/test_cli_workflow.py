@@ -334,6 +334,134 @@ class CliWorkflowTest(unittest.TestCase):
         self.assertIn("Proxima acao mantida: nenhum candidato elegivel apos descarte.", result.stdout)
         self.assertNotIn("seguir com finalistas restantes ou registrar nova cotacao", processo)
 
+    def test_status_with_all_candidates_discarded_does_not_request_manual_confirmation(self):
+        self.run_cli(
+            "novo-projeto",
+            "fone encerrado sem compra",
+            "--categoria",
+            "fone",
+            "--valor-estimado",
+            "400",
+            "--preco-teto",
+            "600",
+        )
+        project = f"projetos/{ANO}-fone-encerrado-sem-compra"
+        for product_id, name in [("qcy-h3", "QCY H3"), ("jbl-770", "JBL 770")]:
+            self.run_cli(
+                "novo-produto",
+                project,
+                name,
+                "--marca",
+                "Marca",
+                "--categoria",
+                "fone",
+                "--produto-id",
+                product_id,
+            )
+            self.run_cli(
+                "cotar",
+                project,
+                "--produto-id",
+                product_id,
+                "--loja",
+                "Loja",
+                "--vendedor",
+                "Vendedor",
+                "--vendedor-tipo",
+                "terceiro",
+                "--preco",
+                "299",
+                "--nota",
+                "4.8",
+                "--avaliacoes",
+                "1000",
+                "--garantia-tipo",
+                "vendedor",
+                "--fonte",
+                "web",
+                "--link",
+                f"https://example.com/{product_id}",
+            )
+        self.run_cli("ranking", project)
+        self.run_cli("descartar", "--produto-id", "qcy-h3", "--projeto", project, "--porque", "Necessidade encerrada.")
+        self.run_cli("descartar", "--produto-id", "jbl-770", "--projeto", project, "--porque", "Necessidade encerrada.")
+
+        status = self.run_cli("status", project).stdout
+
+        self.assertIn("Candidatos hoje: 0", status)
+        self.assertIn("Sem comando sugerido: processo sem candidato ativo.", status)
+        self.assertNotIn("Decisao aberta:", status)
+        self.assertNotIn("Confirmar manualmente:", status)
+        self.assertNotIn("promover-cotacao", status)
+
+    def test_status_purchased_project_does_not_reopen_quote_work(self):
+        self.run_cli(
+            "novo-projeto",
+            "fone comprado com web",
+            "--categoria",
+            "fone",
+            "--valor-estimado",
+            "400",
+            "--preco-teto",
+            "600",
+        )
+        project = f"projetos/{ANO}-fone-comprado-com-web"
+        self.run_cli(
+            "novo-produto",
+            project,
+            "QCY H3",
+            "--marca",
+            "QCY",
+            "--categoria",
+            "fone",
+        )
+        self.run_cli(
+            "cotar",
+            project,
+            "--produto-id",
+            "qcy-h3",
+            "--loja",
+            "Loja",
+            "--vendedor",
+            "Vendedor",
+            "--vendedor-tipo",
+            "oficial",
+            "--preco",
+            "299",
+            "--nota",
+            "4.8",
+            "--avaliacoes",
+            "1000",
+            "--garantia-tipo",
+            "vendedor",
+            "--fonte",
+            "web",
+            "--link",
+            "https://example.com/qcy-h3",
+        )
+        self.run_cli(
+            "decidir",
+            project,
+            "--produto-id",
+            "qcy-h3",
+            "--porque",
+            "Compra ja confirmada fora do fluxo manual.",
+            "--sem-perdedores",
+            "--permitir-web",
+            "--permitir-incompleto",
+            "--comprado",
+        )
+
+        status = self.run_cli("status", project).stdout
+
+        self.assertIn("Estado: comprado", status)
+        self.assertIn("preencher-veredito", status)
+        self.assertNotIn("Decisao aberta:", status)
+        self.assertNotIn("Falta cotacao em:", status)
+        self.assertNotIn("Cotacao vencida", status)
+        self.assertNotIn("Confirmar manualmente:", status)
+        self.assertNotIn("promover-cotacao", status)
+
     def test_tco_changes_value_axis_for_car_project(self):
         self.run_cli(
             "novo-projeto",

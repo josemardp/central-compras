@@ -5253,6 +5253,11 @@ def status(args: argparse.Namespace) -> None:
     latest = latest_quotes(rows)
     manual_ids = {row.get("produto_id") for row in rows if row.get("fonte") == "manual"}
     web_only_ids = set(latest) - manual_ids
+    active_candidate_ids = project_candidate_ids(project)
+    discarded_candidate_ids = project_discarded_candidate_ids(project)
+    no_active_candidates = not active_candidate_ids and bool(discarded_candidate_ids)
+    purchased = briefing_meta.get("estado") == "comprado"
+    active_web_only_ids = web_only_ids & active_candidate_ids
     errors, warnings = validation_report(project)
     checked_steps = re.findall(r"(?m)^- \[x\] (\d+)\. (.+)$", process)
     open_steps = re.findall(r"(?m)^- \[ \] (\d+)\. (.+)$", process)
@@ -5264,17 +5269,24 @@ def status(args: argparse.Namespace) -> None:
     print(f"Categoria: {briefing_meta.get('categoria')}")
     print(f"Preco teto: {briefing_meta.get('preco_teto')}")
     print(f"Etapas concluidas: {len(checked_steps)}")
-    if open_steps:
+    if open_steps and not purchased and not no_active_candidates:
         print(f"Proxima etapa aberta: {open_steps[0][0]}. {open_steps[0][1]}")
-    if next_action:
+    if purchased:
+        if next_action:
+            print(f"Proxima acao: {next_action.group(1).strip()}")
+        else:
+            print("Proxima acao: acompanhar pos-compra e preencher veredito quando chegar a data")
+    elif no_active_candidates:
+        print("Proxima acao: nenhum candidato ativo; reabra a necessidade ou cadastre novo candidato se a compra voltar")
+    elif next_action:
         print(f"Proxima acao: {next_action.group(1).strip()}")
-    if open_decision:
+    if open_decision and not purchased and not no_active_candidates:
         print(f"Decisao aberta: {open_decision.group(1).strip()}")
     print(f"Cotacoes: {len(rows)} total, {len(manual_ids)} produtos com cotacao manual, {len(web_only_ids)} so web")
     print(f"Validacao: {len(errors)} erros, {len(warnings)} avisos")
 
     regra = stop_rule_status(project)
-    if regra:
+    if regra and not purchased:
         dias = regra["dias_em_pesquisa"]
         print(
             f"Regra de parada ({regra['faixa']}): teto {regra['tempo_maximo']}, "
@@ -5285,12 +5297,16 @@ def status(args: argparse.Namespace) -> None:
         if regra["produtos_sem_cotacoes_suficientes"]:
             print("Falta cotacao em: " + ", ".join(regra["produtos_sem_cotacoes_suficientes"]))
 
-    vencidas = sorted(pid for pid, row in latest.items() if quote_is_stale(row))
+    vencidas = sorted(pid for pid, row in latest.items() if not purchased and pid in active_candidate_ids and quote_is_stale(row))
     if vencidas:
         print("Cotacao vencida (recote): " + ", ".join(vencidas))
-    if web_only_ids:
-        print("Confirmar manualmente: " + ", ".join(sorted(web_only_ids)))
-        primeiro = sorted(web_only_ids)[0]
+    if purchased:
+        print("Comando sugerido: python scripts/central_compras.py preencher-veredito vereditos/[arquivo] --fase d30 [campos de uso real]")
+    elif no_active_candidates:
+        print("Sem comando sugerido: processo sem candidato ativo.")
+    elif active_web_only_ids:
+        print("Confirmar manualmente: " + ", ".join(sorted(active_web_only_ids)))
+        primeiro = sorted(active_web_only_ids)[0]
         print(
             "Comando sugerido: python scripts/central_compras.py promover-cotacao "
             f"projetos/{project.name} --produto-id {primeiro} [campos conferidos]"
@@ -5634,7 +5650,7 @@ def knowledge_predating(project: Path) -> dict[str, int]:
 
 
 def reuse_stats(categoria: str | None = None) -> tuple[list[dict[str, Any]], int, int, float]:
-    projects = sorted(path for path in PROJETOS.iterdir() if path.is_dir()) if PROJETOS.exists() else []
+    projects = project_dirs()
     rows = []
     for project in projects:
         briefing, _ = load_frontmatter(project / "briefing.md")

@@ -1,0 +1,12 @@
+produto_id: qcy-h3-anc
+estado: descartado
+preco_alvo: 260.0
+preco_teto: 330.0
+requisitos_atendidos:
+  chamadas: parcial
+  conforto: parcial
+descartado_porque: necessidade encerrada pelo usuario em 2026-09-15; compra nao e
+  mais necessaria
+aguardando_preco_porque: Produto lidera a pesquisa web, mas a compra deve esperar
+  confirmacao manual e preco melhor.
+aguardando_preco_desde: '2026-08-26'

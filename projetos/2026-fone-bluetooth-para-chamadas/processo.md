@@ -3,13 +3,18 @@
 ## Estado atual
 
 - Estado: pesquisando
-- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
-- Decisao aberta: QCY H3 ANC lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
+- Proxima acao: nenhum candidato ativo; reabra a necessidade ou cadastre novo candidato se a compra voltar
+- Decisao aberta: nenhuma; necessidade encerrada pelo usuario em 2026-09-15.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-15 | descarte | Descartado soundcore-anker-life-q30 | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
+| 2026-09-15 | descarte | Descartado jbl-tune-770nc | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
+| 2026-09-15 | descarte | Descartado edifier-w820nb-plus | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
+| 2026-09-15 | descarte | Descartado qcy-h3-anc | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
+| 2026-09-15 | encerramento | Encerrar processo sem compra | necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria |
 | 2026-08-29 | cotacao | Cotacao registrada para jbl-tune-770nc | Amazon / fonte=web / custo_total=489.0 |
 | 2026-08-29 | cotacao | Cotacao registrada para jbl-tune-770nc | Amazon / fonte=web / custo_total=489.0 |
 | 2026-08-26 | aguardando_preco | qcy-h3-anc aguardando preco | Produto lidera a pesquisa web, mas a compra deve esperar confirmacao manual e preco melhor. |

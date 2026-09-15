@@ -1,28 +1,16 @@
 # Ranking
 
-Gerado em 2026-08-29T18:22:47.
+Gerado em 2026-09-15T08:46:19.
 
 ## Elegiveis
 
-1. QCY H3 ANC - 84.3
-   qualidade 0.97 · valor 1.00 · risco 0.71 · aderencia 0.50 · conveniencia --
-   custo total R$ 296,64 / Amazon / estimativa web
-   confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
-   aguardando preco desde 2026-08-26: faltam R$ 36,64 para o alvo de R$ 260,00. Voce decidiu esperar, nao comprar.
-
-2. JBL Tune 770NC - 75.0
-   qualidade 0.99 · valor 0.61 · risco 0.76 · aderencia 0.50 · conveniencia --
-   custo total R$ 489,00 / Amazon / estimativa web
-   confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
-
-3. Soundcore Anker Life Q30 - 58.6
-   qualidade 0.58 · valor 0.64 · risco 0.60 · aderencia 0.50 · conveniencia --
-   custo total R$ 466,00 / Amazon / estimativa web
-   confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
-
+Nenhum candidato passou pelos gates.
 ## Cortados pelos gates
 
-- Edifier W820NB Plus: avaliacoes insuficientes (128 < 150) alertas: AVAL_SUSPEITA
+- Edifier W820NB Plus: produto descartado (necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria); avaliacoes insuficientes (128 < 150) alertas: AVAL_SUSPEITA
+- JBL Tune 770NC: produto descartado (necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria)
+- QCY H3 ANC: produto descartado (necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria)
+- Soundcore Anker Life Q30: produto descartado (necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria)
 
 ## Observacoes
 

@@ -7,8 +7,8 @@
 - Data da compra: 2026-09-05
 - Valor pago: R$ 369,55
 - Vendedor: Amazon / Reypi Oficial
-- Veredito D+30 previsto: 2026-10-05
-- Veredito D+180 previsto: 2027-03-04
+- Veredito D+30 previsto: 2026-10-06
+- Veredito D+180 previsto: 2027-03-05
 
 ## D+30
 
@@ -47,3 +47,4 @@
 - Marca: Huawei
 - Loja: Amazon
 - Categoria: wearable
+- Data de inicio de uso: 2026-09-06

@@ -110,6 +110,17 @@ class PipelineArchitectureTest(unittest.TestCase):
         self.assertEqual(cc.knowledge_predating(self.project)["licoes"], 1)
         self.assertTrue(cc.reuse_stats()[0][0]["reaproveitou"])
 
+    def test_dashboard_ignores_orphan_project_directories(self):
+        orphan = cc.PROJETOS / f"{dt.date.today().year}-projeto-removido"
+        orphan.mkdir()
+
+        rows, total, _, _ = cc.reuse_stats()
+        self.assertEqual(total, 1)
+        self.assertNotIn(orphan.name, {row["projeto"] for row in rows})
+
+        self.cli("dashboard")
+        self.assertTrue((cc.DASHBOARD / "index.html").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

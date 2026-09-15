@@ -1,19 +1,16 @@
 # Ranking
 
-Gerado em 2026-09-04T11:34:33.
+Gerado em 2026-09-15T08:46:26.
 
 ## Elegiveis
 
-1. Pulseira Silicone Trava-Clique (Generic) - 62.1
-   qualidade 0.47 · valor 1.00 · risco 0.38 · aderencia -- · conveniencia --
-   custo total R$ 27,99 / Amazon / estimativa web
-   confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
-
+Nenhum candidato passou pelos gates.
 ## Cortados pelos gates
 
-- Pulseira Aco Inoxidavel Band 9/8: custo_total acima do preco_teto do briefing (110.16 > 60.0); avaliacoes insuficientes (1 < 20)
-- Pulseira Nylon Compativel Band 9/8: custo_total acima do preco_teto do briefing (97.19 > 60.0); nota_ajustada abaixo do gate (0.0 < 4.0); avaliacoes insuficientes (0 < 20)
-- Pulseira Silicone Fivela Reversa (xDfind): avaliacoes insuficientes (13 < 20)
+- Pulseira Aco Inoxidavel Band 9/8: produto descartado (necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria); custo_total acima do preco_teto do briefing (110.16 > 60.0); avaliacoes insuficientes (1 < 20)
+- Pulseira Nylon Compativel Band 9/8: produto descartado (necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria); custo_total acima do preco_teto do briefing (97.19 > 60.0); nota_ajustada abaixo do gate (0.0 < 4.0); avaliacoes insuficientes (0 < 20)
+- Pulseira Silicone Trava-Clique (Generic): produto descartado (necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria)
+- Pulseira Silicone Fivela Reversa (xDfind): produto descartado (necessidade encerrada pelo usuario em 2026-09-15; compra nao e mais necessaria); avaliacoes insuficientes (13 < 20)
 
 ## Observacoes
 

@@ -1,0 +1,11 @@
+produto_id: jbl-tune-770nc
+estado: descartado
+preco_alvo: null
+preco_teto: null
+requisitos_atendidos:
+  chamadas: parcial
+  conforto: parcial
+descartado_porque: necessidade encerrada pelo usuario em 2026-09-15; compra nao e
+  mais necessaria
+aguardando_preco_porque: null
+aguardando_preco_desde: null

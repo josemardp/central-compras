@@ -1,0 +1,9 @@
+produto_id: pulseira-aco-inox
+estado: descartado
+preco_alvo: null
+preco_teto: 60.0
+requisitos_atendidos: {}
+descartado_porque: necessidade encerrada pelo usuario em 2026-09-15; compra nao e
+  mais necessaria
+aguardando_preco_porque: null
+aguardando_preco_desde: null
