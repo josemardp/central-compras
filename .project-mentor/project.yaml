@@ -6,7 +6,7 @@ project:
   name: Central de Compras
   summary: Sistema estruturado para gestão de compras, governança de processos e tomada de decisão com rastreabilidade completa e cálculo de TCO (*Total Cost of Ownership*).
   category: pessoal
-  sensitivity: normal
+  sensitivity: restricted
   repo_url: https://github.com/josemardp/central-compras.git
   status_docs:
     - README.md
@@ -17,7 +17,7 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-09-16T16:19:03-03:00
+  updated_at: 2026-09-16T16:35:03-03:00
   last_session_at: 2026-09-16T15:27:54-03:00
   confidence: inferred
 focus:
@@ -89,3 +89,6 @@ review:
 integration:
   managed_by: mentor-de-projetos
   protocol_version: 1
+  public_repo_ack:
+    date: 2026-09-16
+    reason: repo público por decisão do usuário em 16/09/2026; registros devem ser genéricos
