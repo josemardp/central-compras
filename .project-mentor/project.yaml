@@ -14,20 +14,46 @@ project:
     - docs/
 status:
   lifecycle: evolving
-  health: unknown
-  phase: null
+  health: healthy
+  phase: Operacao corrente / Cotacao de exame de saude
   priority: null
-  updated_at: 2026-09-16T06:55:51-03:00
-  last_session_at: null
+  updated_at: 2026-09-16T08:13:04-03:00
+  last_session_at: 2026-09-16T08:13:04-03:00
   confidence: inferred
 focus:
-  objective: null
-  current: null
-  last_completed: null
-  recommended_next_action: null
-next_actions: []
+  objective: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
+  current: Consultar retorno de cotacao do Instituto do Sono de Aracatuba para Polissonografia Tipo I
+  last_completed: Mapeamento de estado, foco e próximas ações
+  recommended_next_action: act-002
+next_actions:
+  - id: act-001
+    title: Acompanhar entrega das pecas do HB20 e registrar veredito D+30
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-09-16T08:13:03-03:00
+    done_at: null
+    note: null
+  - id: act-002
+    title: Consultar retorno de cotacao do Instituto do Sono de Aracatuba para Polissonografia Tipo I
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-09-16T08:13:04-03:00
+    done_at: null
+    note: null
 blockers: []
-decisions_recent: []
+decisions_recent:
+  - date: 2026-09-16
+    text: Estado preenchido com base em STATUS.md de 15/09/2026
 milestones: []
 review:
   stale_after_days: null
