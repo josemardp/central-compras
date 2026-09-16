@@ -15,16 +15,16 @@ project:
 status:
   lifecycle: evolving
   health: healthy
-  phase: Operacao corrente / Cotacao de exame de saude
+  phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-09-16T10:36:46-03:00
-  last_session_at: 2026-09-16T09:14:05-03:00
+  updated_at: 2026-09-16T16:08:46-03:00
+  last_session_at: 2026-09-16T15:27:54-03:00
   confidence: inferred
 focus:
   objective: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
-  current: Último commit (15/09/2026) registrou compras de manutenção veicular e abriu cotação de exame de Polissonografia Tipo I.
-  last_completed: Registro de compras veiculares e cotações de saúde em 15/09/2026.
-  recommended_next_action: act-003
+  current: Aguardar entrega das câmeras e realizar a instalação e configuração no aplicativo Tapo
+  last_completed: Compra de 2 unidades concluída pelo usuário no Mercado Livre (Loja Oficial TP-Link) em 6x sem juros com frete Full
+  recommended_next_action: act-004
 next_actions:
   - id: act-001
     title: Acompanhar entrega das pecas do HB20 e registrar veredito D+30
@@ -39,7 +39,7 @@ next_actions:
     done_at: null
     note: null
   - id: act-002
-    title: Consultar retorno de cotação clínica especializada para Polissonografia Tipo I
+    title: Consultar retorno de cotacao de servico especializado
     status: dropped
     impact: null
     urgency: null
@@ -51,7 +51,7 @@ next_actions:
     done_at: null
     note: null
   - id: act-003
-    title: Acompanhar orçamentos e prazos da cotação de Polissonografia conforme STATUS.md
+    title: Acompanhar orcamentos e prazos da cotacao de servico especializado conforme STATUS.md
     status: pending
     impact: null
     urgency: null
@@ -62,12 +62,26 @@ next_actions:
     created_at: 2026-09-16T09:14:03-03:00
     done_at: null
     note: null
+  - id: act-004
+    title: Aguardar entrega das câmeras e realizar a instalação e configuração no aplicativo Tapo
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-09-16T15:27:54-03:00
+    done_at: null
+    note: null
 blockers: []
 decisions_recent:
   - date: 2026-09-16
     text: Estado preenchido com base em STATUS.md de 15/09/2026
   - date: 2026-09-16
     text: 'Alinhar focus.current e próxima ação com evidência real: STATUS.md e commit 15/09/2026 ("registra compras do HB20, abertura e cotacao...")'
+  - date: 2026-09-16
+    text: Optado por 2x Tapo C320WS (estáticas) em vez de 1x C520WS/C530WS (rotativa) para garantir gravação contínua dos dois lados (~180 graus contínuos) e 8MP de resolução total combinada pelo mesmo investimento (~R$ 500-600) com 2 anos de garantia oficial
 milestones: []
 review:
   stale_after_days: null
