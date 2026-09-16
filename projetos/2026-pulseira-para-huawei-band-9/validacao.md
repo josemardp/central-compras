@@ -1,6 +1,6 @@
 # Validacao
 
-Gerado em 2026-09-04T14:48:36.
+Gerado em 2026-09-15T20:28:45.
 
 ## Erros
 
@@ -9,7 +9,8 @@ Nenhum erro.
 ## Avisos
 
 - Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.
-- Regra de parada (ate_200): 4 candidatos para um teto de 3. Pesquisar demais tambem custa caro.
+- cotacoes.csv esta num schema antigo, sem as colunas: estoque, proveniencia. Rode `migrar-cotacoes` para atualizar o cabecalho.
+- Categoria `pulseira-huawei-band9` sem configuracao propria: usa regras genericas. Revise atributos e gates.
 
 ## Criterio
 

@@ -1,0 +1,15 @@
+{
+  "ambiente.json": "253cb1b2c3093872e000a5fd085fed65bf45c6402c6ed059e2c25745c00a0da3",
+  "briefing.md": "55390a473e1b3c0e2c34db7ca06ce987b92eabbbc1cf321d62238df6a298111b",
+  "categorias.yaml": "5609683d8891a276a649071ce6a9ce8d62bda8cdeb3e7e2b1e39a6c50d0d75ba",
+  "cotacoes.csv": "85b5e94b135cb7cdc3546a46cb10a723b427a2d047926040f671dc097a2bd5f7",
+  "decisao.md": "6a7b1e6bf9f16934a00b6206c7e1f297dd8c1d0b0894c474df6fa85a1cc9665c",
+  "metadados.json": "819d15f7c9a24ddc18ea2c85a814becab89c7edfe8cc96d1b083e532d735996e",
+  "modelo.md": "f8125829b535c1bd71f675d3bae60c2b244b6b64438a7be751174cb9a31e59c8",
+  "motor.py": "2d5e6541d3fdaab244c9dd6819704256b0d979f048b8969b96edd1d5517360d4",
+  "participacoes/bosch-f000te195a.yaml": "3c7269eba2c90c26df3a3c40cea2336310b2fe24584fdc5b113c2aff93e6e0aa",
+  "preferencias.yaml": "0e1cb8c5b3f2bf827ce7e3b8c337363abf3474285036e511e2e4498bc35686a6",
+  "produtos/bosch-f000te195a.yaml": "7acce3bfd651284b3240f87c3a59efb9d24038b4c6c08739246638b9da9f0d2d",
+  "ranking.csv": "39e4fc6100445b13b3b446c216d1ca07dadb151d0b9ca67620cc46239debcfc0",
+  "ranking.md": "7c4631744c79ea674d4d28db11a24c8d5d1b498448a1b8b3934b0d8decdfdc83"
+}

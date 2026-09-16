@@ -1,10 +1,10 @@
 ---
-projeto_id: "2026-hb20s-refil-bomba-combustivel"
-categoria: "Autopeças"
+projeto_id: 2026-hb20s-refil-bomba-combustivel
+categoria: Autopeças
 valor_estimado: 0
 preco_teto: null
-estado: pesquisando
-criado_em: "2026-09-06"
+estado: comprado
+criado_em: '2026-09-06'
 ---
 
 # Briefing
@@ -31,15 +31,21 @@ Refil da bomba elétrica de combustível Bosch F000TE195A para HB20S 1.6 Flex 20
 
 ## Criterios obrigatorios
 
-- [ ] 
+- [ ] Compatibilidade com Hyundai HB20S 1.6 16V Flex 2015
+- [ ] Especificação Bosch F000TE195A (4.2 Bar / 12V Flex)
+- [ ] Garantia de fábrica nacional Bosch (12 meses)
 
 ## Criterios desejaveis
 
-- [ ] 
+- [ ] Vendedor oficial ou distribuidor autorizado (ex: DPaschoal, Lojas Oficiais)
+- [ ] Inclusão do chicote elétrico / pré-filtro
+- [ ] Frete grátis
 
 ## Deal-breakers
 
-- [ ] 
+- [ ] Peça recondicionada, usada ou sem garantia nacional Bosch
+- [ ] Pressão de combustível incompatível
+
 
 ## Regra de parada
 

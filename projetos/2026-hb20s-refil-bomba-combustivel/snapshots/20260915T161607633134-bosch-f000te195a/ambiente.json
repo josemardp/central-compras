@@ -1,0 +1,21 @@
+{
+  "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+  "pyyaml": "6.0.3",
+  "argumentos": {
+    "comando": "decidir",
+    "projeto": "projetos/2026-hb20s-refil-bomba-combustivel",
+    "produto_id": "bosch-f000te195a",
+    "porque": "Comprado na Amazon por R$ 265,88 em 6x sem juros com frete gratis, vendedor Autoramaoficial enviado pela Amazon (FBA). Refil original Bosch F000TE195A com kit completo (pre-filtro e conectores).",
+    "perdedores": [],
+    "risco": [],
+    "permitir_web": false,
+    "permitir_vencida": false,
+    "permitir_aguardando": false,
+    "permitir_cortado": false,
+    "permitir_incompleto": false,
+    "sem_perdedores": true,
+    "comprado": true,
+    "data_compra": "2026-09-15",
+    "force_veredito": false
+  }
+}

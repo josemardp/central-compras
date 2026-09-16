@@ -1,10 +1,10 @@
 ---
-projeto_id: "2026-hb20s-fechadura-dianteira-direita"
-categoria: "Autopeças"
+projeto_id: 2026-hb20s-fechadura-dianteira-direita
+categoria: Autopeças
 valor_estimado: 0
 preco_teto: null
-estado: pesquisando
-criado_em: "2026-09-06"
+estado: comprado
+criado_em: '2026-09-06'
 ---
 
 # Briefing
@@ -31,15 +31,21 @@ Fechadura elétrica da porta dianteira direita (passageiro) 4 pinos para HB20S 1
 
 ## Criterios obrigatorios
 
-- [ ] 
+- [ ] Compatibilidade com Hyundai HB20S 1.6 Flex 2015 (Geração 1)
+- [ ] Conector elétrico de 4 pinos (dianteira direita / passageiro)
+- [ ] Garantia nacional mínima de 3 meses
 
 ## Criterios desejaveis
 
-- [ ] 
+- [ ] Peça nova genuína ou de primeira linha com NF
+- [ ] Garantia de 6 meses
+- [ ] Frete rápido / pronta entrega
 
 ## Deal-breakers
 
-- [ ] 
+- [ ] Peça usada ou recondicionada sem procedência
+- [ ] Pinagem incompatível (ex: 6 pinos)
+
 
 ## Regra de parada
 

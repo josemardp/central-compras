@@ -1,13 +1,13 @@
 # Memoria de calculo
 
-Gerado em 2026-08-28T11:11:51.
+Gerado em 2026-09-15T20:28:44.
 
 ## Impermeabilizante Block Total Decor Colors
 
 ### Qualidade
 
 - nota bruta 0.0 com 0 avaliacoes
-- nota ajustada = (0 x 0.0 + 250.0 x 4.3) / (0 + 250.0) = **0.0**
+- nota ajustada = (0 x 0.0 + 50.0 x 4.3) / (0 + 50.0) = **0.0**
 - qualidade = (0.0 - 4.0) / (4.8 - 4.0) = **0.000**
 
 ### Valor

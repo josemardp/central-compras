@@ -5,7 +5,64 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## AO RETOMAR — comece por aqui (15/09/2026, abertura do projeto de Polissonografia SAOS - Tipo I exclusivo)
+
+Josemar solicitou a abertura do projeto para realização do exame do sono a partir do encaminhamento médico do Dr. Renato Sevestrin Reche (Psiquiatra - CRM-SP 169.803, Araçatuba/SP) e determinou foco **exclusivo na Polissonografia Tipo I** (laboratório completo de noite inteira com monitoramento por técnico):
+- **Projeto (`2026-polissonografia-para-suspeita-de-saos`)**:
+  - Necessidade: Polissonografia diagnóstica Tipo I em laboratório do sono por suspeita de SAOS.
+  - Modalidades domiciliares (Tipo II e Tipo III) descartadas a pedido do usuário; Tipo IV vetada expressamente no pedido médico.
+  - Documento médico de referência: `"G:\Meu Drive\10_JOSEMAR_PESSOAL\01_PESSOAL\Documentos\Médico\Josemar\Renato Reche\Encaminhamento Polissonografia.pdf"`.
+  - Praças cotadas: Araçatuba/SP e São Paulo/SP.
+  - 4 candidatos ativos elegíveis (todos Tipo I):
+    1. `cema-sp-tipo-i`: Hospital CEMA SP (Tipo I laboratorial, R$ 800,00 estimativa web) - lidera em score de custo.
+    2. `instituto-sono-ata-tipo-i`: Instituto do Sono de Araçatuba (Tipo I laboratório com suíte, R$ 850,00 estimativa web) - padrão-ouro local em Araçatuba.
+    3. `fleury-sp-tipo-i`: Grupo Fleury SP (Tipo I laboratório, R$ 1.200,00 estimativa web).
+    4. `instituto-sono-sp-tipo-i`: Instituto do Sono SP / AFIP (Tipo I laboratório, **R$ 1.700,00 confirmada manualmente via WhatsApp oficial** para a Polissonografia BASAL).
+  - Candidatos cortados/descartados: `clinica-fontanelli-ata-tipo-iii` e `delboni-sp-tipo-iii` (ambos Tipo III domiciliares).
+  - Próximo passo operacional: aguardar/consultar o retorno das demais clínicas (especialmente **Instituto do Sono de Araçatuba** pelo WhatsApp `(18) 99655-8866` ou telefone `(18) 3624-4288`) para comparar a cotação confirmada localmente contra a de SP.
+
+Artefatos derivados regenerados (`regenerar`). Checagem de segredos estrita: limpa. Suíte completa: **580 testes, 0 falhas**.
+
+
+## AO RETOMAR — comece por aqui (15/09/2026, compras de pecas do HB20 100% concluidas)
+
+Josemar concluiu a compra das duas pecas do HB20S 1.6 Flex 2015 nesta sessao:
+- **Refil da Bomba de Combustivel (`2026-hb20s-refil-bomba-combustivel`)**:
+  - Compra realizada e registrada como **comprado** em 2026-09-15.
+  - Produto: `bosch-f000te195a` (Bosch F000TE195A original, 12V Flex 4.2 Bar, kit com pre-filtro e conectores).
+  - Loja: Amazon (vendedor `Autoramaoficial`, enviado pela Amazon / FBA).
+  - Preco e condicao: **R$ 265,88** parcelado em até 6x de R$ 44,33 sem juros, com frete gratis.
+  - Decisao congelada em snapshot (`snapshots/20260915T161607633134-bosch-f000te195a`) e arquivo de veredito pos-compra criado (`vereditos/2026-09-15-2026-hb20s-refil-bomba-combustivel-bosch-f000te195a.md`).
+  - Proximo passo operacional: aguardar entrega (previsao 20/09/2026) e preencher veredito D+30 em 2026-10-15.
+
+- **Fechadura Dianteira Direita (`2026-hb20s-fechadura-dianteira-direita`)**:
+  - Compra realizada e registrada como **comprado** em 2026-09-15.
+  - Produto: `universal-15640` (Fechadura eletrica completa 1a linha pronta de fabrica, conector 4 pinos, lado passageiro dianteiro).
+  - Loja: Mercado Livre (vendedor `ml pecas`, MercadoLider Platinum, envio FULL).
+  - Preco e condicao: **R$ 219,10** parcelado em até 6x de R$ 36,52 sem juros, com frete gratis Full (chega amanha 16/09/2026).
+  - Decisao congelada em snapshot (`snapshots/20260915T182450012172-universal-15640`) e arquivo de veredito pos-compra criado (`vereditos/2026-09-15-2026-hb20s-fechadura-dianteira-direita-universal-15640.md`).
+  - Proximo passo operacional: aguardar entrega (previsao 16/09/2026) e preencher veredito D+30 em 2026-10-15.
+
+Artefatos derivados regenerados (`regenerar`). Checagem de segredos estrita: limpa. Suite completa: **580 testes, 0 falhas**. Nenhuma pendencia ativa para essas duas pecas.
+
+## AO RETOMAR — comece por aqui (15/09/2026, pesquisa e atualizacao de pecas do carro)
+
+Atualizacao das compras de acessorios/pecas para o carro (HB20S 1.6 Flex 2015):
+- **Fechadura Dianteira Direita (`2026-hb20s-fechadura-dianteira-direita`)**:
+  - Pesquisa web e especificacao tecnica concluidas: 4 pinos, lado passageiro dianteiro (compativel HB20/HB20S/HB20X 2012-2019).
+  - Candidatos atualizados nas fichas (`pesquisa.md`, `produto.yaml`, `briefing.md`, `01-definir-modelo.md`, `processo.md`):
+    - `universal-15640`: Universal Automotive 15640 Eletrica (lider em valor, ~R$ 215,00, garantia 3-6m).
+    - `mobis-81320-1s021`: Hyundai Mobis 81320-1S021 Genuina (lider em qualidade original, ~R$ 370,30, garantia 6m).
+  - Empate tecnico no ranking (72.8 vs 70.1). Pendencia: confirmacao manual de estoque e frete para compra.
+- **Refil da Bomba de Combustivel (`2026-hb20s-refil-bomba-combustivel`)**:
+  - Pesquisa web e especificacao tecnica concluidas: refil eletrico interno 4.2 Bar, 12V Flex (Bosch F000TE195A).
+  - Candidato atualizado nas fichas: `bosch-f000te195a` (R$ 236,96 na DPaschoal / R$ 356,42 no ML com frete, 12m garantia nacional Bosch).
+  - Ranking score 92.2. Pendencia: confirmacao manual da oferta (conferir kit com pre-filtro).
+
+Artefatos derivados regenerados (`regenerar`). Suite completa: **580 testes, 0 falhas**. Checagem de segredos limpa.
+
 ## AO RETOMAR — comece por aqui (15/09/2026, atualizacao operacional)
+
 
 Josemar informou nesta sessao:
 - **Pulseira Huawei Band 9**: nao precisa mais. Todos os candidatos do

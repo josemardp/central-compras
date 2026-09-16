@@ -1,0 +1,13 @@
+produto_id: universal-15640
+estado: pesquisando
+preco_alvo: null
+preco_teto: null
+requisitos_atendidos:
+  compatibilidade_hb20s_flex: true
+  conector_4_pinos: true
+  garantia_nacional: true
+  primeira_linha_com_nf: true
+  frete_rapido: true
+descartado_porque: null
+aguardando_preco_porque: null
+aguardando_preco_desde: null

@@ -1,0 +1,13 @@
+produto_id: bosch-f000te195a
+estado: pesquisando
+preco_alvo: null
+preco_teto: null
+requisitos_atendidos:
+  compatibilidade_hb20s_flex: true
+  especificacao_bosch_f000te195a: true
+  garantia_fabrica_nacional: true
+  kit_pre_filtro: true
+  frete_gratis: true
+descartado_porque: null
+aguardando_preco_porque: null
+aguardando_preco_desde: null

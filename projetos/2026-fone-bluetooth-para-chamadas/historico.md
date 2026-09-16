@@ -1,6 +1,6 @@
 # Historico de preco
 
-Gerado em 2026-08-28T11:11:51.
+Gerado em 2026-09-15T20:28:44.
 
 Base de comparacao: **custo total** (a mesma do ranking).
 
@@ -17,14 +17,16 @@ Base de comparacao: **custo total** (a mesma do ranking).
 
 ## JBL Tune 770NC
 
-- Observacoes: 1 (2026-08-26 ate 2026-08-26)
-- custo total: atual R$ 429,00 / minimo R$ 429,00 / mediana R$ 429,00 / maximo R$ 429,00
-- Variacao desde a primeira coleta: 0.0%
-- So ha uma observacao. Sem serie nao da para saber se um `desconto` anunciado e real: colete de novo em alguns dias.
+- Observacoes: 3 (2026-08-26 ate 2026-08-29)
+- custo total: atual R$ 489,00 / minimo R$ 429,00 / mediana R$ 489,00 / maximo R$ 489,00
+- Variacao desde a primeira coleta: 14.0%
+- Desconto real contra a propria mediana: 0.0%
 
 | Data | Custo total | Loja | Fonte |
 |---|---:|---|---|
 | 2026-08-26T13:48:21 | R$ 429,00 | MercadoLivre | web |
+| 2026-08-29T16:23:21 | R$ 489,00 | Amazon | web |
+| 2026-08-29T18:22:18 | R$ 489,00 | Amazon | web |
 
 ## QCY H3 ANC
 

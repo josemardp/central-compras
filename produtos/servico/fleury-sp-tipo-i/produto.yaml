@@ -1,0 +1,9 @@
+id: fleury-sp-tipo-i
+categoria: servico
+nome: Polissonografia Tipo I - Fleury SP
+marca: Fleury
+atributos:
+  tipo_exame: polissonografia_tipo_i
+  modalidade: presencial_laboratorio
+  cidade: sao_paulo
+proveniencia: null

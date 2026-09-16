@@ -1,0 +1,23 @@
+{
+  "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+  "pyyaml": "6.0.3",
+  "argumentos": {
+    "comando": "decidir",
+    "projeto": "projetos/2026-hb20s-fechadura-dianteira-direita",
+    "produto_id": "universal-15640",
+    "porque": "Comprada fechadura eletrica completa 1a linha pronta no Mercado Livre por R$ 219,10 em 6x sem juros, frete gratis Full, vendedor ml pecas (MercadoLider Platinum). Solucao completa para resolver o motorzinho atuador que falhava intermitente.",
+    "perdedores": [
+      "mobis-81320-1s021: peca genuina Mobis custaria R$ 370+, diferenca de mais de R$ 150 nao compensa para o mesmo resultado funcional"
+    ],
+    "risco": [],
+    "permitir_web": false,
+    "permitir_vencida": false,
+    "permitir_aguardando": false,
+    "permitir_cortado": false,
+    "permitir_incompleto": false,
+    "sem_perdedores": false,
+    "comprado": true,
+    "data_compra": "2026-09-15",
+    "force_veredito": false
+  }
+}

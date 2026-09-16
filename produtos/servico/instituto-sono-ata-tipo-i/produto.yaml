@@ -1,0 +1,9 @@
+id: instituto-sono-ata-tipo-i
+categoria: servico
+nome: Polissonografia Tipo I - Instituto do Sono Aracatuba
+marca: Instituto do Sono Aracatuba
+atributos:
+  tipo_exame: polissonografia_tipo_i
+  modalidade: presencial_laboratorio
+  cidade: aracatuba
+proveniencia: null

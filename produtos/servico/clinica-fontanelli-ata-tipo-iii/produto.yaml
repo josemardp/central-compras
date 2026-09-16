@@ -1,0 +1,9 @@
+id: clinica-fontanelli-ata-tipo-iii
+categoria: servico
+nome: Polissonografia Domiciliar Tipo III - Clinica Fontanelli Aracatuba
+marca: Clinica Fontanelli
+atributos:
+  tipo_exame: polissonografia_tipo_iii
+  modalidade: domiciliar
+  cidade: aracatuba
+proveniencia: null

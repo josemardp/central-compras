@@ -1,0 +1,9 @@
+id: delboni-sp-tipo-iii
+categoria: servico
+nome: Polissonografia Domiciliar Tipo III - Delboni Auriemo SP
+marca: Delboni Auriemo
+atributos:
+  tipo_exame: polissonografia_tipo_iii
+  modalidade: domiciliar
+  cidade: sao_paulo
+proveniencia: null

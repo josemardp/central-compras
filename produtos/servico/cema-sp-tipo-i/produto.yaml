@@ -1,0 +1,9 @@
+id: cema-sp-tipo-i
+categoria: servico
+nome: Polissonografia Tipo I - Hospital CEMA SP
+marca: Hospital CEMA
+atributos:
+  tipo_exame: polissonografia_tipo_i
+  modalidade: presencial_laboratorio
+  cidade: sao_paulo
+proveniencia: null

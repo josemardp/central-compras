@@ -1,0 +1,9 @@
+produto_id: delboni-sp-tipo-iii
+estado: descartado
+preco_alvo: null
+preco_teto: null
+requisitos_atendidos: {}
+descartado_porque: 'descartado: usuario determinou realizar exclusivamente Polissonografia
+  Tipo I (laboratorio completo); Tipo III descartada'
+aguardando_preco_porque: null
+aguardando_preco_desde: null

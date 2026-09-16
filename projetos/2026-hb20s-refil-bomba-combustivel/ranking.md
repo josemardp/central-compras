@@ -1,13 +1,12 @@
 # Ranking
 
-Gerado em 2026-09-06T19:22:11.
+Gerado em 2026-09-15T20:28:44.
 
 ## Elegiveis
 
-1. Refil Bomba Combustível Bosch F000TE195A - 92.2
-   qualidade 0.89 · valor 1.00 · risco 0.87 · aderencia -- · conveniencia --
-   custo total R$ 356,42 / Mercado Livre / estimativa web
-   confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+1. Refil Bomba Combustível Bosch F000TE195A - 90.3
+   qualidade 0.89 · valor 1.00 · risco 0.73 · aderencia 1.00 · conveniencia 0.89
+   custo total R$ 265,88 / Amazon / confirmada manualmente
 
 ## Cortados pelos gates
 
