@@ -43,17 +43,32 @@ Pendente do Fabio: peso/material do portao, se o 220V e fase-fase (define o
 DPS), metragem de cada circuito, modelo de caixinha, conduite do outro lado
 do portao (fotocelula refletiva dispensa).
 
-Cotacao iniciada (21/09, so busca web: navegador MCP fora do ar, Mercado Livre
-bloqueia busca automatica e a API do ML agora exige login). Cotacoes `fonte=web`
-registradas em cameras (KaBuM R$ 332,40/un, Amazon R$ 339,90/un), motor (kit
-4 m + 3 controles R$ 1.059,25; kit 3 m + 2 controles R$ 872,37, ambos vistos em
-espelhos do ML com certificado invalido: conferir no ML), fotocelula F10-R
-(R$ 251,84 / R$ 255,53) e nobreak (APC 700VA R$ 597,55, TS Shara R$ 635,55,
-SMS 700VA R$ 659,60). Todos cortados no gate por falta de nota/avaliacoes/
-garantia, que os comparadores nao mostram. Cameras acima do teto R$ 1.300 fora
-do ML (pago R$ 309,90/un no ML em 16/09).
-Proximo passo: cotar nas paginas reais (ML/Amazon) com navegador; faltam
-cartoes, caixinhas, cabo, plugues/conectores, DPS/disjuntor, cremalheira, base.
+Cotacao feita em 21/09 com o navegador `nav-lojadares` (so leitura, sem login;
+autorizado pelo Josemar). Mercado Livre bloqueia ate navegador (403), Leroy tambem.
+Todas as cotacoes sao `fonte=web` com `origem=observacao_direta` e o que nao foi
+verificado na evidencia. Melhor achado por item:
+
+| Projeto | Melhor opcao | Total | Situacao no ranking |
+|---|---|---|---|
+| cameras (4) | Amazon, TP-Link Loja oficial | R$ 1.359,60 | cortada: acima do teto R$ 1.300 (ML nao lido; pago R$ 309,90/un em 16/09) |
+| cartoes (6) | WD Purple Intelbras 64 GB (Amazon, BRAES/FBA) | R$ 989,88 | cortado: gate exige vendedor oficial; Endurance 128 GB so importado ou R$ 600-900 |
+| caixas (6) | Intelbras VBOX 1100 E (vendido pela Amazon) | R$ 126,54 | elegivel |
+| cabo | rolo 100 m Loja Eletrica (marca nao informada) | R$ 651,35 | elegivel, mas duvidoso: comprar em loja fisica por metro |
+| plugues (6) | Alumbra 2766 | R$ 91,08 | elegivel |
+| conectores | Wago 221-413 kit 20 (projeto novo) | R$ 66,80 | elegivel |
+| motor | PPA DZ Rio R800 Jetflex Z14, 4 m + 3 controles (Amazon, 123LIDER) | R$ 915,30 | cortado: garantia do vendedor (gate pede nacional) |
+| cremalheira | PPA Gold 1 m x4 | R$ 232,00 | so se o kit nao trouxer 4 m; cortada por poucas avaliacoes |
+| fotocelula | PPA F10-R (Casa do Motor Eletronico) | R$ 251,84 | cortada: comparador sem nota |
+| DPS (2) | Clamper Front 20kA 175V | R$ 83,80 | elegivel (175V so se 220V for fase-fase) |
+| disjuntor | Steck SDD62C10 (projeto novo) | R$ 38,90 | elegivel |
+| nobreak | TS Shara 700VA R$ 409 (5Ah) x Intelbras ATTIV 700VA R$ 582,52 | - | ambos elegiveis |
+| base | nao achada online | - | perguntar ao Fabio / loja local |
+
+Projetos separados nesta rodada (itens complementares nao competem): conectores
+foram para `2026-conectores-emenda-cameras`; disjuntor para
+`2026-disjuntor-bipolar-motor-portao`.
+Proximo passo: Josemar decide as excecoes de gate (teto das cameras, vendedor
+dos cartoes, garantia do motor) e confirma no checkout (`promover-cotacao`).
 
 ## AO RETOMAR — comece por aqui (21/09/2026, especialista tecnico na etapa "definir modelo")
 

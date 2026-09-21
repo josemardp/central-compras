@@ -1,0 +1,13 @@
+id: ppa-dz-rio-500-jetflex-2ctrl-sem-crem
+categoria: motor_portao
+nome: Motor PPA DZ Rio 500 Jetflex 2 controles (sem cremalheira)
+marca: PPA
+atributos:
+  modelo_exato: DZ Rio 500 Jetflex
+  capacidade_kg: 500
+  tensao: bivolt
+  central: Triflex
+  fim_de_curso: hibrido
+  controles_inclusos: 2
+  cremalheira_inclusa_m: 0
+proveniencia: null

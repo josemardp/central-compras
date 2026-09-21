@@ -1,14 +1,16 @@
 # Ranking
 
-Gerado em 2026-09-21T13:09:01.
+Gerado em 2026-09-21T13:43:51.
 
 ## Elegiveis
 
 Nenhum candidato passou pelos gates.
 ## Cortados pelos gates
 
+- Motor PPA DZ Rio 500 Jetflex 2 controles (sem cremalheira): garantia_tipo nao aceito (nenhuma)
 - Kit PPA DZ Rio 500 Jetflex 3 m cremalheira 2 controles: garantia_tipo nao aceito (nenhuma)
 - Kit PPA DZ Rio 500 Jetflex 4 m cremalheira 3 controles: garantia_tipo nao aceito (nenhuma)
+- Kit PPA DZ Rio R800 Jetflex Z14 4 m cremalheira 3 controles: garantia_tipo nao aceito (vendedor)
 
 ## Observacoes
 

@@ -30,7 +30,7 @@ Kit de motor para o portao de correr, especificado pelo Fabio: PPA DZ Rio 500 Je
 | Atributo | Minimo aceitavel | Ideal | Por que, no meu contexto |
 |---|---|---|---|
 | Modelo | PPA DZ Rio 500 Jetflex | idem, confirmar versao 1/4 ou 1/3 e central Facility ou Full Range [VERIFICAR com Fabio] | e o que o Fabio instala e da manutencao |
-| Capacidade | 500 kg | 500 kg; NAO precisa da versao 800 kg (1/2 CV) | portao 4 x 2 m de ferro fica entre ~80 e ~280 kg (estimativa); 800 kg so se o Fabio achar o portao muito mais pesado |
+| Capacidade | 500 kg | 500 kg basta; a R800 Jetflex (Z14, 800 kg) e aceita se custar igual ou menos | portao 4 x 2 m de ferro ~80-280 kg (estimativa); em 21/09 o kit R800 com 4 m + 3 controles saiu MAIS BARATO que o 500 (R$ 915 x R$ 1.059): mais folga pelo mesmo preco, abre 4 m em 5,3 s |
 | Tensao | bivolt 127/220V | bivolt, ligado em 220V | decisao do Josemar (21/09); circuito proprio com disjuntor bipolar e DPS |
 | Central | Triflex bivolt com entrada para fotocelula | idem | permite ligar sensor anti-esmagamento |
 | Fim de curso | hibrido/magnetico | idem | vem no kit |

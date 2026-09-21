@@ -3,13 +3,15 @@
 ## Estado atual
 
 - Estado: pesquisando
-- Proxima acao: definir modelo/requisitos com ajuda da IA
-- Decisao aberta:
+- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
+- Decisao aberta: Caixa de passagem Intelbras VBOX 1100 E (externa) lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | cotacao | Cotacao registrada para intelbras-vbox-1100-e | Amazon / fonte=web / custo_total=126.54 |
+| 2026-09-21 | produto | Candidato registrado: Caixa de passagem Intelbras VBOX 1100 E (externa) | id=intelbras-vbox-1100-e |
 | 2026-09-21 | modelo | Caixa de passagem CFTV externa IP65+, 6 unidades | Abriga a fonte 9V e as emendas no muro, exposta a sol e chuva. |
 | 2026-09-21 | acessorio | acessorio de 2026-cameras-tapo-c320ws-4-unidades | comprado a parte para comparar preco sem misturar ranking |
 | 2026-09-21 | abertura | Compra criada | Necessidade registrada no briefing |
@@ -18,9 +20,9 @@
 
 - [ ] 1. Definir o modelo e a especificacao tecnica para o meu contexto (com acessorios)
 - [ ] 2. Mapear candidatos
-- [ ] 3. Registrar produtos em `produtos/`
-- [ ] 4. Coletar cotacoes iniciais
-- [ ] 5. Aplicar gates eliminatorios
+- [x] 3. Registrar produtos em `produtos/`
+- [x] 4. Coletar cotacoes iniciais
+- [x] 5. Aplicar gates eliminatorios
 - [ ] 6. Comparar finalistas
 - [ ] 7. Confirmar preco/frete/estoque manualmente
 - [ ] 8. Registrar decisao e por que os outros perderam

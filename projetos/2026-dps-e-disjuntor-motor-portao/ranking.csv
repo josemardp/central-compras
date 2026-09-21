@@ -1,1 +1,2 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+clamper-front-20ka-175v,DPS Clamper Front 20kA 175V,64.3,0.521,1.0,0.38,0.5,0.5,elegivel,,,web,0.75,0,nao,conveniencia; aderencia,83.8,0.0,,0.0,83.8

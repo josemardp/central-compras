@@ -10,6 +10,12 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | cotacao | Aceitar a R800 Jetflex (Z14, 800 kg) como candidata | Kit R800 com 4 m + 3 controles na Amazon (R$ 915,30) sai mais barato que o kit 500 equivalente (R$ 1.059,25): mais folga pelo mesmo preco. |
+| 2026-09-21 | cotacao | Cotacao registrada para ppa-dz-rio-500-jetflex-2ctrl-sem-crem | Amazon / fonte=web / custo_total=1043.32 |
+| 2026-09-21 | produto | Candidato registrado: Motor PPA DZ Rio 500 Jetflex 2 controles (sem cremalheira) | id=ppa-dz-rio-500-jetflex-2ctrl-sem-crem |
+| 2026-09-21 | cotacao | Cotacao registrada para ppa-dz-rio-r800-jetflex-z14-4m-3ctrl | Amazon / fonte=web / custo_total=915.3 |
+| 2026-09-21 | produto | Candidato registrado: Kit PPA DZ Rio R800 Jetflex Z14 4 m cremalheira 3 controles | id=ppa-dz-rio-r800-jetflex-z14-4m-3ctrl |
+| 2026-09-21 | acessorio | aberto projeto 2026-disjuntor-bipolar-motor-portao | acessorio com preco a comparar vira compra propria |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-dz-rio-500-jetflex-3m-2ctrl | Mercado Livre / fonte=web / custo_total=872.37 |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-dz-rio-500-jetflex-4m-3ctrl | Mercado Livre / fonte=web / custo_total=1059.25 |
 | 2026-09-21 | produto | Candidato registrado: Kit PPA DZ Rio 500 Jetflex 3 m cremalheira 2 controles | id=ppa-dz-rio-500-jetflex-3m-2ctrl |

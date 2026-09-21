@@ -1,13 +1,13 @@
 # Ranking
 
-Gerado em 2026-09-21T13:09:01.
+Gerado em 2026-09-21T13:43:50.
 
 ## Elegiveis
 
 Nenhum candidato passou pelos gates.
 ## Cortados pelos gates
 
-- Fotocelula refletiva PPA F10-R: nota_ajustada abaixo do gate (0.0 < 4.0); avaliacoes insuficientes (0 < 20)
+- Fotocelula refletiva PPA F10-R: avaliacoes insuficientes (2 < 20) alertas: AVAL_SUSPEITA
 
 ## Observacoes
 

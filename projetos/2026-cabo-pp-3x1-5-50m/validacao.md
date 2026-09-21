@@ -1,6 +1,6 @@
 # Validacao
 
-Gerado em 2026-09-21T13:09:00.
+Gerado em 2026-09-21T13:43:48.
 
 ## Erros
 
@@ -8,7 +8,8 @@ Nenhum erro.
 
 ## Avisos
 
-- Projeto ainda nao tem cotacoes.
+- Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.
+- Regra de parada (de_200_a_2000): minimo de 2 cotacao(oes) por candidato. Abaixo disso: cabo-pp-3x15-100m-lojaeletrica.
 
 ## Criterio
 

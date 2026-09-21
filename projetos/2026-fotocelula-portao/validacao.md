@@ -1,6 +1,6 @@
 # Validacao
 
-Gerado em 2026-09-21T13:09:01.
+Gerado em 2026-09-21T13:43:50.
 
 ## Erros
 
@@ -8,6 +8,7 @@ Nenhum erro.
 
 ## Avisos
 
+- cotacoes.csv linha 4 (ppa-f10-r): alertas AVAL_SUSPEITA
 - Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.
 
 ## Criterio

@@ -1,6 +1,6 @@
 # Validacao
 
-Gerado em 2026-09-21T13:09:00.
+Gerado em 2026-09-21T13:43:49.
 
 ## Erros
 
@@ -8,7 +8,8 @@ Nenhum erro.
 
 ## Avisos
 
-- Projeto ainda nao tem cotacoes.
+- cotacoes.csv linha 2 (ppa-cremalheira-gold-1m): alertas AVAL_SUSPEITA
+- Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.
 
 ## Criterio
 

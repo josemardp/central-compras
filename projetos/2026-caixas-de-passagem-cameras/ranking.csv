@@ -1,1 +1,2 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+intelbras-vbox-1100-e,Caixa de passagem Intelbras VBOX 1100 E (externa),80.6,0.865,1.0,0.38,0.5,1.0,elegivel,,,web,0.85,0,nao,aderencia,126.54,0.0,,0.0,126.54

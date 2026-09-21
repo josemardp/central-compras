@@ -10,6 +10,8 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | cotacao | Cotacao registrada para ppa-cremalheira-gold-1m | Amazon / fonte=web / custo_total=232.0 |
+| 2026-09-21 | produto | Candidato registrado: Cremalheira PPA Gold 1 m (aco, gomos brancos) | id=ppa-cremalheira-gold-1m |
 | 2026-09-21 | modelo | Cremalheira residencial reforcada branca, 4 m ou 1 m | Depende do kit do motor; o metro extra tem que ser do mesmo modelo da do kit. |
 | 2026-09-21 | acessorio | acessorio de 2026-motor-portao-deslizante | comprado a parte para comparar preco sem misturar ranking |
 | 2026-09-21 | abertura | Compra criada | Necessidade registrada no briefing |
@@ -18,9 +20,9 @@
 
 - [ ] 1. Definir o modelo e a especificacao tecnica para o meu contexto (com acessorios)
 - [ ] 2. Mapear candidatos
-- [ ] 3. Registrar produtos em `produtos/`
-- [ ] 4. Coletar cotacoes iniciais
-- [ ] 5. Aplicar gates eliminatorios
+- [x] 3. Registrar produtos em `produtos/`
+- [x] 4. Coletar cotacoes iniciais
+- [x] 5. Aplicar gates eliminatorios
 - [ ] 6. Comparar finalistas
 - [ ] 7. Confirmar preco/frete/estoque manualmente
 - [ ] 8. Registrar decisao e por que os outros perderam

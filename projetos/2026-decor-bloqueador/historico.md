@@ -1,6 +1,6 @@
 # Historico de preco
 
-Gerado em 2026-09-21T13:09:00.
+Gerado em 2026-09-21T13:43:49.
 
 Base de comparacao: **custo total** (a mesma do ranking).
 

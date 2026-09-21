@@ -1,0 +1,2 @@
+produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+wago-221-413-kit20,Conector Wago 221-413 kit 20,76.1,0.759,1.0,0.38,0.5,0.929,elegivel,,,web,0.85,0,nao,aderencia,66.8,0.0,,0.0,66.8

@@ -10,6 +10,8 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | acessorio | aberto projeto 2026-conectores-emenda-cameras | acessorio com preco a comparar vira compra propria |
+| 2026-09-21 | cotacao | Cotacao registrada para tapo-c320ws | Amazon / fonte=web / custo_total=1359.6 |
 | 2026-09-21 | cotacao | Cotacao registrada para tapo-c320ws | Amazon / fonte=web / custo_total=1359.6 |
 | 2026-09-21 | cotacao | Cotacao registrada para tapo-c320ws | KaBuM / fonte=web / custo_total=1329.6 |
 | 2026-09-21 | acessorio | aberto projeto 2026-plugues-e-conectores-cameras | acessorio com preco a comparar vira compra propria |

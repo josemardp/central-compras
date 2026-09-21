@@ -1,6 +1,6 @@
 # Validacao
 
-Gerado em 2026-09-21T13:09:02.
+Gerado em 2026-09-21T13:43:52.
 
 ## Erros
 
@@ -9,7 +9,7 @@ Nenhum erro.
 ## Avisos
 
 - Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.
-- Regra de parada (de_200_a_2000): minimo de 2 cotacao(oes) por candidato. Abaixo disso: apc-back-ups-700va-bivolt, sms-tech-700va-bivolt, ts-shara-ups-mini-700va-bivolt.
+- Regra de parada (de_200_a_2000): minimo de 2 cotacao(oes) por candidato. Abaixo disso: apc-back-ups-700va-bivolt, intelbras-attiv-700va, sms-tech-700va-bivolt.
 
 ## Criterio
 

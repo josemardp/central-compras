@@ -1,1 +1,2 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+cabo-pp-3x15-100m-lojaeletrica,"Cabo PP 3x1,5 mm2 500V rolo 100 m (marca nao informada)",70.4,0.0,1.0,0.335,0.5,0.5,elegivel,,,web,0.45,0,nao,qualidade; conveniencia; aderencia,651.35,0.0,,0.0,651.35

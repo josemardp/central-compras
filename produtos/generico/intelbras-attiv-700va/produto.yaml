@@ -1,0 +1,11 @@
+id: intelbras-attiv-700va
+categoria: generico
+nome: Nobreak Intelbras ATTIV 700VA bivolt
+marca: Intelbras
+atributos:
+  potencia_va: 700
+  entrada: bivolt
+  saida: 127V
+  tipo: interativo
+  tomadas: 4
+proveniencia: null

@@ -1,1 +1,2 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+ppa-cremalheira-gold-1m,"Cremalheira PPA Gold 1 m (aco, gomos brancos)",0,0.379,1.0,0.23,0.5,0.5,cortado,avaliacoes insuficientes (1 < 20),AVAL_SUSPEITA,web,0.75,0,nao,conveniencia; aderencia,232.0,0.0,,0.0,232.0

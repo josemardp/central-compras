@@ -1,1 +1,2 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+alumbra-2766-plugue-femea,Plugue femea 2P+T 10A Alumbra 2766 branco,71.5,0.701,1.0,0.38,0.5,0.5,elegivel,,,web,0.75,0,nao,conveniencia; aderencia,91.08,0.0,,0.0,91.08
