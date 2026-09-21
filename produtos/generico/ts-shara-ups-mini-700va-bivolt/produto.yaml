@@ -1,0 +1,10 @@
+id: ts-shara-ups-mini-700va-bivolt
+categoria: generico
+nome: Nobreak TS Shara UPS Mini 700VA bivolt 6 tomadas saida 115V
+marca: TS Shara
+atributos:
+  potencia_va: 700
+  entrada: bivolt
+  saida: 115V
+  tomadas: 6
+proveniencia: null

@@ -1,0 +1,11 @@
+id: sms-tech-700va-bivolt
+categoria: generico
+nome: Nobreak SMS Tech 700VA interativo bivolt saida 115V
+marca: SMS
+atributos:
+  potencia_va: 700
+  potencia_w: 350
+  entrada: bivolt
+  saida: 115V
+  tipo: interativo
+proveniencia: null

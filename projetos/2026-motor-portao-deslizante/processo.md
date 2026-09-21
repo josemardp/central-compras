@@ -10,6 +10,10 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | cotacao | Cotacao registrada para ppa-dz-rio-500-jetflex-3m-2ctrl | Mercado Livre / fonte=web / custo_total=872.37 |
+| 2026-09-21 | cotacao | Cotacao registrada para ppa-dz-rio-500-jetflex-4m-3ctrl | Mercado Livre / fonte=web / custo_total=1059.25 |
+| 2026-09-21 | produto | Candidato registrado: Kit PPA DZ Rio 500 Jetflex 3 m cremalheira 2 controles | id=ppa-dz-rio-500-jetflex-3m-2ctrl |
+| 2026-09-21 | produto | Candidato registrado: Kit PPA DZ Rio 500 Jetflex 4 m cremalheira 3 controles | id=ppa-dz-rio-500-jetflex-4m-3ctrl |
 | 2026-09-21 | modelo | Classe 500 kg, 220V, 3 controles, com fotocelula, DPS e disjuntor | Portao ~4x2 m de ferro pesa ~80-280 kg (estimativa); 500 kg sobra, 800 kg nao precisa. Decisoes do Josemar em 21/09. |
 | 2026-09-21 | acessorio | aberto projeto 2026-dps-e-disjuntor-motor-portao | acessorio com preco a comparar vira compra propria |
 | 2026-09-21 | acessorio | aberto projeto 2026-fotocelula-portao | acessorio com preco a comparar vira compra propria |
@@ -22,9 +26,9 @@
 
 - [ ] 1. Definir o modelo e a especificacao tecnica para o meu contexto (com acessorios)
 - [ ] 2. Mapear candidatos
-- [ ] 3. Registrar produtos em `produtos/`
-- [ ] 4. Coletar cotacoes iniciais
-- [ ] 5. Aplicar gates eliminatorios
+- [x] 3. Registrar produtos em `produtos/`
+- [x] 4. Coletar cotacoes iniciais
+- [x] 5. Aplicar gates eliminatorios
 - [ ] 6. Comparar finalistas
 - [ ] 7. Confirmar preco/frete/estoque manualmente
 - [ ] 8. Registrar decisao e por que os outros perderam

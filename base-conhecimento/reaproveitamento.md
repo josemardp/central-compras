@@ -1,6 +1,6 @@
 # Reaproveitamento
 
-Gerado em 2026-09-21T11:08:08.
+Gerado em 2026-09-21T13:09:04.
 
 Conta so o conhecimento que **ja existia antes** da compra abrir. O que o
 proprio projeto registrou durante a pesquisa nao e reaproveitamento: seria
@@ -15,7 +15,7 @@ medir a si mesmo e dar 100% sempre.
 | 2026-base-motor-portao-deslizante | generico | 0 | 0 | 1 | sim |
 | 2026-cabo-pp-3x1-5-50m | material_eletrico | 0 | 0 | 1 | sim |
 | 2026-caixas-de-passagem-cameras | material_eletrico | 0 | 0 | 1 | sim |
-| 2026-cameras-tapo-c320ws-4-unidades | camera | 0 | 0 | 1 | sim |
+| 2026-cameras-tapo-c320ws-4-unidades | camera | 0 | 1 | 1 | sim |
 | 2026-cartoes-microsd-128gb-cameras | cartao_memoria | 0 | 0 | 1 | sim |
 | 2026-cremalheira-portao-4m | generico | 0 | 0 | 1 | sim |
 | 2026-decor-bloqueador | material_construcao | 0 | 0 | 0 | nao |

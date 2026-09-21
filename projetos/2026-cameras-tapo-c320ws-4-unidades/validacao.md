@@ -1,6 +1,6 @@
 # Validacao
 
-Gerado em 2026-09-21T11:08:05.
+Gerado em 2026-09-21T13:09:00.
 
 ## Erros
 
@@ -8,8 +8,7 @@ Nenhum erro.
 
 ## Avisos
 
-- Projeto ainda nao tem cotacoes.
-- Regra de parada (de_200_a_2000): minimo de 2 cotacao(oes) por candidato. Abaixo disso: tapo-c320ws.
+- Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.
 
 ## Criterio
 

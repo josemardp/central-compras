@@ -1,1 +1,2 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+tapo-c320ws,Tapo C320WS,0,0.0,1.0,0.38,0.5,0.5,cortado,custo_total acima do preco_teto do briefing (1359.6 > 1300.0); nota_ajustada abaixo do gate (0.0 < 4.2); avaliacoes insuficientes (0 < 150),,web,0.45,0,nao,qualidade; conveniencia; aderencia,1359.6,0.0,,0.0,1359.6

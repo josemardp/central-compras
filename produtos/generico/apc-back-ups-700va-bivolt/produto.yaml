@@ -1,0 +1,9 @@
+id: apc-back-ups-700va-bivolt
+categoria: generico
+nome: Nobreak APC Back-UPS 700VA bivolt saida 115V
+marca: APC
+atributos:
+  potencia_va: 700
+  entrada: bivolt
+  saida: 115V
+proveniencia: null

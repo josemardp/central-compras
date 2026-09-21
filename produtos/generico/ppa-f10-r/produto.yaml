@@ -1,0 +1,10 @@
+id: ppa-f10-r
+categoria: generico
+nome: Fotocelula refletiva PPA F10-R
+marca: PPA
+atributos:
+  tipo: refletiva
+  alcance_m: 8
+  saida: NA/NF/pulsada
+  uso: externo
+proveniencia: null

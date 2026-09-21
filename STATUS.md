@@ -43,8 +43,17 @@ Pendente do Fabio: peso/material do portao, se o 220V e fase-fase (define o
 DPS), metragem de cada circuito, modelo de caixinha, conduite do outro lado
 do portao (fotocelula refletiva dispensa).
 
-Proximo passo: cotar, projeto a projeto (comecar pelas cameras e pelo motor,
-que definem cremalheira/base).
+Cotacao iniciada (21/09, so busca web: navegador MCP fora do ar, Mercado Livre
+bloqueia busca automatica e a API do ML agora exige login). Cotacoes `fonte=web`
+registradas em cameras (KaBuM R$ 332,40/un, Amazon R$ 339,90/un), motor (kit
+4 m + 3 controles R$ 1.059,25; kit 3 m + 2 controles R$ 872,37, ambos vistos em
+espelhos do ML com certificado invalido: conferir no ML), fotocelula F10-R
+(R$ 251,84 / R$ 255,53) e nobreak (APC 700VA R$ 597,55, TS Shara R$ 635,55,
+SMS 700VA R$ 659,60). Todos cortados no gate por falta de nota/avaliacoes/
+garantia, que os comparadores nao mostram. Cameras acima do teto R$ 1.300 fora
+do ML (pago R$ 309,90/un no ML em 16/09).
+Proximo passo: cotar nas paginas reais (ML/Amazon) com navegador; faltam
+cartoes, caixinhas, cabo, plugues/conectores, DPS/disjuntor, cremalheira, base.
 
 ## AO RETOMAR — comece por aqui (21/09/2026, especialista tecnico na etapa "definir modelo")
 

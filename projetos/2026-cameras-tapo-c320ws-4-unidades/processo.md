@@ -10,6 +10,8 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | cotacao | Cotacao registrada para tapo-c320ws | Amazon / fonte=web / custo_total=1359.6 |
+| 2026-09-21 | cotacao | Cotacao registrada para tapo-c320ws | KaBuM / fonte=web / custo_total=1329.6 |
 | 2026-09-21 | acessorio | aberto projeto 2026-plugues-e-conectores-cameras | acessorio com preco a comparar vira compra propria |
 | 2026-09-21 | acessorio | aberto projeto 2026-nobreak-cameras-e-roteador | acessorio com preco a comparar vira compra propria |
 | 2026-09-21 | modelo | Tapo C320WS, 4 unidades | Padronizar 6 cameras com as 2 ja compradas: um app, mesma fonte, caixinha e cartao. |
@@ -24,8 +26,8 @@
 - [ ] 1. Definir o modelo e a especificacao tecnica para o meu contexto (com acessorios)
 - [ ] 2. Mapear candidatos
 - [x] 3. Registrar produtos em `produtos/`
-- [ ] 4. Coletar cotacoes iniciais
-- [ ] 5. Aplicar gates eliminatorios
+- [x] 4. Coletar cotacoes iniciais
+- [x] 5. Aplicar gates eliminatorios
 - [ ] 6. Comparar finalistas
 - [ ] 7. Confirmar preco/frete/estoque manualmente
 - [ ] 8. Registrar decisao e por que os outros perderam
