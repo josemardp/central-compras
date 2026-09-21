@@ -29,7 +29,7 @@ propoe a especificacao para o MEU contexto e pergunta so o que muda a escolha.
 | Atributo | Minimo aceitavel | Ideal | Por que, no meu contexto |
 |---|---|---|---|
 | Grau de protecao | IP65 | IP66 | muro externo, chuva batendo |
-| Espaco interno | cabe fonte 9V plugada + emendas | [VERIFICAR: medir a fonte da C320WS em maos] | a fonte original nao e cortada |
+| Espaco interno | cabe fonte 9V plugada + emendas | VBOX 1100 E: 125 x 123 x 60 mm (ficha Intelbras) | fonte ~57 x 42 x 25 mm + plugue femea: cabe na diagonal, com pouca folga |
 | Entrada de cabo | furo por baixo com vedacao | prensa-cabo | agua nao escorre para dentro |
 | Material | plastico com protecao UV | ABS/PVC com UV | sol forte racha plastico comum |
 | Fixacao da camera | tampa com furacao para camera bullet | furacao compativel com a base da C320WS [VERIFICAR] | caixinha fica atras da camera e esconde os fios |

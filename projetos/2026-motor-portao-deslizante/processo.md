@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | modelo | R800 Jetflex Z14 serve; velocidade real 33 m/min (~7 s em 4 m), nao 5,3 s | manual tecnico PPA DZ Rio (P08665 REV1): R800 800 kg, 280/230 W, 2,8/1,6 A, 33 m/min (Z14) ou 42,9 m/min (Z18), mesma central e fim de curso da linha DZ Rio; consome menos que o R500 (330/270 W). O 5,3 s era do anuncio. ATENCAO: o manual da como dimensao maxima do portao 2,5 m de altura x 3,0 m de comprimento em TODOS os DZ Rio; o portao tem ~4 m [perguntar ao Fabio se ja instalou DZ Rio em portao de 4 m]. |
 | 2026-09-21 | cotacao | Aceitar a R800 Jetflex (Z14, 800 kg) como candidata | Kit R800 com 4 m + 3 controles na Amazon (R$ 915,30) sai mais barato que o kit 500 equivalente (R$ 1.059,25): mais folga pelo mesmo preco. |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-dz-rio-500-jetflex-2ctrl-sem-crem | Amazon / fonte=web / custo_total=1043.32 |
 | 2026-09-21 | produto | Candidato registrado: Motor PPA DZ Rio 500 Jetflex 2 controles (sem cremalheira) | id=ppa-dz-rio-500-jetflex-2ctrl-sem-crem |

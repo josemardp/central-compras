@@ -1,6 +1,6 @@
 # Memoria de calculo
 
-Gerado em 2026-09-21T13:43:53.
+Gerado em 2026-09-21T14:58:05.
 
 ## Polissonografia Tipo I - Hospital CEMA SP
 

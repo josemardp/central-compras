@@ -4,12 +4,15 @@
 
 - Estado: pesquisando
 - Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
-- Decisao aberta: Disjuntor bipolar Steck SDD62C10 10A curva C lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
+- Decisao aberta: Disjuntor bipolar Steck SDD62C06 6A curva C lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | descarte | Descartado steck-sdd62c10 | manual tecnico PPA DZ Rio (P08665 REV1) pede disjuntor de 5 A para o automatizador; 10 A fica acima. Substituido pelo 6 A (menor padrao DIN comum acima de 5 A). |
+| 2026-09-21 | cotacao | Cotacao registrada para steck-sdd62c06 | Amazon / fonte=web / custo_total=29.9 |
+| 2026-09-21 | produto | Candidato registrado: Disjuntor bipolar Steck SDD62C06 6A curva C | id=steck-sdd62c06 |
 | 2026-09-21 | cotacao | Cotacao registrada para steck-sdd62c10 | Amazon / fonte=web / custo_total=38.9 |
 | 2026-09-21 | produto | Candidato registrado: Disjuntor bipolar Steck SDD62C10 10A curva C | id=steck-sdd62c10 |
 | 2026-09-21 | acessorio | acessorio de 2026-motor-portao-deslizante | comprado a parte para comparar preco sem misturar ranking |

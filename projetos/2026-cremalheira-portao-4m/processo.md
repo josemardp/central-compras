@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | modelo | Usar a cremalheira do kit (4 m); nao comprar a Gold | Portao de ~80-280 kg esta muito abaixo dos 800 kg do motor; cremalheira residencial M4 (padrao DZ Rio) sobra. Gold e industrial (30 mm de largura, 55 mm de altura); existe Gold vendida junto com R800 Z14 por loja autorizada, mas tambem ha Gold 'modulo 6', que NAO encaixa. Economia de R$ 232. |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-cremalheira-gold-1m | Amazon / fonte=web / custo_total=232.0 |
 | 2026-09-21 | produto | Candidato registrado: Cremalheira PPA Gold 1 m (aco, gomos brancos) | id=ppa-cremalheira-gold-1m |
 | 2026-09-21 | modelo | Cremalheira residencial reforcada branca, 4 m ou 1 m | Depende do kit do motor; o metro extra tem que ser do mesmo modelo da do kit. |

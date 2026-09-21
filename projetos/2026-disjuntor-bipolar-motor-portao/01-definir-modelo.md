@@ -29,7 +29,7 @@ Disjuntor bipolar 10 A curva C para o circuito proprio do motor em 220V.
 | Atributo | Minimo aceitavel | Ideal | Por que, no meu contexto |
 |---|---|---|---|
 | Polos | bipolar | bipolar | 220V fase-fase desliga as duas fases |
-| Corrente | 10 A | 10 A curva C | protege o cabo de 1,5 mm2 e o motor |
+| Corrente | 6 A | 6 A curva C | manual tecnico PPA DZ Rio (P08665 REV1) pede 5 A; motor consome 1,6 A em 220V; 6 A e o padrao DIN mais proximo |
 | Padrao | DIN, INMETRO | marca conhecida (Steck, WEG, Schneider) | item de seguranca |
 
 ## Acessorios

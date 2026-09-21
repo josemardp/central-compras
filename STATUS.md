@@ -67,6 +67,13 @@ verificado na evidencia. Melhor achado por item:
 Projetos separados nesta rodada (itens complementares nao competem): conectores
 foram para `2026-conectores-emenda-cameras`; disjuntor para
 `2026-disjuntor-bipolar-motor-portao`.
+Respostas do especialista (21/09, manual tecnico PPA DZ Rio P08665): fonte da
+camera cabe na VBOX 1100 E (125x123x60 mm interno); R800 Z14 serve, mas anda a
+33 m/min (~7 s em 4 m, nao 5,3 s) e o manual cita portao ate 3,0 m de comprimento
+(portao tem ~4 m: perguntar ao Fabio); cremalheira do kit basta (Gold dispensada;
+cuidado com Gold 'modulo 6'); disjuntor trocado para 6 A (manual pede 5 A),
+Steck SDD62C06 R$ 29,90; cabo 1,5 mm2 e o dobro do minimo do manual (0,75 mm2).
+Pagina publicada: https://claude.ai/artifact/FseKJabXAoAGKbHNnxtfb4
 Proximo passo: Josemar decide as excecoes de gate (teto das cameras, vendedor
 dos cartoes, garantia do motor) e confirma no checkout (`promover-cotacao`).
 

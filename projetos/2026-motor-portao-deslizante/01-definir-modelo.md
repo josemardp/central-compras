@@ -37,7 +37,8 @@ Kit de motor para o portao de correr, especificado pelo Fabio: PPA DZ Rio 500 Je
 | Controles | 3 no total | kit com 3 controles; se vier com 2, comprar 1 PPA compativel | decisao do Josemar (21/09) |
 | Cremalheira inclusa | 0 m | 3 m | portao de ~4 m pede 4 m; com 3 m no kit, compra-se so 1 m do mesmo modelo |
 | Garantia | nacional | nacional PPA | assistencia facil |
-| Velocidade | - | 3,5 s para 3 m (Jetflex), ~5 s no portao de 4 m (conta) | rapido; confirmar com o Fabio se regula |
+| Velocidade | - | Z14: 33 m/min (~7 s em 4 m); Z18: 42,9 m/min (~5,6 s) (manual tecnico PPA DZ Rio (P08665 REV1)) | o 5,3 s do anuncio nao bate com o manual |
+| Dimensao do portao | - | manual: ate 2,5 m altura x 3,0 m comprimento (todos os DZ Rio) | portao ~4 m passa do comprimento do manual [perguntar ao Fabio] |
 | Potencia (CV) | classe 500 kg | a que a loja chamar 1/4 ou 1/3 dentro do DZ Rio 500 Jetflex | o que decide e a capacidade em kg, nao o CV do anuncio |
 
 ## Acessorios
@@ -53,7 +54,7 @@ ou redundante com o que ja tenho). Compra: `junto` (mesmo carrinho) ou
 | Base regulavel | obrigatorio | aco zincado com regulagem, furacao do DZ Rio | fixa o motor alinhado a cremalheira | projeto: 2026-base-motor-portao-deslizante |
 | Fotocelula refletiva | obrigatorio (decisao do Josemar) | PPA F10-R ou compativel com a entrada de fotocelula da Triflex | impede o portao de fechar em cima de pessoa ou carro | projeto: 2026-fotocelula-portao |
 | DPS (protetor de surto) | obrigatorio (decisao do Josemar) | ver projeto | central com inversor queima com raio/surto | projeto: 2026-dps-e-disjuntor-motor-portao |
-| Disjuntor so do motor | obrigatorio (decisao do Josemar) | bipolar 10 A curva C [VERIFICAR com Fabio] | circuito proprio em 220V | projeto: 2026-dps-e-disjuntor-motor-portao |
+| Disjuntor so do motor | obrigatorio (decisao do Josemar) | bipolar 6 A curva C (manual PPA pede 5 A) | circuito proprio em 220V | projeto: 2026-dps-e-disjuntor-motor-portao |
 | Controle extra (se o kit vier com 2) | obrigatorio | PPA 433,92 MHz rolling code, compativel com a Triflex | 3 controles no total | junto com o motor |
 | Nobreak de motor | dispensavel | - | falta de luz se resolve com o destravamento manual (chave) | - |
 

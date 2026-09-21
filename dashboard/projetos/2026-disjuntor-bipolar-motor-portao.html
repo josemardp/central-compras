@@ -17,9 +17,9 @@
   <div class="actions"><a href="../index.html">inicio</a> · <a href="../../projetos/2026-disjuntor-bipolar-motor-portao/briefing.md">briefing</a> · <a href="../../projetos/2026-disjuntor-bipolar-motor-portao/processo.md">processo</a> · <a href="../../projetos/2026-disjuntor-bipolar-motor-portao/ranking.md">ranking</a> · <a href="../../projetos/2026-disjuntor-bipolar-motor-portao/cotacoes.csv">cotacoes</a> · <a href="../../projetos/2026-disjuntor-bipolar-motor-portao/validacao.md">validacao</a></div>
 </div>
 <section class="grid">
-  <div class="metric teal"><strong>1</strong><span>cotacoes</span></div>
+  <div class="metric teal"><strong>2</strong><span>cotacoes</span></div>
   <div class="metric green"><strong>0</strong><span>produtos com cotacao manual</span></div>
-  <div class="metric amber"><strong>1</strong><span>avisos</span></div>
+  <div class="metric amber"><strong>2</strong><span>avisos</span></div>
   <div class="metric coral"><strong></strong><span>dias ate decisao</span></div>
 </section>
 <section class="section panel">
@@ -29,7 +29,7 @@
       <tr><td>Escolhido</td><td></td></tr>
       <tr><td>Por que</td><td></td></tr>
       <tr><td>Validacao</td><td><span class="pill ok">sem erro</span></td></tr>
-      <tr><td>Candidatos</td><td>1 elegiveis, 0 cortados pelo gate</td></tr>
+      <tr><td>Candidatos</td><td>1 elegiveis, 1 cortados pelo gate</td></tr>
       <tr><td>Aguardando preco</td><td>0</td></tr>
     </tbody>
   </table>
@@ -38,7 +38,7 @@
   <h2>Ranking</h2>
   <table>
     <thead><tr><th>Produto</th><th class="num">Score</th><th class="num">Confianca</th><th>Status</th><th>Motivos</th><th>Alertas</th></tr></thead>
-    <tbody><tr><td>Disjuntor bipolar Steck SDD62C10 10A curva C</td><td class="num">75.9</td><td class="num"><span class="pill warn">75%</span></td><td><span class="pill ok">elegivel</span></td><td></td><td></td></tr></tbody>
+    <tbody><tr><td>Disjuntor bipolar Steck SDD62C06 6A curva C</td><td class="num">58.8</td><td class="num"><span class="pill warn">75%</span></td><td><span class="pill ok">elegivel</span></td><td></td><td>AVAL_SUSPEITA</td></tr><tr><td>Disjuntor bipolar Steck SDD62C10 10A curva C</td><td class="num">0</td><td class="num"><span class="pill warn">75%</span></td><td><span class="pill bad">cortado</span></td><td>produto descartado (manual tecnico PPA DZ Rio (P08665 REV1) pede disjuntor de 5 A para o automatizador; 10 A fica acima. Substituido pelo 6 A (menor padrao DIN comum acima de 5 A).)</td><td></td></tr></tbody>
   </table>
 </section>
 
@@ -47,10 +47,10 @@
   <p class="muted">Um candidato por coluna, igual comparador de celular. "-" e atributo sem dado, nunca valor inventado. Estrela e a classificacao final: so pros elegiveis (quem chega na mesa de decisao), nunca pros cortados pelo gate.</p>
   <div class="compare-wrap">
   <table class="compare">
-    <thead><tr><th>Candidato</th><th>Disjuntor bipolar Steck SDD62C10 10A curva C</th></tr></thead>
+    <thead><tr><th>Candidato</th><th>Disjuntor bipolar Steck SDD62C06 6A curva C</th><th>Disjuntor bipolar Steck SDD62C10 10A curva C <span class="pill bad">cortado</span></th></tr></thead>
     <tbody>
-      <tr><td>Preco</td><td>R$ 38,90</td></tr><tr><td>Loja</td><td>Amazon</td></tr><tr><td>Vendedor</td><td>[nao verificado] (terceiro)</td></tr><tr><td>Nota</td><td>4.7 (338 aval.) <span class="stars" title="5/5">★★★★★</span></td></tr><tr><td>Garantia</td><td>nenhuma <span class="stars" title="1/5">★☆☆☆☆</span></td></tr><tr><td>Fonte</td><td>web</td></tr>
-      <tr><td>Tipo</td><td>disjuntor bipolar</td></tr><tr><td>Especificacao</td><td>10 A, curva C, 3 kA, DIN</td></tr><tr><td>Certificacao</td><td>[VERIFICAR INMETRO]</td></tr><tr><td>Quantidade</td><td>1</td></tr>
+      <tr><td>Preco</td><td>R$ 29,90</td><td>R$ 38,90</td></tr><tr><td>Loja</td><td>Amazon</td><td>Amazon</td></tr><tr><td>Vendedor</td><td>[nao verificado] (terceiro)</td><td>[nao verificado] (terceiro)</td></tr><tr><td>Nota</td><td>5.0 (7 aval.) <span class="stars" title="3/5">★★★☆☆</span></td><td>4.7 (338 aval.)</td></tr><tr><td>Garantia</td><td>nenhuma <span class="stars" title="1/5">★☆☆☆☆</span></td><td>nenhuma</td></tr><tr><td>Fonte</td><td>web</td><td>web</td></tr>
+      <tr><td>Tipo</td><td>disjuntor bipolar</td><td>disjuntor bipolar</td></tr><tr><td>Especificacao</td><td>6 A, curva C, 3 kA, DIN</td><td>10 A, curva C, 3 kA, DIN</td></tr><tr><td>Certificacao</td><td>[VERIFICAR INMETRO]</td><td>[VERIFICAR INMETRO]</td></tr><tr><td>Quantidade</td><td>1</td><td>1</td></tr>
     </tbody>
   </table>
   </div>
@@ -61,14 +61,14 @@
   <p class="muted">Desconto so e desconto contra a sua propria serie. Com uma unica observacao, nao da para saber.</p>
   <table>
     <thead><tr><th>Produto</th><th class="num">Obs.</th><th class="num">Atual</th><th class="num">Minimo</th><th class="num">Mediana</th><th class="num">Maximo</th><th class="num">vs mediana</th></tr></thead>
-    <tbody><tr><td>Disjuntor bipolar Steck SDD62C10 10A curva C</td><td class="num">1</td><td class="num">R$ 38,90</td><td class="num">R$ 38,90</td><td class="num">R$ 38,90</td><td class="num">R$ 38,90</td><td class="num"><span class="pill warn">1 observacao</span></td></tr></tbody>
+    <tbody><tr><td>Disjuntor bipolar Steck SDD62C06 6A curva C</td><td class="num">1</td><td class="num">R$ 29,90</td><td class="num">R$ 29,90</td><td class="num">R$ 29,90</td><td class="num">R$ 29,90</td><td class="num"><span class="pill warn">1 observacao</span></td></tr><tr><td>Disjuntor bipolar Steck SDD62C10 10A curva C</td><td class="num">1</td><td class="num">R$ 38,90</td><td class="num">R$ 38,90</td><td class="num">R$ 38,90</td><td class="num">R$ 38,90</td><td class="num"><span class="pill warn">1 observacao</span></td></tr></tbody>
   </table>
 </section>
 <section class="section panel">
   <h2>Cotacoes</h2>
   <table>
     <thead><tr><th>Data</th><th>Produto</th><th>Loja</th><th class="num">Custo</th><th>Fonte</th></tr></thead>
-    <tbody><tr><td>2026-09-21T13:41:32</td><td>steck-sdd62c10</td><td>Amazon</td><td class="num">R$ 38,90</td><td>web</td></tr></tbody>
+    <tbody><tr><td>2026-09-21T13:41:32</td><td>steck-sdd62c10</td><td>Amazon</td><td class="num">R$ 38,90</td><td>web</td></tr><tr><td>2026-09-21T14:57:12</td><td>steck-sdd62c06</td><td>Amazon</td><td class="num">R$ 29,90</td><td>web</td></tr></tbody>
   </table>
 </section>
 

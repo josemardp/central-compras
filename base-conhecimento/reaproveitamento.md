@@ -1,6 +1,6 @@
 # Reaproveitamento
 
-Gerado em 2026-09-21T13:43:56.
+Gerado em 2026-09-21T14:58:07.
 
 Conta so o conhecimento que **ja existia antes** da compra abrir. O que o
 proprio projeto registrou durante a pesquisa nao e reaproveitamento: seria

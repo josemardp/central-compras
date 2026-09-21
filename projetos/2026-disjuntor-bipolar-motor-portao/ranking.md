@@ -1,17 +1,18 @@
 # Ranking
 
-Gerado em 2026-09-21T13:43:49.
+Gerado em 2026-09-21T14:58:03.
 
 ## Elegiveis
 
-1. Disjuntor bipolar Steck SDD62C10 10A curva C - 75.9
-   qualidade 0.81 · valor 1.00 · risco 0.38 · aderencia -- · conveniencia --
-   custo total R$ 38,90 / Amazon / estimativa web
+1. Disjuntor bipolar Steck SDD62C06 6A curva C - 58.8
+   qualidade 0.48 · valor 1.00 · risco 0.23 · aderencia -- · conveniencia --
+   custo total R$ 29,90 / Amazon / estimativa web
    confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+   alertas: AVAL_SUSPEITA
 
 ## Cortados pelos gates
 
-Nenhum corte.
+- Disjuntor bipolar Steck SDD62C10 10A curva C: produto descartado (manual tecnico PPA DZ Rio (P08665 REV1) pede disjuntor de 5 A para o automatizador; 10 A fica acima. Substituido pelo 6 A (menor padrao DIN comum acima de 5 A).)
 
 ## Observacoes
 

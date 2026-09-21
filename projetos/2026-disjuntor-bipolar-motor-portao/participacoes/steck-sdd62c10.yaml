@@ -1,8 +1,10 @@
 produto_id: steck-sdd62c10
-estado: pesquisando
+estado: descartado
 preco_alvo: null
 preco_teto: null
 requisitos_atendidos: {}
-descartado_porque: null
+descartado_porque: manual tecnico PPA DZ Rio (P08665 REV1) pede disjuntor de 5 A para
+  o automatizador; 10 A fica acima. Substituido pelo 6 A (menor padrao DIN comum acima
+  de 5 A).
 aguardando_preco_porque: null
 aguardando_preco_desde: null
