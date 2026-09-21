@@ -1,31 +1,33 @@
 # Ranking
 
-Gerado em 2026-09-15T20:28:45.
+Gerado em 2026-09-21T10:40:00.
 
 ## Elegiveis
 
-1. Samsung Galaxy Fit3 - 69.7
+1. Samsung Galaxy Fit3 - 70.0
    qualidade 1.00 · valor 0.61 · risco 0.38 · aderencia 0.67 · conveniencia --
-   custo total R$ 279,00 / Mercado Livre / estimativa web
+   custo total R$ 275,00 / Mercado Livre / confirmada manualmente
    confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+   cotacao vencida: 16 dias desde a coleta (limite 7 para fonte=manual); recote antes de decidir
 
 2. Redmi Watch 5 Lite - 69.0
    qualidade 1.00 · valor 0.56 · risco 0.38 · aderencia -- · conveniencia --
    custo total R$ 298,86 / Mercado Livre / confirmada manualmente
    empate tecnico com o lider: decida pelo criterio humano, nao pelo numero
    confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
-   cotacao vencida: 10 dias desde a coleta (limite 7 para fonte=manual); recote antes de decidir
+   cotacao vencida: 16 dias desde a coleta (limite 7 para fonte=manual); recote antes de decidir
 
-3. Huawei Band 11 - 65.9
+3. Xiaomi Smart Band 9 Active - 67.6
+   qualidade 0.49 · valor 1.00 · risco 0.61 · aderencia 0.67 · conveniencia 0.57
+   custo total R$ 169,00 / Amazon / confirmada manualmente
+   empate tecnico com o lider: decida pelo criterio humano, nao pelo numero
+   cotacao vencida: 17 dias desde a coleta (limite 7 para fonte=manual); recote antes de decidir
+
+4. Huawei Band 11 - 65.9
    qualidade 0.74 · valor 0.79 · risco 0.38 · aderencia -- · conveniencia --
    custo total R$ 214,95 / Amazon / confirmada manualmente
    confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
-   cotacao vencida: 10 dias desde a coleta (limite 7 para fonte=manual); recote antes de decidir
-
-4. Xiaomi Smart Band 9 Active - 63.8
-   qualidade 0.49 · valor 1.00 · risco 0.38 · aderencia 0.67 · conveniencia --
-   custo total R$ 169,00 / Amazon / estimativa web
-   confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+   cotacao vencida: 16 dias desde a coleta (limite 7 para fonte=manual); recote antes de decidir
 
 ## Cortados pelos gates
 

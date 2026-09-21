@@ -5424,6 +5424,20 @@ def status(args: argparse.Namespace) -> None:
             "Comando sugerido: python scripts/central_compras.py promover-cotacao "
             f"projetos/{project.name} --produto-id {primeiro} [campos conferidos]"
         )
+    elif not latest and especificacao_status(project)["atributos"]:
+        # Especificacao pronta: o proximo passo e cadastrar candidato e cotar,
+        # nao voltar a definir modelo.
+        if active_candidate_ids:
+            primeiro = sorted(active_candidate_ids)[0]
+            print(
+                "Comando sugerido: python scripts/central_compras.py cotar "
+                f"projetos/{project.name} --produto-id {primeiro} [campos da oferta]"
+            )
+        else:
+            print(
+                "Comando sugerido: python scripts/central_compras.py novo-produto "
+                f"projetos/{project.name} \"[nome]\" --produto-id [id] [atributos da especificacao]"
+            )
     elif not latest:
         print(
             "Comando sugerido: python scripts/central_compras.py prompt-ia "

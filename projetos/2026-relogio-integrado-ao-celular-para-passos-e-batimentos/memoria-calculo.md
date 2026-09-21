@@ -1,21 +1,21 @@
 # Memoria de calculo
 
-Gerado em 2026-09-15T20:28:45.
+Gerado em 2026-09-21T10:40:00.
 
 ## Samsung Galaxy Fit3
 
 ### Qualidade
 
-- nota bruta 4.9 com 12081 avaliacoes
-- nota ajustada = (12081 x 4.9 + 250.0 x 4.3) / (12081 + 250.0) = **4.888**
-- qualidade = (4.888 - 4.0) / (4.8 - 4.0) = **1.000**
+- nota bruta 4.9 com 14678 avaliacoes
+- nota ajustada = (14678 x 4.9 + 250.0 x 4.3) / (14678 + 250.0) = **4.89**
+- qualidade = (4.89 - 4.0) / (4.8 - 4.0) = **1.000**
 
 ### Valor
 
 - base de comparacao: **custo total**
-- custo total desta cotacao: R$ 279,00
+- custo total desta cotacao: R$ 275,00
 - menor custo total entre os elegiveis: R$ 169,00
-- valor = R$ 169,00 / R$ 279,00 = **0.606**
+- valor = R$ 169,00 / R$ 275,00 = **0.615**
 
 ### Risco
 
@@ -44,12 +44,12 @@ Gerado em 2026-09-15T20:28:45.
 | Eixo | Nota | Peso | Entra na conta? | Contribui |
 |---|---:|---:|:--:|---:|
 | qualidade | 1.000 | 0.3 | sim | 0.300000 |
-| valor | 0.606 | 0.25 | sim | 0.151500 |
+| valor | 0.615 | 0.25 | sim | 0.153750 |
 | risco | 0.380 | 0.2 | sim | 0.076000 |
 | aderencia | 0.667 | 0.15 | sim | 0.100050 |
 | conveniencia | -- | 0.1 | nao (sem dado) | 0 |
-| soma dos que entraram | | 0.900000 | | **0.627550** |
-| **renormalizado: 0.627550 / 0.900000 x 100** | | | | **69.7** |
+| soma dos que entraram | | 0.900000 | | **0.629800** |
+| **renormalizado: 0.629800 / 0.900000 x 100** | | | | **70.0** |
 
 Confianca: **90%** do peso do score apoiado em dado real.
 
@@ -101,6 +101,56 @@ Confianca: **90%** do peso do score apoiado em dado real.
 
 Confianca: **75%** do peso do score apoiado em dado real.
 
+## Xiaomi Smart Band 9 Active
+
+### Qualidade
+
+- nota bruta 4.4 com 3790 avaliacoes
+- nota ajustada = (3790 x 4.4 + 250.0 x 4.3) / (3790 + 250.0) = **4.394**
+- qualidade = (4.394 - 4.0) / (4.8 - 4.0) = **0.493**
+
+### Valor
+
+- base de comparacao: **custo total**
+- custo total desta cotacao: R$ 169,00
+- menor custo total entre os elegiveis: R$ 169,00
+- valor = R$ 169,00 / R$ 169,00 = **1.000**
+
+### Risco
+
+| Parcela | Lido da cotacao | Nota | Peso | Contribui |
+|---|---|---:|---:|---:|
+| vendedor | terceiro | 0.65 | 0.3 | 0.1950 |
+| garantia (tipo) | importada | 0.70 | 0.35 | 0.2450 |
+| garantia (prazo) | 3 de 36 meses | 0.08 | 0.2 | 0.0166 |
+| loja | Amazon (preferida) | 1.00 | 0.15 | 0.1500 |
+| soma | | | | **0.6066** |
+| risco | | | | **0.607** |
+
+### Aderencia
+
+- passos: True vale 1.0
+- batimentos: True vale 1.0
+- resistencia_agua: 5ATM vale 0.0
+- aderencia = media = **0.667**
+
+### Conveniencia
+
+- conveniencia = (30.0 - 14) / (30.0 - 2.0) = **0.571**
+
+### Score final
+
+| Eixo | Nota | Peso | Entra na conta? | Contribui |
+|---|---:|---:|:--:|---:|
+| qualidade | 0.493 | 0.3 | sim | 0.147900 |
+| valor | 1.000 | 0.25 | sim | 0.250000 |
+| risco | 0.607 | 0.2 | sim | 0.121400 |
+| aderencia | 0.667 | 0.15 | sim | 0.100050 |
+| conveniencia | 0.571 | 0.1 | sim | 0.057100 |
+| **total x 100** | | | | **67.6** |
+
+Confianca: **100%** do peso do score apoiado em dado real.
+
 ## Huawei Band 11
 
 ### Qualidade
@@ -148,57 +198,6 @@ Confianca: **75%** do peso do score apoiado em dado real.
 | **renormalizado: 0.494500 / 0.750000 x 100** | | | | **65.9** |
 
 Confianca: **75%** do peso do score apoiado em dado real.
-
-## Xiaomi Smart Band 9 Active
-
-### Qualidade
-
-- nota bruta 4.4 com 3790 avaliacoes
-- nota ajustada = (3790 x 4.4 + 250.0 x 4.3) / (3790 + 250.0) = **4.394**
-- qualidade = (4.394 - 4.0) / (4.8 - 4.0) = **0.493**
-
-### Valor
-
-- base de comparacao: **custo total**
-- custo total desta cotacao: R$ 169,00
-- menor custo total entre os elegiveis: R$ 169,00
-- valor = R$ 169,00 / R$ 169,00 = **1.000**
-
-### Risco
-
-| Parcela | Lido da cotacao | Nota | Peso | Contribui |
-|---|---|---:|---:|---:|
-| vendedor | terceiro | 0.65 | 0.3 | 0.1950 |
-| garantia (tipo) | nenhuma | 0.10 | 0.35 | 0.0350 |
-| garantia (prazo) | 0 de 36 meses | 0.00 | 0.2 | 0.0000 |
-| loja | Amazon (preferida) | 1.00 | 0.15 | 0.1500 |
-| soma | | | | **0.3800** |
-| risco | | | | **0.380** |
-
-### Aderencia
-
-- passos: True vale 1.0
-- batimentos: True vale 1.0
-- resistencia_agua: 5ATM vale 0.0
-- aderencia = media = **0.667**
-
-### Conveniencia
-
-- prazo de frete nao informado: o eixo fica **fora da conta** (nao vale 0,50)
-
-### Score final
-
-| Eixo | Nota | Peso | Entra na conta? | Contribui |
-|---|---:|---:|:--:|---:|
-| qualidade | 0.493 | 0.3 | sim | 0.147900 |
-| valor | 1.000 | 0.25 | sim | 0.250000 |
-| risco | 0.380 | 0.2 | sim | 0.076000 |
-| aderencia | 0.667 | 0.15 | sim | 0.100050 |
-| conveniencia | -- | 0.1 | nao (sem dado) | 0 |
-| soma dos que entraram | | 0.900000 | | **0.573950** |
-| **renormalizado: 0.573950 / 0.900000 x 100** | | | | **63.8** |
-
-Confianca: **90%** do peso do score apoiado em dado real.
 
 ## Huawei Band 10
 

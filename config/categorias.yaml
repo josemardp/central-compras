@@ -180,3 +180,46 @@ generico:
   gate:
     nota_minima_ajustada: 4.0
     minimo_avaliacoes: 20
+
+# Abertas em 21/09/2026 para a instalacao de cameras e motor de portao
+# (instalador: Fabio; Josemar compra o material). Gates propostos pela
+# etapa do especialista; confirmar com o Josemar se algum cortar demais.
+motor_portao:
+  atributos_obrigatorios:
+    - modelo_exato
+    - capacidade_kg
+    - tensao
+    - central
+    - fim_de_curso
+    - controles_inclusos
+    - cremalheira_inclusa_m
+  # Nicho: anuncio de kit de motor tem dezenas de avaliacoes, nao milhares.
+  nota_bayesiana:
+    peso_ancora: 50
+  gate:
+    garantia_tipo_aceita:
+      - nacional
+
+material_eletrico:
+  atributos_obrigatorios:
+    - tipo
+    - especificacao
+    - certificacao
+    - quantidade
+  # Mesmo racional de material_construcao: poucas avaliacoes por SKU.
+  nota_bayesiana:
+    peso_ancora: 50
+  gate: {}
+
+cartao_memoria:
+  atributos_obrigatorios:
+    - capacidade_gb
+    - classe_velocidade
+    - resistencia
+    - garantia_meses
+  # Cartao falsificado e o golpe mais comum de marketplace nesta categoria:
+  # so loja oficial da marca ou vendido e entregue pela propria loja.
+  gate:
+    nota_minima_ajustada: 4.3
+    minimo_avaliacoes: 300
+    exige_vendedor_oficial: true

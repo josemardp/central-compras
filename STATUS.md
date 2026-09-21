@@ -5,6 +5,39 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## AO RETOMAR — comece por aqui (21/09/2026, 7 projetos da instalacao de cameras + motor de portao)
+
+O Fabio (instalador) vai instalar 6 Tapo C320WS no muro e um motor no portao
+de correr. Josemar ja tem 2 cameras (compradas em 16/09 na Loja Oficial
+TP-Link do ML, R$ 309,90 cada; essa compra NAO ficou registrada na Central,
+a pasta `projetos/2026-camera-de-monitoramento-externa` so tem um lock) e vai
+comprar todo o resto cotando aqui. Projetos abertos, todos com especificacao
+tecnica e tabela de acessorios preenchidas em `01-definir-modelo.md`:
+
+| Projeto | Categoria | O que e |
+|---|---|---|
+| `2026-cameras-tapo-c320ws-4-unidades` | camera | 4x C320WS (candidato `tapo-c320ws` ja vinculado, teto R$ 1.300) |
+| `2026-cartoes-microsd-128gb-cameras` | cartao_memoria (nova) | 6x microSD 128 GB Endurance |
+| `2026-caixas-de-passagem-cameras` | material_eletrico (nova) | 6 caixinhas IP65+ |
+| `2026-cabo-pp-3x1-5-50m` | material_eletrico | cabo PP 3x1,5 50 m + plugues femea e emendas |
+| `2026-motor-portao-deslizante` | motor_portao (nova) | kit PPA DZ Rio 500 Jetflex bivolt |
+| `2026-cremalheira-portao-4m` | generico | 4 m reforcada branca (ou 1 m se o kit trouxer 3 m) |
+| `2026-base-motor-portao-deslizante` | generico | base regulavel |
+
+Os 6 ultimos sao `acessorio_de` dos dois principais (cameras e motor).
+Regra de cotacao nesses projetos: cada cotacao = custo TOTAL da quantidade.
+Guias novos em `base-conhecimento/especificacoes/` (camera, cartao_memoria,
+material_eletrico, motor_portao). `status` agora sugere `novo-produto`/`cotar`
+quando a especificacao ja esta pronta.
+
+Pendente de decisao do Josemar: fotocelula, DPS e disjuntor do motor,
+controles extras, nobreak das cameras. Pendente de resposta do Fabio: versao
+exata do motor (1/4 ou 1/3), 127V x 220V, peso do portao, se o cabo PP tambem
+alimenta o motor, modelo de caixinha que ele usa.
+
+Proximo passo: cotar, projeto a projeto (comecar pelas cameras e pelo motor,
+que definem cremalheira/base).
+
 ## AO RETOMAR — comece por aqui (21/09/2026, especialista tecnico na etapa "definir modelo")
 
 Pedido do Josemar: "quero X" -> a Central tem que saber a especificacao de X

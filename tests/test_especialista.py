@@ -71,6 +71,19 @@ class EspecialistaTest(RepoTestCase):
 
         self.assertIn("Especificacao tecnica: 2 atributo(s) definido(s)", saida)
         self.assertIn("Acessorios: 1 avaliado(s)", saida)
+        # Especificacao pronta e sem candidato: manda cadastrar, nao redefinir modelo.
+        self.assertIn("Comando sugerido: python scripts/central_compras.py novo-produto", saida)
+        self.assertNotIn("--etapa modelo", saida.split("Comando sugerido:")[-1])
+
+        self.product(projeto, "fone-a")
+        saida = self.cli("status", str(projeto))
+        self.assertIn("cotar", saida.split("Comando sugerido:")[-1])
+        self.assertIn("--produto-id fone-a", saida)
+
+    def test_status_sem_especificacao_continua_mandando_definir_modelo(self):
+        projeto = self.project("fone cru")
+        saida = self.cli("status", str(projeto))
+        self.assertIn("--etapa modelo", saida.split("Comando sugerido:")[-1])
 
     def test_projeto_antigo_sem_secao_nao_e_cobrado(self):
         projeto = self.project("fone antigo")

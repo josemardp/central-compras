@@ -1,6 +1,6 @@
 # Ranking
 
-Gerado em 2026-09-15T20:28:43.
+Gerado em 2026-09-21T10:39:59.
 
 ## Elegiveis
 
@@ -8,7 +8,7 @@ Gerado em 2026-09-15T20:28:43.
    qualidade -- · valor 1.00 · risco 0.44 · aderencia -- · conveniencia --
    custo total R$ 379,99 / Loja Decor Colors / estimativa web
    confianca 45% - sem dado em: qualidade, conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
-   cotacao vencida: 19 dias desde a coleta (limite 14 para fonte=web); recote antes de decidir
+   cotacao vencida: 25 dias desde a coleta (limite 14 para fonte=web); recote antes de decidir
 
 ## Cortados pelos gates
 

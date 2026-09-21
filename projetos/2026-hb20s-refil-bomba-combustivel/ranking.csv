@@ -1,2 +1,2 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
-bosch-f000te195a,Refil Bomba Combustível Bosch F000TE195A,90.3,0.893,1.0,0.728,1.0,0.893,elegivel,,,manual,1.0,0,nao,,265.88,0.0,,0.0,265.88
+bosch-f000te195a,Refil Bomba Combustível Bosch F000TE195A,90.3,0.893,1.0,0.728,1.0,0.893,elegivel,,,manual,1.0,6,nao,,265.88,0.0,,0.0,265.88

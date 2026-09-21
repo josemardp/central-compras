@@ -1,6 +1,6 @@
 # Ranking
 
-Gerado em 2026-09-15T20:28:44.
+Gerado em 2026-09-21T10:39:59.
 
 ## Elegiveis
 
@@ -8,14 +8,9 @@ Gerado em 2026-09-15T20:28:44.
    qualidade 0.50 · valor 1.00 · risco 0.71 · aderencia 1.00 · conveniencia 1.00
    custo total R$ 219,10 / Mercado Livre / confirmada manualmente
 
-2. Fechadura Dianteira Direita Genuina Hyundai Mobis 81320-1S021 - 75.4
-   qualidade 0.78 · valor 0.59 · risco 0.73 · aderencia 1.00 · conveniencia --
-   custo total R$ 370,30 / Mercado Livre / estimativa web
-   confianca 90% - sem dado em: conveniencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
-
 ## Cortados pelos gates
 
-Nenhum corte.
+- Fechadura Dianteira Direita Genuina Hyundai Mobis 81320-1S021: nota_ajustada abaixo do gate (0.0 < 4.0); avaliacoes insuficientes (0 < 20)
 
 ## Observacoes
 
