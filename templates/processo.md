@@ -14,7 +14,7 @@
 
 ## Etapas
 
-- [ ] 1. Definir o modelo certo para a necessidade
+- [ ] 1. Definir o modelo e a especificacao tecnica para o meu contexto (com acessorios)
 - [ ] 2. Mapear candidatos
 - [ ] 3. Registrar produtos em `produtos/`
 - [ ] 4. Coletar cotacoes iniciais

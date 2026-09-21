@@ -5,6 +5,35 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## AO RETOMAR — comece por aqui (21/09/2026, especialista tecnico na etapa "definir modelo")
+
+Pedido do Josemar: "quero X" -> a Central tem que saber a especificacao de X
+para o contexto dele (perguntar ou propor) e indicar os acessorios.
+Diagnostico: nao tinha. O `01-definir-modelo.md` era um questionario generico
+e o "Contexto de uso" do briefing ficou vazio em quase todo projeto.
+
+O que foi feito:
+- `config/perfil.yaml` (novo): o que ele ja tem (celular Samsung, Band 11 Pro,
+  HB20S 2015), regiao, preferencias inferidas. Repo e PUBLICO: so contexto
+  tecnico, nada de endereco/CPF. Campos `[VERIFICAR]`: tensao da tomada,
+  modelo do celular, notebook.
+- `templates/01-definir-modelo.md`: secoes "Contexto aplicado",
+  "Especificacao tecnica para o meu contexto" (tabela minimo/ideal/por que) e
+  "Acessorios" (obrigatorio/recomendado/dispensavel + spec + junto/projeto).
+- `prompt-ia --etapa modelo`: leva perfil + guia da categoria e pede
+  perguntas decisivas com resposta padrao, tabela de spec e de acessorios.
+- `status`: mostra "Especificacao tecnica: PENDENTE" / "Acessorios: nao
+  avaliados" em projeto novo; projeto antigo (sem a secao) nao e cobrado.
+- `novo-projeto --acessorio-de <projeto>`: acessorio com preco a comparar vira
+  compra propria ligada ao principal (anota nas duas linhas do tempo).
+- Guias por categoria em `base-conhecimento/especificacoes/<categoria>.md`
+  (modelo em `templates/guia-especificacao.md`). Nenhum criado ainda: nasce na
+  primeira compra de cada categoria.
+- Skill `central-compras` com o protocolo "Technical Specialist"; reinstalada
+  (Claude Code e Codex). Testes: `tests/test_especialista.py` (7).
+
+Proximo passo: preencher os `[VERIFICAR]` do perfil e testar num pedido real.
+
 ## AO RETOMAR — comece por aqui (15/09/2026, abertura do projeto de Polissonografia SAOS - Tipo I exclusivo)
 
 Josemar solicitou a abertura do projeto para realização do exame do sono a partir do encaminhamento médico do Dr. Renato Sevestrin Reche (Psiquiatra - CRM-SP 169.803, Araçatuba/SP) e determinou foco **exclusivo na Polissonografia Tipo I** (laboratório completo de noite inteira com monitoramento por técnico):

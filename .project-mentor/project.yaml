@@ -17,7 +17,7 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-09-16T16:35:03-03:00
+  updated_at: 2026-09-21T10:09:06-03:00
   last_session_at: 2026-09-16T15:27:54-03:00
   confidence: inferred
 focus:
@@ -73,6 +73,18 @@ next_actions:
     blocked_by: []
     created_at: 2026-09-16T15:27:54-03:00
     done_at: null
+    note: null
+  - id: act-005
+    title: "Especialista tecnico: spec por contexto e acessorios na etapa definir modelo"
+    status: done_tested
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-09-21T10:09:05-03:00
+    done_at: 2026-09-21T10:09:06-03:00
     note: null
 blockers: []
 decisions_recent:

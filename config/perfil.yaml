@@ -1,0 +1,37 @@
+# Perfil de contexto do comprador.
+#
+# O especialista tecnico (etapa "definir modelo") le este arquivo para
+# especificar cada compra para o MEU contexto: compatibilidade com o que ja
+# tenho, local de uso, habitos. Sem ele, toda compra recomeca do zero e a IA
+# recomenda o "melhor do mercado" em vez do certo pra mim.
+#
+# ATENCAO: este repositorio e PUBLICO. Aqui entra so contexto tecnico nao
+# sensivel. Endereco, CPF, pedido e comprovante moram em
+# ~/.central-compras/dados-privados/ (regra 4 do CLAUDE.md).
+#
+# Campo desconhecido fica vazio ou com [VERIFICAR]: a IA pergunta em vez de
+# presumir. Cada compra que revelar um dado novo atualiza este arquivo.
+
+local:
+  regiao: "interior de SP (regiao de Aracatuba)"
+  tensao_tomada: ""            # [VERIFICAR] 127V ou 220V na casa
+  clima: "quente, sol forte, chuva de verao"
+
+equipamentos:
+  - tipo: celular
+    descricao: "Android Samsung"
+    observacao: "favorece integracao com Samsung Health; modelo exato [VERIFICAR]"
+  - tipo: relogio
+    descricao: "Huawei Band 11 Pro"
+    observacao: "em uso desde 2026-09-06"
+  - tipo: carro
+    descricao: "Hyundai HB20S 1.6 16V Flex 2015"
+    observacao: "pecas: fechadura 4 pinos; bomba Bosch F000TE195A (4.2 bar)"
+  - tipo: notebook
+    descricao: ""                # [VERIFICAR] marca/modelo, portas USB-C/HDMI
+
+# Inferido das compras ja registradas; confirmar com o Josemar.
+preferencias:
+  - "garantia nacional pesa (gates de celular/fone/camera)"
+  - "conforto antes de portabilidade extrema (briefing do fone, 2026)"
+  - "compra online com entrega no interior: prazo e frete contam"

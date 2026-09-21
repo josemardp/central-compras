@@ -1350,6 +1350,15 @@ def new_project(args: argparse.Namespace) -> None:
     ensure_structure(args)
     projeto_id = _novo_projeto_id(args)
     path = PROJETOS / projeto_id
+    principal = None
+    if getattr(args, "acessorio_de", None):
+        # Acessorio com preco a comparar vira compra propria (regra 3: score
+        # so compara dentro da mesma compra), mas fica ligado ao principal.
+        principal = project_path(args.acessorio_de)
+        if not (principal / "briefing.md").exists():
+            raise SystemExit(f"Projeto principal nao encontrado: {args.acessorio_de}")
+        if principal.resolve() == path.resolve():
+            raise SystemExit("Um projeto nao pode ser acessorio dele mesmo.")
     if path.exists():
         if not args.force:
             raise SystemExit(f"Projeto ja existe: {path}")
@@ -1389,8 +1398,15 @@ def new_project(args: argparse.Namespace) -> None:
             f"- Cotacoes minimas por candidato: {regra['cotacoes_minimas_texto']}",
             1,
         )
+    if principal is not None:
+        briefing = briefing.replace("\nestado: ", f"\nacessorio_de: \"{principal.name}\"\nestado: ", 1)
     atomic_write_text((path / "briefing.md"), briefing)
     atomic_write_text((path / "processo.md"), render_template("processo.md", data=today()))
+    if principal is not None:
+        append_timeline(path, "acessorio", f"acessorio de {principal.name}",
+                        "comprado a parte para comparar preco sem misturar ranking")
+        append_timeline(principal, "acessorio", f"aberto projeto {projeto_id}",
+                        "acessorio com preco a comparar vira compra propria")
     atomic_write_text(
         path / "01-definir-modelo.md",
         render_template("01-definir-modelo.md", necessidade=necessidade),
@@ -3577,6 +3593,68 @@ def decision_briefing(project: Path) -> str:
     return "\n".join(partes)
 
 
+def perfil_contexto() -> str:
+    """Perfil do comprador (`config/perfil.yaml`) em texto para o prompt.
+
+    E o que deixa a especificacao ser "pra mim" e nao "o melhor do mercado":
+    o que ja tenho (compatibilidade), onde uso, o que prefiro. Arquivo
+    ausente devolve "" e o prompt manda perguntar em vez de presumir.
+    """
+    path = CONFIG / "perfil.yaml"
+    if not path.exists():
+        return ""
+    linhas = path.read_text(encoding="utf-8").splitlines()
+    return "\n".join(l for l in linhas if l.strip() and not l.lstrip().startswith("#"))
+
+
+def guia_especificacao(categoria: Any) -> str:
+    """Guia do especialista da categoria (`base-conhecimento/especificacoes/`).
+
+    Acumula o que cada compra ensinou: perguntas que decidem, specs que
+    importam, marketing a ignorar, acessorios. Sem guia devolve "", e a IA
+    especifica do zero - e cria o guia ao fim da etapa.
+    """
+    if not categoria:
+        return ""
+    path = BASE / "especificacoes" / f"{slugify(str(categoria))}.md"
+    return path.read_text(encoding="utf-8").strip() if path.exists() else ""
+
+
+def _linhas_tabela_secao(texto: str, titulo: str) -> list[list[str]]:
+    """Linhas preenchidas da primeira tabela markdown sob `## titulo`
+    (sem cabecalho, sem separador, so linha com item e algum valor)."""
+    match = re.search(rf"(?ms)^##\s+{re.escape(titulo)}\s*$(.*?)(?=^##\s|\Z)", texto)
+    if not match:
+        return []
+    linhas = []
+    for linha in match.group(1).splitlines():
+        linha = linha.strip()
+        if not linha.startswith("|"):
+            continue
+        celulas = [c.strip() for c in linha.strip("|").split("|")]
+        if all(re.fullmatch(r":?-{3,}:?", c) for c in celulas if c):
+            continue
+        linhas.append(celulas)
+    return [c for c in linhas[1:] if c and c[0] and any(c[1:])]
+
+
+def especificacao_status(project: Path) -> dict[str, Any]:
+    """Quanto da etapa de especialista foi registrada no `01-definir-modelo.md`.
+
+    `None` = arquivo do template antigo, sem a secao (projeto aberto antes
+    desta etapa existir, nao e cobrado); `0` = secao existe e ninguem preencheu.
+    """
+    path = project / "01-definir-modelo.md"
+    texto = path.read_text(encoding="utf-8") if path.exists() else ""
+    resultado: dict[str, Any] = {}
+    for chave, titulo in (("atributos", "Especificacao tecnica para o meu contexto"), ("acessorios", "Acessorios")):
+        if re.search(rf"(?m)^##\s+{re.escape(titulo)}\s*$", texto):
+            resultado[chave] = len(_linhas_tabela_secao(texto, titulo))
+        else:
+            resultado[chave] = None
+    return resultado
+
+
 def ai_prompt(args: argparse.Namespace) -> None:
     project = project_path(args.projeto)
     briefing_meta, briefing_body = load_frontmatter(project / "briefing.md")
@@ -3585,6 +3663,17 @@ def ai_prompt(args: argparse.Namespace) -> None:
     candidatos = [find_product(pid, project) or {"id": pid} for pid in sorted(project_product_ids(project))]
     known = knowledge_context(project)
     known_block = f"\n\nBase de conhecimento relevante:\n{known}" if known else "\n\nBase de conhecimento relevante: nada registrado ainda."
+    perfil = perfil_contexto()
+    perfil_block = (
+        f"\n\nMeu perfil (config/perfil.yaml; campo vazio ou [VERIFICAR] = pergunte, nao presuma):\n{perfil}"
+        if perfil else "\n\nMeu perfil: nao cadastrado (config/perfil.yaml). Pergunte o que precisar."
+    )
+    guia = guia_especificacao(briefing_meta.get("categoria"))
+    guia_block = (
+        f"\n\nGuia do especialista desta categoria (base-conhecimento/especificacoes/):\n{guia}"
+        if guia else "\n\nGuia do especialista desta categoria: ainda nao existe."
+    )
+    known_block = perfil_block + guia_block + known_block
     etapa = args.etapa
     common = f"""
 Voce e meu assessor de compras. Use apenas como contexto as informacoes abaixo e deixe claro o que for inferencia.
@@ -3613,15 +3702,25 @@ Protocolo de pesquisa e evidencia:
 """
     if etapa == "modelo":
         prompt = common + """
-Tarefa: transforme o pedido em um modelo de compra.
+Tarefa: atue como especialista tecnico desta categoria e transforme o pedido
+em um modelo de compra para o MEU contexto (perfil acima), nao para um
+comprador generico.
 
 Responda com:
-1. tipo/modelo mais adequado;
-2. atributos obrigatorios para comparar produtos;
-3. atributos que parecem marketing;
-4. deal-breakers;
-5. perguntas que eu ainda preciso responder antes de cotar.
-6. 3 a 5 candidatos iniciais e lacunas da pesquisa, incluindo geracoes/variantes a verificar.
+1. perguntas decisivas: so as que mudam a especificacao (no maximo 5), cada
+   uma com a resposta padrao que voce adotaria se eu nao responder e o que
+   muda em cada resposta. Se o perfil ja responde, nao pergunte;
+2. tipo/modelo mais adequado e alternativas descartadas, com motivo;
+3. tabela "Atributo | Minimo aceitavel | Ideal | Por que, no meu contexto",
+   com valores tecnicos (unidade, norma, versao), nao adjetivos;
+4. atributos que parecem marketing e podem ser ignorados;
+5. deal-breakers, incluindo incompatibilidade com o que ja tenho;
+6. tabela "Acessorio | Necessidade | Especificacao tecnica | Por que | Compra":
+   necessidade = obrigatorio, recomendado ou dispensavel; especificacao
+   tecnica compativel com o produto (ex.: potencia do carregador, classe do
+   cartao, bitola do cabo); compra = junto ou projeto (vale comparar preco);
+7. 3 a 5 candidatos iniciais e lacunas da pesquisa, incluindo geracoes/variantes a verificar;
+8. o que deste raciocinio vale guardar no guia da categoria para a proxima compra.
 """
     elif etapa == "cotacao":
         prompt = common + """
@@ -5284,6 +5383,20 @@ def status(args: argparse.Namespace) -> None:
         print(f"Decisao aberta: {open_decision.group(1).strip()}")
     print(f"Cotacoes: {len(rows)} total, {len(manual_ids)} produtos com cotacao manual, {len(web_only_ids)} so web")
     print(f"Validacao: {len(errors)} erros, {len(warnings)} avisos")
+    if not purchased and not no_active_candidates:
+        espec = especificacao_status(project)
+        if espec["atributos"] is not None:
+            print(
+                "Especificacao tecnica: "
+                + (f"{espec['atributos']} atributo(s) definido(s)" if espec["atributos"]
+                   else "PENDENTE - especifique antes de cotar (prompt-ia --etapa modelo)")
+            )
+        if espec["acessorios"] is not None:
+            print(
+                "Acessorios: "
+                + (f"{espec['acessorios']} avaliado(s)" if espec["acessorios"]
+                   else "nao avaliados (registre obrigatorio/recomendado/dispensavel)")
+            )
 
     regra = stop_rule_status(project)
     if regra and not purchased:
@@ -7444,6 +7557,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--valor-estimado", type=real_number, default=0)
     p.add_argument("--preco-teto", type=real_number)
     p.add_argument("--necessidade")
+    p.add_argument("--acessorio-de", help="projeto principal do qual este e acessorio (compra separada, ranking separado)")
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=new_project)
 
@@ -7817,12 +7931,17 @@ def _recursos_diretos_novo_projeto(args: argparse.Namespace) -> "set[Path]":
     """So ha recurso a checar se `--force` mira um projeto que JA existe -
     criar um projeto novo nao pode conflitar com nada, porque nada reivindica
     um caminho que ainda nao existia."""
+    recursos: set[Path] = set()
+    # `--acessorio-de` anota a abertura no processo.md do projeto principal.
+    if getattr(args, "acessorio_de", None):
+        principal = project_path(args.acessorio_de)
+        recursos.add(principal / "processo.md")
     if not args.force:
-        return set()
+        return recursos
     alvo = PROJETOS / _novo_projeto_id(args)
     if not alvo.exists():
-        return set()
-    return {alvo / "decisao.md", alvo / "processo.md"}
+        return recursos
+    return recursos | {alvo / "decisao.md", alvo / "processo.md"}
 
 
 def _recursos_diretos_preencher_veredito(args: argparse.Namespace) -> "set[Path]":

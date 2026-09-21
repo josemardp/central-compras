@@ -10,6 +10,18 @@ python scripts\central_compras.py prompt-ia projetos\2026-fone-bluetooth-para-ch
 python scripts\central_compras.py anotar projetos\2026-fone-bluetooth-para-chamadas --etapa modelo --decisao "Pesquisar headphone over-ear" --porque "Conforto e microfone importam mais que portabilidade."
 ```
 
+## Specify for His Context (before any candidate)
+
+`prompt-ia --etapa modelo` carries `config/perfil.yaml` and the category guide
+(`base-conhecimento/especificacoes/<categoria>.md`). Fill the spec and
+accessory tables in `01-definir-modelo.md`; `status` shows them as PENDENTE
+until they have rows. An accessory worth comparing prices becomes its own
+purchase, linked to the main one:
+
+```powershell
+python scripts\central_compras.py novo-projeto "cartao microsd camera" --categoria generico --valor-estimado 80 --acessorio-de projetos\2026-camera-externa
+```
+
 ## Register Candidates and Quotes
 
 ```powershell
