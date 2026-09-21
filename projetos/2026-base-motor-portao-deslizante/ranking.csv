@@ -1,1 +1,2 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+ppa-base-flex-deslizante,Base Flex PPA para automatizador deslizante (regulavel 80-150 mm),0,0.0,1.0,0.335,0.5,0.5,cortado,nota_ajustada abaixo do gate (0.0 < 4.0); avaliacoes insuficientes (0 < 20),,web,0.45,0,nao,qualidade; conveniencia; aderencia,155.0,0.0,,0.0,155.0

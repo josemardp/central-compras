@@ -1,6 +1,6 @@
 # Validacao
 
-Gerado em 2026-09-21T14:58:02.
+Gerado em 2026-09-21T15:07:52.
 
 ## Erros
 
@@ -8,7 +8,7 @@ Nenhum erro.
 
 ## Avisos
 
-- Projeto ainda nao tem cotacoes.
+- Nenhum produto tem cotacao manual; decisao final ainda nao deve ser fechada.
 
 ## Criterio
 

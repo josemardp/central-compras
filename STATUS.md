@@ -74,6 +74,12 @@ camera cabe na VBOX 1100 E (125x123x60 mm interno); R800 Z14 serve, mas anda a
 cuidado com Gold 'modulo 6'); disjuntor trocado para 6 A (manual pede 5 A),
 Steck SDD62C06 R$ 29,90; cabo 1,5 mm2 e o dobro do minimo do manual (0,75 mm2).
 Pagina publicada: https://claude.ai/artifact/FseKJabXAoAGKbHNnxtfb4
+Investigacao 2 e 3 (21/09): o '2,5 x 3,0 m' do manual DZ Rio e igual do 350 ao
+800 kg (referencia, nao limite de forca): R800 Z14 mantido para portao de 4 m.
+Base: piso firme = so parafusos (manual); senao concreto ou Base Flex PPA
+(Afermix R$ 155). Manual EXIGE DR 30 mA + aterramento + roldanas >= 120 mm:
+projeto novo `2026-dr-motor-portao` (Steck SDR22530A tipo A, R$ 85,38 ref.;
+anuncio Amazon com fotos erradas, comprar em loja fisica). Total R$ 4.737,64 + cabo.
 Proximo passo: Josemar decide as excecoes de gate (teto das cameras, vendedor
 dos cartoes, garantia do motor) e confirma no checkout (`promover-cotacao`).
 

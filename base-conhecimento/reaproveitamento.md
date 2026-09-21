@@ -1,14 +1,14 @@
 # Reaproveitamento
 
-Gerado em 2026-09-21T14:58:07.
+Gerado em 2026-09-21T15:07:57.
 
 Conta so o conhecimento que **ja existia antes** da compra abrir. O que o
 proprio projeto registrou durante a pesquisa nao e reaproveitamento: seria
 medir a si mesmo e dar 100% sempre.
 
-- Projetos analisados: 20
-- Projetos que encontraram base pronta: 18
-- Taxa: 90.0% (meta do PRD: acima de 40% a partir da decima compra)
+- Projetos analisados: 21
+- Projetos que encontraram base pronta: 19
+- Taxa: 90.5% (meta do PRD: acima de 40% a partir da decima compra)
 
 | Projeto | Categoria | Marcas | Lojas | Licoes | Reaproveitou |
 |---|---|---:|---:|---:|---|
@@ -22,6 +22,7 @@ medir a si mesmo e dar 100% sempre.
 | 2026-decor-bloqueador | material_construcao | 0 | 0 | 0 | nao |
 | 2026-disjuntor-bipolar-motor-portao | material_eletrico | 0 | 1 | 1 | sim |
 | 2026-dps-e-disjuntor-motor-portao | material_eletrico | 0 | 1 | 1 | sim |
+| 2026-dr-motor-portao | material_eletrico | 0 | 1 | 1 | sim |
 | 2026-fone-bluetooth-para-chamadas | fone | 0 | 0 | 0 | nao |
 | 2026-fotocelula-portao | generico | 0 | 1 | 1 | sim |
 | 2026-hb20s-fechadura-dianteira-direita | Autopeças | 0 | 0 | 1 | sim |
