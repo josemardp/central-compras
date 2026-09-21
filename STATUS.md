@@ -15,8 +15,7 @@ e o "Contexto de uso" do briefing ficou vazio em quase todo projeto.
 O que foi feito:
 - `config/perfil.yaml` (novo): o que ele ja tem (celular Samsung, Band 11 Pro,
   HB20S 2015), regiao, preferencias inferidas. Repo e PUBLICO: so contexto
-  tecnico, nada de endereco/CPF. Campos `[VERIFICAR]`: tensao da tomada,
-  modelo do celular, notebook.
+  tecnico, nada de endereco/CPF. Tensao, celular e notebooks preenchidos
 - `templates/01-definir-modelo.md`: secoes "Contexto aplicado",
   "Especificacao tecnica para o meu contexto" (tabela minimo/ideal/por que) e
   "Acessorios" (obrigatorio/recomendado/dispensavel + spec + junto/projeto).
@@ -32,7 +31,7 @@ O que foi feito:
 - Skill `central-compras` com o protocolo "Technical Specialist"; reinstalada
   (Claude Code e Codex). Testes: `tests/test_especialista.py` (7).
 
-Proximo passo: preencher os `[VERIFICAR]` do perfil e testar num pedido real.
+Proximo passo: testar num pedido real ("quero X").
 
 ## AO RETOMAR — comece por aqui (15/09/2026, abertura do projeto de Polissonografia SAOS - Tipo I exclusivo)
 

@@ -14,13 +14,13 @@
 
 local:
   regiao: "interior de SP (regiao de Aracatuba)"
-  tensao_tomada: ""            # [VERIFICAR] 127V ou 220V na casa
+  tensao_tomada: "127V padrao; 220V disponivel em ponto especifico"
   clima: "quente, sol forte, chuva de verao"
 
 equipamentos:
   - tipo: celular
-    descricao: "Android Samsung"
-    observacao: "favorece integracao com Samsung Health; modelo exato [VERIFICAR]"
+    descricao: "Samsung Galaxy S20 FE"
+    observacao: "favorece integracao com Samsung Health"
   - tipo: relogio
     descricao: "Huawei Band 11 Pro"
     observacao: "em uso desde 2026-09-06"
@@ -28,7 +28,11 @@ equipamentos:
     descricao: "Hyundai HB20S 1.6 16V Flex 2015"
     observacao: "pecas: fechadura 4 pinos; bomba Bosch F000TE195A (4.2 bar)"
   - tipo: notebook
-    descricao: ""                # [VERIFICAR] marca/modelo, portas USB-C/HDMI
+    descricao: "Lenovo IdeaPad Slim 3 15IRH10 (83NS0002BR)"
+    observacao: "casa; i5-13420H, 8GB RAM, 512GB SSD, tela 15.3, Windows 11; portas [VERIFICAR no datasheet]"
+  - tipo: notebook
+    descricao: "Lenovo K14 Gen 1 (21CUS0GE00)"
+    observacao: "trabalho (institucional); portas [VERIFICAR no datasheet]"
 
 # Inferido das compras ja registradas; confirmar com o Josemar.
 preferencias:
