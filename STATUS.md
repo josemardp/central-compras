@@ -23,6 +23,10 @@ tecnica e tabela de acessorios preenchidas em `01-definir-modelo.md`:
 | `2026-motor-portao-deslizante` | motor_portao (nova) | kit PPA DZ Rio 500 Jetflex bivolt |
 | `2026-cremalheira-portao-4m` | generico | 4 m reforcada branca (ou 1 m se o kit trouxer 3 m) |
 | `2026-base-motor-portao-deslizante` | generico | base regulavel |
+| `2026-fotocelula-portao` | generico | fotocelula refletiva PPA F10-R |
+| `2026-dps-e-disjuntor-motor-portao` | material_eletrico | disjuntor bipolar 10A + 2 DPS (tensao depende de fase-fase x fase-neutro) |
+| `2026-nobreak-cameras-e-roteador` | generico | nobreak 700-1.200 VA saida 115V (~50 W de carga) |
+| `2026-plugues-e-conectores-cameras` | material_eletrico | 6 plugues femea 2P+T 10A + 12 conectores de alavanca |
 
 Os 6 ultimos sao `acessorio_de` dos dois principais (cameras e motor).
 Regra de cotacao nesses projetos: cada cotacao = custo TOTAL da quantidade.
@@ -30,10 +34,14 @@ Guias novos em `base-conhecimento/especificacoes/` (camera, cartao_memoria,
 material_eletrico, motor_portao). `status` agora sugere `novo-produto`/`cotar`
 quando a especificacao ja esta pronta.
 
-Pendente de decisao do Josemar: fotocelula, DPS e disjuntor do motor,
-controles extras, nobreak das cameras. Pendente de resposta do Fabio: versao
-exata do motor (1/4 ou 1/3), 127V x 220V, peso do portao, se o cabo PP tambem
-alimenta o motor, modelo de caixinha que ele usa.
+Decisoes do Josemar (21/09): quer tudo (fotocelula, DPS, disjuntor, nobreak,
+plugues/conectores); 3 controles; motor em 220V; o cabo PP alimenta tambem o
+motor (proposta: mesmo rolo em 2 circuitos, motor 220V com disjuntor proprio e
+cameras 127V saindo do nobreak); portao de correr ~4 x 2 m -> classe 500 kg
+(peso estimado 80-280 kg, 800 kg nao precisa).
+Pendente do Fabio: peso/material do portao, se o 220V e fase-fase (define o
+DPS), metragem de cada circuito, modelo de caixinha, conduite do outro lado
+do portao (fotocelula refletiva dispensa).
 
 Proximo passo: cotar, projeto a projeto (comecar pelas cameras e pelo motor,
 que definem cremalheira/base).

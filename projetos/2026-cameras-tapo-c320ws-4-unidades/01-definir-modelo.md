@@ -48,9 +48,9 @@ ou redundante com o que ja tenho). Compra: `junto` (mesmo carrinho) ou
 | Cartao microSD 128 GB High Endurance (6 un) | obrigatorio | ver projeto dos cartoes | grava sem assinatura | projeto: 2026-cartoes-microsd-128gb-cameras |
 | Caixa de passagem externa (6 un) | obrigatorio | IP65 ou mais, cabe a fonte 9V plugada | protege fonte e emendas no muro | projeto: 2026-caixas-de-passagem-cameras |
 | Cabo PP 3x1,5 mm2 (50 m) | obrigatorio | ver projeto do cabo | leva 127V ate cada caixinha | projeto: 2026-cabo-pp-3x1-5-50m |
-| Plugue femea 2P+T 10A (6 un) | obrigatorio | padrao NBR 14136, 10A | liga a fonte original na ponta do cabo, sem cortar a fonte [VERIFICAR com Fabio como ele liga] | junto com o cabo |
-| Conector de emenda tipo alavanca (~12 un) | recomendado | 3 vias, ate 2,5 mm2 | deriva o cabo principal para cada caixinha sem fita | junto com o cabo |
-| Nobreak ~600 VA 127V | recomendado | alimenta roteador + circuito das cameras | cameras seguem gravando se cortarem a luz (estimativa 2 a 3 h) | decisao pendente do Josemar |
+| Plugue femea 2P+T 10A (6 un) | obrigatorio | padrao NBR 14136, 10A | liga a fonte original na ponta do cabo, sem cortar a fonte [VERIFICAR com Fabio como ele liga] | projeto: 2026-plugues-e-conectores-cameras |
+| Conector de emenda tipo alavanca (~12 un) | obrigatorio (decisao do Josemar) | 3 vias, ate 2,5 mm2 | deriva o cabo principal para cada caixinha sem fita | projeto: 2026-plugues-e-conectores-cameras |
+| Nobreak | obrigatorio (decisao do Josemar) | ver projeto | cameras e roteador seguem gravando se cortarem a luz | projeto: 2026-nobreak-cameras-e-roteador |
 | Cabo de rede Cat6 externo | recomendado so onde o Wi-Fi nao chegar | UTP Cat6 com cobertura para area externa | a C320WS aceita cabo; testar o sinal em cada ponto antes de fixar | decisao depois do teste de sinal |
 | Assinatura Tapo Care | dispensavel | - | o cartao ja grava local; nuvem so se quiser copia fora de casa | - |
 

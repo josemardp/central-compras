@@ -22,7 +22,8 @@ propoe a especificacao para o MEU contexto e pergunta so o que muda a escolha.
 
 - Do perfil (equipamento, local, uso) o que pesa nesta compra: conduites ja passados no muro; tensao 127V.
 - Perguntas decisivas respondidas: 50 m de PP 3x1,5 (lista do Fabio).
-- Suposicoes adotadas (sem resposta minha, a IA propos o padrao): o cabo alimenta as cameras; se tambem for alimentar o motor, o ideal e o motor ter circuito e disjuntor proprios [VERIFICAR com Fabio].
+- Decisao do Josemar (21/09): o rolo alimenta cameras E motor.
+- Proposta do especialista: o mesmo rolo, cortado em DOIS circuitos separados: (1) motor em 220V saindo de disjuntor bipolar proprio com DPS; (2) cameras em 127V saindo do nobreak. Se as cameras ficassem no circuito do motor, o nobreak nao as seguraria na falta de luz e o surto do motor chegaria nelas [VERIFICAR metragem de cada trecho com Fabio].
 
 ## Especificacao tecnica para o meu contexto
 
@@ -30,7 +31,7 @@ propoe a especificacao para o MEU contexto e pergunta so o que muda a escolha.
 |---|---|---|---|
 | Tipo | cabo PP flexivel 3 vias | PP 3x1,5 mm2 300/500V, condutor classe 5 | duplo isolamento, proprio para conduite externo |
 | Condutor | cobre | cobre eletrolitico | CCA (aluminio cobreado) esquenta e da mau contato |
-| Bitola | 1,5 mm2 real | 1,5 mm2 | 6 cameras de ~5,4 W somam pouco; sobra folga |
+| Bitola | 1,5 mm2 real | 1,5 mm2 | cameras (~33 W) e motor (poucos amperes em 220V) cabem com folga; disjuntor de 10 A protege o cabo |
 | Certificacao | INMETRO | INMETRO + marca conhecida (Sil, Corfio, Cobrecom, Conduspar) | bitola menor que a anunciada e golpe comum |
 | Comprimento | 50 m | rolo fechado de 50 m | medida do Fabio |
 | Cobertura | PVC preta | PVC preta antichama | resiste melhor ao sol nas pontas expostas |
@@ -44,8 +45,8 @@ ou redundante com o que ja tenho). Compra: `junto` (mesmo carrinho) ou
 
 | Acessorio | Necessidade | Especificacao tecnica | Por que | Compra |
 |---|---|---|---|---|
-| Plugue femea 2P+T 10A (6 un) | obrigatorio | NBR 14136, 10A | liga a fonte de cada camera dentro da caixinha | junto |
-| Conector de emenda tipo alavanca (~12 un) | recomendado | 3 vias, ate 2,5 mm2 | derivacao limpa e segura | junto |
+| Plugue femea 2P+T 10A (6 un) | obrigatorio | NBR 14136, 10A | liga a fonte de cada camera dentro da caixinha | projeto: 2026-plugues-e-conectores-cameras |
+| Conector de emenda tipo alavanca (~12 un) | obrigatorio (decisao do Josemar) | 3 vias, ate 2,5 mm2 | derivacao limpa e segura | projeto: 2026-plugues-e-conectores-cameras |
 | Fita isolante | dispensavel | - | o conector de alavanca dispensa | - |
 
 ## Decisao de modelo

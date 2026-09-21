@@ -1,14 +1,14 @@
 # Reaproveitamento
 
-Gerado em 2026-09-21T10:40:01.
+Gerado em 2026-09-21T11:08:08.
 
 Conta so o conhecimento que **ja existia antes** da compra abrir. O que o
 proprio projeto registrou durante a pesquisa nao e reaproveitamento: seria
 medir a si mesmo e dar 100% sempre.
 
-- Projetos analisados: 14
-- Projetos que encontraram base pronta: 12
-- Taxa: 85.7% (meta do PRD: acima de 40% a partir da decima compra)
+- Projetos analisados: 18
+- Projetos que encontraram base pronta: 16
+- Taxa: 88.9% (meta do PRD: acima de 40% a partir da decima compra)
 
 | Projeto | Categoria | Marcas | Lojas | Licoes | Reaproveitou |
 |---|---|---:|---:|---:|---|
@@ -19,10 +19,14 @@ medir a si mesmo e dar 100% sempre.
 | 2026-cartoes-microsd-128gb-cameras | cartao_memoria | 0 | 0 | 1 | sim |
 | 2026-cremalheira-portao-4m | generico | 0 | 0 | 1 | sim |
 | 2026-decor-bloqueador | material_construcao | 0 | 0 | 0 | nao |
+| 2026-dps-e-disjuntor-motor-portao | material_eletrico | 0 | 0 | 1 | sim |
 | 2026-fone-bluetooth-para-chamadas | fone | 0 | 0 | 0 | nao |
+| 2026-fotocelula-portao | generico | 0 | 0 | 1 | sim |
 | 2026-hb20s-fechadura-dianteira-direita | Autopeças | 0 | 0 | 1 | sim |
 | 2026-hb20s-refil-bomba-combustivel | Autopeças | 0 | 1 | 1 | sim |
 | 2026-motor-portao-deslizante | motor_portao | 0 | 0 | 1 | sim |
+| 2026-nobreak-cameras-e-roteador | generico | 0 | 0 | 1 | sim |
+| 2026-plugues-e-conectores-cameras | material_eletrico | 0 | 0 | 1 | sim |
 | 2026-polissonografia-para-suspeita-de-saos | servico | 0 | 0 | 1 | sim |
 | 2026-pulseira-para-huawei-band-9 | pulseira-huawei-band9 | 0 | 1 | 0 | sim |
 | 2026-relogio-integrado-ao-celular-para-passos-e-batimentos | wearable | 0 | 1 | 0 | sim |

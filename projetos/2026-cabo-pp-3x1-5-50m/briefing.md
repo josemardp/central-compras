@@ -19,7 +19,7 @@ criado_em: "2026-09-21"
 - Quem vai usar: Josemar e familia; quem instala e o Fabio (instalador), Josemar compra o material
 - Onde vai usar: casa, area externa; conduites no muro ja passados
 - Frequencia de uso: permanente, dentro de conduite externo
-- Restricoes fisicas, tecnicas ou de compatibilidade: casa em 127V (ha ponto 220V); 6 cameras de ~5,4 W cada
+- Restricoes fisicas, tecnicas ou de compatibilidade: casa em 127V (ha ponto 220V); 6 cameras de ~5,4 W cada em 127V + motor em 220V, em circuitos separados
 - Prazo limite para comprar ou receber: sem prazo definido [VERIFICAR com o Josemar]
 - Vida util esperada: 10 anos ou mais
 - Experiencia ruim anterior que nao pode se repetir:

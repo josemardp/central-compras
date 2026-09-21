@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | modelo | Mesmo rolo em dois circuitos: motor 220V e cameras 127V via nobreak | Cameras no circuito do motor ficariam sem nobreak e expostas ao surto do motor. |
 | 2026-09-21 | modelo | Cabo PP 3x1,5 mm2 500V cobre INMETRO, 50 m | Cabo indicado pelo Fabio; duplo isolamento para conduite externo. |
 | 2026-09-21 | acessorio | acessorio de 2026-cameras-tapo-c320ws-4-unidades | comprado a parte para comparar preco sem misturar ranking |
 | 2026-09-21 | abertura | Compra criada | Necessidade registrada no briefing |

@@ -10,6 +10,8 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-09-21 | acessorio | aberto projeto 2026-plugues-e-conectores-cameras | acessorio com preco a comparar vira compra propria |
+| 2026-09-21 | acessorio | aberto projeto 2026-nobreak-cameras-e-roteador | acessorio com preco a comparar vira compra propria |
 | 2026-09-21 | modelo | Tapo C320WS, 4 unidades | Padronizar 6 cameras com as 2 ja compradas: um app, mesma fonte, caixinha e cartao. |
 | 2026-09-21 | produto | Produto reaproveitado: Tapo C320WS | id=tapo-c320ws |
 | 2026-09-21 | acessorio | aberto projeto 2026-cabo-pp-3x1-5-50m | acessorio com preco a comparar vira compra propria |

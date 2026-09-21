@@ -24,6 +24,11 @@ confirmado leva [VERIFICAR].
 | Central | com entrada para fotocelula | + modulo de trava/luz de garagem | ex.: PPA Triflex |
 | Cremalheira no kit | 0 m | 3 m | muda o que comprar a parte |
 
+## Conta rapida de peso (estimativa, nao medida)
+
+- Area do portao x peso por m2: gradil/tubular de ferro ~10-20 kg/m2; fechado em chapa ~20-35 kg/m2.
+- Portao 4 x 2 m (8 m2): ~80-160 kg gradil; ~160-280 kg chapa. Classe 500 kg sobra; 800 kg (1/2 CV) so para portao muito pesado.
+
 ## Marketing que pode ignorar
 
 - "Potencia" (1/4 x 1/3 CV) como argumento isolado: a capacidade em kg e o que decide. O mesmo DZ Rio 500 Jetflex aparece como 1/4 e como 1/3 em lojas diferentes.
@@ -40,8 +45,8 @@ confirmado leva [VERIFICAR].
 |---|---|---|---|
 | Cremalheira | obrigatorio | nylon com alma de aco, M4, compativel com a engrenagem (PPA DZ: Z18) | sempre |
 | Base regulavel | obrigatorio | aco zincado, furacao do motor | sempre |
-| Fotocelula | recomendado (forte) | par infravermelho compativel com a central | crianca, pedestre ou carro passando |
-| DPS + disjuntor proprio | recomendado | conforme o circuito | regiao com tempestade; central com inversor |
+| Fotocelula | recomendado (forte) | refletiva (fio so de um lado; PPA F10-R para Triflex) ou par emissor-receptor | crianca, pedestre ou carro passando |
+| DPS + disjuntor proprio | recomendado | 220V fase-fase: disjuntor bipolar + 1 DPS por fase (Uc para 127V fase-terra); fase-neutro: DPS 275V | regiao com tempestade; central com inversor |
 | Controles extras | depende | mesma frequencia/protocolo (PPA: 433,92 MHz rolling code) | um por motorista |
 | Nobreak de motor | dispensavel | - | destravamento manual resolve falta de luz |
 

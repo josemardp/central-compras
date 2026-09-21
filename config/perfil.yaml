@@ -27,6 +27,9 @@ equipamentos:
   - tipo: carro
     descricao: "Hyundai HB20S 1.6 16V Flex 2015"
     observacao: "pecas: fechadura 4 pinos; bomba Bosch F000TE195A (4.2 bar)"
+  - tipo: portao
+    descricao: "portao de correr ~4 x 2 m"
+    observacao: "motor PPA em 220V (decisao de 21/09/2026); material e peso [VERIFICAR com o Fabio]"
   - tipo: notebook
     descricao: "Lenovo IdeaPad Slim 3 15IRH10 (83NS0002BR)"
     observacao: "casa; i5-13420H, 8GB RAM, 512GB SSD, tela 15.3, Windows 11; portas [VERIFICAR no datasheet]"

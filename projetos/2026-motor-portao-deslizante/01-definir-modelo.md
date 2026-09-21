@@ -22,21 +22,23 @@ Kit de motor para o portao de correr, especificado pelo Fabio: PPA DZ Rio 500 Je
 
 - Do perfil (equipamento, local, uso) o que pesa nesta compra: casa 127V padrao, 220V disponivel; regiao com tempestade (surto eletrico).
 - Perguntas decisivas respondidas: motor PPA 500 kg Jetflex, especificado pelo Fabio; cremalheira de 4 m ou 3 m + 1 m (Josemar, 21/09).
-- Suposicoes adotadas (sem resposta minha, a IA propos o padrao): portao abaixo de 500 kg [VERIFICAR com Fabio]; o motor e bivolt, entao 127V ou 220V servem.
+- Decisoes do Josemar (21/09): portao de correr de cerca de 4 x 2 m; ligar em 220V; 3 controles; quer fotocelula, DPS, disjuntor proprio e nobreak das cameras.
+- Suposicoes adotadas (sem resposta minha, a IA propos o padrao): portao de ferro. Peso estimado (conta da IA, nao medido): 8 m2 x 10-20 kg/m2 (gradil/tubular) = 80-160 kg; 8 m2 x 20-35 kg/m2 (fechado em chapa) = 160-280 kg. Nos dois casos a classe 500 kg fica com folga de quase 2x ou mais [VERIFICAR peso real com o Fabio].
 
 ## Especificacao tecnica para o meu contexto
 
 | Atributo | Minimo aceitavel | Ideal | Por que, no meu contexto |
 |---|---|---|---|
 | Modelo | PPA DZ Rio 500 Jetflex | idem, confirmar versao 1/4 ou 1/3 e central Facility ou Full Range [VERIFICAR com Fabio] | e o que o Fabio instala e da manutencao |
-| Capacidade | 500 kg | 500 kg (existe versao 800 kg) | acima do peso real do portao, com folga |
-| Tensao | bivolt 127/220V | bivolt | Fabio pediu 220V; o motor aceita os dois, decidir com ele |
+| Capacidade | 500 kg | 500 kg; NAO precisa da versao 800 kg (1/2 CV) | portao 4 x 2 m de ferro fica entre ~80 e ~280 kg (estimativa); 800 kg so se o Fabio achar o portao muito mais pesado |
+| Tensao | bivolt 127/220V | bivolt, ligado em 220V | decisao do Josemar (21/09); circuito proprio com disjuntor bipolar e DPS |
 | Central | Triflex bivolt com entrada para fotocelula | idem | permite ligar sensor anti-esmagamento |
 | Fim de curso | hibrido/magnetico | idem | vem no kit |
-| Controles inclusos | 2 | 2 + extras conforme quem usa | quantas pessoas abrem o portao? [pergunta] |
-| Cremalheira inclusa | 0 m | 3 m | com 3 m no kit, compra-se so 1 m do mesmo modelo |
+| Controles | 3 no total | kit com 3 controles; se vier com 2, comprar 1 PPA compativel | decisao do Josemar (21/09) |
+| Cremalheira inclusa | 0 m | 3 m | portao de ~4 m pede 4 m; com 3 m no kit, compra-se so 1 m do mesmo modelo |
 | Garantia | nacional | nacional PPA | assistencia facil |
-| Velocidade | - | 3,5 s para 3 m (Jetflex) | rapido; confirmar com o Fabio se regula |
+| Velocidade | - | 3,5 s para 3 m (Jetflex), ~5 s no portao de 4 m (conta) | rapido; confirmar com o Fabio se regula |
+| Potencia (CV) | classe 500 kg | a que a loja chamar 1/4 ou 1/3 dentro do DZ Rio 500 Jetflex | o que decide e a capacidade em kg, nao o CV do anuncio |
 
 ## Acessorios
 
@@ -49,15 +51,15 @@ ou redundante com o que ja tenho). Compra: `junto` (mesmo carrinho) ou
 |---|---|---|---|---|
 | Cremalheira | obrigatorio | 4 m no total; nylon reforcado com alma de aco, gomos M4, padrao residencial compativel com engrenagem Z18 | e onde o motor engrena | projeto: 2026-cremalheira-portao-4m |
 | Base regulavel | obrigatorio | aco zincado com regulagem, furacao do DZ Rio | fixa o motor alinhado a cremalheira | projeto: 2026-base-motor-portao-deslizante |
-| Fotocelula (par infravermelho) | recomendado (forte) | compativel com a central Triflex PPA | impede o portao de fechar em cima de pessoa ou carro | junto, decisao pendente do Josemar |
-| DPS (protetor de surto) | recomendado | classe II, tensao conforme o circuito (127 ou 220V), no quadro [VERIFICAR com Fabio] | central com inversor queima com raio/surto | junto, decisao pendente |
-| Disjuntor so do motor | recomendado | conforme orientacao do Fabio | circuito proprio, sem dividir com as cameras | junto, decisao pendente |
-| Controles extras | depende | PPA 433,92 MHz rolling code | um por motorista | junto, pendente da resposta |
+| Fotocelula refletiva | obrigatorio (decisao do Josemar) | PPA F10-R ou compativel com a entrada de fotocelula da Triflex | impede o portao de fechar em cima de pessoa ou carro | projeto: 2026-fotocelula-portao |
+| DPS (protetor de surto) | obrigatorio (decisao do Josemar) | ver projeto | central com inversor queima com raio/surto | projeto: 2026-dps-e-disjuntor-motor-portao |
+| Disjuntor so do motor | obrigatorio (decisao do Josemar) | bipolar 10 A curva C [VERIFICAR com Fabio] | circuito proprio em 220V | projeto: 2026-dps-e-disjuntor-motor-portao |
+| Controle extra (se o kit vier com 2) | obrigatorio | PPA 433,92 MHz rolling code, compativel com a Triflex | 3 controles no total | junto com o motor |
 | Nobreak de motor | dispensavel | - | falta de luz se resolve com o destravamento manual (chave) | - |
 
 ## Decisao de modelo
 
-- Tipo/modelo escolhido para pesquisar: kit PPA DZ Rio 500 Jetflex bivolt, de preferencia com 3 m de cremalheira.
+- Tipo/modelo escolhido para pesquisar: kit PPA DZ Rio 500 Jetflex bivolt (classe 500 kg), de preferencia com 3 m de cremalheira e 3 controles.
 - Alternativas descartadas: outras marcas (Garen, Intelbras, Rossi).
 - Motivo: modelo do instalador (manutencao e garantia de instalacao com ele); PPA e marca lider.
 
