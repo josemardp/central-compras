@@ -24,10 +24,18 @@ Conhecimento tecnico reaproveitavel desta categoria. Cresce a cada compra.
 
 - "Antichama" e bom, mas nao decide em conduite externo.
 
+## Onde comprar (observado em 21/09/2026)
+
+- Cabo PP por metro: loja fisica. Online, rolo de 50 m passa de R$ 1.000 na Amazon; Loja Eletrica vende so rolo de 100 m (R$ 6,51/m) sem marca informada.
+- Caixa VBOX 1100 E (Intelbras): interno 125 x 123 x 60 mm; cabe fonte 9V de camera + plugue femea na diagonal.
+- DR tipo A e raro online; o unico anuncio (Steck SDR22530A, Amazon) tinha todas as fotos de outro produto.
+
 ## Armadilhas e incompatibilidades
 
 - Bitola real menor que a anunciada em cabo barato.
 - Caixa pequena demais para a fonte plugada: medir a fonte antes.
+- Anuncio com foto de outro produto (ex.: DR mostrando interruptor de luz): risco de receber peca trocada; comprar em loja fisica.
+- Itens complementares (DPS e disjuntor, plugue e conector) sao projetos separados: nao podem competir no mesmo ranking.
 
 ## Acessorios
 

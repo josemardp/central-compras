@@ -17,14 +17,14 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-09-21T10:22:25-03:00
-  last_session_at: 2026-09-21T10:22:25-03:00
-  confidence: inferred
+  updated_at: 2026-09-21T15:16:47-03:00
+  last_session_at: 2026-09-21T15:16:47-03:00
+  confidence: confirmed
 focus:
   objective: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
-  current: Fazer o primeiro "quero X" real e validar a especificacao e os acessorios propostos
-  last_completed: Skill central-compras com protocolo do especialista, reinstalada no Claude Code e no Codex
-  recommended_next_action: act-006
+  current: Enviar as perguntas ao instalador e, com as respostas, confirmar precos no carrinho e fechar as compras
+  last_completed: Referencia da skill atualizada com o que funciona e o que bloqueia na cotacao web; 3 licoes registradas
+  recommended_next_action: act-007
 next_actions:
   - id: act-001
     title: Acompanhar entrega das pecas do HB20 e registrar veredito D+30
@@ -88,7 +88,7 @@ next_actions:
     note: null
   - id: act-006
     title: Fazer o primeiro "quero X" real e validar a especificacao e os acessorios propostos
-    status: pending
+    status: done_tested
     impact: null
     urgency: null
     effort: null
@@ -96,6 +96,18 @@ next_actions:
     unblocks: []
     blocked_by: []
     created_at: 2026-09-21T10:22:25-03:00
+    done_at: 2026-09-21T15:16:21-03:00
+    note: null
+  - id: act-007
+    title: Comprar o material da instalacao (cameras + portao) apos respostas do instalador e confirmacao no carrinho
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-09-21T15:16:22-03:00
     done_at: null
     note: null
 blockers: []
@@ -112,6 +124,12 @@ decisions_recent:
     text: Acessorio com preco a comparar vira projeto proprio ligado ao principal, para nao misturar ranking
   - date: 2026-09-21
     text: Projetos antigos (template sem as secoes novas) nao sao cobrados no status
+  - date: 2026-09-21
+    text: "Motor da versao 800 kg (Z14) no lugar da 500 kg: kit completo mais barato e mais torque para portao de 4 m"
+  - date: 2026-09-21
+    text: Cartao de 64 GB linha CFTV no lugar de 128 GB Endurance (inexistente a preco normal no pais)
+  - date: 2026-09-21
+    text: Itens complementares ficam em projetos separados; cotacao registra o custo total da quantidade
 milestones: []
 review:
   stale_after_days: null

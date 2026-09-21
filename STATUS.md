@@ -5,83 +5,61 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (21/09/2026, 7 projetos da instalacao de cameras + motor de portao)
+## AO RETOMAR — comece por aqui (21/09/2026, instalacao de cameras + motor de portao: tudo cotado)
 
-O Fabio (instalador) vai instalar 6 Tapo C320WS no muro e um motor no portao
-de correr. Josemar ja tem 2 cameras (compradas em 16/09 na Loja Oficial
-TP-Link do ML, R$ 309,90 cada; essa compra NAO ficou registrada na Central,
-a pasta `projetos/2026-camera-de-monitoramento-externa` so tem um lock) e vai
-comprar todo o resto cotando aqui. Projetos abertos, todos com especificacao
-tecnica e tabela de acessorios preenchidas em `01-definir-modelo.md`:
+**Onde estamos.** O Fabio (instalador) vai instalar 6 Tapo C320WS no muro e um
+motor no portao de correr (~4 x 2 m). Josemar ja tem 2 cameras (16/09, Loja
+Oficial TP-Link no ML, R$ 309,90 cada; compra NAO registrada na Central: a pasta
+`projetos/2026-camera-de-monitoramento-externa` so tem um lock) e vai comprar o
+resto. 14 projetos abertos e cotados (so `fonte=web`); nada comprado ainda.
+Pagina com fotos, especificacao e preco de cada item (compartilhada por link):
+https://claude.ai/artifact/FseKJabXAoAGKbHNnxtfb4 (fonte local da pagina: nao
+versionada; regerar a partir dos projetos se precisar).
 
-| Projeto | Categoria | O que e |
-|---|---|---|
-| `2026-cameras-tapo-c320ws-4-unidades` | camera | 4x C320WS (candidato `tapo-c320ws` ja vinculado, teto R$ 1.300) |
-| `2026-cartoes-microsd-128gb-cameras` | cartao_memoria (nova) | 6x microSD 128 GB Endurance |
-| `2026-caixas-de-passagem-cameras` | material_eletrico (nova) | 6 caixinhas IP65+ |
-| `2026-cabo-pp-3x1-5-50m` | material_eletrico | cabo PP 3x1,5 50 m + plugues femea e emendas |
-| `2026-motor-portao-deslizante` | motor_portao (nova) | kit PPA DZ Rio 500 Jetflex bivolt |
-| `2026-cremalheira-portao-4m` | generico | 4 m reforcada branca (ou 1 m se o kit trouxer 3 m) |
-| `2026-base-motor-portao-deslizante` | generico | base regulavel |
-| `2026-fotocelula-portao` | generico | fotocelula refletiva PPA F10-R |
-| `2026-dps-e-disjuntor-motor-portao` | material_eletrico | disjuntor bipolar 10A + 2 DPS (tensao depende de fase-fase x fase-neutro) |
-| `2026-nobreak-cameras-e-roteador` | generico | nobreak 700-1.200 VA saida 115V (~50 W de carga) |
-| `2026-plugues-e-conectores-cameras` | material_eletrico | 6 plugues femea 2P+T 10A + 12 conectores de alavanca |
+**Proximo passo.** (1) Mandar ao Fabio as 5 perguntas abaixo; (2) Josemar decide
+as 4 excecoes; (3) conferir cada item no carrinho e registrar com
+`promover-cotacao` antes de `decidir`.
 
-Os 6 ultimos sao `acessorio_de` dos dois principais (cameras e motor).
-Regra de cotacao nesses projetos: cada cotacao = custo TOTAL da quantidade.
-Guias novos em `base-conhecimento/especificacoes/` (camera, cartao_memoria,
-material_eletrico, motor_portao). `status` agora sugere `novo-produto`/`cotar`
-quando a especificacao ja esta pronta.
+Decisoes do Josemar: quer tudo; 6 cameras C320WS; 3 controles; motor em 220V;
+cabo PP alimenta cameras (127V, saindo do nobreak) e motor (220V, circuito proprio).
 
-Decisoes do Josemar (21/09): quer tudo (fotocelula, DPS, disjuntor, nobreak,
-plugues/conectores); 3 controles; motor em 220V; o cabo PP alimenta tambem o
-motor (proposta: mesmo rolo em 2 circuitos, motor 220V com disjuntor proprio e
-cameras 127V saindo do nobreak); portao de correr ~4 x 2 m -> classe 500 kg
-(peso estimado 80-280 kg, 800 kg nao precisa).
-Pendente do Fabio: peso/material do portao, se o 220V e fase-fase (define o
-DPS), metragem de cada circuito, modelo de caixinha, conduite do outro lado
-do portao (fotocelula refletiva dispensa).
-
-Cotacao feita em 21/09 com o navegador `nav-lojadares` (so leitura, sem login;
-autorizado pelo Josemar). Mercado Livre bloqueia ate navegador (403), Leroy tambem.
-Todas as cotacoes sao `fonte=web` com `origem=observacao_direta` e o que nao foi
-verificado na evidencia. Melhor achado por item:
-
-| Projeto | Melhor opcao | Total | Situacao no ranking |
+| Projeto | Melhor opcao cotada | Total | Situacao |
 |---|---|---|---|
-| cameras (4) | Amazon, TP-Link Loja oficial | R$ 1.359,60 | cortada: acima do teto R$ 1.300 (ML nao lido; pago R$ 309,90/un em 16/09) |
-| cartoes (6) | WD Purple Intelbras 64 GB (Amazon, BRAES/FBA) | R$ 989,88 | cortado: gate exige vendedor oficial; Endurance 128 GB so importado ou R$ 600-900 |
-| caixas (6) | Intelbras VBOX 1100 E (vendido pela Amazon) | R$ 126,54 | elegivel |
-| cabo | rolo 100 m Loja Eletrica (marca nao informada) | R$ 651,35 | elegivel, mas duvidoso: comprar em loja fisica por metro |
-| plugues (6) | Alumbra 2766 | R$ 91,08 | elegivel |
-| conectores | Wago 221-413 kit 20 (projeto novo) | R$ 66,80 | elegivel |
-| motor | PPA DZ Rio R800 Jetflex Z14, 4 m + 3 controles (Amazon, 123LIDER) | R$ 915,30 | cortado: garantia do vendedor (gate pede nacional) |
-| cremalheira | PPA Gold 1 m x4 | R$ 232,00 | so se o kit nao trouxer 4 m; cortada por poucas avaliacoes |
-| fotocelula | PPA F10-R (Casa do Motor Eletronico) | R$ 251,84 | cortada: comparador sem nota |
-| DPS (2) | Clamper Front 20kA 175V | R$ 83,80 | elegivel (175V so se 220V for fase-fase) |
-| disjuntor | Steck SDD62C10 (projeto novo) | R$ 38,90 | elegivel |
-| nobreak | TS Shara 700VA R$ 409 (5Ah) x Intelbras ATTIV 700VA R$ 582,52 | - | ambos elegiveis |
-| base | nao achada online | - | perguntar ao Fabio / loja local |
+| `2026-cameras-tapo-c320ws-4-unidades` | Amazon, TP-Link Loja oficial | R$ 1.359,60 | acima do teto R$ 1.300: decisao do Josemar |
+| `2026-cartoes-microsd-128gb-cameras` | WD Purple Intelbras 64 GB (Amazon, BRAES/FBA) | R$ 989,88 | gate exige vendedor oficial: decisao do Josemar |
+| `2026-caixas-de-passagem-cameras` | Intelbras VBOX 1100 E (Amazon) | R$ 126,54 | elegivel; fonte cabe (interno 125x123x60 mm) |
+| `2026-cabo-pp-3x1-5-50m` | loja fisica por metro (ref. R$ 6,51/m) | ~R$ 325 | online so rolo 100 m sem marca |
+| `2026-plugues-e-conectores-cameras` | Alumbra 2766 x6 | R$ 91,08 | elegivel (so plugues) |
+| `2026-conectores-emenda-cameras` | Wago 221-413 kit 20 | R$ 66,80 | elegivel |
+| `2026-nobreak-cameras-e-roteador` | Intelbras ATTIV 700VA (recomendado) x TS Shara R$ 409 | R$ 582,52 | decisao do Josemar |
+| `2026-motor-portao-deslizante` | PPA DZ Rio R800 Jetflex Z14, 4 m cremalheira + 3 controles (Amazon, 123LIDER) | R$ 915,30 | garantia do vendedor: decisao do Josemar |
+| `2026-fotocelula-portao` | PPA F10-R (Casa do Motor Eletronico) | R$ 251,84 | ok no preco |
+| `2026-dps-e-disjuntor-motor-portao` | Clamper Front 20kA 175V x2 (so DPS) | R$ 83,80 | 175V so se 220V for fase-fase |
+| `2026-disjuntor-bipolar-motor-portao` | Steck SDD62C06 6 A (manual pede 5 A) | R$ 29,90 | 10 A descartado |
+| `2026-dr-motor-portao` | Steck SDR22530A tipo A (loja fisica) | R$ 85,38 ref. | manual exige DR 30 mA; anuncio Amazon com fotos erradas |
+| `2026-base-motor-portao-deslizante` | Base Flex PPA (Afermix) | R$ 155,00 | so se o piso nao for firme |
+| `2026-cremalheira-portao-4m` | PPA Gold x4 | R$ 232,00 | NAO comprar: kit ja traz 4 m |
 
-Projetos separados nesta rodada (itens complementares nao competem): conectores
-foram para `2026-conectores-emenda-cameras`; disjuntor para
-`2026-disjuntor-bipolar-motor-portao`.
-Respostas do especialista (21/09, manual tecnico PPA DZ Rio P08665): fonte da
-camera cabe na VBOX 1100 E (125x123x60 mm interno); R800 Z14 serve, mas anda a
-33 m/min (~7 s em 4 m, nao 5,3 s) e o manual cita portao ate 3,0 m de comprimento
-(portao tem ~4 m: perguntar ao Fabio); cremalheira do kit basta (Gold dispensada;
-cuidado com Gold 'modulo 6'); disjuntor trocado para 6 A (manual pede 5 A),
-Steck SDD62C06 R$ 29,90; cabo 1,5 mm2 e o dobro do minimo do manual (0,75 mm2).
-Pagina publicada: https://claude.ai/artifact/FseKJabXAoAGKbHNnxtfb4
-Investigacao 2 e 3 (21/09): o '2,5 x 3,0 m' do manual DZ Rio e igual do 350 ao
-800 kg (referencia, nao limite de forca): R800 Z14 mantido para portao de 4 m.
-Base: piso firme = so parafusos (manual); senao concreto ou Base Flex PPA
-(Afermix R$ 155). Manual EXIGE DR 30 mA + aterramento + roldanas >= 120 mm:
-projeto novo `2026-dr-motor-portao` (Steck SDR22530A tipo A, R$ 85,38 ref.;
-anuncio Amazon com fotos erradas, comprar em loja fisica). Total R$ 4.737,64 + cabo.
-Proximo passo: Josemar decide as excecoes de gate (teto das cameras, vendedor
-dos cartoes, garantia do motor) e confirma no checkout (`promover-cotacao`).
+Total cotado R$ 4.737,64 + cabo (~R$ 325).
+
+**Achados que valem para o futuro** (detalhe nos guias de
+`base-conhecimento/especificacoes/` e em `skills/central-compras/references/fluxo.md`):
+manual PPA DZ Rio (P08665) exige DR 30 mA, aterramento, disjuntor 5 A, roldanas
+>= 120 mm; o "portao ate 3,0 m" do manual e referencia (igual do 350 ao 800 kg),
+entao R800 Z14 serve para 4 m; velocidade real Z14 = 33 m/min (~7 s em 4 m).
+Mercado Livre e Leroy bloqueiam leitura automatica; Amazon e KaBuM funcionam no
+navegador `nav-lojadares` (so leitura, autorizado pelo Josemar em 21/09).
+
+**Perguntas para o Fabio:** 220V e fase-fase? (define o DPS) · o quadro ja tem
+DR e aterramento? · o piso junto ao portao e firme? (define a base) · roldanas
+>= 120 mm e portao leve na mao? · metragem de cada circuito?
+
+**Decisoes do Josemar:** teto das cameras (R$ 339,90 x R$ 309,90 no ML) ·
+cartao de vendedor terceiro (FBA) · motor com garantia do vendedor ou
+distribuidor PPA · nobreak ATTIV x TS Shara.
+
+Checagem de segredos: limpa. Suite: 588 testes, 0 falhas (ultima mudanca de
+codigo desta sessao: `status` sugere `novo-produto`/`cotar` com especificacao pronta).
 
 ## AO RETOMAR — comece por aqui (21/09/2026, especialista tecnico na etapa "definir modelo")
 

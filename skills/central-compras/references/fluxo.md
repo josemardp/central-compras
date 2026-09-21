@@ -22,6 +22,28 @@ purchase, linked to the main one:
 python scripts\central_compras.py novo-projeto "cartao microsd camera" --categoria generico --valor-estimado 80 --acessorio-de projetos\2026-camera-externa
 ```
 
+## Quoting on the Web (what works, measured 2026-09-21)
+
+- Mercado Livre blocks automated reading everywhere: WebFetch, headless browser
+  (403 even on the home page) and its public API (now requires auth). Leroy
+  Merlin also returns 403. Ask Josemar to check ML on his phone when it matters.
+- Amazon.com.br and KaBuM work in the headless browser without login (read
+  only). On an Amazon page, `fetch('/dp/<ASIN>')` from the page context returns
+  other listings' HTML for image/price extraction in one call.
+- Buscape/Zoom work through WebFetch but show no rating, reviews or warranty:
+  the gate will cut those quotes. Use them only as a price floor.
+- Sites that mirror ML listings (gooseguardian, megsegurancaeletronica) have
+  invalid TLS certificates: never a place to buy; cite the MLB id instead.
+- Record `--origem-dados observacao_direta` only for pages actually read in the
+  browser, `relatorio_ia` for search/aggregator summaries, and put in
+  `--evidencia` everything that was NOT verified (seller, warranty, freight).
+- Check listing photos: an Amazon listing for a Steck DR showed a smart switch
+  in every photo. Wrong photos mean risk of receiving the wrong item.
+- Manufacturer manuals beat listings. The PPA DZ Rio manual corrected speed,
+  breaker size and added a mandatory DR; `pdftotext -layout` reads PPA PDFs.
+- One project per item. Complementary items (DPS + breaker, plug + connector)
+  never share a ranking; quantity purchases quote the TOTAL for the quantity.
+
 ## Register Candidates and Quotes
 
 ```powershell

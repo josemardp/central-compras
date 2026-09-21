@@ -44,4 +44,4 @@ Classificacao por estrelas desta categoria: `config/categorias.yaml`.
 | Data | Projeto | O que este projeto ensinou |
 |---|---|---|
 | 2026-09-16 | compra de 2 Tapo C320WS (sessao do Antigravity, nao registrada na Central) | 2 fixas cobrem ~180 graus melhor que 1 rotativa |
-| 2026-09-21 | 2026-cameras-tapo-c320ws-4-unidades | padronizar as 6 cameras no mesmo modelo |
+| 2026-09-21 | 2026-cameras-tapo-c320ws-4-unidades | padronizar as 6 cameras no mesmo modelo; Amazon loja oficial TP-Link R$ 339,90/un (ML R$ 309,90 em 16/09, nao lido: ML bloqueia) |
