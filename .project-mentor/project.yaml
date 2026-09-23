@@ -17,14 +17,14 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-09-21T15:16:47-03:00
-  last_session_at: 2026-09-21T15:16:47-03:00
+  updated_at: 2026-09-23T17:57:04-03:00
+  last_session_at: 2026-09-23T17:57:04-03:00
   confidence: confirmed
 focus:
   objective: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
-  current: Enviar as perguntas ao instalador e, com as respostas, confirmar precos no carrinho e fechar as compras
-  last_completed: Referencia da skill atualizada com o que funciona e o que bloqueia na cotacao web; 3 licoes registradas
-  recommended_next_action: act-007
+  current: Efetuar a compra dos 5 itens cotados da bike conforme links da planilha consolidada
+  last_completed: Dashboard local regenerado com 26 projetos ativos e checagem estrita de segredos limpa
+  recommended_next_action: act-010
 next_actions:
   - id: act-001
     title: Acompanhar entrega das pecas do HB20 e registrar veredito D+30
@@ -110,14 +110,44 @@ next_actions:
     created_at: 2026-09-21T15:16:22-03:00
     done_at: null
     note: null
+  - id: act-008
+    title: Cadastrar projetos e cotacoes do kit de freios Shimano MT200 para Gonew 6.3
+    status: done_tested
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-09-23T16:38:24-03:00
+    done_at: 2026-09-23T16:38:37-03:00
+    note: null
+  - id: act-009
+    title: Atualizar adaptador dianteiro para Shimano SM-MA-F180P/S (padrao IS) e recalcular ranking
+    status: done_tested
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-09-23T17:44:51-03:00
+    done_at: 2026-09-23T17:45:22-03:00
+    note: null
+  - id: act-010
+    title: Efetuar a compra dos 5 itens cotados da bike conforme links da planilha consolidada
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-09-23T17:57:04-03:00
+    done_at: null
+    note: null
 blockers: []
 decisions_recent:
-  - date: 2026-09-16
-    text: Estado preenchido com base em STATUS.md de 15/09/2026
-  - date: 2026-09-16
-    text: 'Alinhar focus.current e próxima ação com evidência real: STATUS.md e commit 15/09/2026 ("registra compras do HB20, abertura e cotacao...")'
-  - date: 2026-09-16
-    text: Optado por 2x Tapo C320WS (estáticas) em vez de 1x C520WS/C530WS (rotativa) para garantir gravação contínua dos dois lados (~180 graus contínuos) e 8MP de resolução total combinada pelo mesmo investimento (~R$ 500-600) com 2 anos de garantia oficial
   - date: 2026-09-21
     text: Perfil versionado no repo publico so com contexto tecnico; numero de serie e BIOS ficaram fora
   - date: 2026-09-21
@@ -130,6 +160,14 @@ decisions_recent:
     text: Cartao de 64 GB linha CFTV no lugar de 128 GB Endurance (inexistente a preco normal no pais)
   - date: 2026-09-21
     text: Itens complementares ficam em projetos separados; cotacao registra o custo total da quantidade
+  - date: 2026-09-23
+    text: Discos Center Lock (SM-RT10) em vez de 6 parafusos após macro da roda revelar lockring de 40 N.m
+  - date: 2026-09-23
+    text: Adaptador SM-MA-F180P/S (IS para Post Mount) confirmado após detalhe lateral do garfo
+  - date: 2026-09-23
+    text: Trocadores avulsos Shimano Altus SL-M315 3x8v selecionados pela relação nativa de 24 velocidades
+  - date: 2026-09-23
+    text: Adaptador traseiro reaproveitado do conjunto de 160 mm já existente no quadro
 milestones: []
 review:
   stale_after_days: null

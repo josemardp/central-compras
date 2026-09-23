@@ -5,7 +5,23 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
-## AO RETOMAR — comece por aqui (21/09/2026, instalacao de cameras + motor de portao: tudo cotado)
+## AO RETOMAR — comece por aqui (23/09/2026, upgrade freios Gonew Endorphine 6.3: cotado e validado)
+
+**Onde estamos (23/09/2026 - Bike Gonew Endorphine 6.3).** Perícia visual minuciosa feita a partir de fotos reais da bike do Josemar para upgrade de freios mecânicos para hidráulicos Shimano MT200. Achados técnicos comprovados: (1) cubos originais Shimano HB-TX505 Center Lock com gravação LOCK 40 N.m visível; (2) garfo dianteiro padrão IS Mount com adaptador de 160 mm; (3) alavancas de marcha integradas Shimano ST-TX800; (4) cassete de 8 velocidades (3x8v). 5 projetos abertos e cotados (fonte=web, total R$ 839,50). Lista 100% blindada para compra.
+
+| Projeto | Melhor opcao cotada | Total | Situacao |
+|---|---|---|---|
+| `2026-freios-hidraulicos-shimano-mt200` | Mercado Livre (Itabike) | R$ 329,90 | Par montado/sangrado original c/ pastilhas |
+| `2026-disco-center-lock-180mm-dianteiro` | Mercado Livre (Scatt Bikes) | R$ 129,90 | SM-RT10 180mm Center Lock c/ lockring |
+| `2026-disco-center-lock-160mm-traseiro` | Mercado Livre (Itabike) | R$ 94,90 | SM-RT10 160mm Center Lock c/ lockring |
+| `2026-adaptador-post-mount-180mm-dianteiro` | Mercado Livre (Pedalokos) | R$ 64,90 | Shimano SM-MA-F180P/S (garfo IS p/ PM 180mm) |
+| `2026-trocadores-shimano-altus-sl-m315-3x8` | Mercado Livre (Bike Point SC) | R$ 219,90 | Par SL-M315 3x8v Rapid Fire c/ cabos |
+
+**Proximo passo da bike.** Josemar conferir carrinho/frete e comprar o kit quando desejar; adaptador traseiro não precisa comprar (reaproveita o de 160 mm que já está no quadro).
+
+---
+
+## Sessão anterior (21/09/2026, instalacao de cameras + motor de portao: tudo cotado)
 
 **Onde estamos.** O Fabio (instalador) vai instalar 6 Tapo C320WS no muro e um
 motor no portao de correr (~4 x 2 m). Josemar ja tem 2 cameras (16/09, Loja
