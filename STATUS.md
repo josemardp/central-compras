@@ -5,6 +5,16 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 24/09/2026: manual de regulagem do freio atual (fora do repositório)
+
+- **O que é.** Manual visual (HTML autocontido, offline) para regular o freio **atual** da Gonew: Shimano BR-TX805 (disco mecânico) + manete ST-TX800 (etiqueta "ST-TX800-L" confirmada em foto). Montado pelo Codex e revisado aqui contra os Dealer's Manuals Shimano DM-BR0007-04 e DM-ST0001-05. Tem 12 quadros com 10 fotos reais da bike com marcações e a Parte 7, guia rápido para lixar os discos (dica prática, fora do manual Shimano).
+- **Onde está.** `C:\Users\pc\Downloads\manual-freio-bicicleta.html` (só neste PC, **não versionado**; backup sem fotos: `manual-freio-bicicleta.BACKUP.html`, mesma pasta). Fotos originais: `C:\Users\pc\Downloads\WhatsApp Image 2026-09-24 at 11.35.2*.jpeg` e `11.48.0*.jpeg`.
+- **Achado.** Na foto da pinça traseira, a sobra do cabo depois do parafuso prendedor parece passar dos 20 mm do manual (risco de enroscar no disco). Josemar medir e cortar se passar.
+- **Pendências do manual.** Parafuso de distância da alavanca sem foto (não identificado com certeza); pastilha de reposição B01S a confirmar na loja.
+- **Se trocar para o MT200** (projetos abaixo), este manual deixa de valer: hidráulico se regula de outro jeito.
+
+---
+
 ## AO RETOMAR — comece por aqui (23/09/2026, upgrade freios Gonew Endorphine 6.3: cotado e validado)
 
 **Onde estamos (23/09/2026 - Bike Gonew Endorphine 6.3).** Perícia visual minuciosa feita a partir de fotos reais da bike do Josemar para upgrade de freios mecânicos para hidráulicos Shimano MT200. Achados técnicos comprovados: (1) cubos originais Shimano HB-TX505 Center Lock com gravação LOCK 40 N.m visível; (2) garfo dianteiro padrão IS Mount com adaptador de 160 mm; (3) alavancas de marcha integradas Shimano ST-TX800; (4) cassete de 8 velocidades (3x8v). 5 projetos abertos e cotados (fonte=web, total R$ 839,50). Lista 100% blindada para compra.
