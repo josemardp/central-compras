@@ -29,7 +29,7 @@ repo ──POST JSON──> Apps Script Web App (conta conta-comercial)
   passa por esse fluxo; se quiser espelhá-lo também, suba o arquivo na mesma
   pasta do Drive manualmente.
 - A pasta "Central de Compras" vive em
-  `Meu Drive/10_JOSEMAR_PESSOAL/03_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/Central de Compras`
+  `Meu Drive/10_JOSEMAR_PESSOAL/02_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/Central de Compras`
   (mesmo padrão dos outros projetos de código nessa conta, tipo FisioAI e DISC).
   O script referencia essa pasta **por ID fixo**, não por busca de nome na raiz
   do Drive — isso evita criar uma pasta duplicada na raiz se um dia a pasta for

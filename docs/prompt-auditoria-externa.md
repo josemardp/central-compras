@@ -80,7 +80,7 @@ Perguntas concretas:
 ### 2. A planilha publicada, aba por aba
 
 `Central de Compras - Cotacoes e Comparacoes`, na conta conta-comercial, dentro de
-`Meu Drive/10_JOSEMAR_PESSOAL/03_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/Central de Compras`.
+`Meu Drive/10_JOSEMAR_PESSOAL/02_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/Central de Compras`.
 
 São 8 abas de projeto mais a `Visao Geral`. **Abra uma por uma.** Foi assim
 que os bugs silenciosos apareceram; eles atravessaram mais de uma revisão

@@ -58,7 +58,7 @@ servidor de automação não comprova qual conta está ativa.
 ### Pasta no Drive
 
 ```
-Meu Drive/10_JOSEMAR_PESSOAL/03_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/Central de Compras
+Meu Drive/10_JOSEMAR_PESSOAL/02_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/Central de Compras
 ```
 
 ID: `1MyR5NNhHz5Q2RtSHbgPZxXDV3kRM2ARU`

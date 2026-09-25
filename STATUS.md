@@ -2800,7 +2800,7 @@ na sessao de 05/09; o veredito D+30 segue pendente. Nenhuma compra foi refeita.
     sozinha em ~30 dias.
 - **Montagem nova (a que está no ar)**, tudo na conta **conta-comercial**:
   - Pasta `Central de Compras` em
-    `Meu Drive/10_JOSEMAR_PESSOAL/03_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/`
+    `Meu Drive/10_JOSEMAR_PESSOAL/02_PROJETOS_ATIVOS/02_TECNOLOGIA_E_IA/`
     (id `1MyR5NNhHz5Q2RtSHbgPZxXDV3kRM2ARU`), seguindo o padrão dos outros
     projetos de código dessa conta (FisioAI, DISC).
   - Apps Script `Central de Compras - Sync`, Web App implantado (Versão 3),
