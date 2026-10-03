@@ -17,7 +17,7 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-10-01T20:40:03-03:00
+  updated_at: 2026-10-03T20:35:15-03:00
   last_session_at: 2026-10-01T20:40:03-03:00
   confidence: confirmed
 focus:
@@ -157,6 +157,30 @@ next_actions:
     blocked_by: []
     created_at: 2026-09-24T12:14:32-03:00
     done_at: null
+    note: null
+  - id: act-012
+    title: \ Varredura de mercado celular 512GB/1TB para Esdra\
+    status: done_implemented
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-10-03T19:50:00-03:00
+    done_at: 2026-10-03T19:55:04-03:00
+    note: null
+  - id: act-013
+    title: Mesclar pesquisa de celulares da Esdra à planilha comparativa da Agy
+    status: done_tested
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-10-03T20:35:03-03:00
+    done_at: 2026-10-03T20:35:15-03:00
     note: null
 blockers: []
 decisions_recent:

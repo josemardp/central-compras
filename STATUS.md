@@ -5,6 +5,15 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 03/10/2026: abertura do processo de celular para a Esdra (512 GB / 1 TB)
+
+- **O que é.** Abertura do projeto `projetos/2026-celular-esdra` para substituir o iPhone 14 Plus de 128 GB da Esdra (memoria esgotada, 41 GB de midias do WhatsApp Business, backup iCloud travado). Varredura ampla do mercado brasileiro realizada em 03/10/2026 cobrindo 13 modelos em 3 faixas, com links por variante e lacunas marcadas [VERIFICAR]. Precos sao observacoes web, nao cotacoes confirmadas.
+- **Onde está.** Dossiê completo em `projetos/2026-celular-esdra/01-pesquisa-mercado.md`, planilha em `projetos/2026-celular-esdra/comparacao.xlsx` (7 abas: 51 modelos com coluna de garantia nacional, iPhone vs Android, simulador de custo líquido, 105 anúncios observados, briefing e pendências, fora da lista com motivo, fontes; gerada por `scripts/gerar_planilha_celular.py`, refeita e mesclada pelo Claude Code em 03/10 porque a v1 tinha modelos de 2024 sem link de produto), briefing em `briefing.md` e acompanhamento em `processo.md`.
+- **Achado critico.** Documentacao oficial da Meta confirma que NAO ha transferencia de conversas do WhatsApp Business de iPhone para Android. Inicio Rapido da Apple permite transferencia direta entre iPhones, mas a integridade dos dados especificos do Business ainda precisa ser comprovada no novo aparelho antes de apagar ou vender o antigo.
+- **Pendencias.** Resposta do Josemar sobre: (1) orcamento maximo; (2) aceitacao da Esdra quanto a manter iOS ou arriscar migracao para Android; (3) preferencia de tamanho de tela (6,7 pol vs 6,1 pol); (4) prazo e forma de pagamento.
+
+---
+
 ## Sessão 24/09/2026: manual de regulagem do freio atual (fora do repositório)
 
 - **O que é.** Manual visual (HTML autocontido, offline) para regular o freio **atual** da Gonew: Shimano BR-TX805 (disco mecânico) + manete ST-TX800 (etiqueta "ST-TX800-L" confirmada em foto). Montado pelo Codex e revisado aqui contra os Dealer's Manuals Shimano DM-BR0007-04 e DM-ST0001-05. Tem 12 quadros com 10 fotos reais da bike com marcações e a Parte 7, guia rápido para lixar os discos (dica prática, fora do manual Shimano).
