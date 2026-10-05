@@ -114,8 +114,11 @@ erros já observados**.
 2. Preserve compatibilidade entre payload antigo e novo.
 3. Atualize o bloco versionado em `docs/integracao-google-sheets.md`.
 4. Faça o redeploy da implantação existente pela conta proprietária.
-5. Rode `sincronizar-planilha` com timeout de 120 segundos e leia `detalhe` se
-   `ok` for falso.
+5. Rode `sincronizar-planilha` com timeout de 300 segundos e leia `detalhe` se
+   `ok` for falso. Em 05/10/2026, com 28 projetos, cada sincronização levou
+   100 a 180 s no Apps Script; um timeout de 150 s matou o cliente enquanto o
+   servidor terminava normalmente. Sem resposta no terminal, confira a página
+   **Execuções** do projeto antes de reenviar.
 6. Rode a sincronização uma segunda vez e confira que não surgiram abas,
    filtros ou gráficos duplicados.
 7. Abra a planilha e confira conteúdo **e aparência**, não apenas a resposta do

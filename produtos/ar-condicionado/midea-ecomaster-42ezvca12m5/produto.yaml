@@ -1,0 +1,17 @@
+id: midea-ecomaster-42ezvca12m5
+categoria: ar_condicionado
+nome: Midea AI Ecomaster 12000 Frio 42EZVCA12M5
+marca: Midea
+atributos:
+  btu: 12000
+  tensao: 220
+  ciclo: frio
+  compressor: inverter
+  idrs: 7.6
+  consumo_kwh_ano: 382.5
+  gas: R-32
+  garantia_compressor_anos: 10
+  garantia_total_meses: 24
+  wifi: true
+  rede_assistencia: nacional_verificar_regiao
+proveniencia: null

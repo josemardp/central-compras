@@ -1,0 +1,17 @@
+id: samsung-windfree-ar60h12d1
+categoria: ar_condicionado
+nome: Samsung WindFree AI Pro 12000 Frio AR60H12D1AWNAZ
+marca: Samsung
+atributos:
+  btu: 12000
+  tensao: 220
+  ciclo: frio
+  compressor: inverter
+  idrs: 7.0
+  consumo_kwh_ano: 416
+  gas: R-32
+  garantia_compressor_anos: VERIFICAR
+  garantia_total_meses: 12
+  wifi: true
+  rede_assistencia: nacional_verificar_regiao
+proveniencia: null

@@ -5,6 +5,17 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 05/10/2026: ar condicionado split 12.000 BTU para o irmão (escolhido, falta comprar)
+
+- **O que é.** Projeto `projetos/2026-ar-condicionado-split-12000-btu-irmao`: split hi-wall 12.000 BTU, só frio, inverter, 220V, entrega em Floreal-SP (casa do irmão; endereço salvo na Amazon do Josemar, fora do repo). Instalador do irmão é credenciado de todas as marcas.
+- **Decisão do Josemar.** LG Dual Inverter Voice +AI **S3-Q12JA31L**. Melhor anúncio: Amazon B0GL9FF7Q5, vendido e entregue por WebContinental, R$ 2.159,10 no Pix ou R$ 2.399 em 18x sem juros, frete grátis para Floreal (19 a 21/10). Ele finaliza a compra em 06/10.
+- **Ao retomar.** Pedir a ele o preço, frete e vendedor que viu no checkout; rodar `promover-cotacao ... --produto-id lg-s3-q12ja31l` com esses campos e depois `decidir`; registrar por que Midea (empate técnico, 85 x 83) e Gree (5 anos de garantia, +R$ 200) perderam; `sincronizar-planilha`.
+- **Onde está.** Ranking e cotações (13 linhas, todas `fonte=web`) no projeto; processo.md tem a linha do tempo (2ª e 3ª opinião de IAs externas conferidas, erros apontados). Categoria nova `ar_condicionado` em `config/categorias.yaml` e guia em `base-conhecimento/especificacoes/ar_condicionado.md`.
+- **Infra.** O token Sheets deste PC estava errado ("token inválido"); foi regravado a partir do Code.gs (conta lojadares) sem alterar nada na nuvem. A sincronização agora leva 100 a 180 s: use timeout de 300 s (doc `aprendizados-google-sheets.md` atualizado).
+- **Navegador.** A Amazon do Josemar ficou com Floreal como local de busca (proposital, para a compra).
+
+---
+
 ## Sessão 03/10/2026: abertura do processo de celular para a Esdra (512 GB / 1 TB)
 
 - **O que é.** Abertura do projeto `projetos/2026-celular-esdra` para substituir o iPhone 14 Plus de 128 GB da Esdra (memoria esgotada, 41 GB de midias do WhatsApp Business, backup iCloud travado). Varredura ampla do mercado brasileiro realizada em 03/10/2026 cobrindo 13 modelos em 3 faixas, com links por variante e lacunas marcadas [VERIFICAR]. Precos sao observacoes web, nao cotacoes confirmadas.

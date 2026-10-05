@@ -1,0 +1,17 @@
+id: gree-g-side-gwc12atcxb
+categoria: ar_condicionado
+nome: Gree G-Side Auto Inverter 12000 Frio GWC12ATCXB
+marca: Gree
+atributos:
+  btu: 12000
+  tensao: 220
+  ciclo: frio
+  compressor: inverter
+  idrs: 7.01
+  consumo_kwh_ano: 415
+  gas: R-32
+  garantia_compressor_anos: 10
+  garantia_total_meses: 60
+  wifi: true
+  rede_assistencia: nacional_verificar_regiao
+proveniencia: null

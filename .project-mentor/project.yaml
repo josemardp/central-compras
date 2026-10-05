@@ -17,14 +17,14 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-10-03T22:13:42-03:00
-  last_session_at: 2026-10-03T22:13:42-03:00
+  updated_at: 2026-10-05T14:57:15-03:00
+  last_session_at: 2026-10-05T14:57:15-03:00
   confidence: confirmed
 focus:
   objective: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
-  current: Coletar as 4 respostas do comprador e afunilar para 3 a 5 finalistas com cotação conferida
-  last_completed: processo.md, dossiê de pesquisa e STATUS.md atualizados
-  recommended_next_action: act-014
+  current: Registrar a cotação confirmada do checkout com promover-cotacao e fechar a decisão
+  last_completed: Sincronização da planilha Google com o token correto; aba conferida aberta no navegador
+  recommended_next_action: act-015
 next_actions:
   - id: act-001
     title: Acompanhar entrega das pecas do HB20 e registrar veredito D+30
@@ -194,14 +194,20 @@ next_actions:
     created_at: 2026-10-03T22:13:42-03:00
     done_at: null
     note: null
+  - id: act-015
+    title: Registrar a cotação confirmada do checkout com promover-cotacao e fechar a decisão
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-10-05T14:57:15-03:00
+    done_at: null
+    note: null
 blockers: []
 decisions_recent:
-  - date: 2026-09-21
-    text: Cartao de 64 GB linha CFTV no lugar de 128 GB Endurance (inexistente a preco normal no pais)
-  - date: 2026-09-21
-    text: Itens complementares ficam em projetos separados; cotacao registra o custo total da quantidade
-  - date: 2026-09-23
-    text: Discos Center Lock (SM-RT10) em vez de 6 parafusos após macro da roda revelar lockring de 40 N.m
   - date: 2026-09-23
     text: Adaptador SM-MA-F180P/S (IS para Post Mount) confirmado após detalhe lateral do garfo
   - date: 2026-09-23
@@ -216,6 +222,12 @@ decisions_recent:
     text: Importados de versão global (Xiaomi/POCO/Redmi, HONOR Magic8 Pro) ficam marcados como sem garantia nacional comprovada
   - date: 2026-10-03
     text: Preço de referência = menor entre loja oficial e varejo que vende direto; marketplace só como referência
+  - date: 2026-10-05
+    text: "Modelo escolhido pelo Josemar: LG Dual Inverter Voice +AI S3-Q12JA31L"
+  - date: 2026-10-05
+    text: Instalador credenciado de todas as marcas, então vale a garantia estendida
+  - date: 2026-10-05
+    text: Gate de avaliações da categoria virou nota bayesiana (splits têm poucas centenas de avaliações)
 milestones: []
 review:
   stale_after_days: null

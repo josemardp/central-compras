@@ -1,0 +1,17 @@
+id: lg-s3-q12ja31j
+categoria: ar_condicionado
+nome: LG Dual Inverter Voice +AI 12000 Frio S3-Q12JA31J
+marca: LG
+atributos:
+  btu: 12000
+  tensao: 220
+  ciclo: frio
+  compressor: dual_inverter
+  idrs: 7.7
+  consumo_kwh_ano: 377.4
+  gas: R-32
+  garantia_compressor_anos: 10
+  garantia_total_meses: 24
+  wifi: true
+  rede_assistencia: nacional_verificar_regiao
+proveniencia: null

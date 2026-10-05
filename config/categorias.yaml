@@ -223,3 +223,27 @@ cartao_memoria:
     nota_minima_ajustada: 4.3
     minimo_avaliacoes: 300
     exige_vendedor_oficial: true
+
+# Aberta em 05/10/2026 para o split 12.000 BTU do irmao do Josemar (Floreal-SP).
+# Aparelho de garantia longa e instalacao tecnica: so garantia nacional e
+# marca com assistencia autorizada que alcance a regiao. Anuncio de split
+# tem poucas centenas de avaliacoes (medido em 05/10/2026 na Amazon: lideres
+# com 200 a 250, Gree com 16), entao o volume entra pela nota bayesiana, que
+# puxa para a media quem tem pouca avaliacao, em vez de corte seco.
+ar_condicionado:
+  atributos_obrigatorios:
+    - btu
+    - tensao
+    - ciclo
+    - compressor
+    - idrs
+    - gas
+    - garantia_compressor_anos
+  nota_bayesiana:
+    peso_ancora: 50
+  gate:
+    nota_minima_ajustada: 4.3
+    minimo_avaliacoes: 10
+    garantia_tipo_aceita:
+      - nacional
+    exige_rede_assistencia: true
