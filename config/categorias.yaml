@@ -222,7 +222,6 @@ cartao_memoria:
   gate:
     nota_minima_ajustada: 4.3
     minimo_avaliacoes: 300
-    exige_vendedor_oficial: true
 
 # Aberta em 05/10/2026 para o split 12.000 BTU do irmao do Josemar (Floreal-SP).
 # Aparelho de garantia longa e instalacao tecnica: so garantia nacional e
@@ -247,3 +246,20 @@ ar_condicionado:
     garantia_tipo_aceita:
       - nacional
     exige_rede_assistencia: true
+
+# Aberta em 09/10/2026 para a bateria externa do Josemar (Galaxy S20 FE).
+# Power bank de marketplace tem capacidade falsa e celula ruim como golpe
+# comum. Gate de vendedor oficial foi proposto e retirado no mesmo dia: o
+# Josemar aceita vendedor terceiro (09/10/2026). O risco de falsificado fica
+# no eixo risco do score e na conferencia do anuncio, nao em corte seco.
+power_bank:
+  atributos_obrigatorios:
+    - capacidade_mah
+    - potencia_usb_c_w
+    - pps
+    - portas
+    - anatel
+    - garantia_meses
+  gate:
+    nota_minima_ajustada: 4.3
+    minimo_avaliacoes: 300

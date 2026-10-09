@@ -1,0 +1,12 @@
+id: baseus-bipow2-pro
+categoria: power_bank
+nome: Baseus EnerFill FC51 Bipow2 Pro 20.000 mAh 22,5W
+marca: Baseus
+atributos:
+  capacidade_mah: 20000
+  potencia_usb_c_w: 22.5
+  pps: false
+  portas: cabo USB-C embutido + USB-C + USB-A
+  anatel: '[VERIFICAR]'
+  garantia_meses: 12
+proveniencia: null

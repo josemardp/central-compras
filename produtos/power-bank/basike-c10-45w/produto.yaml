@@ -1,0 +1,12 @@
+id: basike-c10-45w
+categoria: power_bank
+nome: Basike C10 20.000 mAh 45W cabo integrado
+marca: Basike
+atributos:
+  capacidade_mah: 20000
+  potencia_usb_c_w: 45
+  pps: 'declarado no titulo do anuncio B0FFTCF8LL ("PPS/PD/QC ... Samsung S25-21"); sem tabela de saida legivel [VERIFICAR na embalagem]'
+  portas: cabo USB-C integrado + USB-C + USB-A
+  anatel: '[VERIFICAR: anuncio nao cita]'
+  garantia_meses: 12
+proveniencia: null

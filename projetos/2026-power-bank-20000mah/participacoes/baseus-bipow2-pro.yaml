@@ -1,0 +1,9 @@
+produto_id: baseus-bipow2-pro
+estado: descartado
+preco_alvo: null
+preco_teto: 270.0
+requisitos_atendidos: {}
+descartado_porque: 'Sem PPS na ficha do anuncio oficial (so PD fixo e SCP Huawei):
+  S20 FE fica em ~15W. Falha requisito obrigatorio.'
+aguardando_preco_porque: null
+aguardando_preco_desde: null

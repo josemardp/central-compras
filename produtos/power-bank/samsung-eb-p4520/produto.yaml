@@ -1,0 +1,12 @@
+id: samsung-eb-p4520
+categoria: power_bank
+nome: Samsung EB-P4520 20.000 mAh 45W
+marca: Samsung
+atributos:
+  capacidade_mah: 20000
+  potencia_usb_c_w: 45
+  pps: true
+  portas: 3x USB-C
+  anatel: '[VERIFICAR no anuncio]'
+  garantia_meses: 12
+proveniencia: null

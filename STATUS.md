@@ -5,6 +5,16 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 09/10/2026: power bank 20.000 mAh para o S20 FE (cotado e ranqueado, falta Josemar escolher)
+
+- **O que é.** Projeto `projetos/2026-power-bank-20000mah`. Bateria externa 20.000 mAh, critério custo-benefício. Teto R$ 270 e vendedor terceiro aceito (decisões do Josemar em 09/10).
+- **Especificação.** O S20 FE só faz 25W com USB-PD 3.0 + **PPS**. O Baseus Bipow2 Pro (pedido original) foi descartado: a ficha do anúncio oficial mostra só PD fixo e SCP, sem PPS.
+- **Ranking (Amazon, fonte=web, 09/10).** 1. Basike C10 45W R$ 194,75 (80,6; PPS declarado no título, vendedor terceiro com envio Amazon, Anatel não citado); 2. Samsung EB-P4520 45W R$ 269,10 (73,4; PPS garantido, vendedor terceiro, entrega 21/10); 3. Anker Zolo A1689 R$ 265,03 (70,3; AnkerDirect BR, PPS só por ficha de revendedor). O score não mede a dúvida de PPS.
+- **Ao retomar.** Josemar escolhe e compra; pedir preço/frete/vendedor do checkout, rodar `promover-cotacao` do escolhido e `decidir` com os dois perdedores.
+- **Onde está.** Categoria nova `power_bank` em `config/categorias.yaml` (gate: nota 4,3 e 300 avaliações; gate de vendedor oficial retirado) e guia em `base-conhecimento/especificacoes/power_bank.md`.
+
+---
+
 ## Sessão 05/10/2026: ar condicionado split 12.000 BTU para o irmão (escolhido, falta comprar)
 
 - **O que é.** Projeto `projetos/2026-ar-condicionado-split-12000-btu-irmao`: split hi-wall 12.000 BTU, só frio, inverter, 220V, entrega em Floreal-SP (casa do irmão; endereço salvo na Amazon do Josemar, fora do repo). Instalador do irmão é credenciado de todas as marcas.

@@ -1,0 +1,12 @@
+id: anker-zolo-a1689
+categoria: power_bank
+nome: Anker Zolo 20K A1689
+marca: Anker
+atributos:
+  capacidade_mah: 20000
+  potencia_usb_c_w: 30
+  pps: 'provavel: PPS 5-11V/2,75A na ficha de revendedor (didongviet.vn), nao confirmado pela Anker'
+  portas: cabo USB-C embutido + USB-C + USB-A
+  anatel: '[VERIFICAR]'
+  garantia_meses: 18
+proveniencia: null
