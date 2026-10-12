@@ -1,0 +1,15 @@
+id: electrolux-led13
+categoria: lavadora
+nome: Electrolux LED13 Essential Care 13kg 127V
+marca: Electrolux
+atributos:
+  rede_assistencia: nacional_verificar_regiao
+  capacidade_kg: 13
+  tensao: 127V
+  cesto: inox
+  consumo_kwh_ciclo: 0.4
+  consumo_agua_l_ciclo: 150
+  centrifugacao_rpm: 630
+  garantia_meses: 12
+  filtro_fiapos: true
+proveniencia: null

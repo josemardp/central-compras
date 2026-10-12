@@ -5,6 +5,15 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 12/10/2026: máquina de lavar 13 kg (aberta, rodada 1 de cotação web)
+
+- **O que é.** Projeto `projetos/2026-maquina-de-lavar-13kg`: lavadora 13 kg, só lava, abertura superior, **127V**, Electrolux favorita comparada com outras marcas, teto R$ 2.300 com frete (respostas do Josemar em 12/10).
+- **Ranking (fonte=web, 12/10).** Só a Electrolux **LED13** passou no gate (92,5; confiança 75%): R$ 1.849 na loja oficial Electrolux e R$ 1.999 na Amazon (4,8 em 1.081 avaliações). Cortadas: LDA13 (nota 4,1 em 13 avaliações e **sem filtro de fiapos**), Midea MA512W130A e Consul CWH13AB (garantia não conferida no anúncio), Brastemp BWK13AB (indisponível na loja oficial em 127V; preço de lista R$ 3.047).
+- **Ao retomar.** (1) Josemar medir o espaço (largura, profundidade, altura com a tampa aberta) e conferir se a tomada tem terra e se há torneira com bico; (2) ver frete e prazo para o CEP dele na loja Electrolux e na Amazon; (3) `promover-cotacao` do anúncio escolhido e `decidir` com os perdedores.
+- **Onde está.** Categoria nova `lavadora` em `config/categorias.yaml` (gate nota 4,3, mínimo 10 avaliações, garantia nacional, rede de assistência) e guia em `base-conhecimento/especificacoes/lavadora.md`.
+
+---
+
 ## Sessão 09/10/2026: power bank 20.000 mAh para o S20 FE (cotado e ranqueado, falta Josemar escolher)
 
 - **O que é.** Projeto `projetos/2026-power-bank-20000mah`. Bateria externa 20.000 mAh, critério custo-benefício. Teto R$ 270 e vendedor terceiro aceito (decisões do Josemar em 09/10).

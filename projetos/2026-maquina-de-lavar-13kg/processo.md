@@ -1,0 +1,54 @@
+# Processo da compra
+
+## Estado atual
+
+- Estado: pesquisando
+- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
+- Decisao aberta: Electrolux LED13 Essential Care 13kg 127V lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
+
+## Linha do tempo decisoria
+
+| Data | Etapa | Decisao | Por que |
+|---|---|---|---|
+| 2026-10-12 | cotacao | Rodada 1 de cotacoes web: LED13 lidera sozinha (92,5, confianca 75%) | LDA13 cortada por nota (4,1 em 13 avaliacoes) e sem filtro de fiapos; Midea e Consul cortadas por garantia nao verificada no anuncio; Brastemp indisponivel na loja oficial em 127V. Frete e prazo nao lidos (headless sem CEP). |
+| 2026-10-12 | cotacao | Cotacao registrada para brastemp-bwk13ab | Loja Brastemp / fonte=web / custo_total=3047.0 |
+| 2026-10-12 | cotacao | Cotacao registrada para consul-cwh13ab | Amazon / fonte=web / custo_total=1691.75 |
+| 2026-10-12 | cotacao | Cotacao registrada para midea-ma512w130a | Amazon / fonte=web / custo_total=1673.9 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-lda13 | Amazon / fonte=web / custo_total=1709.05 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-lda13 | Loja Electrolux / fonte=web / custo_total=1799.0 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-led13 | Amazon / fonte=web / custo_total=1999.0 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-led13 | Loja Electrolux / fonte=web / custo_total=1849.0 |
+| 2026-10-12 | produto | Candidato registrado: Brastemp BWK13AB 13kg 127V | id=brastemp-bwk13ab |
+| 2026-10-12 | produto | Candidato registrado: Consul CWH13AB 13kg 127V | id=consul-cwh13ab |
+| 2026-10-12 | produto | Candidato registrado: Midea Wave Agitator 13kg MA512W130A 127V | id=midea-ma512w130a |
+| 2026-10-12 | produto | Candidato registrado: Electrolux LDA13 Efficient 13kg 127V | id=electrolux-lda13 |
+| 2026-10-12 | produto | Candidato registrado: Electrolux LED13 Essential Care 13kg 127V | id=electrolux-led13 |
+| 2026-10-12 | modelo | Lavadora 13 kg so lava, abertura superior, 127V, classe A; Electrolux favorita (LED13, LDA13, LET13, LEM13) comparada com Brastemp, Consul, Midea e Panasonic; teto R$ 2.300 com frete | Respostas do Josemar em 12/10/2026. O que separa os modelos e consumo de agua e energia, cesto, filtro e preco; lava e seca descartada por custo e consumo. |
+| 2026-10-12 | abertura | Compra criada | Necessidade registrada no briefing |
+
+## Etapas
+
+- [ ] 1. Definir o modelo e a especificacao tecnica para o meu contexto (com acessorios)
+- [ ] 2. Mapear candidatos
+- [x] 3. Registrar produtos em `produtos/`
+- [x] 4. Coletar cotacoes iniciais
+- [x] 5. Aplicar gates eliminatorios
+- [ ] 6. Comparar finalistas
+- [ ] 7. Confirmar preco/frete/estoque manualmente
+- [ ] 8. Registrar decisao e por que os outros perderam
+- [ ] 9. Comprar
+- [ ] 10. Fazer veredito D+30
+- [ ] 11. Fazer veredito D+180
+
+## O que ja sei
+
+- 
+
+## O que ainda preciso descobrir
+
+- 
+
+## Hipoteses descartadas
+
+| Hipotese | Motivo do descarte |
+|---|---|

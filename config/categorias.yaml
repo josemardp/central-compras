@@ -263,3 +263,27 @@ power_bank:
   gate:
     nota_minima_ajustada: 4.3
     minimo_avaliacoes: 300
+
+# Aberta em 12/10/2026 para a maquina de lavar 13 kg do Josemar (so lava,
+# abertura superior, 127V). Mesmo desenho do ar condicionado: garantia
+# nacional e rede de assistencia sao corte seco, porque lavadora quebrada se
+# conserta em casa, com tecnico autorizado da marca.
+lavadora:
+  atributos_obrigatorios:
+    - capacidade_kg
+    - tensao
+    - cesto
+    - consumo_kwh_ciclo
+    - consumo_agua_l_ciclo
+    - centrifugacao_rpm
+    - garantia_meses
+  # Anuncio de lavadora tem poucas avaliacoes (13 a 41 na Amazon em
+  # 12/10/2026, fora a LED13 com 1.081): mesmo ajuste do ar condicionado.
+  nota_bayesiana:
+    peso_ancora: 50
+  gate:
+    nota_minima_ajustada: 4.3
+    minimo_avaliacoes: 10
+    garantia_tipo_aceita:
+      - nacional
+    exige_rede_assistencia: true
