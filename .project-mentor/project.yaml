@@ -17,14 +17,14 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-10-10T07:50:02-03:00
-  last_session_at: 2026-10-10T07:50:01-03:00
+  updated_at: 2026-10-12T23:08:31-03:00
+  last_session_at: 2026-10-12T23:08:31-03:00
   confidence: confirmed
 focus:
   objective: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
-  current: Ao receber o produto, conferir a embalagem e registrar a decisão e a cotação da compra no projeto do power bank
-  last_completed: Visual conferido por captura em desktop e celular, temas claro e escuro, sem rolagem horizontal
-  recommended_next_action: act-016
+  current: Receber a escolha e os valores do carrinho, rodar promover-cotacao e decidir com as perdedoras
+  last_completed: Comparação LED13 x LED15 com dados do manual do fabricante (tampa aberta, disjuntor, pressão de água)
+  recommended_next_action: act-017
 next_actions:
   - id: act-001
     title: Acompanhar entrega das pecas do HB20 e registrar veredito D+30
@@ -218,16 +218,20 @@ next_actions:
     created_at: 2026-10-10T07:50:01-03:00
     done_at: null
     note: null
+  - id: act-017
+    title: Receber a escolha e os valores do carrinho, rodar promover-cotacao e decidir com as perdedoras
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-10-12T23:08:31-03:00
+    done_at: null
+    note: null
 blockers: []
 decisions_recent:
-  - date: 2026-09-23
-    text: Trocadores avulsos Shimano Altus SL-M315 3x8v selecionados pela relação nativa de 24 velocidades
-  - date: 2026-09-23
-    text: Adaptador traseiro reaproveitado do conjunto de 160 mm já existente no quadro
-  - date: 2026-09-24
-    text: Manual cobre o freio mecanico atual; se o upgrade para hidraulico for comprado, o manual deixa de valer
-  - date: 2026-09-24
-    text: "Nao usar imagens geradas por IA nem copiadas da internet/manuais: so fotos reais da bike"
   - date: 2026-10-03
     text: Importados de versão global (Xiaomi/POCO/Redmi, HONOR Magic8 Pro) ficam marcados como sem garantia nacional comprovada
   - date: 2026-10-03
@@ -240,6 +244,14 @@ decisions_recent:
     text: Gate de avaliações da categoria virou nota bayesiana (splits têm poucas centenas de avaliações)
   - date: 2026-10-10
     text: Na divergência entre texto da loja e tabela da embalagem, o guia segue a embalagem
+  - date: 2026-10-12
+    text: Lavadora só lava, abertura superior, 127V, teto R$ 2.300 com frete
+  - date: 2026-10-12
+    text: Preço comparado é o total em 10x no cartão, não o do Pix
+  - date: 2026-10-12
+    text: "Gate da categoria: nota 4,3, mínimo 10 avaliações, garantia nacional, rede de assistência"
+  - date: 2026-10-12
+    text: LET13 e LDA13 cortadas por falta de filtro de fiapos e poucas avaliações
 milestones: []
 review:
   stale_after_days: null
