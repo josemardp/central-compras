@@ -1,0 +1,15 @@
+id: electrolux-led15
+categoria: lavadora
+nome: Electrolux LED15 Essential Care 15kg 127V
+marca: Electrolux
+atributos:
+  rede_assistencia: nacional_verificar_regiao
+  capacidade_kg: 15
+  tensao: 127V
+  cesto: inox
+  consumo_kwh_ciclo: 0.46
+  consumo_agua_l_ciclo: 160
+  centrifugacao_rpm: 630
+  garantia_meses: 12
+  filtro_fiapos: true
+proveniencia: null

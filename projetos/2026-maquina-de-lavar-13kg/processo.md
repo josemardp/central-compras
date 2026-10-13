@@ -10,6 +10,10 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-12 | cotacao | LED15 (15 kg) entra como candidata a pedido do Josemar | Mesmo cesto inox, filtro e 630 rpm da LED13 por R$ 50 a mais na loja oficial; em troca e 6,7 cm mais larga, 5,9 cm mais funda, 6 kg mais pesada e gasta 10 L e 0,06 kWh a mais por ciclo. Decide pelo espaco medido. |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-led15 | Amazon / fonte=web / custo_total=2110.0 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-led15 | Loja Electrolux / fonte=web / custo_total=1899.0 |
+| 2026-10-12 | produto | Candidato registrado: Electrolux LED15 Essential Care 15kg 127V | id=electrolux-led15 |
 | 2026-10-12 | cotacao | Rodada 1 de cotacoes web: LED13 lidera sozinha (92,5, confianca 75%) | LDA13 cortada por nota (4,1 em 13 avaliacoes) e sem filtro de fiapos; Midea e Consul cortadas por garantia nao verificada no anuncio; Brastemp indisponivel na loja oficial em 127V. Frete e prazo nao lidos (headless sem CEP). |
 | 2026-10-12 | cotacao | Cotacao registrada para brastemp-bwk13ab | Loja Brastemp / fonte=web / custo_total=3047.0 |
 | 2026-10-12 | cotacao | Cotacao registrada para consul-cwh13ab | Amazon / fonte=web / custo_total=1691.75 |
@@ -33,7 +37,7 @@
 - [x] 3. Registrar produtos em `produtos/`
 - [x] 4. Coletar cotacoes iniciais
 - [x] 5. Aplicar gates eliminatorios
-- [ ] 6. Comparar finalistas
+- [x] 6. Comparar finalistas
 - [ ] 7. Confirmar preco/frete/estoque manualmente
 - [ ] 8. Registrar decisao e por que os outros perderam
 - [ ] 9. Comprar
