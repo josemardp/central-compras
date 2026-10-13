@@ -1,7 +1,8 @@
 produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
-electrolux-led13,Electrolux LED13 Essential Care 13kg 127V,92.5,0.972,1.0,0.762,0.5,0.5,elegivel,,,web,0.75,0,nao,conveniencia; aderencia,1999.0,0.0,,0.0,1999.0
-electrolux-led15,Electrolux LED15 Essential Care 15kg 127V,88.7,0.85,0.947,0.867,0.5,0.5,elegivel,,,web,0.75,0,nao,conveniencia; aderencia,2110.0,0.0,,0.0,2110.0
-brastemp-bwk13ab,Brastemp BWK13AB 13kg 127V,0,0.624,0.656,0.822,0.5,0.5,cortado,custo_total acima do preco_teto do briefing (3047.0 > 2300.0),,web,0.75,0,nao,conveniencia; aderencia,3047.0,0.0,,0.0,3047.0
+electrolux-led13,Electrolux LED13 Essential Care 13kg 127V,94.1,0.972,1.0,0.822,0.5,0.5,elegivel,,,web,0.75,0,nao,conveniencia; aderencia,1849.0,0.0,,0.0,1849.0
+electrolux-led15,Electrolux LED15 Essential Care 15kg 127V,88.4,0.85,0.974,0.822,0.5,0.5,elegivel,,,web,0.75,0,nao,conveniencia; aderencia,1899.0,0.0,,0.0,1899.0
+brastemp-bwk13ab,Brastemp BWK13AB 13kg 127V,0,0.624,0.607,0.822,0.5,0.5,cortado,custo_total acima do preco_teto do briefing (3047.0 > 2300.0),,web,0.75,0,nao,conveniencia; aderencia,3047.0,0.0,,0.0,3047.0
 consul-cwh13ab,Consul CWH13AB 13kg 127V,0,0.414,1.0,0.38,0.5,0.5,cortado,garantia_tipo nao aceito (nenhuma),,web,0.75,0,nao,conveniencia; aderencia,1691.75,0.0,,0.0,1691.75
-electrolux-lda13,Electrolux LDA13 Efficient 13kg 127V,0,0.324,1.0,0.762,0.5,0.5,cortado,nota_ajustada abaixo do gate (4.259 < 4.3),,web,0.75,0,nao,conveniencia; aderencia,1709.05,0.0,,0.0,1709.05
-midea-ma512w130a,Midea Wave Agitator 13kg MA512W130A 127V,0,0.544,1.0,0.38,0.5,0.5,cortado,garantia_tipo nao aceito (nenhuma),,web,0.75,0,nao,conveniencia; aderencia,1673.9,0.0,,0.0,1673.9
+electrolux-lda13,Electrolux LDA13 Efficient 13kg 127V,0,0.324,1.0,0.762,0.5,0.5,cortado,nota_ajustada abaixo do gate (4.259 < 4.3),,web,0.75,0,nao,conveniencia; aderencia,1839.78,0.0,,0.0,1839.78
+electrolux-let13,Electrolux LET13 Efficient 13kg 127V,0,0.389,1.0,0.822,0.5,0.5,cortado,avaliacoes insuficientes (6 < 10),,web,0.75,0,nao,conveniencia; aderencia,1749.0,0.0,,0.0,1749.0
+midea-ma512w130a,Midea Wave Agitator 13kg MA512W130A 127V,0,0.544,1.0,0.38,0.5,0.5,cortado,garantia_tipo nao aceito (nenhuma),,web,0.75,0,nao,conveniencia; aderencia,1800.12,0.0,,0.0,1800.12

@@ -70,6 +70,7 @@ ou redundante com o que ja tenho). Compra: `junto` (mesmo carrinho) ou
 
 ### Obrigatorios
 
+- Pagamento em 10x no cartao; o preco que conta e o TOTAL pago em 10x, nao o do Pix (mudanca do Josemar em 12/10/2026)
 - 13 kg, abertura superior, versao 127V
 - Classe A de energia no selo INMETRO
 - Garantia nacional de fabrica de 12 meses e rede autorizada na regiao
@@ -86,4 +87,4 @@ ou redundante com o que ja tenho). Compra: `junto` (mesmo carrinho) ou
 
 - Versao 220V (ou anuncio sem tensao clara)
 - Vendedor sem nota ou sem garantia de fabrica
-- Total com frete acima de R$ 2.300
+- Total em 10x, com frete, acima de R$ 2.300

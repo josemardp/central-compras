@@ -10,6 +10,15 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-12 | cotacao | Requisito de preco mudou: vale o total pago em 10x no cartao; foco em menor preco com maior qualidade | Pedido do Josemar em 12/10/2026. Loja Electrolux parcela em 10x sem juros pelo preco do Pix; na Amazon o preco exibido e o do Pix e o cartao sai 5 a 7% mais caro. Recotado: LED13 R$ 1.849 (10x R$ 184,90) lidera com 94,1; LED15 R$ 1.899 (88,4); LET13 R$ 1.749 cortada por so 6 avaliacoes e sem filtro de fiapos; LDA13 R$ 1.799 cortada por nota 4,1 e sem filtro. |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-led15 | Amazon / fonte=web / custo_total=2110.44 |
+| 2026-10-12 | cotacao | Cotacao registrada para midea-ma512w130a | Amazon / fonte=web / custo_total=1800.12 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-lda13 | Amazon / fonte=web / custo_total=1839.78 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-let13 | Loja Electrolux / fonte=web / custo_total=1749.0 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-lda13 | Loja Electrolux / fonte=web / custo_total=1799.0 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-led15 | Loja Electrolux / fonte=web / custo_total=1899.0 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-led13 | Loja Electrolux / fonte=web / custo_total=1849.0 |
+| 2026-10-12 | produto | Candidato registrado: Electrolux LET13 Efficient 13kg 127V | id=electrolux-let13 |
 | 2026-10-12 | cotacao | LED15 (15 kg) entra como candidata a pedido do Josemar | Mesmo cesto inox, filtro e 630 rpm da LED13 por R$ 50 a mais na loja oficial; em troca e 6,7 cm mais larga, 5,9 cm mais funda, 6 kg mais pesada e gasta 10 L e 0,06 kWh a mais por ciclo. Decide pelo espaco medido. |
 | 2026-10-12 | cotacao | Cotacao registrada para electrolux-led15 | Amazon / fonte=web / custo_total=2110.0 |
 | 2026-10-12 | cotacao | Cotacao registrada para electrolux-led15 | Loja Electrolux / fonte=web / custo_total=1899.0 |

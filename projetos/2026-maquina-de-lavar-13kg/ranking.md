@@ -1,17 +1,17 @@
 # Ranking
 
-Gerado em 2026-10-12T22:22:05.
+Gerado em 2026-10-12T22:41:22.
 
 ## Elegiveis
 
-1. Electrolux LED13 Essential Care 13kg 127V - 92.5
-   qualidade 0.97 · valor 1.00 · risco 0.76 · aderencia -- · conveniencia --
-   custo total R$ 1.999,00 / Amazon / estimativa web
+1. Electrolux LED13 Essential Care 13kg 127V - 94.1
+   qualidade 0.97 · valor 1.00 · risco 0.82 · aderencia -- · conveniencia --
+   custo total R$ 1.849,00 / Loja Electrolux / estimativa web
    confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
-2. Electrolux LED15 Essential Care 15kg 127V - 88.7
-   qualidade 0.85 · valor 0.95 · risco 0.87 · aderencia -- · conveniencia --
-   custo total R$ 2.110,00 / Amazon / estimativa web
+2. Electrolux LED15 Essential Care 15kg 127V - 88.4
+   qualidade 0.85 · valor 0.97 · risco 0.82 · aderencia -- · conveniencia --
+   custo total R$ 1.899,00 / Loja Electrolux / estimativa web
    confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
 ## Cortados pelos gates
@@ -19,6 +19,7 @@ Gerado em 2026-10-12T22:22:05.
 - Brastemp BWK13AB 13kg 127V: custo_total acima do preco_teto do briefing (3047.0 > 2300.0)
 - Consul CWH13AB 13kg 127V: garantia_tipo nao aceito (nenhuma)
 - Electrolux LDA13 Efficient 13kg 127V: nota_ajustada abaixo do gate (4.259 < 4.3)
+- Electrolux LET13 Efficient 13kg 127V: avaliacoes insuficientes (6 < 10)
 - Midea Wave Agitator 13kg MA512W130A 127V: garantia_tipo nao aceito (nenhuma)
 
 ## Observacoes
