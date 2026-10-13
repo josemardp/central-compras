@@ -1,13 +1,13 @@
 # Ranking
 
-Gerado em 2026-09-21T15:15:05.
+Gerado em 2026-10-13T17:01:23.
 
 ## Elegiveis
 
-1. Disjuntor bipolar Steck SDD62C06 6A curva C - 58.8
-   qualidade 0.48 · valor 1.00 · risco 0.23 · aderencia -- · conveniencia --
+1. Disjuntor bipolar Steck SDD62C06 6A curva C - 72.7
+   qualidade 0.48 · valor 1.00 · risco 0.65 · aderencia -- · conveniencia 0.93
    custo total R$ 29,90 / Amazon / estimativa web
-   confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+   confianca 85% - sem dado em: aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
    alertas: AVAL_SUSPEITA
 
 ## Cortados pelos gates

@@ -3,13 +3,16 @@
 ## Estado atual
 
 - Estado: pesquisando
-- Proxima acao: definir modelo/requisitos com ajuda da IA
-- Decisao aberta:
+- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
+- Decisao aberta: Cartao microSD 64GB WD Purple Intelbras (4600163) lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | cotacao | Cotacao registrada para intelbras-wd-purple-64gb | KaBuM / fonte=web / custo_total=996.84 |
+| 2026-10-13 | cotacao | Cotacao registrada para intelbras-wd-purple-64gb | Amazon / fonte=web / custo_total=1006.02 |
+| 2026-10-13 | cotacao | Aceito vendedor terceiro com entrega pela Amazon (FBA); preco comparado e o total em 10x no cartao | Decisao do Josemar em 13/10/2026: excecao ao gate de vendedor oficial |
 | 2026-09-21 | cotacao | Trocar alvo de 128 GB Endurance para 64 GB WD Purple Intelbras | Endurance 128 GB no Brasil so importado (SanDisk HE: Amazon Global, 1 em estoque) ou R$ 600-900 (Samsung PRO; WD Purple 128 de terceiro a R$ 830). WD Purple 64 GB e linha CFTV com garantia de 3 anos; ~3,5 dias continuos, mais com gravacao por movimento. |
 | 2026-09-21 | cotacao | Cotacao registrada para intelbras-wd-purple-64gb | KaBuM / fonte=web / custo_total=893.16 |
 | 2026-09-21 | cotacao | Cotacao registrada para intelbras-wd-purple-64gb | Amazon / fonte=web / custo_total=989.88 |

@@ -1,13 +1,17 @@
 # Ranking
 
-Gerado em 2026-09-21T15:15:04.
+Gerado em 2026-10-13T15:52:09.
 
 ## Elegiveis
 
-Nenhum candidato passou pelos gates.
+1. Cartao microSD 64GB WD Purple Intelbras (4600163) - 90.2
+   qualidade 0.93 · valor 1.00 · risco 0.69 · aderencia -- · conveniencia 1.00
+   custo total R$ 1.006,02 / Amazon / estimativa web
+   confianca 85% - sem dado em: aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+
 ## Cortados pelos gates
 
-- Cartao microSD 64GB WD Purple Intelbras (4600163): nota_ajustada abaixo do gate (0.0 < 4.3); avaliacoes insuficientes (0 < 300); categoria exige vendedor oficial
+Nenhum corte.
 
 ## Observacoes
 

@@ -10,6 +10,10 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | modelo | As 2 C320WS de setembro ainda nao foram instaladas; o Fabio instala as 6 juntas | Josemar informou em 13/10/2026 |
+| 2026-10-13 | cotacao | Cotacao registrada para tapo-c320ws | KaBuM / fonte=web / custo_total=1399.2 |
+| 2026-10-13 | cotacao | Cotacao registrada para tapo-c320ws | Amazon / fonte=web / custo_total=1418.88 |
+| 2026-10-13 | cotacao | Preco comparado passa a ser o total em 10x no cartao; vale a melhor opcao parcelada em 10x, mesmo acima do teto de R$ 1.300 | Decisao do Josemar em 13/10/2026 (mesma regra da lavadora). Recotar todos os anuncios em 10x |
 | 2026-09-21 | acessorio | aberto projeto 2026-conectores-emenda-cameras | acessorio com preco a comparar vira compra propria |
 | 2026-09-21 | cotacao | Cotacao registrada para tapo-c320ws | Amazon / fonte=web / custo_total=1359.6 |
 | 2026-09-21 | cotacao | Cotacao registrada para tapo-c320ws | Amazon / fonte=web / custo_total=1359.6 |

@@ -1,12 +1,12 @@
 # Ranking
 
-Gerado em 2026-09-21T15:15:04.
+Gerado em 2026-10-13T17:01:26.
 
 ## Elegiveis
 
-1. Conector Wago 221-413 kit 20 - 76.1
-   qualidade 0.76 · valor 1.00 · risco 0.38 · aderencia -- · conveniencia 0.93
-   custo total R$ 66,80 / Amazon / estimativa web
+1. Conector Wago 221-413 kit 20 - 79.8
+   qualidade 0.76 · valor 1.00 · risco 0.54 · aderencia -- · conveniencia 0.93
+   custo total R$ 63,46 / Amazon / estimativa web
    confianca 85% - sem dado em: aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
 ## Cortados pelos gates

@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | cotacao | Cotacao registrada para ppa-f10-r | Amazon / fonte=web / custo_total=252.6 |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-f10-r | Amazon / fonte=web / custo_total=278.0 |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-f10-r | Shop Gilson / fonte=web / custo_total=255.53 |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-f10-r | Casa do Motor Eletronico / fonte=web / custo_total=251.84 |

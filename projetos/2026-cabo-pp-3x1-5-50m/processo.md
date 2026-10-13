@@ -10,6 +10,8 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | cotacao | Comprar em loja fisica por metro (ref. R$ 6,51/m de 21/09) | Amazon 13/10: 3x1,5 50 m so a R$ 990,48 (anuncio sem avaliacao); o resto e 2x1,5 ou extensao pronta |
+| 2026-10-13 | modelo | 50 m de cabo PP 3x1,5 bastam | Josemar confirmou em 13/10/2026 (e a metragem da lista do Fabio) |
 | 2026-09-21 | modelo | PP 3 x 1,5 mm2 atende com folga o motor | manual tecnico PPA DZ Rio (P08665 REV1): alimentacao do automatizador em cabo flexivel 3 x 0,75 mm2 500V (NBR NM 247-5); o 1,5 mm2 e o dobro. Motor 1,6 A em 220V + cameras ~0,4 A em 127V. A metragem de cada circuito so o Fabio mede. |
 | 2026-09-21 | cotacao | Cotacao registrada para cabo-pp-3x15-100m-lojaeletrica | Loja Eletrica / fonte=web / custo_total=651.35 |
 | 2026-09-21 | produto | Candidato registrado: Cabo PP 3x1,5 mm2 500V rolo 100 m (marca nao informada) | id=cabo-pp-3x15-100m-lojaeletrica |

@@ -5,6 +5,18 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 13/10/2026: instalação de câmeras + motor de portão (recotado em 10x, falta resposta do Fabio)
+
+- **O que é.** Retomada dos 14 projetos da instalação abertos em 21/09 (seção "Sessão anterior (21/09/2026...)" abaixo). Nada foi comprado ainda; as 2 C320WS de setembro **não estão instaladas** (o Fabio instala as 6 juntas).
+- **Decisões do Josemar (13/10), anotadas no `processo.md` de cada projeto.** Preço comparado = **total em 10x no cartão** (mesma regra da lavadora). Câmeras: aceita passar do teto de R$ 1.300. Cartões: aceita vendedor terceiro com envio Amazon. Motor: aceita garantia do vendedor. 220V é **fase-fase** (DPS 175V x2 confirmado). **Base: comprar** (está na lista do Fabio). **DR: não comprar**, a casa já tem (o circuito do motor tem que sair depois dele) e já tem aterramento. Cabo: 50 m bastam. **Nobreak: adiado** (modelo escolhido continua Intelbras ATTIV 700VA; pedir ao Fabio as câmeras saindo de uma tomada só perto do roteador).
+- **Lista do Fabio (colada pelo Josemar):** cabo PP 3x1,5 50 m; 4 câmeras; 6 caixinhas; motor PPA 1/3 500 kg 220V Jetflex; 4 m de cremalheira reforçada branca; base. Fotocélula, DPS, disjuntor, cartões, plugues e conectores são decisão do Josemar de 21/09.
+- **Pendente: motor.** Opção A (lista do Fabio): DZ Rio 500 Jetflex 2 controles R$ 811,32 + 1 controle PPA ~R$ 20 + cremalheira PPA Gold 4 m R$ 252,24 = ~R$ 1.084. Opção B: kit R800 Jetflex Z14 com 4 m de cremalheira comum + 3 controles R$ 915,30 (10x sem juros). Mensagem com os links enviada pelo Josemar ao Fabio em 13/10 perguntando se o R800 e a cremalheira do kit servem.
+- **Carrinho Amazon em 10x (fonte=web, 13/10, `nav-lojadares`), sem nobreak:** câmeras 4x C320WS loja oficial TP-Link R$ 1.418,88; cartões 6x WD Purple 64 GB R$ 1.006,02; motor (A ou B); base Flex PPA R$ 148,53; fotocélula F10-R R$ 252,60 (Ecommseg; o R$ 142,90 da página não tem vendedor); 6 caixas VBOX R$ 102; 2 DPS R$ 91,12; 6 plugues R$ 88,86; Wago kit 20 R$ 63,46; disjuntor 6 A R$ 29,90. **Total ~R$ 4.117 (B) ou ~R$ 4.285 (A)** + cabo em loja física (~R$ 325; Amazon só tem 3x1,5 50 m a R$ 990). Itens baratos não têm 10x sozinhos; o total real sai no carrinho.
+- **Ao retomar.** (1) Josemar cola a resposta do Fabio; fechar motor A ou B (`anotar` + `descartar` o outro). (2) Perguntar em qual conta da Amazon ele compra e montar o carrinho para ele conferir e pagar (pagamento é dele). (3) Com o carrinho, `promover-cotacao` de cada item e `decidir` com os perdedores.
+- **Ideia para depois (não aberta como projeto).** Câmera solar com bateria + chip 4G + Wi-Fi: a única no Brasil com troca automática Wi-Fi→4G é a **Ezviz EB8 Pro 4G** (4K, 10.400 mAh, painel 8 W; Amazon B0H8QLHFYM, Maximus, preço só no carrinho). Só 4G: Ezviz EB8 (2K) US$ 136 no Paraguai (Cellshop/Flytec) x ~R$ 1.336 no ML; Hikvision PT 4G DS-2DE2C400IWG-K/4G/C05S10 US$ 181 na Cellshop. Tapo C615G/C665G e Reolink Go PT Ultra não são vendidas no Brasil.
+
+---
+
 ## Sessão 12/10/2026: máquina de lavar 13 kg (aberta, rodada 1 de cotação web)
 
 - **O que é.** Projeto `projetos/2026-maquina-de-lavar-13kg`: lavadora 13 kg, só lava, abertura superior, **127V**, Electrolux favorita comparada com outras marcas, teto R$ 2.300 com frete (respostas do Josemar em 12/10).

@@ -1,12 +1,12 @@
 # Ranking
 
-Gerado em 2026-09-21T15:15:06.
+Gerado em 2026-10-13T17:01:25.
 
 ## Elegiveis
 
-1. Plugue femea 2P+T 10A Alumbra 2766 branco - 71.5
-   qualidade 0.70 · valor 1.00 · risco 0.38 · aderencia -- · conveniencia --
-   custo total R$ 91,08 / Amazon / estimativa web
+1. Plugue femea 2P+T 10A Alumbra 2766 branco - 82.7
+   qualidade 0.70 · valor 1.00 · risco 0.80 · aderencia -- · conveniencia --
+   custo total R$ 88,86 / Amazon / estimativa web
    confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
 ## Cortados pelos gates

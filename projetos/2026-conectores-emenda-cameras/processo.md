@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | cotacao | Cotacao registrada para wago-221-413-kit20 | Amazon / fonte=web / custo_total=63.46 |
 | 2026-09-21 | cotacao | Cotacao registrada para wago-221-413-kit20 | Amazon / fonte=web / custo_total=66.8 |
 | 2026-09-21 | produto | Candidato registrado: Conector Wago 221-413 kit 20 | id=wago-221-413-kit20 |
 | 2026-09-21 | acessorio | acessorio de 2026-cameras-tapo-c320ws-4-unidades | comprado a parte para comparar preco sem misturar ranking |

@@ -17,14 +17,14 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-10-12T23:08:31-03:00
-  last_session_at: 2026-10-12T23:08:31-03:00
+  updated_at: 2026-10-13T17:34:44-03:00
+  last_session_at: 2026-10-13T17:34:44-03:00
   confidence: confirmed
 focus:
   objective: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
-  current: Receber a escolha e os valores do carrinho, rodar promover-cotacao e decidir com as perdedoras
-  last_completed: Comparação LED13 x LED15 com dados do manual do fabricante (tampa aberta, disjuntor, pressão de água)
-  recommended_next_action: act-017
+  current: Colar a resposta do instalador, fechar o motor e montar o carrinho
+  last_completed: "Varredura de cameras solares 4G (Brasil, Paraguai, Shopee, AliExpress): so a Ezviz EB8 Pro 4G troca sozinha de Wi-Fi para 4G"
+  recommended_next_action: act-018
 next_actions:
   - id: act-001
     title: Acompanhar entrega das pecas do HB20 e registrar veredito D+30
@@ -230,16 +230,32 @@ next_actions:
     created_at: 2026-10-12T23:08:31-03:00
     done_at: null
     note: null
+  - id: act-018
+    title: Receber a resposta do Fabio (motor R800 x 500 e cremalheira), fechar o motor e montar o carrinho da instalacao na Amazon
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-10-13T17:33:56-03:00
+    done_at: null
+    note: null
+  - id: act-019
+    title: Avaliar depois a camera solar 4G + Wi-Fi (Ezviz EB8 Pro 4G) e o nobreak adiado
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-10-13T17:33:59-03:00
+    done_at: null
+    note: null
 blockers: []
 decisions_recent:
-  - date: 2026-10-03
-    text: Importados de versão global (Xiaomi/POCO/Redmi, HONOR Magic8 Pro) ficam marcados como sem garantia nacional comprovada
-  - date: 2026-10-03
-    text: Preço de referência = menor entre loja oficial e varejo que vende direto; marketplace só como referência
-  - date: 2026-10-05
-    text: "Modelo escolhido pelo Josemar: LG Dual Inverter Voice +AI S3-Q12JA31L"
-  - date: 2026-10-05
-    text: Instalador credenciado de todas as marcas, então vale a garantia estendida
   - date: 2026-10-05
     text: Gate de avaliações da categoria virou nota bayesiana (splits têm poucas centenas de avaliações)
   - date: 2026-10-10
@@ -252,6 +268,14 @@ decisions_recent:
     text: "Gate da categoria: nota 4,3, mínimo 10 avaliações, garantia nacional, rede de assistência"
   - date: 2026-10-12
     text: LET13 e LDA13 cortadas por falta de filtro de fiapos e poucas avaliações
+  - date: 2026-10-13
+    text: Preco comparado da instalacao e o total em 10x no cartao
+  - date: 2026-10-13
+    text: DR nao sera comprado; circuito do motor sai depois do DR existente
+  - date: 2026-10-13
+    text: Nobreak adiado; cameras saem de uma tomada unica perto do roteador
+  - date: 2026-10-13
+    text: Cabo PP comprado em loja fisica (Amazon so tem 3x1,5 50 m a R$ 990)
 milestones: []
 review:
   stale_after_days: null

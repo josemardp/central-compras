@@ -4,12 +4,15 @@
 
 - Estado: pesquisando
 - Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
-- Decisao aberta: Nobreak TS Shara UPS Mini 700VA bivolt 6 tomadas saida 115V lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
+- Decisao aberta: Nobreak Intelbras ATTIV 700VA bivolt lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | decisao | Compra ADIADA: nobreak fica fora do carrinho por enquanto (modelo escolhido continua Intelbras ATTIV 700VA) | Decisao do Josemar em 13/10/2026. Sem nobreak as cameras e o roteador desligam na falta de luz. Pedir ao Fabio para sair com o circuito das cameras de um ponto unico perto do roteador, para encaixar o nobreak depois sem refazer fiacao |
+| 2026-10-13 | cotacao | Cotacao registrada para intelbras-attiv-700va | Amazon / fonte=web / custo_total=619.0 |
+| 2026-10-13 | modelo | Intelbras ATTIV 700VA (bateria 7Ah, ~1 h estimada com ~50 W) em vez do TS Shara UPS Mini (5Ah, ~40 min) | Josemar aceitou 1 hora de autonomia como suficiente (13/10/2026); bateria maior e marca com assistencia nacional para trocar a bateria a cada 2-3 anos. Preco de 21/09 precisa ser recotado antes da compra |
 | 2026-09-21 | cotacao | Cotacao registrada para ts-shara-ups-mini-700va-bivolt | Amazon / fonte=web / custo_total=409.0 |
 | 2026-09-21 | cotacao | Cotacao registrada para intelbras-attiv-700va | Amazon / fonte=web / custo_total=582.52 |
 | 2026-09-21 | produto | Candidato registrado: Nobreak Intelbras ATTIV 700VA bivolt | id=intelbras-attiv-700va |

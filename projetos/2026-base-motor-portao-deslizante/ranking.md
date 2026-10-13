@@ -1,13 +1,13 @@
 # Ranking
 
-Gerado em 2026-09-21T15:15:03.
+Gerado em 2026-10-13T15:57:40.
 
 ## Elegiveis
 
 Nenhum candidato passou pelos gates.
 ## Cortados pelos gates
 
-- Base Flex PPA para automatizador deslizante (regulavel 80-150 mm): nota_ajustada abaixo do gate (0.0 < 4.0); avaliacoes insuficientes (0 < 20)
+- Base Flex PPA para automatizador deslizante (regulavel 80-150 mm): avaliacoes insuficientes (3 < 20) alertas: AVAL_SUSPEITA
 
 ## Observacoes
 

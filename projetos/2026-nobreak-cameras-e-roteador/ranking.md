@@ -1,18 +1,19 @@
 # Ranking
 
-Gerado em 2026-09-21T15:15:06.
+Gerado em 2026-10-13T17:01:19.
 
 ## Elegiveis
 
-1. Nobreak TS Shara UPS Mini 700VA bivolt 6 tomadas saida 115V - 57.7
+1. Nobreak Intelbras ATTIV 700VA bivolt - 61.5
+   qualidade 0.52 · valor 0.66 · risco 0.69 · aderencia -- · conveniencia --
+   custo total R$ 619,00 / Amazon / estimativa web
+   confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+
+2. Nobreak TS Shara UPS Mini 700VA bivolt 6 tomadas saida 115V - 57.7
    qualidade 0.35 · valor 1.00 · risco 0.38 · aderencia -- · conveniencia --
    custo total R$ 409,00 / Amazon / estimativa web
    confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
-
-2. Nobreak Intelbras ATTIV 700VA bivolt - 52.2
-   qualidade 0.45 · valor 0.70 · risco 0.38 · aderencia -- · conveniencia 0.57
-   custo total R$ 582,52 / Amazon / estimativa web
-   confianca 85% - sem dado em: aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+   cotacao vencida: 22 dias desde a coleta (limite 14 para fonte=web); recote antes de decidir
 
 ## Cortados pelos gates
 

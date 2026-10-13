@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | cotacao | Cotacao registrada para alumbra-2766-plugue-femea | Amazon / fonte=web / custo_total=88.86 |
 | 2026-09-21 | cotacao | Este projeto fica so com os plugues; conectores foram para 2026-conectores-emenda-cameras | Itens complementares nao podem competir no mesmo ranking (regra 3). |
 | 2026-09-21 | cotacao | Cotacao registrada para alumbra-2766-plugue-femea | Amazon / fonte=web / custo_total=91.08 |
 | 2026-09-21 | produto | Candidato registrado: Plugue femea 2P+T 10A Alumbra 2766 branco | id=alumbra-2766-plugue-femea |

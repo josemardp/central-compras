@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | cotacao | Cotacao registrada para steck-sdd62c06 | Amazon / fonte=web / custo_total=29.9 |
 | 2026-09-21 | descarte | Descartado steck-sdd62c10 | manual tecnico PPA DZ Rio (P08665 REV1) pede disjuntor de 5 A para o automatizador; 10 A fica acima. Substituido pelo 6 A (menor padrao DIN comum acima de 5 A). |
 | 2026-09-21 | cotacao | Cotacao registrada para steck-sdd62c06 | Amazon / fonte=web / custo_total=29.9 |
 | 2026-09-21 | produto | Candidato registrado: Disjuntor bipolar Steck SDD62C06 6A curva C | id=steck-sdd62c06 |

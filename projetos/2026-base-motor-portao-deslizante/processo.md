@@ -10,6 +10,9 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | cotacao | Cotacao registrada para ppa-base-flex-deslizante | Amazon / fonte=web / custo_total=148.53 |
+| 2026-10-13 | modelo | REVOGADA a anotacao anterior: comprar a base sim | Josemar corrigiu em 13/10/2026: a base esta na lista de material do Fabio (instalador), que vai instalar; ela alinha o motor a cremalheira mesmo em piso de concreto |
+| 2026-10-13 | modelo | Nao comprar a base: motor vai chumbado direto no piso | Josemar informou em 13/10/2026 que o piso junto ao portao e concreto comum (firme); a base so serve para piso fraco ou para corrigir altura [VERIFICAR altura com o Fabio na instalacao] |
 | 2026-09-21 | modelo | Base: 1o piso firme e nivelado (so parafusos), 2o base de concreto, 3o Base Flex PPA | manual tecnico PPA DZ Rio (P08665 REV1) fixa o motor direto no piso com parafusos S 1/4 x 2 1/2 (com buchas) e, se o piso nao for firme, manda fazer base de concreto a ~20 mm da face do portao. Base metalica regulavel (Base Flex PPA, R$ 155, 80-150 mm) evita alvenaria e cura do concreto e corrige piso desnivelado. |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-base-flex-deslizante | Afermix / fonte=web / custo_total=155.0 |
 | 2026-09-21 | produto | Candidato registrado: Base Flex PPA para automatizador deslizante (regulavel 80-150 mm) | id=ppa-base-flex-deslizante |

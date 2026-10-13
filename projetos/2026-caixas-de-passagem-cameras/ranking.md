@@ -1,13 +1,13 @@
 # Ranking
 
-Gerado em 2026-09-21T15:15:04.
+Gerado em 2026-10-13T17:01:24.
 
 ## Elegiveis
 
-1. Caixa de passagem Intelbras VBOX 1100 E (externa) - 80.6
-   qualidade 0.86 · valor 1.00 · risco 0.38 · aderencia -- · conveniencia 1.00
-   custo total R$ 126,54 / Amazon / estimativa web
-   confianca 85% - sem dado em: aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+1. Caixa de passagem Intelbras VBOX 1100 E (externa) - 89.3
+   qualidade 0.87 · valor 1.00 · risco 0.80 · aderencia -- · conveniencia --
+   custo total R$ 102,00 / Amazon / estimativa web
+   confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
 ## Cortados pelos gates
 

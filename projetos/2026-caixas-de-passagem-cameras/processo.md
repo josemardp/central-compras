@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | cotacao | Cotacao registrada para intelbras-vbox-1100-e | Amazon / fonte=web / custo_total=102.0 |
 | 2026-09-21 | modelo | Fonte da C320WS cabe na VBOX 1100 E, com pouca folga | Interno da VBOX 1100 E: 125 x 123 x 60 mm (ficha Intelbras). Fonte T090060 ~57 x 42 x 25 mm (anuncio de fonte compativel; medir a original). Fonte + plugue femea em linha ~12 cm: montar na diagonal da caixa. |
 | 2026-09-21 | cotacao | Cotacao registrada para intelbras-vbox-1100-e | Amazon / fonte=web / custo_total=126.54 |
 | 2026-09-21 | produto | Candidato registrado: Caixa de passagem Intelbras VBOX 1100 E (externa) | id=intelbras-vbox-1100-e |

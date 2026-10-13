@@ -10,6 +10,8 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | cotacao | Cotacao registrada para clamper-front-20ka-175v | Amazon / fonte=web / custo_total=91.12 |
+| 2026-10-13 | modelo | DPS Clamper Front 175V x2 confirmado (um por fase) | Josemar confirmou em 13/10/2026 que o 220V da casa e de duas fases (fase-fase, 127V fase-neutro) |
 | 2026-09-21 | cotacao | Este projeto fica so com o DPS; disjuntor foi para 2026-disjuntor-bipolar-motor-portao | Itens complementares nao podem competir no mesmo ranking (regra 3). |
 | 2026-09-21 | cotacao | Cotacao registrada para clamper-front-20ka-175v | Amazon / fonte=web / custo_total=83.8 |
 | 2026-09-21 | produto | Candidato registrado: DPS Clamper Front 20kA 175V | id=clamper-front-20ka-175v |

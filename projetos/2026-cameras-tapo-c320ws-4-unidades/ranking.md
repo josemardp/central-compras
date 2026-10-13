@@ -1,13 +1,13 @@
 # Ranking
 
-Gerado em 2026-09-21T15:15:04.
+Gerado em 2026-10-13T15:52:08.
 
 ## Elegiveis
 
 Nenhum candidato passou pelos gates.
 ## Cortados pelos gates
 
-- Tapo C320WS: custo_total acima do preco_teto do briefing (1359.6 > 1300.0)
+- Tapo C320WS: custo_total acima do preco_teto do briefing (1399.2 > 1300.0); avaliacoes insuficientes (1 < 150) alertas: AVAL_SUSPEITA
 
 ## Observacoes
 

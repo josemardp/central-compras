@@ -10,6 +10,10 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | modelo | Lista do Fabio (13/10): motor PPA 1/3 500 kg 220V Jetflex + 4 m de cremalheira reforcada branca + base. Proposta: voltar ao DZ Rio 500 Jetflex (2 controles, sem cremalheira) + 1 controle + cremalheira PPA Gold 4 m | Fabio pede cremalheira reforcada separada; o kit R800 traz 4 m de cremalheira comum que sobraria. Em 10x: 500 + controle + Gold = ~R$ 1.084 x R800 kit + Gold = R$ 1.168. Aguarda o sim do Josemar; CV 1/3 nao aparece no anuncio [VERIFICAR] |
+| 2026-10-13 | cotacao | Cotacao registrada para ppa-dz-rio-500-jetflex-2ctrl-sem-crem | Amazon / fonte=web / custo_total=831.32 |
+| 2026-10-13 | cotacao | Cotacao registrada para ppa-dz-rio-r800-jetflex-z14-4m-3ctrl | Amazon / fonte=web / custo_total=915.3 |
+| 2026-10-13 | cotacao | Aceita garantia do vendedor (sem exigir distribuidor PPA); preco comparado e o total em 10x no cartao | Decisao do Josemar em 13/10/2026 |
 | 2026-09-21 | acessorio | aberto projeto 2026-dr-motor-portao | acessorio com preco a comparar vira compra propria |
 | 2026-09-21 | modelo | Requisitos do manual para o portao e a rede | manual tecnico PPA DZ Rio (P08665 REV1): roldanas de no minimo 120 mm (trilho de secao circular preferivel a cantoneira); portao deve abrir a mao com esforco minimo; DR de 30 mA obrigatorio; aterramento obrigatorio; eletroduto 3/4 ate o motor e 1/2 para fotocelula; disjuntor 5 A. |
 | 2026-09-21 | modelo | Portao de 4 m: manter o R800 Z14 | O '2,5 x 3,0 m' do manual tecnico PPA DZ Rio (P08665 REV1) e o MESMO para todos os DZ Rio (350 a 800 kg), logo nao e limite de forca; e a medida de referencia (a PPA mede a velocidade 'em 3 metros'). Manuais antigos (DZ Predial, DZ 1500 IND) nem declaram comprimento. Mercado vende DZ Rio com 4 a 6 m de cremalheira. Para 4 m, a Z14 (mais torque, 33 m/min) e melhor que a Z18: mais massa em movimento pede partida e frenagem suaves; ajustar desaceleracao na central Triflex. Continua sendo fora do declarado no manual [confirmar com o Fabio a experiencia dele; opcional: pedir confirmacao escrita ao SAC PPA]. |
