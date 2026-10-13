@@ -1,18 +1,18 @@
 # Ranking
 
-Gerado em 2026-10-12T22:41:22.
+Gerado em 2026-10-12T22:53:04.
 
 ## Elegiveis
 
-1. Electrolux LED13 Essential Care 13kg 127V - 94.1
-   qualidade 0.97 · valor 1.00 · risco 0.82 · aderencia -- · conveniencia --
-   custo total R$ 1.849,00 / Loja Electrolux / estimativa web
-   confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+1. Electrolux LED13 Essential Care 13kg 127V - 91.0
+   qualidade 0.97 · valor 1.00 · risco 0.82 · aderencia -- · conveniencia 0.68
+   custo total R$ 1.868,90 / Loja Electrolux / estimativa web
+   confianca 85% - sem dado em: aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
-2. Electrolux LED15 Essential Care 15kg 127V - 88.4
-   qualidade 0.85 · valor 0.97 · risco 0.82 · aderencia -- · conveniencia --
-   custo total R$ 1.899,00 / Loja Electrolux / estimativa web
-   confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
+2. Electrolux LED15 Essential Care 15kg 127V - 86.0
+   qualidade 0.85 · valor 0.97 · risco 0.82 · aderencia -- · conveniencia 0.68
+   custo total R$ 1.918,90 / Loja Electrolux / estimativa web
+   confianca 85% - sem dado em: aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
 ## Cortados pelos gates
 

@@ -10,6 +10,11 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-12 | cotacao | Frete simulado para o CEP dele na loja Electrolux: LED13 total R$ 1.868,90 lidera (91,0) | R$ 19,90 de frete para LED13, LED15 e LDA13 (11 dias uteis, ou 8 com 'Coleta Consciente'); LET13 com frete gratis (R$ 1.749) segue cortada por 6 avaliacoes e sem filtro de fiapos. Falta conferir no carrinho dele para virar fonte=manual. |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-let13 | Loja Electrolux / fonte=web / custo_total=1749.0 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-lda13 | Loja Electrolux / fonte=web / custo_total=1818.9 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-led15 | Loja Electrolux / fonte=web / custo_total=1918.9 |
+| 2026-10-12 | cotacao | Cotacao registrada para electrolux-led13 | Loja Electrolux / fonte=web / custo_total=1868.9 |
 | 2026-10-12 | cotacao | Requisito de preco mudou: vale o total pago em 10x no cartao; foco em menor preco com maior qualidade | Pedido do Josemar em 12/10/2026. Loja Electrolux parcela em 10x sem juros pelo preco do Pix; na Amazon o preco exibido e o do Pix e o cartao sai 5 a 7% mais caro. Recotado: LED13 R$ 1.849 (10x R$ 184,90) lidera com 94,1; LED15 R$ 1.899 (88,4); LET13 R$ 1.749 cortada por so 6 avaliacoes e sem filtro de fiapos; LDA13 R$ 1.799 cortada por nota 4,1 e sem filtro. |
 | 2026-10-12 | cotacao | Cotacao registrada para electrolux-led15 | Amazon / fonte=web / custo_total=2110.44 |
 | 2026-10-12 | cotacao | Cotacao registrada para midea-ma512w130a | Amazon / fonte=web / custo_total=1800.12 |
