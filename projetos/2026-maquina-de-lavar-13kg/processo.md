@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-12 | modelo | Comparacao LED13 x LED15 pelo manual e pela ficha da loja: mesma maquina, muda so tamanho | Iguais em motor, 630 rpm, 11 programas, cesto inox, Jet&Clean, filtro, painel mecanico, garantia 1 ano e nota (90% x 89% de 5 estrelas). LED15: +2 kg, edredom queen (LED13 casal), +6,7 cm largura, +5,9 cm profundidade, +4 cm com tampa aberta (143 cm), +6 kg, +R$ 50 (R$ 5/mes em 10x). Manual exige disjuntor exclusivo 20A em 127V. |
 | 2026-10-12 | cotacao | Frete simulado para o CEP dele na loja Electrolux: LED13 total R$ 1.868,90 lidera (91,0) | R$ 19,90 de frete para LED13, LED15 e LDA13 (11 dias uteis, ou 8 com 'Coleta Consciente'); LET13 com frete gratis (R$ 1.749) segue cortada por 6 avaliacoes e sem filtro de fiapos. Falta conferir no carrinho dele para virar fonte=manual. |
 | 2026-10-12 | cotacao | Cotacao registrada para electrolux-let13 | Loja Electrolux / fonte=web / custo_total=1749.0 |
 | 2026-10-12 | cotacao | Cotacao registrada para electrolux-lda13 | Loja Electrolux / fonte=web / custo_total=1818.9 |

@@ -38,10 +38,10 @@ Referencia de mercado: ficha oficial da Electrolux LED13 lida em 12/10/2026 na l
 | Centrifugacao | 600 rpm | 630 a 750 rpm | sol forte seca no varal; acima disso e pouco ganho [inferencia] |
 | Cesto | polipropileno aceito | inox | inox resiste melhor a risco e acumulo de residuo; plastico tambem dura [inferencia] |
 | Filtro de fiapos | presente | filtro facil de limpar | roupa escura sem bolinha de fiapo |
-| Dimensoes | cabe no espaco medido | LED13: 59,5 x 66,5 x 105,5 cm (L x P x A, ficha) | altura com tampa aberta nao consta na ficha [VERIFICAR no manual e no local] |
+| Dimensoes | cabe no espaco medido | LED13: 59,5 x 66,5 x 105,5 cm; LED15: 66,2 x 72,4 x 105,2 cm (L x P x A, ficha) | tampa aberta: LED13 139 cm, LED15 143 cm (guia rapido Electrolux) |
 | Peso da maquina | - | LED13: 40 kg (ficha) | entrega no interior: confirmar se a entrega leva ate o local de uso |
-| Pressao de agua | dentro da faixa do manual | - | caixa d'agua baixa enche devagar [VERIFICAR faixa em m.c.a. no manual] |
-| Plugue | NBR 14136 com terra | - | tomada precisa de pino terra [VERIFICAR 10A ou 20A no manual] |
+| Pressao de agua | 0,02 a 0,8 MPa (2 a 81 m.c.a.) | base da caixa d'agua 2,4 m acima da entrada da lavadora | manual Electrolux; abaixo disso enche devagar |
+| Plugue e disjuntor | plugue 10A com terra; disjuntor EXCLUSIVO de 20A na fase (127V) | - | manual Electrolux: disjuntor exclusivo e obrigatorio; ficha da loja: plugue 10A |
 | Garantia | 12 meses nacional de fabrica | 12 meses + rede autorizada na regiao de Aracatuba | conserto e feito em casa por tecnico da marca; LED13 tem 1 ano (ficha) |
 
 ## Acessorios
@@ -53,8 +53,9 @@ ou redundante com o que ja tenho). Compra: `junto` (mesmo carrinho) ou
 
 | Acessorio | Necessidade | Especificacao tecnica | Por que | Compra |
 |---|---|---|---|---|
-| Tomada 2P+T no ponto da lavanderia | obrigatorio se o ponto atual nao tiver terra | NBR 14136, mesma corrente do plugue (10A ou 20A) [VERIFICAR] | o manual exige aterramento; sem terra ha risco de choque na carcaca | junto (loja local) |
-| Torneira com bico para lavadora | obrigatorio se o ponto nao tiver | saida com rosca 3/4" para a mangueira de entrada | a mangueira de entrada rosqueia na torneira [VERIFICAR se a mangueira vem na caixa] | junto (loja local) |
+| Tomada 2P+T no ponto da lavanderia | obrigatorio se o ponto atual nao tiver terra | NBR 14136, 10A (plugue da LED13/LED15) | sem terra ha risco de choque na carcaca | junto (loja local) |
+| Disjuntor exclusivo para a lavadora | obrigatorio se o circuito for compartilhado | 20A na fase (127V), conforme manual Electrolux | o manual exige circuito exclusivo; compartilhar pode desarmar ou perder garantia [VERIFICAR o quadro] | junto (loja local) |
+| Torneira com bico para lavadora | obrigatorio se o ponto nao tiver | rosca 26,5 mm (3/4"), 14 fios por polegada (manual) | a mangueira de entrada (com filtro) ja vem conectada na maquina | junto (loja local) |
 | Capa protetora | recomendado so se a maquina ficar em area aberta | capa para 13 kg, medida da maquina escolhida | sol forte resseca o painel e a tampa | - |
 | Base com rodinhas | dispensavel | - | piora o nivelamento e aumenta a vibracao na centrifugacao [inferencia] | - |
 | Protetor eletronico / estabilizador | dispensavel | - | lavadora nao precisa de estabilizador; protecao contra surto e no quadro de energia [inferencia] | - |

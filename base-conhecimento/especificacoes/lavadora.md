@@ -35,6 +35,10 @@ inferencia ficam separados; valor nao confirmado leva [VERIFICAR].
 - "110V" no anuncio = 127V.
 - Anuncio de lavadora tem poucas avaliacoes (13 a 41 tipico, 12/10/2026): gate com minimo 10 e ancora bayesiana 50.
 - Lavadora pesa ~40 kg: confirmar se a entrega leva ate o local de uso.
+- Electrolux (manual G0051111 e guia rapido LED13/14/15/17): disjuntor EXCLUSIVO obrigatorio, 20A na fase em 127V; pressao 0,02 a 0,8 MPa (caixa d'agua 2,4 m acima da entrada); saida de agua entre 90 e 140 cm de altura, no maximo 20 cm dentro do esgoto, nunca emendar a mangueira; torneira 3/4" 14 fios.
+- Altura com a tampa aberta (guia rapido): LED13 139 cm, LED15 143 cm. Conferir prateleira ou armario acima.
+- Na mesma linha, capacidade maior gasta menos agua por kg: LED13 150 L/13 kg = 11,5 L/kg; LED15 160 L/15 kg = 10,7 L/kg. Energia por kg igual (0,031 kWh/kg).
+- A loja Electrolux parcela em 10x sem juros pelo preco do Pix; a Amazon mostra o preco do Pix e cobra 5 a 7% a mais no cartao (12/10/2026).
 
 ## Acessorios
 
