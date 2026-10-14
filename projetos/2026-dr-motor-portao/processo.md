@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | decisao | Confirmado: motor ligado em disjuntor proprio depois do DR existente | Instalador confirmou em 13/10/2026 (repassado pelo Josemar) |
 | 2026-10-13 | modelo | NAO comprar DR: a casa ja tem DR no quadro | Josemar confirmou em 13/10/2026. Condicao: o circuito novo do motor (220V, disjuntor bipolar proprio) tem que sair DEPOIS do DR existente, e o DR tem que ser de 30 mA [VERIFICAR com o Fabio na instalacao] |
 | 2026-10-13 | modelo | Aterramento ja existe na casa; DR no quadro ainda nao confirmado | Josemar informou em 13/10/2026 que a casa tem aterramento; DR sera conferido por foto do quadro ou pelo Fabio |
 | 2026-09-21 | cotacao | Cotacao registrada para steck-sdr22530a | Amazon / fonte=web / custo_total=85.38 |

@@ -10,6 +10,10 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | descarte | Descartado ppa-dz-rio-500-jetflex-2ctrl-sem-crem | Instalador aprovou o R800 Jetflex (13/10/2026); kit R800 com 4 m e 3 controles sai mais barato que qualquer combinacao do 500 com cremalheira e controle extra |
+| 2026-10-13 | descarte | Descartado ppa-dz-rio-500-jetflex-3m-2ctrl | Instalador aprovou o R800 Jetflex (13/10/2026); kit R800 com 4 m e 3 controles sai mais barato que qualquer combinacao do 500 com cremalheira e controle extra |
+| 2026-10-13 | descarte | Descartado ppa-dz-rio-500-jetflex-4m-3ctrl | Instalador aprovou o R800 Jetflex (13/10/2026); kit R800 com 4 m e 3 controles sai mais barato que qualquer combinacao do 500 com cremalheira e controle extra |
+| 2026-10-13 | modelo | Motor escolhido: kit PPA DZ Rio R800 Jetflex Z14 com 4 m de cremalheira e 3 controles (opcao B, Amazon 123LIDER, R$ 915,30 em 10x sem juros) | Instalador aprovou o R800 no lugar do 500 em 13/10/2026 (resposta repassada pelo Josemar). Mais folga de peso, menor consumo pelo manual e o kit mais barato. Ele nao comentou a cremalheira; adotado que a do kit serve [VERIFICAR com o Josemar] |
 | 2026-10-13 | modelo | Lista do Fabio (13/10): motor PPA 1/3 500 kg 220V Jetflex + 4 m de cremalheira reforcada branca + base. Proposta: voltar ao DZ Rio 500 Jetflex (2 controles, sem cremalheira) + 1 controle + cremalheira PPA Gold 4 m | Fabio pede cremalheira reforcada separada; o kit R800 traz 4 m de cremalheira comum que sobraria. Em 10x: 500 + controle + Gold = ~R$ 1.084 x R800 kit + Gold = R$ 1.168. Aguarda o sim do Josemar; CV 1/3 nao aparece no anuncio [VERIFICAR] |
 | 2026-10-13 | cotacao | Cotacao registrada para ppa-dz-rio-500-jetflex-2ctrl-sem-crem | Amazon / fonte=web / custo_total=831.32 |
 | 2026-10-13 | cotacao | Cotacao registrada para ppa-dz-rio-r800-jetflex-z14-4m-3ctrl | Amazon / fonte=web / custo_total=915.3 |

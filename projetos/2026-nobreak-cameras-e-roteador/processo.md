@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | decisao | Cameras sairao de uma tomada unica perto do roteador, pronta para receber o nobreak depois | Instalador confirmou em 13/10/2026 (repassado pelo Josemar) |
 | 2026-10-13 | decisao | Compra ADIADA: nobreak fica fora do carrinho por enquanto (modelo escolhido continua Intelbras ATTIV 700VA) | Decisao do Josemar em 13/10/2026. Sem nobreak as cameras e o roteador desligam na falta de luz. Pedir ao Fabio para sair com o circuito das cameras de um ponto unico perto do roteador, para encaixar o nobreak depois sem refazer fiacao |
 | 2026-10-13 | cotacao | Cotacao registrada para intelbras-attiv-700va | Amazon / fonte=web / custo_total=619.0 |
 | 2026-10-13 | modelo | Intelbras ATTIV 700VA (bateria 7Ah, ~1 h estimada com ~50 W) em vez do TS Shara UPS Mini (5Ah, ~40 min) | Josemar aceitou 1 hora de autonomia como suficiente (13/10/2026); bateria maior e marca com assistencia nacional para trocar a bateria a cada 2-3 anos. Preco de 21/09 precisa ser recotado antes da compra |

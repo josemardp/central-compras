@@ -17,14 +17,14 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-10-13T17:34:44-03:00
-  last_session_at: 2026-10-13T17:34:44-03:00
+  updated_at: 2026-10-14T04:11:33-03:00
+  last_session_at: 2026-10-14T04:11:32-03:00
   confidence: confirmed
 focus:
   objective: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
-  current: Colar a resposta do instalador, fechar o motor e montar o carrinho
-  last_completed: "Varredura de cameras solares 4G (Brasil, Paraguai, Shopee, AliExpress): so a Ezviz EB8 Pro 4G troca sozinha de Wi-Fi para 4G"
-  recommended_next_action: act-018
+  current: Abrir Seus pedidos na Amazon e listar todos os pedidos pendentes antes de qualquer nova tentativa de pagamento
+  last_completed: 6 de 8 pedidos pendentes cancelados
+  recommended_next_action: act-020
 next_actions:
   - id: act-001
     title: Acompanhar entrega das pecas do HB20 e registrar veredito D+30
@@ -254,12 +254,26 @@ next_actions:
     created_at: 2026-10-13T17:33:59-03:00
     done_at: null
     note: null
-blockers: []
+  - id: act-020
+    title: "Amazon: listar pedidos pendentes, resolver os 2 que nao cancelaram e a causa da recusa do cartao antes de pagar de novo"
+    status: pending
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-10-14T04:11:26-03:00
+    done_at: null
+    note: null
+blockers:
+  - id: blk-001
+    description: Pagamento recusado 2 vezes na Amazon (instalacao de cameras e portao)
+    type: decision
+    since: 2026-10-14
+    resolves_with: null
+    resolved_at: null
 decisions_recent:
-  - date: 2026-10-05
-    text: Gate de avaliações da categoria virou nota bayesiana (splits têm poucas centenas de avaliações)
-  - date: 2026-10-10
-    text: Na divergência entre texto da loja e tabela da embalagem, o guia segue a embalagem
   - date: 2026-10-12
     text: Lavadora só lava, abertura superior, 127V, teto R$ 2.300 com frete
   - date: 2026-10-12
@@ -276,6 +290,10 @@ decisions_recent:
     text: Nobreak adiado; cameras saem de uma tomada unica perto do roteador
   - date: 2026-10-13
     text: Cabo PP comprado em loja fisica (Amazon so tem 3x1,5 50 m a R$ 990)
+  - date: 2026-10-14
+    text: Motor R800 com cremalheira do kit
+  - date: 2026-10-14
+    text: Disjuntor e plugues comprados em loja fisica junto com o cabo
 milestones: []
 review:
   stale_after_days: null

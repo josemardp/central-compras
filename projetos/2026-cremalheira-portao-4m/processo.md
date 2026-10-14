@@ -10,6 +10,8 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-13 | decisao | Confirmado: NAO comprar cremalheira; a do kit R800 serve | Instalador confirmou em 13/10/2026 (repassado pelo Josemar) |
+| 2026-10-13 | decisao | NAO comprar a cremalheira Gold: usar os 4 m que vem no kit R800 | Instalador aprovou o kit R800 em 13/10/2026 [VERIFICAR se ele aceitou a cremalheira do kit ou ainda quer a reforcada; se quiser, comprar 4 x Gold B0G15GL48Q, R$ 252,24 em 10x] |
 | 2026-10-13 | cotacao | Cotacao registrada para ppa-cremalheira-gold-1m | Amazon / fonte=web / custo_total=252.24 |
 | 2026-09-21 | modelo | Usar a cremalheira do kit (4 m); nao comprar a Gold | Portao de ~80-280 kg esta muito abaixo dos 800 kg do motor; cremalheira residencial M4 (padrao DZ Rio) sobra. Gold e industrial (30 mm de largura, 55 mm de altura); existe Gold vendida junto com R800 Z14 por loja autorizada, mas tambem ha Gold 'modulo 6', que NAO encaixa. Economia de R$ 232. |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-cremalheira-gold-1m | Amazon / fonte=web / custo_total=232.0 |
