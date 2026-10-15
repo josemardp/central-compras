@@ -1,0 +1,9 @@
+id: hyundai-vela-original-jogo4
+categoria: Autopeças
+nome: Jogo 4 velas originais Hyundai/Mobis (balcao concessionaria)
+marca: Hyundai
+atributos:
+  tipo: vela_ignicao_original
+  codigo_fabricante: VERIFICAR
+  quantidade: 4
+proveniencia: null
