@@ -3,13 +3,14 @@
 ## Estado atual
 
 - Estado: pesquisando
-- Proxima acao: definir modelo/requisitos com ajuda da IA
+- Proxima acao: gerar ranking e comparar finalistas com cotacao manual
 - Decisao aberta:
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-15 | cotacao | Cotacao registrada para ngk-u5067-jogo4 | Quirino Marcos Pecas / fonte=manual / custo_total=1008.0 |
 | 2026-10-15 | cotacao | Pedido de orcamento enviado por WhatsApp a Golden Motors Aracatuba (concessionaria Hyundai, 18 3519-3100, 15:12) e a Quirino Marcos Pecas Aracatuba (18 99770-6033, indicacao do mecanico Denis, 15:07) | Carro parado na oficina do Denis; compra local em Aracatuba com frete ate Valparaiso e mais rapida que o Mercado Livre, que entrega no endereco atual da conta. Loja fisica reduz o risco de falsificacao. Aguardando resposta das duas. |
 | 2026-10-15 | modelo | Pesquisar jogo de 4 bobinas: original Hyundai 27301-2B010, NGK U5067 e Bosch | Bobinas ainda sao as originais do carro (Denis, 15/10). Falha alternou cilindros 2 e 1 sem troca de pecas, entao o Denis recomendou as 4. Anuncios de 27301-2B010 a R$ 59-81 por unidade com 61-75% OFF tratados como risco de falsificacao e nao cotados. |
 | 2026-10-15 | cotacao | Cotacao registrada para bosch-098622a318-jogo4 | Mercado Livre / fonte=web / custo_total=715.11 |
@@ -27,7 +28,7 @@
 - [x] 4. Coletar cotacoes iniciais
 - [ ] 5. Aplicar gates eliminatorios
 - [ ] 6. Comparar finalistas
-- [ ] 7. Confirmar preco/frete/estoque manualmente
+- [x] 7. Confirmar preco/frete/estoque manualmente
 - [ ] 8. Registrar decisao e por que os outros perderam
 - [ ] 9. Comprar
 - [ ] 10. Fazer veredito D+30
