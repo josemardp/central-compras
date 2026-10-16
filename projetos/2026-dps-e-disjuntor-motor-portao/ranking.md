@@ -1,12 +1,12 @@
 # Ranking
 
-Gerado em 2026-10-13T17:01:21.
+Gerado em 2026-10-16T13:06:37.
 
 ## Elegiveis
 
 1. DPS Clamper Front 20kA 175V - 72.7
    qualidade 0.52 · valor 1.00 · risco 0.69 · aderencia -- · conveniencia --
-   custo total R$ 91,12 / Amazon / estimativa web
+   custo total R$ 41,90 / Amazon / confirmada manualmente
    confianca 75% - sem dado em: conveniencia, aderencia. Esses eixos ficaram FORA da conta; o score mede so o que se sabe.
 
 ## Cortados pelos gates

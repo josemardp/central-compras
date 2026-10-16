@@ -1,0 +1,15 @@
+{
+  "ambiente.json": "34140469a35b098b8b5cf1003caccf2a0af97a8be73105ebd49b1999f0beb86a",
+  "briefing.md": "c77b586598f3da54399c145ff9aa38117aebe66f1877a3868bfb278d7f81b5d7",
+  "categorias.yaml": "bb8f2f45df1a2fcc55c922aa1a8f9607400071324ec6d8aa28abc01fc2a4a3d5",
+  "cotacoes.csv": "b689dd897e07bc646ba4eefb6db765d678f7ff84f31495df6fc252eaa52a695e",
+  "decisao.md": "a46351516cbac52dedfb8f445df2ee90dd9b70bcc9b1e3c18c0da1c0b3b60c65",
+  "metadados.json": "69ba1d79e99d36e1eacaa1b08d9f0a37eb58ae87af29e8282702216a814261bb",
+  "modelo.md": "1299f0f6b13ee1a0add338ef5e1c19781b1c6f02c1d11a1dc957c64727a04343",
+  "motor.py": "e8ba42fe014f6f5a844ca786ee230ff80b2db7d3fff313417094ce3f80bace4d",
+  "participacoes/clamper-front-20ka-175v.yaml": "02379338d7afbf610fd92c3d08f8e497e8c0bb78fbd9e0eb56684cc73ba5b74b",
+  "preferencias.yaml": "0e1cb8c5b3f2bf827ce7e3b8c337363abf3474285036e511e2e4498bc35686a6",
+  "produtos/clamper-front-20ka-175v.yaml": "78fa1818bec831f5197cf74c9689b88fc8063206b2d7cb342dc58dc35fb67339",
+  "ranking.csv": "9ea1625781497b8bf93b125f634f112198dc5fdec3a839297e53ffcda0d0c691",
+  "ranking.md": "d3eeeb2072c69270acc1a9c832208968b80cb017f24e3ad50e19c3700515080a"
+}

@@ -2,14 +2,19 @@
 
 ## Estado atual
 
-- Estado: pesquisando
-- Proxima acao: definir modelo/requisitos com ajuda da IA
+- Estado: comprado
+- Proxima acao: acompanhar entrega e preencher veredito D+30
 - Decisao aberta:
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-16 | veredito | Arquivo de veredito criado | 2026-10-16-2026-fotocelula-portao-ppa-f30.md |
+| 2026-10-16 | decisao | Escolhido ppa-f30 | Comprada pelo Josemar na Amazon em 16/10 por R$ 142,90, quase metade do preco da F10-R; compativel com qualquer central. |
+| 2026-10-16 | modelo | Josemar comprou a PPA F30 (barreira, emissor + receptor) em vez da F10-R refletiva | Preco: R$ 142,90 contra R$ 252,60 da F10-R. Atencao: barreira precisa de cabo de alimentacao (12-24 Vdc) ate o emissor no lado oposto do portao; a F10-R tinha sido escolhida por ter fio so de um lado. [VERIFICAR com o instalador como passar o cabo ao lado oposto] |
+| 2026-10-16 | cotacao | Cotacao registrada para ppa-f30 | Amazon / fonte=manual / custo_total=142.9 |
+| 2026-10-16 | produto | Candidato registrado: Fotocelula de barreira PPA F30 (emissor + receptor) | id=ppa-f30 |
 | 2026-10-13 | cotacao | Cotacao registrada para ppa-f10-r | Amazon / fonte=web / custo_total=252.6 |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-f10-r | Amazon / fonte=web / custo_total=278.0 |
 | 2026-09-21 | cotacao | Cotacao registrada para ppa-f10-r | Shop Gilson / fonte=web / custo_total=255.53 |
@@ -27,9 +32,9 @@
 - [x] 4. Coletar cotacoes iniciais
 - [x] 5. Aplicar gates eliminatorios
 - [ ] 6. Comparar finalistas
-- [ ] 7. Confirmar preco/frete/estoque manualmente
-- [ ] 8. Registrar decisao e por que os outros perderam
-- [ ] 9. Comprar
+- [x] 7. Confirmar preco/frete/estoque manualmente
+- [x] 8. Registrar decisao e por que os outros perderam
+- [x] 9. Comprar
 - [ ] 10. Fazer veredito D+30
 - [ ] 11. Fazer veredito D+180
 

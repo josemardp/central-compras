@@ -1,0 +1,51 @@
+{
+  "categoria": "motor_portao",
+  "confianca": 0.55,
+  "confianca_minima": 0.9,
+  "cortes": [
+    "garantia_tipo nao aceito (vendedor)"
+  ],
+  "cotacao": {
+    "anuncio_id": "",
+    "confirmacao": "conferido: preco",
+    "custo_extra": "0.0",
+    "custo_operacional_mensal": "0.0",
+    "custo_total": "893.99",
+    "data_coleta": "2026-10-16T00:00:00",
+    "estoque": "disponivel",
+    "flag_suspeita": "",
+    "fonte": "manual",
+    "frete_prazo_dias": "2",
+    "frete_valor": "0.0",
+    "garantia_meses": "",
+    "garantia_tipo": "vendedor",
+    "link": "https://www.amazon.com.br/dp/B0GSC1SSYX",
+    "loja": "Amazon",
+    "n_avaliacoes": "0",
+    "nota": "0.0",
+    "nota_ajustada": "",
+    "preco": "893.99",
+    "preco_promocional": "",
+    "produto_id": "ppa-dz-rio-r800-jetflex-z14-4m-3ctrl",
+    "proveniencia": "{\"estoque\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pedido Amazon realizado 16/10/2026, colado pelo Josemar (numero do pedido em dados-privados); total do pedido R$ 893,99, entrega prevista quinta 22/10\", \"origem\": \"conferencia_humana\"}, \"frete\": {\"data\": \"2026-10-13T15:50:00\", \"estado\": \"conferido\", \"evidencia\": \"pagina Amazon B0GSC1SSYX 13/10: 10x R$ 91,53 sem juros = R$ 915,30; somente 3 em estoque; entrega 15/10\", \"origem\": \"observacao_direta\"}, \"garantia\": {\"data\": \"2026-10-13T15:50:00\", \"estado\": \"conferido\", \"evidencia\": \"pagina Amazon B0GSC1SSYX 13/10: 10x R$ 91,53 sem juros = R$ 915,30; somente 3 em estoque; entrega 15/10\", \"origem\": \"observacao_direta\"}, \"preco\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pedido Amazon realizado 16/10/2026, colado pelo Josemar (numero do pedido em dados-privados); total do pedido R$ 893,99, entrega prevista quinta 22/10\", \"origem\": \"conferencia_humana\"}, \"variacao\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pedido Amazon realizado 16/10/2026, colado pelo Josemar (numero do pedido em dados-privados); total do pedido R$ 893,99, entrega prevista quinta 22/10\", \"origem\": \"conferencia_humana\"}, \"vendedor\": {\"data\": \"2026-10-13T15:50:00\", \"estado\": \"conferido\", \"evidencia\": \"pagina Amazon B0GSC1SSYX 13/10: 10x R$ 91,53 sem juros = R$ 915,30; somente 3 em estoque; entrega 15/10\", \"origem\": \"observacao_direta\"}}",
+    "score": "",
+    "tco_meses": "",
+    "tco_total": "893.99",
+    "valor_revenda_estimado": "0.0",
+    "variacao": "kit 4 m cremalheira + 3 controles, bivolt; total do pedido pago",
+    "vendedor": "123LIDER (enviado pela Amazon)",
+    "vendedor_tipo": "terceiro"
+  },
+  "cotacao_sha256": "4baa401987300cbacce0a9c94e326eb7279da3ce36ee5560ba3ec2cf1db57a2b",
+  "criado_em": "2026-10-16T13:05:34",
+  "excecoes": [
+    "--permitir-cortado",
+    "--permitir-incompleto"
+  ],
+  "justificativa": "Instalador aprovou o R800 no lugar do 500 (13/10); kit com 4 m de cremalheira e 3 controles saiu mais barato que qualquer combinacao do 500. Pago R$ 893,99 na Amazon em 16/10.",
+  "produto_id": "ppa-dz-rio-r800-jetflex-z14-4m-3ctrl",
+  "riscos_declarados": [
+    "Registro a posteriori (compra ja feita). Excecoes conscientes: garantia so do vendedor (123LIDER, terceiro, enviado pela Amazon; guardar nota fiscal para acionar a PPA) e eixo aderencia sem nota."
+  ],
+  "schema_versao": 2
+}

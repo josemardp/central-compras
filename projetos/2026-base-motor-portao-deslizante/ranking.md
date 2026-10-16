@@ -1,6 +1,6 @@
 # Ranking
 
-Gerado em 2026-10-13T15:57:40.
+Gerado em 2026-10-16T13:05:41.
 
 ## Elegiveis
 

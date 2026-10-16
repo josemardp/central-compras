@@ -1,0 +1,21 @@
+{
+  "ambiente.json": "c8fecb18f9e661b83ce4ab87d9d59c128a7e4b745b0a2280f0fd1b541aa94d98",
+  "briefing.md": "fb4063d959df8ef375bbb35a89bde24046ca8c9f6230658da41d542e8884eac1",
+  "categorias.yaml": "bb8f2f45df1a2fcc55c922aa1a8f9607400071324ec6d8aa28abc01fc2a4a3d5",
+  "cotacoes.csv": "70f91bae0ed85e699bab056c6561102d8393fcbf8efcd288fd344568c08fcd10",
+  "decisao.md": "bed3f502a4b353754bf18f5e26df437f1bda09ec77b534a3994a463eeb56822f",
+  "metadados.json": "a123ce1640072149bde6710b35185d41bae671f8616e583282c0cac8558ce64a",
+  "modelo.md": "19d639999b9d91fd8dccc7be9a5968a58b07491ca3d75c6dad4e222dfb2206cd",
+  "motor.py": "e8ba42fe014f6f5a844ca786ee230ff80b2db7d3fff313417094ce3f80bace4d",
+  "participacoes/ppa-dz-rio-500-jetflex-2ctrl-sem-crem.yaml": "5404dd114ae55a95170241a43d4ee07451441fef900e6f8b523ac7c998081903",
+  "participacoes/ppa-dz-rio-500-jetflex-3m-2ctrl.yaml": "1ad8e9d4c441c94e4331b3670d47cfb73b77fd2be3ba1e1334a57a713d604b0a",
+  "participacoes/ppa-dz-rio-500-jetflex-4m-3ctrl.yaml": "eb295abe6bf87fe18c0be395acd88617ed3a02b2229bd91de52c1d0397054643",
+  "participacoes/ppa-dz-rio-r800-jetflex-z14-4m-3ctrl.yaml": "4cbf368128db355cef390183c6031686856aba3340e1fa55836a661eb0d41898",
+  "preferencias.yaml": "0e1cb8c5b3f2bf827ce7e3b8c337363abf3474285036e511e2e4498bc35686a6",
+  "produtos/ppa-dz-rio-500-jetflex-2ctrl-sem-crem.yaml": "1560bc4acc29af7e57fede63ce955dd07d0ffef2b9ecd23abe332d9923ab2d4a",
+  "produtos/ppa-dz-rio-500-jetflex-3m-2ctrl.yaml": "81aea1687994a886dd5d6af668e5dc316b9fd71177b506b85a8c0bae35e6af55",
+  "produtos/ppa-dz-rio-500-jetflex-4m-3ctrl.yaml": "b2e03b6fcb5557e0e7ca0a2cc9c6a3badd88311b8f2844da743d20860ddf8fb6",
+  "produtos/ppa-dz-rio-r800-jetflex-z14-4m-3ctrl.yaml": "618978177856b8d12e6d88a70acdd085d2be958806837c655be3600781b016af",
+  "ranking.csv": "4df6b9ea0c3d0dba56ac9dd3b79da7d94e68b66c9002bea6d96ea388adaacaa4",
+  "ranking.md": "8f10d052de36467a8e5f862ebc738be177c8074b3d142ff3753c956f2918d8ce"
+}

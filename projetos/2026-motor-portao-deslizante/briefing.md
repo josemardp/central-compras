@@ -1,10 +1,10 @@
 ---
-projeto_id: "2026-motor-portao-deslizante"
-categoria: "motor_portao"
+projeto_id: 2026-motor-portao-deslizante
+categoria: motor_portao
 valor_estimado: 1000.0
 preco_teto: null
-estado: pesquisando
-criado_em: "2026-09-21"
+estado: comprado
+criado_em: '2026-09-21'
 ---
 
 # Briefing

@@ -1,0 +1,51 @@
+{
+  "categoria": "generico",
+  "confianca": 0.75,
+  "confianca_minima": 0.9,
+  "cortes": [
+    "avaliacoes insuficientes (4 < 20)"
+  ],
+  "cotacao": {
+    "anuncio_id": "",
+    "confirmacao": "coleta",
+    "custo_extra": "0.0",
+    "custo_operacional_mensal": "0.0",
+    "custo_total": "142.9",
+    "data_coleta": "2026-10-16T00:00:00",
+    "estoque": "disponivel",
+    "flag_suspeita": "",
+    "fonte": "manual",
+    "frete_prazo_dias": "",
+    "frete_valor": "0.0",
+    "garantia_meses": "",
+    "garantia_tipo": "vendedor",
+    "link": "https://www.amazon.com.br/dp/B081D9C26W",
+    "loja": "Amazon",
+    "n_avaliacoes": "4",
+    "nota": "5.0",
+    "nota_ajustada": "4.311",
+    "preco": "142.9",
+    "preco_promocional": "",
+    "produto_id": "ppa-f30",
+    "proveniencia": "{\"estoque\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pedido Amazon 16/10/2026 colado pelo Josemar: base + F30 = R$ 282,30; F30 = R$ 142,90 inferido (4x sem juros na pagina B081D9C26W lida em 16/10) [VERIFICAR na fatura]. Descricao do anuncio: sensor infravermelho de feixe unico, emissor e receptor, 12-24 Vdc, 32 m externo\", \"origem\": \"conferencia_humana\"}, \"frete\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pedido Amazon 16/10/2026 colado pelo Josemar: base + F30 = R$ 282,30; F30 = R$ 142,90 inferido (4x sem juros na pagina B081D9C26W lida em 16/10) [VERIFICAR na fatura]. Descricao do anuncio: sensor infravermelho de feixe unico, emissor e receptor, 12-24 Vdc, 32 m externo\", \"origem\": \"conferencia_humana\"}, \"garantia\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pedido Amazon 16/10/2026 colado pelo Josemar: base + F30 = R$ 282,30; F30 = R$ 142,90 inferido (4x sem juros na pagina B081D9C26W lida em 16/10) [VERIFICAR na fatura]. Descricao do anuncio: sensor infravermelho de feixe unico, emissor e receptor, 12-24 Vdc, 32 m externo\", \"origem\": \"conferencia_humana\"}, \"preco\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pedido Amazon 16/10/2026 colado pelo Josemar: base + F30 = R$ 282,30; F30 = R$ 142,90 inferido (4x sem juros na pagina B081D9C26W lida em 16/10) [VERIFICAR na fatura]. Descricao do anuncio: sensor infravermelho de feixe unico, emissor e receptor, 12-24 Vdc, 32 m externo\", \"origem\": \"conferencia_humana\"}, \"variacao\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pedido Amazon 16/10/2026 colado pelo Josemar: base + F30 = R$ 282,30; F30 = R$ 142,90 inferido (4x sem juros na pagina B081D9C26W lida em 16/10) [VERIFICAR na fatura]. Descricao do anuncio: sensor infravermelho de feixe unico, emissor e receptor, 12-24 Vdc, 32 m externo\", \"origem\": \"conferencia_humana\"}, \"vendedor\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pedido Amazon 16/10/2026 colado pelo Josemar: base + F30 = R$ 282,30; F30 = R$ 142,90 inferido (4x sem juros na pagina B081D9C26W lida em 16/10) [VERIFICAR na fatura]. Descricao do anuncio: sensor infravermelho de feixe unico, emissor e receptor, 12-24 Vdc, 32 m externo\", \"origem\": \"conferencia_humana\"}}",
+    "score": "",
+    "tco_meses": "",
+    "tco_total": "142.9",
+    "valor_revenda_estimado": "0.0",
+    "variacao": "",
+    "vendedor": "Goose Guardian (enviado pela Amazon) [VERIFICAR vendedor do pedido]",
+    "vendedor_tipo": "terceiro"
+  },
+  "cotacao_sha256": "37ce4f40ba3032ecff9e24f6b3a935de0077231d14ea76fa66e791c9ce32384f",
+  "criado_em": "2026-10-16T13:06:18",
+  "excecoes": [
+    "--permitir-cortado",
+    "--permitir-incompleto"
+  ],
+  "justificativa": "Comprada pelo Josemar na Amazon em 16/10 por R$ 142,90, quase metade do preco da F10-R; compativel com qualquer central.",
+  "produto_id": "ppa-f30",
+  "riscos_declarados": [
+    "Registro a posteriori. Barreira exige fio ate o lado oposto do portao (a F10-R refletiva evitava isso); poucas avaliacoes (4); garantia so do vendedor; eixo aderencia sem nota. Anuncio cita F30 no titulo e F32 na descricao [VERIFICAR modelo recebido]."
+  ],
+  "schema_versao": 2
+}

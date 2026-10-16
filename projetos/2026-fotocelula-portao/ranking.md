@@ -1,6 +1,6 @@
 # Ranking
 
-Gerado em 2026-10-13T17:01:20.
+Gerado em 2026-10-16T13:06:18.
 
 ## Elegiveis
 
@@ -8,6 +8,7 @@ Nenhum candidato passou pelos gates.
 ## Cortados pelos gates
 
 - Fotocelula refletiva PPA F10-R: avaliacoes insuficientes (2 < 20) alertas: AVAL_SUSPEITA
+- Fotocelula de barreira PPA F30 (emissor + receptor): avaliacoes insuficientes (4 < 20) alertas: AVAL_SUSPEITA
 
 ## Observacoes
 

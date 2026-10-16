@@ -1,0 +1,10 @@
+id: ppa-f30
+categoria: generico
+nome: Fotocelula de barreira PPA F30 (emissor + receptor)
+marca: PPA
+atributos:
+  tipo: barreira_emissor_receptor
+  alcance_externo_m: 32
+  alimentacao: 12-24Vdc
+  consumo_ma: 55
+proveniencia: null

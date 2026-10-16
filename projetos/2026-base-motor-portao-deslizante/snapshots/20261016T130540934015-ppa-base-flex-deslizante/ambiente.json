@@ -1,0 +1,23 @@
+{
+  "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+  "pyyaml": "6.0.3",
+  "argumentos": {
+    "comando": "decidir",
+    "projeto": "projetos\\2026-base-motor-portao-deslizante",
+    "produto_id": "ppa-base-flex-deslizante",
+    "porque": "Base esta na lista de material do instalador; alinha o motor a cremalheira. Comprada na Amazon em 16/10.",
+    "perdedores": [],
+    "risco": [
+      "Registro a posteriori (compra ja feita). Excecoes conscientes: poucas avaliacoes (3 < 20), item especifico PPA pedido pelo instalador; eixo aderencia sem nota. Valor R$ 139,40 inferido do total do pedido [VERIFICAR na fatura]."
+    ],
+    "permitir_web": false,
+    "permitir_vencida": false,
+    "permitir_aguardando": false,
+    "permitir_cortado": true,
+    "permitir_incompleto": true,
+    "sem_perdedores": true,
+    "comprado": true,
+    "data_compra": "2026-10-16",
+    "force_veredito": false
+  }
+}

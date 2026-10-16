@@ -1,11 +1,11 @@
 ---
-projeto_id: "2026-base-motor-portao-deslizante"
-categoria: "generico"
+projeto_id: 2026-base-motor-portao-deslizante
+categoria: generico
 valor_estimado: 60.0
 preco_teto: null
-acessorio_de: "2026-motor-portao-deslizante"
-estado: pesquisando
-criado_em: "2026-09-21"
+acessorio_de: 2026-motor-portao-deslizante
+estado: comprado
+criado_em: '2026-09-21'
 ---
 
 # Briefing

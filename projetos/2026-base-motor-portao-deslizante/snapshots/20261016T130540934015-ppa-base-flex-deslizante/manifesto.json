@@ -1,0 +1,15 @@
+{
+  "ambiente.json": "cb042794dff5a08814576579d46eefd7ce3ecd9c722efeb2cb75f6bc28161e3e",
+  "briefing.md": "0cf56c053c9541ef9c8c53ed31cb348fa29712ed12c9fd76e3b0630fa6553472",
+  "categorias.yaml": "bb8f2f45df1a2fcc55c922aa1a8f9607400071324ec6d8aa28abc01fc2a4a3d5",
+  "cotacoes.csv": "2b75cedcdf3b0292a775c883291b80ea8a294a0c4eca63dfe50ecc064eaaef99",
+  "decisao.md": "a7953d6e93e8399e075dff01238a63c231d901dd939bf243808384315c0b83c1",
+  "metadados.json": "9e76c5ea9f30bd8592f2eed547478f6fcccbea0697b6d6452709180d17b55df2",
+  "modelo.md": "b3cc2a9aa2fd4fac7e95dc882d69f953cf959efc0758fe405e939fe7006daeae",
+  "motor.py": "e8ba42fe014f6f5a844ca786ee230ff80b2db7d3fff313417094ce3f80bace4d",
+  "participacoes/ppa-base-flex-deslizante.yaml": "dc704b57e00ac33761f9f551340bce5ea1f6b324c3ee7b7b3c7b662ab520546a",
+  "preferencias.yaml": "0e1cb8c5b3f2bf827ce7e3b8c337363abf3474285036e511e2e4498bc35686a6",
+  "produtos/ppa-base-flex-deslizante.yaml": "cf88a5e79cd4924df0c75250c7d2d1f4bd2841312196d7166865438b1eca91db",
+  "ranking.csv": "94e581163219b248a22596d0bc7963752347a8b9c8f932ce7abca256c68fa267",
+  "ranking.md": "1ba71e53d08028d859b14d67dd3a4ab008266234b9198515a9e7fac6464e43c4"
+}

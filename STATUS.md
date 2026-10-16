@@ -5,6 +5,16 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 16/10/2026: pedidos da instalação pagos (parte do portão)
+
+- **Pagos na Amazon em 16/10 (lista colada pelo Josemar), registrados com `promover-cotacao`/`cotar` manual + `decidir --comprado`:** motor PPA DZ Rio R800 Jetflex Z14 kit 4 m + 3 controles **R$ 893,99**; base Flex PPA + fotocélula **PPA F30** juntas **R$ 282,30** (base R$ 139,40 e F30 R$ 142,90, divisão inferida, conferir na fatura); **1** DPS Clamper Front 20kA 175V **R$ 41,90**. Entrega prevista quinta 22/10. Números dos pedidos em `~/.central-compras/dados-privados/pedidos-amazon-instalacao-2026-10-13.md` (seção 16/10). Os 4 decididos como registro a posteriori, com `--permitir-incompleto` (eixo aderência sem nota) e `--permitir-cortado` onde o gate cortou (garantia do vendedor no motor e na F30, poucas avaliações na base e na F30).
+- **Atenção 1: fotocélula trocou de tipo.** O modelo escolhido era a F10-R **refletiva** (fio só de um lado do portão). A F30 comprada é de **barreira** (emissor + receptor, 12-24 Vdc, 32 m): precisa de cabo até o lado oposto do portão. Avisar o Fabio. O anúncio diz F30 no título e F32 na descrição: conferir o que chegar.
+- **Atenção 2: DPS veio 1, o modelo previa 2** (um por fase, 220V fase-fase). Comprar o 2º ou confirmar com o Fabio.
+- **Não aparecem na lista de 16/10:** 4 câmeras C320WS, 6 cartões WD Purple, 6 caixinhas VBOX, Wago kit 20. Situação dos 2 pedidos pendentes de 13/10 (câmeras; cartões + caixinhas + plugues) **não conferida**: o Chrome conectado em 16/10 abriu a Amazon deslogada. Há também um pedido de **R$ 0,00** na lista, sem item visível.
+- **Ao retomar.** (1) Josemar diz o que houve com câmeras, cartões, caixinhas e Wago, e o que é o pedido de R$ 0,00. (2) Registrar os que foram pagos (`promover-cotacao` + `decidir --comprado`). (3) 2º DPS. (4) Loja física: cabo PP 3x1,5 50 m, disjuntor bipolar 6 A curva C, 6 plugues fêmea 2P+T 10 A. (5) D+30 dos vereditos criados em 16/10 (pasta `vereditos/`).
+
+---
+
 ## Sessão 13/10/2026: instalação de câmeras + motor de portão (recotado em 10x, falta resposta do Fabio)
 
 - **O que é.** Retomada dos 14 projetos da instalação abertos em 21/09 (seção "Sessão anterior (21/09/2026...)" abaixo). Nada foi comprado ainda; as 2 C320WS de setembro **não estão instaladas** (o Fabio instala as 6 juntas).

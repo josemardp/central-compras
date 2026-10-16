@@ -2,14 +2,17 @@
 
 ## Estado atual
 
-- Estado: pesquisando
-- Proxima acao: definir modelo/requisitos com ajuda da IA
+- Estado: comprado
+- Proxima acao: acompanhar entrega e preencher veredito D+30
 - Decisao aberta:
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-16 | veredito | Arquivo de veredito criado | 2026-10-16-2026-motor-portao-deslizante-ppa-dz-rio-r800-jetflex-z14-4m-3ctrl.md |
+| 2026-10-16 | decisao | Escolhido ppa-dz-rio-r800-jetflex-z14-4m-3ctrl | Instalador aprovou o R800 no lugar do 500 (13/10); kit com 4 m de cremalheira e 3 controles saiu mais barato que qualquer combinacao do 500. Pago R$ 893,99 na Amazon em 16/10. |
+| 2026-10-16 | cotacao-manual | Cotacao manual confirmada para ppa-dz-rio-r800-jetflex-z14-4m-3ctrl | Amazon / custo_total=893.99 |
 | 2026-10-13 | descarte | Descartado ppa-dz-rio-500-jetflex-2ctrl-sem-crem | Instalador aprovou o R800 Jetflex (13/10/2026); kit R800 com 4 m e 3 controles sai mais barato que qualquer combinacao do 500 com cremalheira e controle extra |
 | 2026-10-13 | descarte | Descartado ppa-dz-rio-500-jetflex-3m-2ctrl | Instalador aprovou o R800 Jetflex (13/10/2026); kit R800 com 4 m e 3 controles sai mais barato que qualquer combinacao do 500 com cremalheira e controle extra |
 | 2026-10-13 | descarte | Descartado ppa-dz-rio-500-jetflex-4m-3ctrl | Instalador aprovou o R800 Jetflex (13/10/2026); kit R800 com 4 m e 3 controles sai mais barato que qualquer combinacao do 500 com cremalheira e controle extra |
@@ -48,9 +51,9 @@
 - [x] 4. Coletar cotacoes iniciais
 - [x] 5. Aplicar gates eliminatorios
 - [ ] 6. Comparar finalistas
-- [ ] 7. Confirmar preco/frete/estoque manualmente
-- [ ] 8. Registrar decisao e por que os outros perderam
-- [ ] 9. Comprar
+- [x] 7. Confirmar preco/frete/estoque manualmente
+- [x] 8. Registrar decisao e por que os outros perderam
+- [x] 9. Comprar
 - [ ] 10. Fazer veredito D+30
 - [ ] 11. Fazer veredito D+180
 

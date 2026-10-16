@@ -1,0 +1,13 @@
+id: ppa-dz-rio-500-jetflex-4m-3ctrl
+categoria: motor_portao
+nome: Kit PPA DZ Rio 500 Jetflex 4 m cremalheira 3 controles
+marca: PPA
+atributos:
+  modelo_exato: DZ Rio 500 Jetflex
+  capacidade_kg: 500
+  tensao: bivolt
+  central: Triflex [VERIFICAR Facility ou Full Range]
+  fim_de_curso: hibrido
+  controles_inclusos: 3
+  cremalheira_inclusa_m: 4
+proveniencia: null

@@ -1,0 +1,25 @@
+{
+  "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+  "pyyaml": "6.0.3",
+  "argumentos": {
+    "comando": "decidir",
+    "projeto": "projetos\\2026-fotocelula-portao",
+    "produto_id": "ppa-f30",
+    "porque": "Comprada pelo Josemar na Amazon em 16/10 por R$ 142,90, quase metade do preco da F10-R; compativel com qualquer central.",
+    "perdedores": [
+      "ppa-f10-r: R$ 252,60 contra R$ 142,90 da F30; Josemar optou pela mais barata"
+    ],
+    "risco": [
+      "Registro a posteriori. Barreira exige fio ate o lado oposto do portao (a F10-R refletiva evitava isso); poucas avaliacoes (4); garantia so do vendedor; eixo aderencia sem nota. Anuncio cita F30 no titulo e F32 na descricao [VERIFICAR modelo recebido]."
+    ],
+    "permitir_web": false,
+    "permitir_vencida": false,
+    "permitir_aguardando": false,
+    "permitir_cortado": true,
+    "permitir_incompleto": true,
+    "sem_perdedores": false,
+    "comprado": true,
+    "data_compra": "2026-10-16",
+    "force_veredito": false
+  }
+}

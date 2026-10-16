@@ -2,14 +2,17 @@
 
 ## Estado atual
 
-- Estado: pesquisando
-- Proxima acao: confirmar manualmente preco, frete, estoque, vendedor e garantia dos finalistas
-- Decisao aberta: DPS Clamper Front 20kA 175V lidera a pesquisa web, mas ainda nao fecha compra sem cotacao manual.
+- Estado: comprado
+- Proxima acao: acompanhar entrega e preencher veredito D+30
+- Decisao aberta: DPS Clamper Front 20kA 175V lidera com cotacao manual.
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-16 | veredito | Arquivo de veredito criado | 2026-10-16-2026-dps-e-disjuntor-motor-portao-clamper-front-20ka-175v.md |
+| 2026-10-16 | decisao | Escolhido clamper-front-20ka-175v | DPS classe II 175V certo para 220V fase-fase (127V fase-neutro), confirmado por Josemar em 13/10. Comprado na Amazon em 16/10. |
+| 2026-10-16 | cotacao-manual | Cotacao manual confirmada para clamper-front-20ka-175v | Amazon / custo_total=41.9 |
 | 2026-10-13 | cotacao | Cotacao registrada para clamper-front-20ka-175v | Amazon / fonte=web / custo_total=91.12 |
 | 2026-10-13 | modelo | DPS Clamper Front 175V x2 confirmado (um por fase) | Josemar confirmou em 13/10/2026 que o 220V da casa e de duas fases (fase-fase, 127V fase-neutro) |
 | 2026-09-21 | cotacao | Este projeto fica so com o DPS; disjuntor foi para 2026-disjuntor-bipolar-motor-portao | Itens complementares nao podem competir no mesmo ranking (regra 3). |
@@ -27,9 +30,9 @@
 - [x] 4. Coletar cotacoes iniciais
 - [x] 5. Aplicar gates eliminatorios
 - [ ] 6. Comparar finalistas
-- [ ] 7. Confirmar preco/frete/estoque manualmente
-- [ ] 8. Registrar decisao e por que os outros perderam
-- [ ] 9. Comprar
+- [x] 7. Confirmar preco/frete/estoque manualmente
+- [x] 8. Registrar decisao e por que os outros perderam
+- [x] 9. Comprar
 - [ ] 10. Fazer veredito D+30
 - [ ] 11. Fazer veredito D+180
 

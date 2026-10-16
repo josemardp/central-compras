@@ -1,0 +1,17 @@
+{
+  "ambiente.json": "2c51fe4444220c999f4154d7ec9bd7130092857efa59788c8b6fe1e86aabf224",
+  "briefing.md": "0de413e7e1715349a8e9f13033b9467415463f4b10110fd14224b67d2bcd1938",
+  "categorias.yaml": "bb8f2f45df1a2fcc55c922aa1a8f9607400071324ec6d8aa28abc01fc2a4a3d5",
+  "cotacoes.csv": "ad839b1d7892b064359c495ac8f0ca26aed71c963e470751e82d7529a1db612a",
+  "decisao.md": "38083f2f04d9267ef1b0a5ebe30e232083cef3ea0a0b95b32160d72efc5e9ab6",
+  "metadados.json": "9e2931fc306b5eb6e9c2fe847f0ccd32e98da89a93ea6577edb5f2372e64414e",
+  "modelo.md": "d75abdf0b24a4721c8d57f2b64048733fdd450f7c471e1e16c92236c84b9e82e",
+  "motor.py": "e8ba42fe014f6f5a844ca786ee230ff80b2db7d3fff313417094ce3f80bace4d",
+  "participacoes/ppa-f10-r.yaml": "44e03c96c1ea02e0b9a5ba8ef7d827d1018f09b07a294575f4cc5c4b98d18590",
+  "participacoes/ppa-f30.yaml": "b74a50ed79dac9df738d1f2314d9fffa28ac3e5d83c7a73ecc5e9062c49da930",
+  "preferencias.yaml": "0e1cb8c5b3f2bf827ce7e3b8c337363abf3474285036e511e2e4498bc35686a6",
+  "produtos/ppa-f10-r.yaml": "26ec1b280b4694bf971b29fe0dba95c8bdf61029b13b8f35ffb53ea9c60053e0",
+  "produtos/ppa-f30.yaml": "6d5628e60da5f1f74d62a9d9901fbdabd0dbe64bf21c89fe777b1479c2671d4a",
+  "ranking.csv": "968a5c8227e527353da557318bd2546fcb84dc16bce927f575a28f55375a9686",
+  "ranking.md": "5d453f271fdb1b36b1258d4e8f8e081c58192e58b3886dba0494622e13b649b5"
+}

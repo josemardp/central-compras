@@ -1,11 +1,11 @@
 ---
-projeto_id: "2026-dps-e-disjuntor-motor-portao"
-categoria: "material_eletrico"
+projeto_id: 2026-dps-e-disjuntor-motor-portao
+categoria: material_eletrico
 valor_estimado: 120.0
 preco_teto: null
-acessorio_de: "2026-motor-portao-deslizante"
-estado: pesquisando
-criado_em: "2026-09-21"
+acessorio_de: 2026-motor-portao-deslizante
+estado: comprado
+criado_em: '2026-09-21'
 ---
 
 # Briefing

@@ -2,14 +2,17 @@
 
 ## Estado atual
 
-- Estado: pesquisando
-- Proxima acao: definir modelo/requisitos com ajuda da IA
+- Estado: comprado
+- Proxima acao: acompanhar entrega e preencher veredito D+30
 - Decisao aberta:
 
 ## Linha do tempo decisoria
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-16 | veredito | Arquivo de veredito criado | 2026-10-16-2026-base-motor-portao-deslizante-ppa-base-flex-deslizante.md |
+| 2026-10-16 | decisao | Escolhido ppa-base-flex-deslizante | Base esta na lista de material do instalador; alinha o motor a cremalheira. Comprada na Amazon em 16/10. |
+| 2026-10-16 | cotacao-manual | Cotacao manual confirmada para ppa-base-flex-deslizante | Amazon / custo_total=139.4 |
 | 2026-10-13 | cotacao | Cotacao registrada para ppa-base-flex-deslizante | Amazon / fonte=web / custo_total=148.53 |
 | 2026-10-13 | modelo | REVOGADA a anotacao anterior: comprar a base sim | Josemar corrigiu em 13/10/2026: a base esta na lista de material do Fabio (instalador), que vai instalar; ela alinha o motor a cremalheira mesmo em piso de concreto |
 | 2026-10-13 | modelo | Nao comprar a base: motor vai chumbado direto no piso | Josemar informou em 13/10/2026 que o piso junto ao portao e concreto comum (firme); a base so serve para piso fraco ou para corrigir altura [VERIFICAR altura com o Fabio na instalacao] |
@@ -28,9 +31,9 @@
 - [x] 4. Coletar cotacoes iniciais
 - [x] 5. Aplicar gates eliminatorios
 - [ ] 6. Comparar finalistas
-- [ ] 7. Confirmar preco/frete/estoque manualmente
-- [ ] 8. Registrar decisao e por que os outros perderam
-- [ ] 9. Comprar
+- [x] 7. Confirmar preco/frete/estoque manualmente
+- [x] 8. Registrar decisao e por que os outros perderam
+- [x] 9. Comprar
 - [ ] 10. Fazer veredito D+30
 - [ ] 11. Fazer veredito D+180
 

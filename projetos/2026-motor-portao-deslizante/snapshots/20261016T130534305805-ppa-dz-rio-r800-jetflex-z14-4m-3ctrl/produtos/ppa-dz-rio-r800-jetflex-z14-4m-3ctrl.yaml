@@ -1,0 +1,13 @@
+id: ppa-dz-rio-r800-jetflex-z14-4m-3ctrl
+categoria: motor_portao
+nome: Kit PPA DZ Rio R800 Jetflex Z14 4 m cremalheira 3 controles
+marca: PPA
+atributos:
+  modelo_exato: DZ Rio R800 Jetflex (Z14), 1/2
+  capacidade_kg: 800
+  tensao: bivolt
+  central: Triflex (inversor, entrada fotocelula)
+  fim_de_curso: hibrido
+  controles_inclusos: 3
+  cremalheira_inclusa_m: 4
+proveniencia: null
