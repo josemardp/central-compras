@@ -1,0 +1,23 @@
+{
+  "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+  "pyyaml": "6.0.3",
+  "argumentos": {
+    "comando": "decidir",
+    "projeto": "projetos\\2026-dps-e-disjuntor-motor-portao",
+    "produto_id": "clamper-front-20ka-175v",
+    "porque": "DPS classe II 175V certo para 220V fase-fase (127V fase-neutro), um por fase, confirmado por Josemar em 13/10. 2 unidades pagas na Amazon em 16/10 (2 pedidos de R$ 41,90).",
+    "perdedores": [],
+    "risco": [
+      "Registro a posteriori; eixo aderencia sem nota."
+    ],
+    "permitir_web": false,
+    "permitir_vencida": false,
+    "permitir_aguardando": false,
+    "permitir_cortado": true,
+    "permitir_incompleto": true,
+    "sem_perdedores": true,
+    "comprado": true,
+    "data_compra": "2026-10-16",
+    "force_veredito": true
+  }
+}

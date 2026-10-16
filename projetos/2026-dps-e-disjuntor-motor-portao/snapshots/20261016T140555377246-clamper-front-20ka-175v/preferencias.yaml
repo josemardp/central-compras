@@ -1,0 +1,115 @@
+score:
+  qualidade: 0.30
+  valor: 0.25
+  risco: 0.20
+  aderencia: 0.15
+  conveniencia: 0.10
+
+nota_bayesiana:
+  media_categoria_padrao: 4.3
+  # Com m=50, um produto de 150 avaliacoes tem 75% da nota ajustada vinda da
+  # media do marketplace, nao dele. m=250 derruba isso para 37,5%: em
+  # marketplace grande, produto popular passa dos milhares de avaliacoes.
+  peso_ancora: 250
+
+# Escalas do score. Antes era min-max dentro do projeto, e o segundo colocado
+# tirava 0,00 mesmo perdendo por pouco.
+#
+# `qualidade`, `risco` e `conveniencia` sao absolutos: a mesma cotacao da o
+# mesmo numero em qualquer projeto. `valor` e `aderencia` NAO sao: valor e a
+# razao contra o mais barato do conjunto, entao entrar um candidato barato
+# rebaixa os outros. Isso e proposital (valor so existe em comparacao), mas
+# significa que o score total nao e comparavel entre projetos diferentes.
+escala:
+  qualidade:
+    # 4,8 ja e qualidade maxima pratica em marketplace: reservar o topo para
+    # 5,0 comprimia demais os produtos bons. E abaixo de 4,0 ja e ruim.
+    nota_piso: 4.0      # nota_ajustada <= piso  -> 0,00
+    nota_teto: 4.8      # nota_ajustada >= teto  -> 1,00
+  # O eixo valor usa razao (menor_custo / custo deste), sem parametro:
+  # custar o dobro do mais barato vale 0,50.
+  conveniencia:
+    prazo_otimo_dias: 2   # ate aqui -> 1,00
+    prazo_ruim_dias: 30   # daqui em diante -> 0,00
+  # Principio 3 do PRD: todo numero e rastreavel. Estes pesos estavam cravados
+  # no codigo, entao `risco 0,71` era um numero que voce nao tinha como conferir.
+  # `auditar` mostra a conta inteira usando exatamente o que esta aqui.
+  risco:
+    peso_vendedor: 0.30
+    peso_garantia_tipo: 0.35
+    peso_garantia_prazo: 0.20
+    peso_loja: 0.15
+    garantia_meses_cheia: 36    # a partir daqui o prazo vale 1,00
+    penalidade_por_alerta: 0.15
+    penalidade_maxima: 0.35
+    vendedor:
+      oficial: 1.00
+      fisica: 0.85
+      terceiro: 0.65
+      desconhecido: 0.55
+    garantia:
+      nacional: 1.00
+      importada: 0.70
+      vendedor: 0.55
+      nenhuma: 0.10
+      desconhecido: 0.45
+    loja_preferida: 1.00
+    loja_desconhecida: 0.70
+
+# Preco envelhece. Cotacao velha nao pode ser tratada como preco de hoje.
+frescor:
+  validade_web_dias: 14
+  validade_manual_dias: 7
+
+# Fracao minima do peso do score que precisa estar apoiada em dado real para
+# fechar uma compra. Abaixo disso, `decidir` pede --permitir-incompleto.
+#
+# A criticidade ja esta embutida: o peso do eixo E a criticidade dele. Faltar
+# `qualidade` (0,30) derruba a confianca tres vezes mais que faltar
+# `conveniencia` (0,10), sem precisar de uma segunda tabela de numeros magicos.
+#
+# Calibragem com os pesos atuais:
+#   falta so conveniencia .......... 0,90  passa
+#   falta so aderencia ............. 0,85  passa
+#   falta aderencia + conveniencia . 0,75  barra
+#   falta qualidade ................ 0,70  barra
+# Quanto mais cara a compra, menos tolerancia a dado faltando.
+confianca_minima_para_decidir:
+  padrao: 0.90
+  acima_de_20000: 0.95
+
+# Eixos que nao podem simplesmente faltar numa decisao final, qualquer que seja
+# a confianca. Omitir um eixo ruim ainda subia o score: o remedio nao e so o
+# limite, e exigir semanticamente o que nao pode faltar.
+eixos_obrigatorios_para_decidir:
+  - valor
+  - aderencia
+
+lojas_preferidas:
+  - Amazon
+  - Mercado Livre
+  - Magazine Luiza
+
+marcas_vetadas: []
+
+regras_parada:
+  ate_200:
+    valor_maximo: 200
+    tempo_maximo: 20 min
+    candidatos: 3
+    cotacoes_minimas_por_candidato: 1
+  de_200_a_2000:
+    valor_maximo: 2000
+    tempo_maximo: 2 h
+    candidatos: 5
+    cotacoes_minimas_por_candidato: 2
+  de_2000_a_20000:
+    valor_maximo: 20000
+    tempo_maximo: 1 semana
+    candidatos: 5
+    cotacoes_minimas_por_candidato: 3
+  acima_20000:
+    valor_maximo: null
+    tempo_maximo: 30 dias
+    candidatos: 4
+    cotacoes_minimas_por_candidato: 3 + 1 presencial

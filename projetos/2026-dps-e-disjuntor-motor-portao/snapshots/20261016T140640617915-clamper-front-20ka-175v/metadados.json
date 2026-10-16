@@ -1,0 +1,48 @@
+{
+  "categoria": "material_eletrico",
+  "confianca": 0.75,
+  "confianca_minima": 0.9,
+  "cortes": [],
+  "cotacao": {
+    "anuncio_id": "",
+    "confirmacao": "conferido: preco",
+    "custo_extra": "0.0",
+    "custo_operacional_mensal": "0.0",
+    "custo_total": "41.9",
+    "data_coleta": "2026-10-16T00:00:00",
+    "estoque": "disponivel",
+    "flag_suspeita": "",
+    "fonte": "manual",
+    "frete_prazo_dias": "",
+    "frete_valor": "0.0",
+    "garantia_meses": "",
+    "garantia_tipo": "nacional",
+    "link": "https://www.amazon.com.br/dp/B07WSF554Q",
+    "loja": "Amazon",
+    "n_avaliacoes": "32",
+    "nota": "4.6",
+    "nota_ajustada": "4.334",
+    "preco": "41.9",
+    "preco_promocional": "",
+    "produto_id": "clamper-front-20ka-175v",
+    "proveniencia": "{\"estoque\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"Josemar em 16/10: 1o pedido do DPS pago; 2o pedido (R$ 41,90) com pagamento pendente; numeros em dados-privados\", \"origem\": \"conferencia_humana\"}, \"frete\": {\"data\": \"2026-10-13T17:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pagina Amazon B07WSF554Q 13/10: 10x R$ 4,55 = R$ 45,56; somente 8 em estoque\", \"origem\": \"observacao_direta\"}, \"garantia\": {\"data\": \"2026-10-13T17:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pagina Amazon B07WSF554Q 13/10: 10x R$ 4,55 = R$ 45,56; somente 8 em estoque\", \"origem\": \"observacao_direta\"}, \"preco\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"Josemar em 16/10: 1o pedido do DPS pago; 2o pedido (R$ 41,90) com pagamento pendente; numeros em dados-privados\", \"origem\": \"conferencia_humana\"}, \"variacao\": {\"data\": \"2026-10-16T00:00:00\", \"estado\": \"conferido\", \"evidencia\": \"Josemar em 16/10: 1o pedido do DPS pago; 2o pedido (R$ 41,90) com pagamento pendente; numeros em dados-privados\", \"origem\": \"conferencia_humana\"}, \"vendedor\": {\"data\": \"2026-10-13T17:00:00\", \"estado\": \"conferido\", \"evidencia\": \"pagina Amazon B07WSF554Q 13/10: 10x R$ 4,55 = R$ 45,56; somente 8 em estoque\", \"origem\": \"observacao_direta\"}}",
+    "score": "",
+    "tco_meses": "",
+    "tco_total": "41.9",
+    "valor_revenda_estimado": "0.0",
+    "variacao": "1 unidade paga em 16/10; 2a unidade em pedido com pagamento pendente",
+    "vendedor": "Inova Materiais Eletricos (envia e vende)",
+    "vendedor_tipo": "terceiro"
+  },
+  "cotacao_sha256": "d5f66cd809fcc2b1e845e60eb5f80a748b5c347fa6a3b3d77ceb53aa9d9570dd",
+  "criado_em": "2026-10-16T14:06:41",
+  "excecoes": [
+    "--permitir-incompleto"
+  ],
+  "justificativa": "DPS classe II 175V certo para 220V fase-fase (127V fase-neutro), um por fase, confirmado por Josemar em 13/10. 2 unidades pagas na Amazon em 16/10 (2 pedidos de R$ 41,90).",
+  "produto_id": "clamper-front-20ka-175v",
+  "riscos_declarados": [
+    "Registro a posteriori; eixo aderencia sem nota."
+  ],
+  "schema_versao": 2
+}

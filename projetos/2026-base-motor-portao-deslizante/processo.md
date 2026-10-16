@@ -10,6 +10,8 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-16 | decisao | Base PAGA (R$ 139,40) na 2a tentativa de pagamento em 16/10 | Josemar colou o pedido com 'Chega quinta-feira' em 16/10 |
+| 2026-10-16 | decisao | CORRECAO: base NAO esta paga. Pedido de recompra ficou com pagamento pendente | Josemar informou em 16/10 que a recompra da base (R$ 139,40) e o 2o DPS ficaram com 'Pagamento pendente / atualize o metodo de pagamento'. Estado voltou a pesquisando; quando pagar: registrar-evento --evento comprado no veredito |
 | 2026-10-16 | decisao | Base recomprada por R$ 139,40 | Josemar confirmou em 16/10 que o valor do novo pedido e o mesmo do pedido cancelado |
 | 2026-10-16 | decisao | Pedido original (base + F30) cancelado em 16/10; base recomprada sozinha no mesmo dia | Para tirar a F30 do pedido. Valor do novo pedido nao informado [VERIFICAR; o pedido cancelado tinha a base a R$ 139,40 inferido] |
 | 2026-10-16 | veredito | Arquivo de veredito criado | 2026-10-16-2026-base-motor-portao-deslizante-ppa-base-flex-deslizante.md |
