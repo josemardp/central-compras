@@ -5,6 +5,15 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 16/10/2026 (tarde): HB20S bobinas e velas (nada comprado, falta recotar bobina original)
+
+- **O que é.** Projetos `projetos/2026-hb20s-jogo-bobinas-ignicao` e `projetos/2026-hb20s-jogo-velas-ignicao`, abertos em 15/10. Scanner deu P0300/P0302/P0301; o mecânico Denis recomendou trocar as 4 bobinas (ainda as originais) e as 4 velas. Carro parado na oficina dele. Prioridade: peça original, sem risco de falsificação.
+- **Cotações (ver `cotacoes.csv` de cada projeto).** Bobinas: Quirino Marcos Peças Araçatuba NGK U5067 R$ 1.008 (orçamento 87099, válido até 14/11, `fonte=manual`); ML NGK U5067 R$ 765,71 e Bosch R$ 715,11 (`fonte=web`; o Bosch tem anúncio ambíguo e 1 mês de garantia). Velas: Quirino NGK LZKR7B-DE R$ 180 (`manual`); ML R$ 149,90 e Maturo R$ 170,16 (`web`); **Golden Motors original Hyundai 18855-08070 R$ 313,16** (orçamento 79364, `manual`, registrado nesta sessão).
+- **Golden cotou a peça errada.** No lugar da bobina 27301-2B010 o orçamento 79364 trouxe 35310-2B030 **conjunto do injetor de combustível** (4 x R$ 1.138,68). Não registrado como cotação de bobina; anotado no `processo.md` das bobinas. Garantia Golden: 90 dias só se instalada na concessionária; troca só em 24 h; validade contraditória (14/11 no cabeçalho, 5 dias na observação).
+- **Ao retomar.** (1) Josemar pedir de novo à Golden (vendedor Samuel) o preço da bobina **27301-2B010**. (2) Se ficar perto de R$ 1.008, considerar a original; se não, fechar tudo no Quirino (NGK, R$ 1.188 bobinas + velas). Velas: recomendação é a NGK do Quirino (é a marca de fábrica; a Hyundai custa R$ 133 a mais sem garantia no caso dele). (3) Perguntar ao Quirino garantia e entrega na oficina do Denis. (4) Comprado: `promover-cotacao`/`decidir` nos dois projetos.
+
+---
+
 ## Sessão 16/10/2026: compras da instalação (parte do portão paga)
 
 - **PAGO na Amazon em 16/10, chega quinta 22/10 (registrado com cotação manual + `decidir --comprado`):** motor PPA DZ Rio R800 Jetflex Z14 kit 4 m + 3 controles **R$ 893,99**; base Flex PPA **R$ 139,40**; **2** DPS Clamper Front 20kA 175V **R$ 83,80** (2 pedidos de R$ 41,90). **Total pago R$ 1.117,19.** Números dos pedidos em `~/.central-compras/dados-privados/pedidos-amazon-instalacao-2026-10-13.md` (seção 16/10). Decisões registradas a posteriori com `--permitir-incompleto` (eixo aderência sem nota) e `--permitir-cortado` onde o gate cortou (garantia do vendedor no motor, poucas avaliações na base).
