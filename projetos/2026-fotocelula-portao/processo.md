@@ -10,6 +10,8 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-16 | decisao | CANCELADA a compra da F30 (pedido base + F30 cancelado em 16/10, reembolso em 3 a 5 dias uteis). Volta a F10-R | F30 e barreira (fio dos dois lados do portao); a F10-R refletiva foi escolhida para ter fio so de um lado. F10-R Ecommseg R$ 252,60 colocada no carrinho em 16/10 |
+| 2026-10-16 | descarte | Descartado ppa-f30 | Pedido de 16/10 cancelado (junto com a base): F30 e de barreira e exige fio dos dois lados do portao; o modelo escolhido e a F10-R refletiva |
 | 2026-10-16 | veredito | Arquivo de veredito criado | 2026-10-16-2026-fotocelula-portao-ppa-f30.md |
 | 2026-10-16 | decisao | Escolhido ppa-f30 | Comprada pelo Josemar na Amazon em 16/10 por R$ 142,90, quase metade do preco da F10-R; compativel com qualquer central. |
 | 2026-10-16 | modelo | Josemar comprou a PPA F30 (barreira, emissor + receptor) em vez da F10-R refletiva | Preco: R$ 142,90 contra R$ 252,60 da F10-R. Atencao: barreira precisa de cabo de alimentacao (12-24 Vdc) ate o emissor no lado oposto do portao; a F10-R tinha sido escolhida por ter fio so de um lado. [VERIFICAR com o instalador como passar o cabo ao lado oposto] |

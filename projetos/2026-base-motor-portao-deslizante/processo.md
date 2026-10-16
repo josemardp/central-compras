@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-16 | decisao | Pedido original (base + F30) cancelado em 16/10; base recomprada sozinha no mesmo dia | Para tirar a F30 do pedido. Valor do novo pedido nao informado [VERIFICAR; o pedido cancelado tinha a base a R$ 139,40 inferido] |
 | 2026-10-16 | veredito | Arquivo de veredito criado | 2026-10-16-2026-base-motor-portao-deslizante-ppa-base-flex-deslizante.md |
 | 2026-10-16 | decisao | Escolhido ppa-base-flex-deslizante | Base esta na lista de material do instalador; alinha o motor a cremalheira. Comprada na Amazon em 16/10. |
 | 2026-10-16 | cotacao-manual | Cotacao manual confirmada para ppa-base-flex-deslizante | Amazon / custo_total=139.4 |

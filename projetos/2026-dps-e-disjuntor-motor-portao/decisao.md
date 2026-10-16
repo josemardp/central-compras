@@ -7,12 +7,12 @@
 - Cotacao usada: Amazon / Inova Materiais Eletricos (envia e vende)
 - Data: 2026-10-16
 - Custo total confirmado: R$ 41,90
-- Evidencia congelada: snapshots/20261016T130637004936-clamper-front-20ka-175v/ranking.md
+- Evidencia congelada: snapshots/20261016T132725769181-clamper-front-20ka-175v/ranking.md
 - Cotacao SHA-256: ceab407674ee45e3ff558f67793675c76bd355f967682f184fc7ffb7d5b84d4c
 
 ## Por que escolhi
 
-- DPS classe II 175V certo para 220V fase-fase (127V fase-neutro), confirmado por Josemar em 13/10. Comprado na Amazon em 16/10.
+- DPS classe II 175V certo para 220V fase-fase (127V fase-neutro), um por fase, confirmado por Josemar em 13/10. 2 unidades compradas na Amazon em 16/10 (2 pedidos de R$ 41,90).
 
 ## Por que os outros perderam
 
@@ -22,8 +22,8 @@
 
 ## Riscos aceitos
 
-- Excecao efetiva: --permitir-incompleto. Justificativa: DPS classe II 175V certo para 220V fase-fase (127V fase-neutro), confirmado por Josemar em 13/10. Comprado na Amazon em 16/10.
-- Registro a posteriori. Pedido com 1 unidade e o modelo previa 2 (uma por fase) [VERIFICAR se falta comprar a 2a ou se o instalador aceita 1]; eixo aderencia sem nota.
+- Excecao efetiva: --permitir-incompleto. Justificativa: DPS classe II 175V certo para 220V fase-fase (127V fase-neutro), um por fase, confirmado por Josemar em 13/10. 2 unidades compradas na Amazon em 16/10 (2 pedidos de R$ 41,90).
+- Registro a posteriori; eixo aderencia sem nota.
 
 ## O que conferir antes de pagar
 

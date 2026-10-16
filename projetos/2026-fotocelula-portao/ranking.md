@@ -1,6 +1,6 @@
 # Ranking
 
-Gerado em 2026-10-16T13:06:18.
+Gerado em 2026-10-16T13:27:17.
 
 ## Elegiveis
 
@@ -8,7 +8,7 @@ Nenhum candidato passou pelos gates.
 ## Cortados pelos gates
 
 - Fotocelula refletiva PPA F10-R: avaliacoes insuficientes (2 < 20) alertas: AVAL_SUSPEITA
-- Fotocelula de barreira PPA F30 (emissor + receptor): avaliacoes insuficientes (4 < 20) alertas: AVAL_SUSPEITA
+- Fotocelula de barreira PPA F30 (emissor + receptor): produto descartado (Pedido de 16/10 cancelado (junto com a base): F30 e de barreira e exige fio dos dois lados do portao; o modelo escolhido e a F10-R refletiva); avaliacoes insuficientes (4 < 20) alertas: AVAL_SUSPEITA
 
 ## Observacoes
 

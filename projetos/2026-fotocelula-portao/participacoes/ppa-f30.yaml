@@ -1,8 +1,9 @@
 produto_id: ppa-f30
-estado: pesquisando
+estado: descartado
 preco_alvo: null
 preco_teto: null
 requisitos_atendidos: {}
-descartado_porque: null
+descartado_porque: 'Pedido de 16/10 cancelado (junto com a base): F30 e de barreira
+  e exige fio dos dois lados do portao; o modelo escolhido e a F10-R refletiva'
 aguardando_preco_porque: null
 aguardando_preco_desde: null

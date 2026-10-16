@@ -11,6 +11,9 @@
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
 | 2026-10-16 | veredito | Arquivo de veredito criado | 2026-10-16-2026-dps-e-disjuntor-motor-portao-clamper-front-20ka-175v.md |
+| 2026-10-16 | decisao | Escolhido clamper-front-20ka-175v | DPS classe II 175V certo para 220V fase-fase (127V fase-neutro), um por fase, confirmado por Josemar em 13/10. 2 unidades compradas na Amazon em 16/10 (2 pedidos de R$ 41,90). |
+| 2026-10-16 | cotacao-manual | Cotacao manual confirmada para clamper-front-20ka-175v | Amazon / custo_total=83.8 |
+| 2026-10-16 | veredito | Arquivo de veredito criado | 2026-10-16-2026-dps-e-disjuntor-motor-portao-clamper-front-20ka-175v.md |
 | 2026-10-16 | decisao | Escolhido clamper-front-20ka-175v | DPS classe II 175V certo para 220V fase-fase (127V fase-neutro), confirmado por Josemar em 13/10. Comprado na Amazon em 16/10. |
 | 2026-10-16 | cotacao-manual | Cotacao manual confirmada para clamper-front-20ka-175v | Amazon / custo_total=41.9 |
 | 2026-10-13 | cotacao | Cotacao registrada para clamper-front-20ka-175v | Amazon / fonte=web / custo_total=91.12 |
