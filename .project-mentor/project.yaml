@@ -17,14 +17,14 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-10-14T04:11:33-03:00
-  last_session_at: 2026-10-14T04:11:32-03:00
+  updated_at: 2026-10-16T13:48:10-03:00
+  last_session_at: 2026-10-16T13:48:10-03:00
   confidence: confirmed
 focus:
   objective: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
-  current: Abrir Seus pedidos na Amazon e listar todos os pedidos pendentes antes de qualquer nova tentativa de pagamento
-  last_completed: 6 de 8 pedidos pendentes cancelados
-  recommended_next_action: act-020
+  current: Comprar os itens pendentes da Amazon e registrar cada pedido pago no repositorio
+  last_completed: Carrinho montado com a fotocelula refletiva (navegador sem login)
+  recommended_next_action: act-007
 next_actions:
   - id: act-001
     title: Acompanhar entrega das pecas do HB20 e registrar veredito D+30
@@ -232,7 +232,7 @@ next_actions:
     note: null
   - id: act-018
     title: Receber a resposta do Fabio (motor R800 x 500 e cremalheira), fechar o motor e montar o carrinho da instalacao na Amazon
-    status: pending
+    status: done_implemented
     impact: null
     urgency: null
     effort: null
@@ -240,7 +240,7 @@ next_actions:
     unblocks: []
     blocked_by: []
     created_at: 2026-10-13T17:33:56-03:00
-    done_at: null
+    done_at: 2026-10-16T13:48:10-03:00
     note: null
   - id: act-019
     title: Avaliar depois a camera solar 4G + Wi-Fi (Ezviz EB8 Pro 4G) e o nobreak adiado
@@ -275,10 +275,6 @@ blockers:
     resolved_at: null
 decisions_recent:
   - date: 2026-10-12
-    text: Lavadora só lava, abertura superior, 127V, teto R$ 2.300 com frete
-  - date: 2026-10-12
-    text: Preço comparado é o total em 10x no cartão, não o do Pix
-  - date: 2026-10-12
     text: "Gate da categoria: nota 4,3, mínimo 10 avaliações, garantia nacional, rede de assistência"
   - date: 2026-10-12
     text: LET13 e LDA13 cortadas por falta de filtro de fiapos e poucas avaliações
@@ -294,6 +290,10 @@ decisions_recent:
     text: Motor R800 com cremalheira do kit
   - date: 2026-10-14
     text: Disjuntor e plugues comprados em loja fisica junto com o cabo
+  - date: 2026-10-16
+    text: Compras ja feitas registradas a posteriori com --permitir-incompleto e, onde o gate cortou, --permitir-cortado, com o motivo no risco
+  - date: 2026-10-16
+    text: "Fotocelula: manter o modelo refletivo (fio de um lado so do portao)"
 milestones: []
 review:
   stale_after_days: null
