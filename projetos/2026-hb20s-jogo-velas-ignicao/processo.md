@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-16 | cotacao | Cotacao registrada para hyundai-vela-original-jogo4 | Golden Motors Aracatuba / fonte=manual / custo_total=313.16 |
 | 2026-10-15 | cotacao | Cotacao registrada para ngk-lzkr7b-de-jogo4 | Quirino Marcos Pecas / fonte=manual / custo_total=180.0 |
 | 2026-10-15 | cotacao | Pedido de orcamento enviado por WhatsApp a Golden Motors Aracatuba (concessionaria Hyundai, 18 3519-3100, 15:12) e a Quirino Marcos Pecas Aracatuba (18 99770-6033, indicacao do mecanico Denis, 15:07) | Carro parado na oficina do Denis; compra local em Aracatuba com frete ate Valparaiso e mais rapida que o Mercado Livre, que entrega no endereco atual da conta. Loja fisica reduz o risco de falsificacao. Aguardando resposta das duas. |
 | 2026-10-15 | modelo | Pesquisar jogo NGK LZKR7B-DE (spec de fabrica 2012-2015) e original Hyundai na concessionaria | LZKR7B-DE e o codigo NGK citado pelas lojas para HB20 1.6 Gamma 2013-2015; SILZKR7G8DE iridium e o de 2016+ e nao foi confirmado para 2015. Anuncio iridium MLBU3719022910 descartado de cara: titulo diz SILZKR7G8DE mas a marca e ACDelco. |

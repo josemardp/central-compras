@@ -4,6 +4,6 @@ nome: Jogo 4 velas originais Hyundai/Mobis (balcao concessionaria)
 marca: Hyundai
 atributos:
   tipo: vela_ignicao_original
-  codigo_fabricante: VERIFICAR
+  codigo_fabricante: "18855-08070"
   quantidade: 4
 proveniencia: null

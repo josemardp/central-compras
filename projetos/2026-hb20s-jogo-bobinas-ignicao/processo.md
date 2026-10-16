@@ -10,6 +10,7 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-16 | cotacao | Golden Motors respondeu (orcamento 79364, 15/10 14:50) mas cotou a peca errada: 35310-2B030 CONJUNTO DO INJETOR DE COMBUSTIVEL, 4 x R$ 1.138,68 (R$ 4.326,98 com desconto), e nao a bobina 27301-2B010. Nao registrado como cotacao de bobina. | Injetor nao e bobina e nao foi pedido pelo Denis. Falta pedir de novo a Golden o preco da bobina original 27301-2B010. |
 | 2026-10-15 | cotacao | Cotacao registrada para ngk-u5067-jogo4 | Quirino Marcos Pecas / fonte=manual / custo_total=1008.0 |
 | 2026-10-15 | cotacao | Pedido de orcamento enviado por WhatsApp a Golden Motors Aracatuba (concessionaria Hyundai, 18 3519-3100, 15:12) e a Quirino Marcos Pecas Aracatuba (18 99770-6033, indicacao do mecanico Denis, 15:07) | Carro parado na oficina do Denis; compra local em Aracatuba com frete ate Valparaiso e mais rapida que o Mercado Livre, que entrega no endereco atual da conta. Loja fisica reduz o risco de falsificacao. Aguardando resposta das duas. |
 | 2026-10-15 | modelo | Pesquisar jogo de 4 bobinas: original Hyundai 27301-2B010, NGK U5067 e Bosch | Bobinas ainda sao as originais do carro (Denis, 15/10). Falha alternou cilindros 2 e 1 sem troca de pecas, entao o Denis recomendou as 4. Anuncios de 27301-2B010 a R$ 59-81 por unidade com 61-75% OFF tratados como risco de falsificacao e nao cotados. |
