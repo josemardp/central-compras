@@ -1,0 +1,11 @@
+id: keim-soldalit
+categoria: generico
+nome: KEIM Soldalit
+marca: KEIM
+atributos:
+  tecnologia: sol_silicato
+  sd_m: 0.01
+  consumo_kg_m2_2demaos: 0.35-0.50
+  embalagem_kg: 5_ou_18
+  suporte_brasil: nao_confirmado
+proveniencia: null

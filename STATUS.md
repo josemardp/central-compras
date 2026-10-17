@@ -5,6 +5,21 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 17/10/2026: parede de garagem com umidade e sais
+
+- **Decisão do Josemar (17/10, mais recente):** Caminho A, parede que respira. Reboco de saneamento só onde o reboco estiver podre + tinta de silicato. Parede falsa e drenagem ficam fora. Dois processos: `projetos/2026-recuperacao-parede-umida-com-sais/` (reboco: KÖSTER, KEIM, Remmers, Mapei, Diasen) e `projetos/2026-tinta-silicato-parede-garagem/` (tinta, acessório: KEIM Soldalit, Kröten Ecossílica). Nada cotado. Próximo passo: Josemar faz o teste da parede e liga para a KÖSTER Brasil. Guia ilustrado (privado): https://claude.ai/artifact/RmRkSqy5qUkHTNWvsUG3rS
+
+- **Esclarecimento mais recente, prevalece sobre o encaminhamento inicial:** Josemar quer resiliência e saída de vapor, não barrar água. Foco em acabamento mineral de silicato/sol-silicato e mínimo reparo. Não foi constatada necessidade de trocar toda a faixa de reboco: distinguir pintura/massa solta de reboco desagregado. Injeção e drenagem não são o objetivo atual; não prometer zero mofo ou descascamento permanente.
+- Varredura de tecnologias internacionais (Japão, China, Israel, EUA, Europa, Dubai) concluída no relatório técnico: detalha a armadilha física da cristalização de sais (criptoflorescência) e apresenta as duas rotas estado da arte para não quebrar a parede e não mexer no vizinho: (1) Desconexão por parede falsa ventilada (Reino Unido / Japão); (2) Descontaminação localizada com neutralizador de sais à base de fluossilicato + reboco macroporoso + silicato de potássio puro (Alemanha / Itália / EUA). **Essa varredura veio de outra IA sem fonte e foi conferida por Claude Code no mesmo dia:** procede que tinta sozinha falha sobre sais; caíram pH "antimofo perpétuo", norma chinesa "obrigatória", proibição JIS e pressão de 100 a 200 MPa; a Rota 1 com drywall de gesso não serve como descrita. Tabela de conferência no início do panorama em `02-pesquisa-tecnica.md`. Candidato novo a verificar: Diasen Diathonite Deumix+ (sem distribuidor BR achado).
+- Pesquisa técnica aberta em `projetos/2026-recuperacao-parede-umida-com-sais/`. Quatro fotos examinadas; origem da água e alvenaria ainda não identificadas. Sem compra ou mensagem enviada.
+- [Relatório completo](projetos/2026-recuperacao-parede-umida-com-sais/02-pesquisa-tecnica.md): revisão do parecer, comparação, preços públicos, ranking condicionado, quantitativos, especificação para aplicadores e perguntas técnicas.
+- Atualização do Josemar: bloco de seis furos, cerca de 5 m na área + 5 m no muro; entrada lateral do terreno vizinho com terra e grama perto da tomada. Crisin Cream sai da recomendação principal. KÖSTER White permanece para recuperar revestimento/sais, não para bloquear água lateral. Se houver fluxo ativo, avaliar drenagem interna completa. Canal brasileiro não significa estoque confirmado.
+- Não foi comprovado reboco de fabricação nacional equivalente WTA/R nesta rodada. Injetáveis nacionais têm restrições e não substituem o sistema. Drenagem interna é plano B para água ativa, com saída e manutenção.
+- Respostas seguintes: apenas úmido e descascando, sem escorrimento relatado; existe ralo no lado próprio, ainda sem aferição de cota/destino/capacidade. Próximo passo: parecer escrito e orçamento KÖSTER para saneamento localizado, com vistoria. Sem Crisin e sem drenagem inicialmente; não prometer que o reboco interrompe a alimentação lateral. Faixa de 1,40 m: ~14 m²; 1,80 m: ~18 m². Altura inteira de 2,70 m é só hipótese, não recomendação de obra até o teto. Preços estrangeiros de componentes não são cotação de sistema completo.
+- Guia reutilizável: `base-conhecimento/especificacoes/parede_umida_sais.md`. Mentor: act-022. Sem alteração de código e sem commit/push nesta sessão até autorização explícita.
+
+---
+
 ## Sessão 16/10/2026 (tarde): HB20S bobinas e velas (nada comprado, falta recotar bobina original)
 
 - **O que é.** Projetos `projetos/2026-hb20s-jogo-bobinas-ignicao` e `projetos/2026-hb20s-jogo-velas-ignicao`, abertos em 15/10. Scanner deu P0300/P0302/P0301; o mecânico Denis recomendou trocar as 4 bobinas (ainda as originais) e as 4 velas. Carro parado na oficina dele. Prioridade: peça original, sem risco de falsificação.

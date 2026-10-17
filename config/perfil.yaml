@@ -37,6 +37,17 @@ equipamentos:
     descricao: "Lenovo K14 Gen 1 (21CUS0GE00)"
     observacao: "trabalho (institucional); portas [VERIFICAR no datasheet]"
 
+imovel:
+  parede_garagem_umida:
+    alvenaria: "bloco de seis furos, informado por Josemar em 17/10/2026; espessura e orientacao dos furos nao medidas"
+    extensao: "aproximadamente 5 m na area e 5 m no muro; considerar cerca de 10 m lineares sem dupla contagem"
+    agua: "Josemar relata entrada lateral do terreno vizinho com terra e grama, aproximadamente na altura da tomada; vazao e pressao nao medidas"
+    manifestacao: "Josemar informou em 17/10/2026 apenas umido e descascando, sem gotas/escorrimento relatados"
+    drenagem: "existe ralo no lado proprio; cota, destino, capacidade e protecao contra retorno nao verificados"
+    restricao: "intervencao apenas pelo lado proprio, com minima remocao necessaria"
+    objetivo: "acabamento resiliente e permeavel ao vapor, nao bloqueio da agua; preservar reboco firme e reparar somente o necessario"
+    altura: "nao medida; 2,70 m e apenas hipotese de pre-orcamento, nao fato do imovel"
+
 # Inferido das compras ja registradas; confirmar com o Josemar.
 preferencias:
   - "garantia nacional pesa (gates de celular/fone/camera)"
