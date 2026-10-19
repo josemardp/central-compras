@@ -10,6 +10,11 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-19 | decisao | Compra prevista no Quirino em 20/10 (NGK U5067) | Josemar decidiu em 19/10/2026 comprar bobinas + velas no Quirino (orcamento 87099, R$ 1.188 em 6x sem acrescimo) e retirar em 20/10, mesmo o ML saindo ~R$ 213-240 mais barato (Box Online bobinas R$ 798,66 + SUVMOTORS velas R$ 149,90): carro parado na oficina do Denis, retirada imediata e loja fisica para troca. Ainda nao pago; registrar com promover-cotacao/decidir --comprado apos a compra. Garantia do Quirino ainda nao informada. |
+| 2026-10-19 | cotacao | Cotacao registrada para ngk-u5067-jogo4 | Quirino Marcos Pecas / fonte=manual / custo_total=1008.0 |
+| 2026-10-19 | cotacao | Cotacao registrada para ngk-u5067-jogo4 | Mercado Livre / fonte=web / custo_total=1015.0 |
+| 2026-10-19 | cotacao | Cotacao registrada para ngk-u5067-jogo4 | Mercado Livre / fonte=web / custo_total=798.66 |
+| 2026-10-19 | cotacao | Cotacao registrada para ngk-u5067-jogo4 | Mercado Livre / fonte=web / custo_total=765.71 |
 | 2026-10-16 | cotacao | Golden Motors respondeu (orcamento 79364, 15/10 14:50) mas cotou a peca errada: 35310-2B030 CONJUNTO DO INJETOR DE COMBUSTIVEL, 4 x R$ 1.138,68 (R$ 4.326,98 com desconto), e nao a bobina 27301-2B010. Nao registrado como cotacao de bobina. | Injetor nao e bobina e nao foi pedido pelo Denis. Falta pedir de novo a Golden o preco da bobina original 27301-2B010. |
 | 2026-10-15 | cotacao | Cotacao registrada para ngk-u5067-jogo4 | Quirino Marcos Pecas / fonte=manual / custo_total=1008.0 |
 | 2026-10-15 | cotacao | Pedido de orcamento enviado por WhatsApp a Golden Motors Aracatuba (concessionaria Hyundai, 18 3519-3100, 15:12) e a Quirino Marcos Pecas Aracatuba (18 99770-6033, indicacao do mecanico Denis, 15:07) | Carro parado na oficina do Denis; compra local em Aracatuba com frete ate Valparaiso e mais rapida que o Mercado Livre, que entrega no endereco atual da conta. Loja fisica reduz o risco de falsificacao. Aguardando resposta das duas. |

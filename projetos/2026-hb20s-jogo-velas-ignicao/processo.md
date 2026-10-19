@@ -10,6 +10,9 @@
 
 | Data | Etapa | Decisao | Por que |
 |---|---|---|---|
+| 2026-10-19 | decisao | Compra prevista no Quirino em 20/10 (NGK LZKR7B-DE) | Josemar decidiu em 19/10/2026 comprar bobinas + velas no Quirino (orcamento 87099, R$ 1.188 em 6x sem acrescimo) e retirar em 20/10, mesmo o ML saindo ~R$ 213-240 mais barato (Box Online bobinas R$ 798,66 + SUVMOTORS velas R$ 149,90): carro parado na oficina do Denis, retirada imediata e loja fisica para troca. Ainda nao pago; registrar com promover-cotacao/decidir --comprado apos a compra. Garantia do Quirino ainda nao informada. |
+| 2026-10-19 | cotacao | Cotacao registrada para ngk-lzkr7b-de-jogo4 | Quirino Marcos Pecas / fonte=manual / custo_total=180.0 |
+| 2026-10-19 | cotacao | Cotacao registrada para ngk-lzkr7b-de-jogo4 | Mercado Livre / fonte=web / custo_total=149.9 |
 | 2026-10-16 | cotacao | Cotacao registrada para hyundai-vela-original-jogo4 | Golden Motors Aracatuba / fonte=manual / custo_total=313.16 |
 | 2026-10-15 | cotacao | Cotacao registrada para ngk-lzkr7b-de-jogo4 | Quirino Marcos Pecas / fonte=manual / custo_total=180.0 |
 | 2026-10-15 | cotacao | Pedido de orcamento enviado por WhatsApp a Golden Motors Aracatuba (concessionaria Hyundai, 18 3519-3100, 15:12) e a Quirino Marcos Pecas Aracatuba (18 99770-6033, indicacao do mecanico Denis, 15:07) | Carro parado na oficina do Denis; compra local em Aracatuba com frete ate Valparaiso e mais rapida que o Mercado Livre, que entrega no endereco atual da conta. Loja fisica reduz o risco de falsificacao. Aguardando resposta das duas. |
