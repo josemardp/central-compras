@@ -25,6 +25,7 @@
 - **Recotado o ML (`fonte=web`, 19/10).** Bobina NGK U5067 da SANS IMPORT (R$ 765,71) **esgotou**. Melhor ML agora: loja oficial Box Online R$ 798,66 em 10x sem juros, 3 meses de garantia de fábrica (anúncio de i30, ficha diz U5067). Coutinho R$ 1.015. Velas SUVMOTORS R$ 149,90, mas 12x **com** juros.
 - **Quirino respondeu no WhatsApp (19/10 15:04):** "no cartão faz em 6x 1188.00", sem acréscimo. Registrado como `fonte=manual` nos dois projetos. Garantia ainda não informada.
 - **Decisão do Josemar:** comprar bobinas + velas no **Quirino amanhã (20/10)**, mesmo o ML saindo uns R$ 213 a R$ 240 mais barato (carro parado na oficina do Denis; retirada imediata). Anotado no `processo.md` dos dois projetos. A recotação da bobina original na Golden ficou dispensada.
+- **Retirada (19/10, noite):** a Esdra vai buscar no Quirino em 20/10. Enviados a ela no WhatsApp (perfil `nav-josemardp`, autorizado pelo Josemar): print do orçamento 87099 encaminhado e foto da fachada com valor, 6x de R$ 198, endereço, horário, telefones e link do Maps. A loja é a **Marcopeças**, R. Porangaba, 480, Vila Industrial, Araçatuba (o site diz 422; Maps e placa dizem 480). Mensagens lidas.
 - **Ao retomar.** Comprado: perguntar a garantia na hora; depois `promover-cotacao` + `decidir --comprado` nos dois projetos (perdedores: Box Online e SUVMOTORS no ML, Golden nas velas).
 
 ---
