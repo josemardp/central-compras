@@ -5,6 +5,14 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 30/10/2026: bacia Deca Aspen P.75.17 (cotada, nada comprado)
+
+- **Onde está:** `projetos/2026-bacia-deca-aspen-convencional-p7517/`, com 13 cotações datadas `fonte=web`.
+- **Melhor oferta entregue:** Magalu, vendida pela Liven Casa, R$ 367,35 no Pix e R$ 383,79 no cartão, entrega até 06/11. O fechamento do pedido não foi simulado, porque exige login.
+- **Sem servir:** anúncio do ML de R$ 346,90 sumiu para o endereço de casa; KUBBO com domínio estacionado; Telhanorte, eFácil, Irmãos Soares e Leroy Merlin sem entrega.
+- **Pendente:** decidir a compra, confirmar o total com `promover-cotacao`, preencher especificação e acessórios (assento e fixação são à parte).
+- **Navegador:** o Chrome ligado à extensão é o perfil da Esdra. O WhatsApp do Josemar está no `nav-josemardp`.
+
 ## Sessão 17/10/2026: parede de garagem com umidade e sais
 
 - **Decisão do Josemar (17/10, mais recente):** Caminho A, parede que respira. Reboco de saneamento só onde o reboco estiver podre + tinta de silicato. Parede falsa e drenagem ficam fora. Dois processos: `projetos/2026-recuperacao-parede-umida-com-sais/` (reboco: KÖSTER, KEIM, Remmers, Mapei, Diasen) e `projetos/2026-tinta-silicato-parede-garagem/` (tinta, acessório: KEIM Soldalit, Kröten Ecossílica). Nada cotado. Próximo passo: Josemar faz o teste da parede e liga para a KÖSTER Brasil. Guia ilustrado (privado): https://claude.ai/artifact/RmRkSqy5qUkHTNWvsUG3rS

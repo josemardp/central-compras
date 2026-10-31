@@ -22,3 +22,4 @@ Formato sugerido:
 2026-09-21 - motor_portao - Manual tecnico do fabricante vale mais que anuncio: o manual PPA DZ Rio corrigiu velocidade (33 m/min, nao 5,3 s em 4 m), disjuntor (5 A, nao 10 A) e revelou DR 30 mA obrigatorio.
 2026-09-21 - cartao_memoria - Cartao Endurance 128 GB nao existe no Brasil a preco normal; WD Purple Intelbras 64 GB (3 anos de garantia) e o equivalente nacional para CFTV.
 2026-09-21 - material_eletrico - Anuncio com foto de outro produto (DR Steck mostrando interruptor) indica cadastro errado: comprar em loja fisica.
+2026-10-30 - louca_sanitaria - Em louca sanitaria, o frete decide: para a mesma bacia de 15 kg ele variou de R$ 54,90 a R$ 638,08, e as tres ofertas mais baratas na vitrine nao entregavam ou ficavam caras. Comparar sempre o total com CEP.
