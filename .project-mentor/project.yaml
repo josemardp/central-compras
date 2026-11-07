@@ -17,7 +17,7 @@ status:
   health: healthy
   phase: Operacao corrente / Cotacao de servico especializado
   priority: 2
-  updated_at: 2026-10-31T00:08:38-03:00
+  updated_at: 2026-11-04T10:52:55-03:00
   last_session_at: 2026-10-31T00:08:38-03:00
   confidence: confirmed
 focus:
@@ -373,6 +373,18 @@ next_actions:
     blocked_by: []
     created_at: 2026-10-31T00:08:38-03:00
     done_at: null
+    note: null
+  - id: act-030
+    title: Registrar demanda de Rivotril, 1 frasco, 2,5 mg
+    status: done_implemented
+    impact: null
+    urgency: null
+    effort: null
+    due_date: null
+    unblocks: []
+    blocked_by: []
+    created_at: 2026-11-04T10:50:56-03:00
+    done_at: 2026-11-04T10:52:55-03:00
     note: null
 blockers:
   - id: blk-001

@@ -1,0 +1,3 @@
+produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+rivotril-gotas-2-5mg-ml-20ml,"Rivotril gotas (clonazepam) 2,5 mg/mL, 20 mL",56.3,0.0,1.0,0.44,0.0,0.5,elegivel,,,web,0.6,0,nao,qualidade; conveniencia,25.51,0.0,,0.0,25.51
+clonazepam-gotas-2-5mg-ml-20ml-generico,"Clonazepam gotas 2,5 mg/mL, 20 mL (Generico)",0,0.0,1.0,0.44,0.0,0.5,cortado,"produto descartado (Decisao do Josemar em 04/11: quer o medicamento de marca de referencia (Rivotril), nao o generico.)",,web,0.6,0,nao,qualidade; conveniencia,13.99,0.0,,0.0,13.99

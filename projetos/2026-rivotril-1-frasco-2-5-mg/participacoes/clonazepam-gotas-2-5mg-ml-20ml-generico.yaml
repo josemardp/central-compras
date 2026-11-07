@@ -1,0 +1,10 @@
+produto_id: clonazepam-gotas-2-5mg-ml-20ml-generico
+estado: descartado
+preco_alvo: null
+preco_teto: null
+requisitos_atendidos:
+  prescricao: receita_valida_compativel
+descartado_porque: 'Decisao do Josemar em 04/11: quer o medicamento de marca de referencia
+  (Rivotril), nao o generico.'
+aguardando_preco_porque: null
+aguardando_preco_desde: null

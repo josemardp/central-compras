@@ -1,0 +1,9 @@
+produto_id: rivotril-gotas-2-5mg-ml-20ml
+estado: pesquisando
+preco_alvo: null
+preco_teto: null
+requisitos_atendidos:
+  prescricao: receita_valida_compativel
+descartado_porque: null
+aguardando_preco_porque: null
+aguardando_preco_desde: null

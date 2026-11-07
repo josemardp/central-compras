@@ -7485,7 +7485,8 @@ def scan_sensitive(root: Path) -> list[tuple[str, int, str, str]]:
     que reescrever historico depois.
     """
     achados: list[tuple[str, int, str, str]] = []
-    ignorar = {".git", "__pycache__", ".venv", "venv", ".pytest_cache", "dados-privados"}
+    # node_modules e .tmp sao locais e ignorados pelo git; so geravam falso positivo.
+    ignorar = {".git", "__pycache__", ".venv", "venv", ".pytest_cache", "dados-privados", "node_modules", ".tmp"}
     for path in sorted(root.rglob("*")):
         if not path.is_file() or (path.suffix.lower() not in SCAN_SUFFIXES and path.name.lower() not in SCAN_NAMES):
             continue
