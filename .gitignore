@@ -36,3 +36,7 @@ htmlcov/
 # lojas. Tambem esta no gitignore global desta maquina, mas nao da pra contar
 # com isso em outra maquina - por isso fica aqui tambem.
 .playwright-mcp/
+
+# Rascunhos de coleta feitos na raiz por agentes; ficam locais
+/scratch_*
+/fetch_*.py
