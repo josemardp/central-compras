@@ -287,3 +287,15 @@ lavadora:
     garantia_tipo_aceita:
       - nacional
     exige_rede_assistencia: true
+
+medicamento:
+  atributos_obrigatorios:
+    - principio_ativo
+    - forma
+    - concentracao
+    - conteudo
+  gate:
+    exige_vendedor_oficial: true
+    garantia_tipo_aceita:
+      - nenhuma
+      - nacional
