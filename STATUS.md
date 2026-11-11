@@ -11,7 +11,7 @@
 - **Melhor oferta entregue:** Magalu, vendida pela Liven Casa, R$ 367,35 no Pix e R$ 383,79 no cartão, entrega até 06/11. O fechamento do pedido não foi simulado, porque exige login.
 - **Sem servir:** anúncio do ML de R$ 346,90 sumiu para o endereço de casa; KUBBO com domínio estacionado; Telhanorte, eFácil, Irmãos Soares e Leroy Merlin sem entrega.
 - **Pendente:** decidir a compra, confirmar o total com `promover-cotacao`, preencher especificação e acessórios (assento e fixação são à parte).
-- **Navegador:** o Chrome ligado à extensão é o perfil da Esdra. O WhatsApp do Josemar está no `nav-josemardp`.
+- **Navegador:** o Chrome ligado à extensão é o perfil da Esdra. O WhatsApp do Josemar para as IAs está no `nav-zap` (navegador próprio, CDP 9230, desde 11/11/2026; ver `skills-pessoais/NAVEGADOR_AUTOMACAO.md`, "Rotina para o WhatsApp").
 
 ## Sessão 17/10/2026: parede de garagem com umidade e sais
 
