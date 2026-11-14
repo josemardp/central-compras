@@ -5,6 +5,15 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 14/11/2026: robô aspirador por volta de R$ 1.000 (guia pronto, nada comprado)
+
+- **Entrega:** guia HTML mobile para a Esdra escolher. Link privado: https://claude.ai/artifact/9VY1eQGViTwXbMWABKn2Sk (versão 5). Cópia local só no PC do laptop: `Downloads\guia_robo_aspirador_esdra_nov2026.html`.
+- **Finalistas (preços vistos na página do produto em 14/11, `fonte=web`, sem carrinho):** 1º Dreame F10 R$ 1.102 (Amazon, vendido pela Dreame Ltda); 2º KaBuM K800 Pro 127 V R$ 1.199,99 Pix (KaBuM; cupom CASATECH10 não testado); 3º Tapo RV20 Max R$ 854,05 (Amazon, TNTinfoLoja); 4º Xiaomi S40C R$ 912,63 Pix (ML, revenda urbantechcia). Os quatro aspiram e passam pano (pano úmido arrastado, sem esfregar).
+- **Armadilha:** o K800 Pro de R$ 1.066,98 na Amazon é 220 V; em casa a base precisa ser 127 V.
+- **Descartado:** Idali Life V3S Pro (foto da caixa enviada pelo Josemar): R$ 1.190 num único anúncio do ML, sem avaliações, não passa pano, sem laser, 2.000 Pa, garantia de 3 meses do vendedor. Último lugar.
+- **Não conferido:** Shopee (verificação anti-robô sem login) e TikTok Shop (busca só no app). O guia traz preço-teto para ela comparar no celular.
+- **Pendente:** a Esdra escolher; então abrir o processo na Central (`novo-projeto`), registrar as cotações e confirmar total no carrinho com `promover-cotacao`.
+
 ## Sessão 30/10/2026: bacia Deca Aspen P.75.17 (cotada, nada comprado)
 
 - **Onde está:** `projetos/2026-bacia-deca-aspen-convencional-p7517/`, com 13 cotações datadas `fonte=web`.
