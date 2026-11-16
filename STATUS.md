@@ -3213,3 +3213,49 @@ próxima ação de verdade, em vez de escrever texto fixo.
   Conflito de merge em derivado se resolve com `regenerar`, não à mão.
 - O ev-decisao morreu porque **reconstruía o que a Central já faz**. Antes de
   criar ferramenta nova para decidir compra, verificar se a Central já resolve.
+
+## Pendências herdadas do Mentor de Projetos (importadas em 16/11/2026)
+
+O Mentor de Projetos foi aposentado em 16/11/2026. O que estava aberto nele veio para cá. Marque `- [x]` ao concluir.
+
+- Objetivo: Gestao e controle rigoroso de cotacoes e compras pessoais e familiares
+- Foco na última sessão: Após a escolha, abrir o processo com novo-projeto e confirmar o total no carrinho com promover-cotacao
+- Última entrega: STATUS.md atualizado com finalistas, armadilha de tensão e pendências
+
+### Pendências
+
+- [ ] Acompanhar orcamentos e prazos da cotacao de servico especializado conforme STATUS.md [act-003]
+- [ ] Aguardar entrega das câmeras e realizar a instalação e configuração no aplicativo Tapo [act-004]
+- [ ] Comprar o material da instalacao (cameras + portao) apos respostas do instalador e confirmacao no carrinho [act-007]
+- [ ] Efetuar a compra dos 5 itens cotados da bike conforme links da planilha consolidada [act-010]
+- [ ] Medir e, se preciso, cortar a sobra do cabo traseiro antes de pedalar [act-011]
+- [ ] Coletar as 4 respostas do comprador e afunilar para 3 a 5 finalistas com cotação conferida [act-014]
+- [ ] Registrar a cotação confirmada do checkout com promover-cotacao e fechar a decisão [act-015]
+- [ ] Ao receber o produto, conferir a embalagem e registrar a decisão e a cotação da compra no projeto do power bank [act-016]
+- [ ] Receber a escolha e os valores do carrinho, rodar promover-cotacao e decidir com as perdedoras [act-017]
+- [ ] Avaliar depois a camera solar 4G + Wi-Fi (Ezviz EB8 Pro 4G) e o nobreak adiado [act-019]
+- [ ] Amazon: listar pedidos pendentes, resolver os 2 que nao cancelaram e a causa da recusa do cartao antes de pagar de novo [act-020]
+- [ ] Pedir a concessionaria o preco da bobina original e comparar com o orcamento da loja de pecas [act-021]
+- [ ] Fazer o teste da parede e pedir parecer e orcamento ao fabricante com canal nacional [act-023]
+- [ ] Reiniciar o opencode, validar as ferramentas de navegador e então rodar o sincronizar.ps1 completo [act-024]
+- [ ] Registrar a compra das peças de ignição nos dois projetos assim que o usuário confirmar o pagamento [act-025]
+- [ ] Registrar a compra das peças de ignição nos dois projetos assim que o pagamento for confirmado [act-026]
+- [ ] Confirmar o total da melhor oferta no fechamento e registrar com promover-cotacao. [act-029]
+- [ ] Após a escolha, abrir o processo com novo-projeto e confirmar o total no carrinho com promover-cotacao [act-031]
+
+### Bloqueios
+
+- [ ] BLOQUEIO: Pagamento recusado 2 vezes na Amazon (instalacao de cameras e portao) (desde 2026-10-14)
+
+### Decisões recentes registradas no Mentor
+
+- 2026-10-17: Tinta e reboco em processos separados para nao misturar ranking
+- 2026-10-17: O registro de estado do sincronizar passa a ser não destrutivo (bloco marcado; arquivo sem marcador recebe acréscimo no fim)
+- 2026-10-17: adb e scrcpy entram no inventário canônico
+- 2026-10-19: Comprar bobinas e velas na loja física, aceitando pagar mais que no marketplace em troca de retirada imediata
+- 2026-10-19: Recotação da bobina original na concessionária dispensada
+- 2026-10-19: O familiar retira e paga as peças na loja física no dia seguinte
+- 2026-10-31: Melhor oferta entregue definida como referencia, sem fechar a compra.
+- 2026-10-31: Oferta de preco muito baixo descartada: dominio estacionado e HTTPS quebrado.
+- 2026-11-14: Recomendação principal: o finalista com maior bateria, vendido pela própria marca
+- 2026-11-14: Modelo extra descartado por não passar pano e não ter navegação a laser
