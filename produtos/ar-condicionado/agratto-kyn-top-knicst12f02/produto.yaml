@@ -1,0 +1,14 @@
+id: agratto-kyn-top-knicst12f02
+categoria: ar_condicionado
+nome: Agratto Kyn Top KNICST12F-02
+marca: Agratto
+atributos:
+  btu: 12000
+  tensao: 220V
+  ciclo: frio
+  compressor: inverter
+  gas: R32
+  consumo_kwh_ano: 414
+  classe_energetica: A
+  garantia_meses: 12
+proveniencia: null

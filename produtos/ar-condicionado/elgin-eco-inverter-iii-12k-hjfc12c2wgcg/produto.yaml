@@ -1,0 +1,16 @@
+id: elgin-eco-inverter-iii-12k-hjfc12c2wgcg
+categoria: ar_condicionado
+nome: Elgin Eco Inverter III HJFC12C2WGCG
+marca: Elgin
+atributos:
+  btu: 12000
+  tensao: 220V
+  ciclo: frio
+  compressor: inverter
+  gas: R32
+  idrs: 7.0
+  consumo_kwh_ano: 415
+  classe_energetica: A
+  garantia_compressor_anos: 10
+  garantia_meses: 36
+proveniencia: null

@@ -1,0 +1,13 @@
+id: philco-pac18ftw
+categoria: ar_condicionado
+nome: Philco Eco Inverter PAC18FTW
+marca: Philco
+atributos:
+  btu: 18000
+  tensao: 220V
+  ciclo: frio
+  compressor: inverter
+  gas: R32
+  consumo_kwh_ano: 724
+  garantia_meses: 12
+proveniencia: null

@@ -5,6 +5,17 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 18/11/2026: dois splits inverter 220 V na Black Friday
+
+- **12.000 BTU/h.** Recomendação preliminar: Elgin Eco Inverter III `HJFC12C2WGCG`, R$ 1.799,90 no Pix ou NuPay com entrega grátis de 27/11 a 01/12 pela Amazon, vendido e enviado pela Refricril. Agratto Kyn Top fica em R$ 1.832,02 entregue antes do cupom de primeira compra. [Processo de 12.000 BTU/h](projetos/2026-ar-condicionado-split-12000-btu-black-friday/processo.md).
+- **18.000 BTU/h.** Philco `PAC18FTW`, R$ 2.438,01 entregue no Pix ou boleto pela página do produto. O carrinho com PHI200 mostrou R$ 2.379,00 antes do frete e aviso de nenhum desconto de cupom aplicado. Elgin Eco Inverter III `HJFC18C2WHCH`, alternativa para uso frequente a R$ 2.758,54 entregue. Ambos vendidos e entregues pela WebContinental, com prazo exibido de 17 dias úteis. [Processo de 18.000 BTU/h](projetos/2026-ar-condicionado-split-18000-btu-black-friday/processo.md).
+- **Escopo.** Split hi-wall, só frio como premissa. Usei os CEPs na ordem informada para as duas capacidades. Os endereços ficam fora do Git. As cotações são `fonte=web` e nenhum pedido foi feito.
+
+### Pendências dos dois splits
+
+- [ ] Antes de pagar, rever valores no fechamento, condições dos cupons e garantia da instalação credenciada. Black Friday em 27/11/2026.
+- [ ] Validar o dimensionamento, os dois pontos 220 V e o orçamento de instalação.
+
 ## Sessão 14/11/2026: robô aspirador por volta de R$ 1.000 (guia pronto, nada comprado)
 
 - **Entrega:** guia HTML mobile para a Esdra escolher. Link privado: https://claude.ai/artifact/9VY1eQGViTwXbMWABKn2Sk (versão 5). Cópia local só no PC do laptop: `Downloads\guia_robo_aspirador_esdra_nov2026.html`.

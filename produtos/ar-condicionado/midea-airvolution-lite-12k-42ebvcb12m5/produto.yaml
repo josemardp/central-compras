@@ -1,0 +1,15 @@
+id: midea-airvolution-lite-12k-42ebvcb12m5
+categoria: ar_condicionado
+nome: Midea AirVolution Lite 42EBVCB12M5
+marca: Midea
+atributos:
+  btu: 12000
+  tensao: 220V
+  ciclo: frio
+  compressor: inverter
+  gas: R32
+  consumo_kwh_ano: 548.4
+  classe_energetica: C
+  garantia_compressor_anos: 10
+  garantia_meses: 24
+proveniencia: null
