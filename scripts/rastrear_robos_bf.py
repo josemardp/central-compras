@@ -1,0 +1,594 @@
+"""Rastreador diario de precos dos 4 robos aspiradores (pre-Black Friday 2026).
+
+Coleta precos e cupons em fontes publicas (Amazon, KaBuM, Zoom e Promobit),
+compara com a rodada anterior e com a referencia de 14/11/2026, salva historico
+fora do Git (~/.central-compras/dados-privados/rastreador-robos/) e opcionalmente
+envia o resumo pelo WhatsApp das IAs (nav-zap, CDP 9230).
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+from playwright.sync_api import sync_playwright
+
+PRIVADO_DIR = Path.home() / ".central-compras" / "dados-privados" / "rastreador-robos"
+CONFIG_PATH = PRIVADO_DIR / "config.json"
+ESTADO_PATH = PRIVADO_DIR / "estado.json"
+HIST_PATH = PRIVADO_DIR / "historico.jsonl"
+ZAP_VIVO_JS = Path(r"C:\projetos\skills-pessoais\zap-vivo.mjs")
+CDP_URL = "http://127.0.0.1:9230"
+
+BASELINE_14_11 = {
+    "dreame_f10": {"nome": "Dreame F10", "preco": 1102.00, "nota": "Amazon (Dreame Ltda)"},
+    "k800_pro_127v": {"nome": "KaBuM K800 Pro 127V", "preco": 1199.99, "nota": "KaBuM Pix"},
+    "tapo_rv20_max": {"nome": "Tapo RV20 Max", "preco": 854.05, "nota": "Amazon (TNTinfoLoja)"},
+    "xiaomi_s40c": {"nome": "Xiaomi S40C", "preco": 912.63, "nota": "ML (urbantechcia)"},
+}
+
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+
+def parse_brl(texto: str) -> float | None:
+    m = re.search(r"R\$\s*([\d\.]+,\d{2})", texto or "")
+    if not m:
+        return None
+    val = m.group(1).replace(".", "").replace(",", ".")
+    try:
+        return float(val)
+    except ValueError:
+        return None
+
+
+def fmt_brl(val: float | None) -> str:
+    if val is None:
+        return "indisponivel"
+    s = f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {s}"
+
+
+def extrair_amazon(page: Any, url: str) -> dict[str, Any]:
+    res: dict[str, Any] = {"url": url, "preco": None, "frete": None, "vendedor": None, "cupons": [], "estoque": None}
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=25000)
+        page.wait_for_timeout(2200)
+        buybox_txt = page.locator("#desktop_buybox").inner_text() if page.locator("#desktop_buybox").count() else ""
+        core_txt = page.locator("#corePrice_feature_div").first.inner_text() if page.locator("#corePrice_feature_div").count() else ""
+        preco = parse_brl(core_txt) or parse_brl(buybox_txt)
+        vendedor = None
+        if "Vendido por" in buybox_txt:
+            m = re.search(r"Vendido por\s*\n?\s*([^\n]+)", buybox_txt)
+            if m:
+                vendedor = m.group(1).lstrip(": ").strip()
+        elif "Enviado / Vendido" in buybox_txt:
+            m = re.search(r"Enviado / Vendido\s*\n?\s*([^\n]+)", buybox_txt)
+            if m:
+                vendedor = m.group(1).lstrip(": ").strip()
+
+        promo_texts = page.locator(
+            "#promoPriceBlockMessage_feature_div, #couponBadgeRegularVpc, .promoPriceBlockMessage"
+        ).all_inner_texts()
+        cupons = sorted(set(re.findall(r"\b(?:[A-Z0-9]{4,14})\b", " ".join(promo_texts))))
+        cupons = [
+            c
+            for c in cupons
+            if not c.isdigit() and (any(ch.isdigit() for ch in c) or "BF" in c or "OFF" in c or "PRIME" in c)
+        ]
+
+        # Se nao houver preco no buybox principal, abre "Ver todas as opcoes de compra" (AOD)
+        if preco is None and page.locator("#buybox-see-all-buying-choices a").count():
+            page.locator("#buybox-see-all-buying-choices a").first.click()
+            page.wait_for_timeout(2500)
+            if page.locator("#aod-offer-list").count():
+                aod_txt = page.locator("#aod-offer-list").inner_text()
+                preco = parse_brl(aod_txt)
+                m_vend = re.search(r"Vendido por\s*\n?\s*([^\n]+)", aod_txt)
+                if m_vend:
+                    vendedor = m_vend.group(1).strip()
+                m_frete = re.search(r"Entrega\s+(GRÁTIS|R\$\s*[\d\.]+,\d{2})", aod_txt)
+                if m_frete:
+                    res["frete"] = m_frete.group(1).strip()
+
+        if res["frete"] is None:
+            if "Entrega GRÁTIS" in buybox_txt:
+                res["frete"] = "Gratis"
+            else:
+                mf = re.search(r"Entrega\s+(R\$\s*[\d\.]+,\d{2})", buybox_txt)
+                if mf:
+                    res["frete"] = mf.group(1).strip()
+
+        if "Em estoque" in buybox_txt:
+            res["estoque"] = "Em estoque"
+        else:
+            me = re.search(r"Somente \d+ em estoque", buybox_txt)
+            if me:
+                res["estoque"] = me.group(0)
+
+        res["preco"] = preco
+        res["vendedor"] = vendedor
+        res["cupons"] = cupons
+    except Exception as exc:
+        res["erro"] = str(exc)[:180]
+    return res
+
+
+def extrair_kabum(page: Any, url: str) -> dict[str, Any]:
+    res: dict[str, Any] = {"url": url, "preco_pix": None, "preco_10x": None, "vendedor": None, "cupom": None, "disponivel": None}
+    try:
+        page.goto(url, wait_until="load", timeout=25000)
+        page.wait_for_timeout(2500)
+        next_data = page.evaluate("""() => {
+            const el = document.querySelector('#__NEXT_DATA__');
+            let prod = null;
+            if (el) {
+                const d = JSON.parse(el.textContent);
+                const p = d?.props?.pageProps?.product;
+                if (p) {
+                    prod = {
+                        available: p.available,
+                        price: p.price,
+                        sellerName: p.sellerName,
+                        offer: p.offer || null
+                    };
+                }
+            }
+            let pixValue = null;
+            const nf = document.querySelector('number-flow-react');
+            if (nf) {
+                try {
+                    const dataAttr = JSON.parse(nf.getAttribute('data') || '{}');
+                    if (typeof dataAttr.value === 'number') pixValue = dataAttr.value;
+                } catch {}
+            }
+            return { prod, pixValue };
+        }""")
+        body = page.inner_text("body")
+        cupom = None
+        m_cup = re.search(r"Use o cupom\s+([A-Z0-9]+)", body)
+        if m_cup:
+            cupom = m_cup.group(1)
+        else:
+            m_cup2 = re.search(r"CUPOM\s*\n\s*([A-Z0-9]{4,20})", body)
+            if m_cup2:
+                cupom = m_cup2.group(1)
+
+        prod = next_data.get("prod") if next_data else None
+        pix_val = next_data.get("pixValue") if next_data else None
+        if prod:
+            res["disponivel"] = bool(prod.get("available"))
+            res["preco_10x"] = prod.get("price")
+            res["vendedor"] = prod.get("sellerName")
+            if isinstance(prod.get("offer"), dict):
+                res["estoque_oferta"] = prod["offer"].get("quantity")
+        res["preco_pix"] = pix_val or (prod.get("price") if prod else None)
+        res["cupom"] = cupom
+    except Exception as exc:
+        res["erro"] = str(exc)[:180]
+    return res
+
+
+def extrair_zoom(page: Any, url: str) -> dict[str, Any]:
+    res: dict[str, Any] = {"url": url, "menor_preco": None, "loja": None}
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=20000)
+        page.wait_for_timeout(2000)
+        body = page.inner_text("body")
+        m = re.search(
+            r"Menor preço.*?R\$\s*([\d\.]+,\d{2})à vista.*?(?:Ir à loja|Comprar)\s*\|\s*|Menor preço\s*\n(?:[^\n]*\n){0,4}?R\$\s*([\d\.]+,\d{2})",
+            body,
+        )
+        m2 = re.search(r"Menor preço[\s\S]{0,200}?R\$\s*([\d\.]+,\d{2})à vista([\s\S]{0,160}?)(?:Ir à loja|Comprar)", body)
+        if m2:
+            res["menor_preco"] = parse_brl("R$ " + m2.group(1))
+            tail = [l.strip() for l in m2.group(2).splitlines() if l.strip()]
+            if tail:
+                res["loja"] = tail[-1]
+        elif m:
+            raw = m.group(1) or m.group(2)
+            res["menor_preco"] = parse_brl("R$ " + raw)
+    except Exception as exc:
+        res["erro"] = str(exc)[:180]
+    return res
+
+
+def extrair_promobit(page: Any, query: str, termo_filtro: str) -> list[dict[str, Any]]:
+    ofertas: list[dict[str, Any]] = []
+    try:
+        url = f"https://www.promobit.com.br/buscar/?q={query}"
+        page.goto(url, wait_until="domcontentloaded", timeout=20000)
+        page.wait_for_timeout(1800)
+        raw_items = page.evaluate(
+            """(kw) => {
+            const out = [];
+            const re = new RegExp(kw, 'i');
+            for (const a of document.querySelectorAll('a[href*="/oferta/"]')) {
+                let node = a;
+                for (let step = 0; step < 4 && node.parentElement; step++) {
+                    const t = (node.parentElement.innerText || '').trim();
+                    if (t.length > 360) break;
+                    node = node.parentElement;
+                }
+                const txt = (node.innerText || a.innerText || '').replace(/\\s+/g, ' ').trim();
+                if (!re.test(txt) && !re.test(a.href)) continue;
+                out.push({ href: a.href, text: txt.slice(0, 260) });
+            }
+            return out;
+        }""",
+            termo_filtro,
+        )
+        seen = set()
+        for it in raw_items:
+            if it["href"] in seen:
+                continue
+            seen.add(it["href"])
+            precos_raw = re.findall(r"R\$\s*([\d\.]+,\d{2})", it["text"])
+            precos = [parse_brl("R$ " + p_str) for p_str in precos_raw]
+            precos_validos = [pv for pv in precos if pv is not None]
+            preco = min(precos_validos) if precos_validos else None
+            ofertas.append({"href": it["href"], "preco": preco, "texto": it["text"][:180]})
+            if len(ofertas) >= 3:
+                break
+    except Exception as exc:
+        ofertas.append({"erro": str(exc)[:150]})
+    return ofertas
+
+
+def coletar_precos() -> dict[str, Any]:
+    agora = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
+    dados: dict[str, Any] = {"coletado_em": agora, "modelos": {}}
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            channel="chrome",
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        ctx = browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            locale="pt-BR",
+            user_agent=USER_AGENT,
+        )
+        page = ctx.new_page()
+
+        # 1. Dreame F10
+        f10_amz = extrair_amazon(page, "https://www.amazon.com.br/dp/B0GYZ4NHB3")
+        f10_prom = extrair_promobit(page, "dreame+f10", r"dreame\s*f10")
+        dados["modelos"]["dreame_f10"] = {
+            "nome": "Dreame F10",
+            "amazon": f10_amz,
+            "promobit": f10_prom,
+            "melhor_preco": f10_amz.get("preco"),
+            "melhor_onde": f"Amazon ({f10_amz.get('vendedor') or 'n/d'})",
+        }
+
+        # 2. KaBuM K800 Pro 127V
+        k800_preto = extrair_kabum(
+            page,
+            "https://www.kabum.com.br/produto/1007406/robo-aspirador-kabum-smart-k800-pro-mapeamento-laser-autolimpante-13000pa-127v-preto-ksar81010pt",
+        )
+        k800_branco = extrair_kabum(
+            page,
+            "https://www.kabum.com.br/produto/1007407/robo-aspirador-e-passa-pano-kabum-smart-k800-pro-mapeia-a-laser-autolimpante-recarga-automatica-13000pa-app-127v-branco-ksar81010br",
+        )
+        k800_amz = extrair_amazon(page, "https://www.amazon.com.br/dp/B0HCZVJ6M1")
+        k800_prom = extrair_promobit(page, "k800+pro", r"k800\s*pro")
+        cand_k800 = []
+        if k800_preto.get("preco_pix"):
+            cand_k800.append((k800_preto["preco_pix"], f"KaBuM Preto 127V Pix (cupom {k800_preto.get('cupom') or 'sem'})"))
+        if k800_branco.get("preco_pix"):
+            cand_k800.append((k800_branco["preco_pix"], f"KaBuM Branco 127V Pix (cupom {k800_branco.get('cupom') or 'sem'})"))
+        if k800_amz.get("preco"):
+            frete_amz = parse_brl(k800_amz.get("frete") or "") or 0.0
+            cand_k800.append((k800_amz["preco"] + frete_amz, f"Amazon 127V ({k800_amz.get('vendedor') or 'n/d'} + frete {k800_amz.get('frete') or 'n/d'})"))
+        melhor_k800 = min(cand_k800, key=lambda x: x[0]) if cand_k800 else (None, "indisponivel")
+        dados["modelos"]["k800_pro_127v"] = {
+            "nome": "KaBuM K800 Pro 127V",
+            "kabum_preto": k800_preto,
+            "kabum_branco": k800_branco,
+            "amazon_127v": k800_amz,
+            "promobit": k800_prom,
+            "melhor_preco": melhor_k800[0],
+            "melhor_onde": melhor_k800[1],
+        }
+
+        # 3. Tapo RV20 Max
+        tapo_amz = extrair_amazon(page, "https://www.amazon.com.br/dp/B0DQYJRS5R")
+        tapo_kbm = extrair_kabum(
+            page,
+            "https://www.kabum.com.br/produto/885340/robo-aspirador-de-po-e-mop-tp-link-tapo-rv20-max-aspira-passa-pano-hiper-succao-smart-bivolt-preto",
+        )
+        tapo_zoom = extrair_zoom(page, "https://www.zoom.com.br/aspirador-po-agua/aspirador-de-po-portatil-robo-tp-link")
+        cand_tapo = []
+        if tapo_amz.get("preco"):
+            cand_tapo.append((tapo_amz["preco"], f"Amazon ({tapo_amz.get('vendedor') or 'n/d'})"))
+        if tapo_kbm.get("preco_pix"):
+            cand_tapo.append((tapo_kbm["preco_pix"], f"KaBuM ({tapo_kbm.get('vendedor') or 'n/d'})"))
+        melhor_tapo = min(cand_tapo, key=lambda x: x[0]) if cand_tapo else (None, "indisponivel")
+        dados["modelos"]["tapo_rv20_max"] = {
+            "nome": "Tapo RV20 Max",
+            "amazon": tapo_amz,
+            "kabum": tapo_kbm,
+            "zoom": tapo_zoom,
+            "melhor_preco": melhor_tapo[0],
+            "melhor_onde": melhor_tapo[1],
+        }
+
+        # 4. Xiaomi S40C
+        s40c_amz = extrair_amazon(page, "https://www.amazon.com.br/dp/B0F4K1H6X5")
+        s40c_kbm = extrair_kabum(
+            page,
+            "https://www.kabum.com.br/produto/1047128/robo-aspirador-xiaomi-robot-vacuum-s40c-e101-520-ml-com-30-watts-bivolt-branco",
+        )
+        s40c_zoom = extrair_zoom(page, "https://www.zoom.com.br/aspirador-po-agua/robo-aspirador-xiaomi-s40c-robot-5000pa-mop-smart")
+        cand_s40c = []
+        if s40c_amz.get("preco"):
+            cand_s40c.append((s40c_amz["preco"], f"Amazon ({s40c_amz.get('vendedor') or 'n/d'})"))
+        if s40c_kbm.get("preco_pix"):
+            cand_s40c.append((s40c_kbm["preco_pix"], f"KaBuM ({s40c_kbm.get('vendedor') or 'n/d'})"))
+        if s40c_zoom.get("menor_preco"):
+            cand_s40c.append((s40c_zoom["menor_preco"], f"Zoom/{s40c_zoom.get('loja') or 'loja'}"))
+        melhor_s40c = min(cand_s40c, key=lambda x: x[0]) if cand_s40c else (None, "indisponivel")
+        dados["modelos"]["xiaomi_s40c"] = {
+            "nome": "Xiaomi S40C",
+            "amazon": s40c_amz,
+            "kabum": s40c_kbm,
+            "zoom": s40c_zoom,
+            "melhor_preco": melhor_s40c[0],
+            "melhor_onde": melhor_s40c[1],
+        }
+
+        browser.close()
+    return dados
+
+
+def detectar_alteracoes(atual: dict[str, Any], anterior: dict[str, Any] | None) -> list[str]:
+    if not anterior:
+        return []
+    mudancas: list[str] = []
+    ant_mods = anterior.get("modelos", {})
+    atu_mods = atual.get("modelos", {})
+    for key, mod in atu_mods.items():
+        ant = ant_mods.get(key)
+        if not ant:
+            continue
+        p_ant = ant.get("melhor_preco")
+        p_atu = mod.get("melhor_preco")
+        if p_ant != p_atu and (p_ant is not None or p_atu is not None):
+            if p_ant is not None and p_atu is not None:
+                diff = p_atu - p_ant
+                seta = "BAIXOU" if diff < 0 else "SUBIU"
+                mudancas.append(
+                    f"- {mod['nome']}: {seta} de {fmt_brl(p_ant)} para {fmt_brl(p_atu)} ({mod['melhor_onde']})"
+                )
+            else:
+                mudancas.append(
+                    f"- {mod['nome']}: era {fmt_brl(p_ant)}, agora {fmt_brl(p_atu)} ({mod['melhor_onde']})"
+                )
+        # Checar mudanca de cupom no K800 Pro
+        if key == "k800_pro_127v":
+            cup_ant = (ant.get("kabum_preto") or {}).get("cupom")
+            cup_atu = (mod.get("kabum_preto") or {}).get("cupom")
+            if cup_ant != cup_atu:
+                mudancas.append(f"- K800 Pro cupom KaBuM mudou: {cup_ant or 'nenhum'} -> {cup_atu or 'nenhum'}")
+    return mudancas
+
+
+def periodo_dia() -> str:
+    h = dt.datetime.now().hour
+    if h < 12:
+        return "Manha"
+    if h < 18:
+        return "Tarde"
+    return "Noite"
+
+
+def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, primeira_vez: bool = False) -> str:
+    agora_fmt = dt.datetime.strptime(atual["coletado_em"], "%Y-%m-%d %H:%M").strftime("%d/%m %H:%M")
+    mudancas = detectar_alteracoes(atual, anterior)
+
+    linhas = [f"*Rastreio Pre-Black Friday (Robos)* | {periodo_dia()} ({agora_fmt})"]
+
+    if anterior is None:
+        linhas.append("Primeira checagem da rotina automatica (referencia base de 14/11):")
+    elif not mudancas:
+        ant_fmt = dt.datetime.strptime(anterior["coletado_em"], "%Y-%m-%d %H:%M").strftime("%d/%m %H:%M")
+        linhas.append(f"Nenhuma alteracao de preco desde a ultima checagem ({ant_fmt}).")
+    else:
+        ant_fmt = dt.datetime.strptime(anterior["coletado_em"], "%Y-%m-%d %H:%M").strftime("%d/%m %H:%M")
+        linhas.append(f"*Alterou desde {ant_fmt}:*")
+        linhas.extend(mudancas)
+
+    linhas.append("")
+    linhas.append("*Panorama atual dos 4 finalistas:*")
+
+    ordem = [
+        ("dreame_f10", "1)"),
+        ("k800_pro_127v", "2)"),
+        ("tapo_rv20_max", "3)"),
+        ("xiaomi_s40c", "4)"),
+    ]
+    for key, num in ordem:
+        mod = atual["modelos"][key]
+        base = BASELINE_14_11[key]["preco"]
+        p = mod.get("melhor_preco")
+        onde = mod.get("melhor_onde")
+        if p is not None:
+            diff_base = p - base
+            if abs(diff_base) < 0.50:
+                comp = "igual a 14/11"
+            elif diff_base > 0:
+                comp = f"+{fmt_brl(diff_base)} vs 14/11"
+            else:
+                comp = f"{fmt_brl(diff_base)} vs 14/11"
+        else:
+            comp = f"ref 14/11 {fmt_brl(base)}"
+        linhas.append(f"{num} *{mod['nome']}:* {fmt_brl(p)} | {onde} ({comp})")
+
+        # Detalhes extras uteis
+        if key == "dreame_f10":
+            proms = [pr for pr in mod.get("promobit", []) if pr.get("preco")]
+            if proms:
+                p0 = proms[0]
+                linhas.append(f"   Alerta Promobit: {fmt_brl(p0['preco'])} (checar se ativo)")
+        elif key == "k800_pro_127v":
+            cup = (mod.get("kabum_preto") or {}).get("cupom")
+            if cup == "CASATECH10" and p:
+                linhas.append(f"   Com cupom {cup} (10%): ~{fmt_brl(p * 0.90)} (testar no carrinho)")
+        elif key == "tapo_rv20_max":
+            cupons = (mod.get("amazon") or {}).get("cupons") or []
+            if cupons:
+                linhas.append(f"   Cupons Amazon na pagina: {', '.join(cupons[:3])}")
+
+    if primeira_vez:
+        linhas.append("")
+        linhas.append("*Vale esperar ate semana que vem (Black Friday 27/11)?*")
+        linhas.append(
+            "Sim. O campeao Dreame F10 subiu na Amazon para R$ 1.994,05 (estava R$ 1.102 em 14/11), "
+            "entao nao vale fechar hoje por esse preco. O K800 Pro 127V segue a R$ 1.199,99 na KaBuM com "
+            "estoque alto no Esquenta ate 26/11 e soltou cupons relampago hoje (R$ 1.079 com CASATECH10 e "
+            "ate R$ 959 por minutos). O S40C tambem subiu acima da media. So o Tapo RV20 Max ja esta no menor "
+            "preco dos ultimos 40 dias (R$ 854,05)."
+        )
+        linhas.append("Rotina diaria criada no PC: 08:00, 14:00 e 20:00 com aviso aqui no seu Zap.")
+
+    return "\n".join(linhas)
+
+
+def garantir_zap_vivo() -> None:
+    if ZAP_VIVO_JS.exists():
+        subprocess.run(["node", str(ZAP_VIVO_JS), "josemardp"], check=False, timeout=90)
+
+
+def carregar_destino_config() -> str | None:
+    if CONFIG_PATH.exists():
+        try:
+            cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            return cfg.get("chat_title")
+        except Exception:
+            return None
+    return None
+
+
+def enviar_whatsapp(mensagem: str) -> tuple[bool, str]:
+    garantir_zap_vivo()
+    linhas = mensagem.rstrip("\n").split("\n")
+    norm = lambda x: x.replace("*", "").strip()
+
+    with sync_playwright() as p:
+        br = p.chromium.connect_over_cdp(CDP_URL)
+        pg = next((x for c in br.contexts for x in c.pages if "web.whatsapp.com" in x.url), None)
+        if pg is None:
+            return False, "Aba web.whatsapp.com nao encontrada na porta 9230."
+
+        destino = carregar_destino_config()
+        if not destino:
+            wid = pg.evaluate("() => localStorage.getItem('last-wid-md')")
+            if wid:
+                num = re.sub(r"\D", "", wid.split(":")[0])
+                if len(num) == 13 and num.startswith("55"):
+                    destino = f"+{num[:2]} {num[2:4]} {num[4:9]}-{num[9:]}"
+        if not destino:
+            return False, "Titulo do chat proprio nao configurado nem detectado."
+
+        titulo_atual = lambda: (
+            pg.locator("#main header").inner_text().split("\n")[0].strip()
+            if pg.locator("#main header").count()
+            else ""
+        )
+
+        if titulo_atual() != destino:
+            busca = pg.locator('#side input[role="textbox"]').first
+            busca.click()
+            pg.keyboard.press("Control+A")
+            pg.keyboard.press("Backspace")
+            pg.keyboard.insert_text(destino)
+            time.sleep(2.0)
+
+            alvo = pg.locator(f'#pane-side span[title="{destino}"]')
+            if not alvo.count():
+                # Fallback pelo final do numero sem formatacao
+                digitos = re.sub(r"\D", "", destino)[-4:]
+                busca.click()
+                pg.keyboard.press("Control+A")
+                pg.keyboard.press("Backspace")
+                pg.keyboard.insert_text(digitos)
+                time.sleep(2.0)
+                alvo = pg.locator(f'#pane-side span[title="{destino}"]')
+            if not alvo.count():
+                return False, f"Conversa '{destino}' nao encontrada na barra lateral."
+            alvo.first.click()
+            time.sleep(2.0)
+            busca.click()
+            pg.keyboard.press("Control+A")
+            pg.keyboard.press("Backspace")
+
+        if titulo_atual() != destino:
+            return False, f"Cabecalho aberto '{titulo_atual()}' difere de '{destino}'."
+
+        box = pg.locator('#main footer div[contenteditable="true"]').first
+        box.click()
+        pg.keyboard.press("Control+A")
+        pg.keyboard.press("Backspace")
+
+        for i, linha in enumerate(linhas):
+            if linha:
+                pg.keyboard.insert_text(linha)
+            if i < len(linhas) - 1:
+                pg.keyboard.press("Shift+Enter")
+        time.sleep(0.8)
+
+        obtido = [norm(t) for t in box.locator("p, div[dir]").all_inner_texts() if t.strip()]
+        esperado = [norm(l) for l in linhas if l.strip()]
+        if obtido != esperado:
+            return False, f"Texto digitado divergiu do esperado ({len(obtido)} vs {len(esperado)} linhas)."
+
+        pg.keyboard.press("Enter")
+        time.sleep(3.0)
+        ultima = pg.locator("#main [data-id]").last.inner_text()[:80].replace("\n", " ")
+        caixa_vazia = not box.inner_text().strip()
+        return True, f"Enviado para '{destino}' | caixa_vazia={caixa_vazia} | ultima='{ultima}'"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Rastreador de precos dos 4 robos aspiradores.")
+    parser.add_argument("--enviar-zap", action="store_true", help="Envia o resumo pelo nav-zap.")
+    parser.add_argument("--primeira-vez", action="store_true", help="Inclui analise pre-Black Friday.")
+    args = parser.parse_args()
+
+    PRIVADO_DIR.mkdir(parents=True, exist_ok=True)
+    anterior = None
+    if ESTADO_PATH.exists():
+        try:
+            anterior = json.loads(ESTADO_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            anterior = None
+
+    atual = coletar_precos()
+    mensagem = montar_mensagem(atual, anterior, primeira_vez=args.primeira_vez)
+    print(mensagem)
+
+    with HIST_PATH.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(atual, ensure_ascii=False) + "\n")
+
+    ESTADO_PATH.write_text(json.dumps(atual, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if args.enviar_zap:
+        ok, info = enviar_whatsapp(mensagem)
+        print(f"[ZAP] ok={ok} | {info}")
+        return 0 if ok else 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

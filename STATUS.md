@@ -5,6 +5,18 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 18/11/2026 (tarde): repesquisa dos 4 robôs aspiradores e rotina pré-Black Friday
+
+- **Alterações de preço (18/11/2026 vs 14/11/2026, `fonte=web`):**
+  - **1º Dreame F10:** **subiu** de R$ 1.102,00 (14/11) para **R$ 1.994,05** na Amazon (`B0GYZ4NHB3`, Dreame Ltda, frete grátis). Último alerta no Promobit para o ML (R$ 1.102,00) é de 6 dias atrás (12/11).
+  - **2º KaBuM K800 Pro 127 V:** **manteve** **R$ 1.199,99** no Pix na KaBuM (`1007406` Preto com 756 un. e `1007407` Branco com 905 un., campanha "Esquenta Black das Blacks" até 26/11 10h) com cupom ativo **`CASATECH10`** (~R$ 1.079,99 com 10%, testar no carrinho). Na manhã de 18/11 houve cupom relâmpago **`20TAONOROBO`** por **R$ 959,00** (durou menos de 10 min segundo o Promobit). Na Amazon 127V (`B0HCZVJ6M1`) aparece por R$ 1.199,98 + R$ 84,70 de frete (não confundir com o 220V de R$ 1.066,98).
+  - **3º Tapo RV20 Max:** **manteve** **R$ 854,05** na Amazon (`B0DQYJRS5R`, TNTinfoLoja, enviado pela Amazon, frete grátis), menor preço dos últimos 40 dias segundo o Zoom; página mostra cupons `25PRIMEBF`, `PRIMEIRA20BF` e `70OFF` (R$ 1.000+). Na KaBuM está R$ 1.258,12.
+  - **4º Xiaomi S40C:** **subiu** nas lojas abertas para **R$ 1.165,83** na Amazon (`B0F4K1H6X5`, J R C STORE, última unidade; R$ 1.203,05 Magalu via Zoom; R$ 1.276,67 Pix na KaBuM), acima da referência de R$ 912,63 no ML em 14/11 (ML bloqueia leitura automática sem sessão humana).
+- **Recomendação pré-Black Friday:** **vale esperar até a semana da Black Friday (27/11/2026)**, especialmente para Dreame F10, K800 Pro 127V (monitorando cupons relâmpago) e Xiaomi S40C. Só o Tapo RV20 Max já está no piso dos últimos 40 dias.
+- **Rotina automática criada:** [`scripts/rastrear_robos_bf.py`](scripts/rastrear_robos_bf.py) + [`scripts/rodar_rastreador_robos.ps1`](scripts/rodar_rastreador_robos.ps1), agendados no Windows Task Scheduler (`Central Compras - Rastrear Robos BF`) às **08:00, 14:00 e 20:00** diariamente, salvando histórico em `~/.central-compras/dados-privados/rastreador-robos/` e enviando comparativo ao WhatsApp do Josemar via `nav-zap` (CDP 9230). Primeira mensagem enviada e verificada nesta sessão.
+- **Pendências:**
+  - [ ] Acompanhar alertas até a Black Friday (27/11/2026) ou escolha da Esdra; ao decidir, abrir projeto (`novo-projeto`), confirmar no carrinho (`promover-cotacao`) e desabilitar a tarefa agendada `Central Compras - Rastrear Robos BF`.
+
 ## Sessão 18/11/2026: dois splits inverter 220 V na Black Friday
 
 - **12.000 BTU/h.** Recomendação preliminar: Elgin Eco Inverter III `HJFC12C2WGCG`, R$ 1.799,90 no Pix ou NuPay com entrega grátis de 27/11 a 01/12 pela Amazon, vendido e enviado pela Refricril. Agratto Kyn Top fica em R$ 1.832,02 entregue antes do cupom de primeira compra. [Processo de 12.000 BTU/h](projetos/2026-ar-condicionado-split-12000-btu-black-friday/processo.md).
