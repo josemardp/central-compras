@@ -367,20 +367,19 @@ def detectar_alteracoes(atual: dict[str, Any], anterior: dict[str, Any] | None) 
         if p_ant != p_atu and (p_ant is not None or p_atu is not None):
             if p_ant is not None and p_atu is not None:
                 diff = p_atu - p_ant
-                seta = "BAIXOU" if diff < 0 else "SUBIU"
+                icone = "🟢 *BAIXOU*" if diff < 0 else "🔴 *SUBIU*"
                 mudancas.append(
-                    f"- {mod['nome']}: {seta} de {fmt_brl(p_ant)} para {fmt_brl(p_atu)} ({mod['melhor_onde']})"
+                    f"{icone} *{mod['nome']}:* {fmt_brl(p_ant)} -> *{fmt_brl(p_atu)}* ({mod['melhor_onde']})"
                 )
             else:
                 mudancas.append(
-                    f"- {mod['nome']}: era {fmt_brl(p_ant)}, agora {fmt_brl(p_atu)} ({mod['melhor_onde']})"
+                    f"🟡 *{mod['nome']}:* era {fmt_brl(p_ant)}, agora *{fmt_brl(p_atu)}* ({mod['melhor_onde']})"
                 )
-        # Checar mudanca de cupom no K800 Pro
         if key == "k800_pro_127v":
             cup_ant = (ant.get("kabum_preto") or {}).get("cupom")
             cup_atu = (mod.get("kabum_preto") or {}).get("cupom")
             if cup_ant != cup_atu:
-                mudancas.append(f"- K800 Pro cupom KaBuM mudou: {cup_ant or 'nenhum'} -> {cup_atu or 'nenhum'}")
+                mudancas.append(f"🏷️ *K800 Pro cupom mudou:* {cup_ant or 'nenhum'} -> *{cup_atu or 'nenhum'}*")
     return mudancas
 
 
@@ -393,74 +392,85 @@ def periodo_dia() -> str:
     return "Noite"
 
 
+def proxima_checagem() -> str:
+    h = dt.datetime.now().hour
+    if h < 8:
+        return "08:00"
+    if h < 14:
+        return "14:00"
+    if h < 20:
+        return "20:00"
+    return "08:00 de amanha"
+
+
 def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, primeira_vez: bool = False) -> str:
     agora_fmt = dt.datetime.strptime(atual["coletado_em"], "%Y-%m-%d %H:%M").strftime("%d/%m %H:%M")
     mudancas = detectar_alteracoes(atual, anterior)
 
-    linhas = [f"*Rastreio Pre-Black Friday (Robos)* | {periodo_dia()} ({agora_fmt})"]
+    linhas = [f"🤖 *RASTREIO ROBOS • {periodo_dia().upper()} ({agora_fmt})*", ""]
 
     if anterior is None:
-        linhas.append("Primeira checagem da rotina automatica (referencia base de 14/11):")
+        linhas.append("📌 *Primeira checagem* (base 14/11)")
     elif not mudancas:
         ant_fmt = dt.datetime.strptime(anterior["coletado_em"], "%Y-%m-%d %H:%M").strftime("%d/%m %H:%M")
-        linhas.append(f"Nenhuma alteracao de preco desde a ultima checagem ({ant_fmt}).")
+        linhas.append(f"✅ *Sem alteracoes* desde {ant_fmt}")
     else:
         ant_fmt = dt.datetime.strptime(anterior["coletado_em"], "%Y-%m-%d %H:%M").strftime("%d/%m %H:%M")
-        linhas.append(f"*Alterou desde {ant_fmt}:*")
+        linhas.append(f"🚨 *ALTEROU DESDE {ant_fmt}:*")
         linhas.extend(mudancas)
 
-    linhas.append("")
-    linhas.append("*Panorama atual dos 4 finalistas:*")
-
     ordem = [
-        ("dreame_f10", "1)"),
-        ("k800_pro_127v", "2)"),
-        ("tapo_rv20_max", "3)"),
-        ("xiaomi_s40c", "4)"),
+        ("dreame_f10", "🥇"),
+        ("k800_pro_127v", "🥈"),
+        ("tapo_rv20_max", "🥉"),
+        ("xiaomi_s40c", "4️⃣"),
     ]
-    for key, num in ordem:
+    for key, medalha in ordem:
         mod = atual["modelos"][key]
         base = BASELINE_14_11[key]["preco"]
         p = mod.get("melhor_preco")
         onde = mod.get("melhor_onde")
-        if p is not None:
+
+        if p is None:
+            bola = "⚪"
+            comp = f"ref 14/11 {fmt_brl(base)}"
+        else:
             diff_base = p - base
             if abs(diff_base) < 0.50:
+                bola = "🟢"
                 comp = "igual a 14/11"
-            elif diff_base > 0:
-                comp = f"+{fmt_brl(diff_base)} vs 14/11"
+            elif diff_base < 0:
+                bola = "🟢"
+                comp = f"*{fmt_brl(abs(diff_base))} mais barato* que 14/11 (era {fmt_brl(base)})"
             else:
-                comp = f"{fmt_brl(diff_base)} vs 14/11"
-        else:
-            comp = f"ref 14/11 {fmt_brl(base)}"
-        linhas.append(f"{num} *{mod['nome']}:* {fmt_brl(p)} | {onde} ({comp})")
+                bola = "🔴"
+                comp = f"+{fmt_brl(diff_base)} vs 14/11 (era {fmt_brl(base)})"
 
-        # Detalhes extras uteis
+        linhas.append("")
+        linhas.append(f"{medalha} *{mod['nome']}*")
+        linhas.append(f"{bola} *{fmt_brl(p)}* · {onde}")
+        linhas.append(f"📊 {comp}")
+
         if key == "dreame_f10":
             proms = [pr for pr in mod.get("promobit", []) if pr.get("preco")]
             if proms:
                 p0 = proms[0]
-                linhas.append(f"   Alerta Promobit: {fmt_brl(p0['preco'])} (checar se ativo)")
+                linhas.append(f"🔥 Alerta Promobit: *{fmt_brl(p0['preco'])}* (checar se ativo)")
         elif key == "k800_pro_127v":
             cup = (mod.get("kabum_preto") or {}).get("cupom")
             if cup == "CASATECH10" and p:
-                linhas.append(f"   Com cupom {cup} (10%): ~{fmt_brl(p * 0.90)} (testar no carrinho)")
+                linhas.append(f"🏷️ Cupom *{cup}* (10%): *~{fmt_brl(p * 0.90)}*")
         elif key == "tapo_rv20_max":
             cupons = (mod.get("amazon") or {}).get("cupons") or []
             if cupons:
-                linhas.append(f"   Cupons Amazon na pagina: {', '.join(cupons[:3])}")
+                linhas.append(f"🏷️ Cupons na pagina: *{' · '.join(cupons[:3])}*")
+
+    linhas.append("")
+    linhas.append(f"⏰ Proxima checagem: *{proxima_checagem()}*")
 
     if primeira_vez:
         linhas.append("")
-        linhas.append("*Vale esperar ate semana que vem (Black Friday 27/11)?*")
-        linhas.append(
-            "Sim. O campeao Dreame F10 subiu na Amazon para R$ 1.994,05 (estava R$ 1.102 em 14/11), "
-            "entao nao vale fechar hoje por esse preco. O K800 Pro 127V segue a R$ 1.199,99 na KaBuM com "
-            "estoque alto no Esquenta ate 26/11 e soltou cupons relampago hoje (R$ 1.079 com CASATECH10 e "
-            "ate R$ 959 por minutos). O S40C tambem subiu acima da media. So o Tapo RV20 Max ja esta no menor "
-            "preco dos ultimos 40 dias (R$ 854,05)."
-        )
-        linhas.append("Rotina diaria criada no PC: 08:00, 14:00 e 20:00 com aviso aqui no seu Zap.")
+        linhas.append("💡 *Pre-Black Friday (27/11):* vale esperar pelos 3 que subiram ou tem cupom (Dreame F10, K800 Pro 127V e S40C). So o Tapo RV20 Max ja esta no piso de 40 dias.")
 
     return "\n".join(linhas)
 

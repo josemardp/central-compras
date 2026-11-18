@@ -58,6 +58,22 @@ class RastrearRobosTest(unittest.TestCase):
         self.assertIn("1.102,00", texto)
         self.assertIn("20TAONOROBO", texto)
 
+    def test_montar_mensagem_tem_espacamento_e_emojis(self):
+        snap = {
+            "coletado_em": "2026-11-18 15:15",
+            "modelos": {
+                "dreame_f10": {"nome": "Dreame F10", "melhor_preco": 1994.05, "melhor_onde": "Amazon (DREAME LTDA)", "promobit": []},
+                "k800_pro_127v": {"nome": "KaBuM K800 Pro 127V", "melhor_preco": 1199.99, "melhor_onde": "KaBuM Pix", "kabum_preto": {"cupom": "CASATECH10"}},
+                "tapo_rv20_max": {"nome": "Tapo RV20 Max", "melhor_preco": 854.05, "melhor_onde": "Amazon (TNTinfoLoja)", "amazon": {"cupons": ["25PRIMEBF"]}},
+                "xiaomi_s40c": {"nome": "Xiaomi S40C", "melhor_preco": 1165.83, "melhor_onde": "Amazon (J R C STORE)"},
+            },
+        }
+        msg = rr.montar_mensagem(snap, snap)
+        self.assertIn("🥇 *Dreame F10*", msg)
+        self.assertIn("\n\n🥈 *KaBuM K800 Pro 127V*", msg)
+        self.assertIn("🔴 *R$ 1.994,05*", msg)
+        self.assertIn("🟢 *R$ 1.199,99*", msg)
+
 
 if __name__ == "__main__":
     unittest.main()
