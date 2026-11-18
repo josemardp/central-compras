@@ -5,6 +5,16 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 18/11/2026 (tarde, parte 2): rastreador diário triplo dos dois splits na rotina dos robôs
+
+- **Novo script criado:** [`scripts/rastrear_ares_bf.py`](scripts/rastrear_ares_bf.py) + testes em [`tests/test_rastrear_ares_bf.py`](tests/test_rastrear_ares_bf.py). Monitora os 4 modelos de 12.000 BTU (`HJFC12C2WGCG`, `KNICST12F-02`, `42EBVCB12M5`, `42EZVCA12M5`) e os 2 modelos de 18.000 BTU (`PAC18FTW`, `HJFC18C2WHCH`) na Amazon, Dufrio, WebContinental, KaBuM e Promobit usando os dois CEPs corretos salvos fora do Git em `~/.central-compras/dados-privados/rastreador-ares/config.json`.
+- **Integração na rotina diária tripla:** [`scripts/rodar_rastreador_robos.ps1`](scripts/rodar_rastreador_robos.ps1) agora executa `rastrear_robos_bf.py --enviar-zap` e `rastrear_ares_bf.py --enviar-zap` às **08:00, 14:00 e 20:00** na tarefa agendada `Central Compras - Rastrear Robos BF`, enviando o comparativo dos ares ao WhatsApp do Josemar via `nav-zap` (CDP 9230) logo após o dos robôs. Primeira execução dos ares enviada e verificada nesta sessão.
+- **Achados com os CEPs corretos (18/11/2026 à tarde, `fonte=web`):**
+  - **12.000 BTU:** **Elgin Eco Inverter III (`HJFC12C2WGCG`)** segue campeão em **R$ 1.799,90** na Amazon (Refricril Ar Condicionados, frete grátis, entrega 27/11 a 01/12, cupom `70OFF` na 1ª compra no app). Agratto Kyn Top (`KNICST12F-02`) na Dufrio foi a **R$ 1.871,19** entregue (R$ 1.699,01 + frete R$ 172,18 em 13 dias úteis) e Midea AirVolution Lite (`42EBVCB12M5`) a **R$ 2.022,48** entregue (R$ 1.849,00 + frete R$ 173,48). Midea AI Ecomaster (`42EZVCA12M5`) manteve **R$ 2.304,90** entregue na Amazon (R$ 2.114,90 + frete R$ 190,00).
+  - **18.000 BTU:** **Philco Eco Inverter (`PAC18FTW`)** subiu na WebContinental de R$ 2.299,01 (manhã) para R$ 2.579,00 + frete R$ 139,00 = R$ 2.718,00 (exibe banner de cupom de R$ 200), mas apareceu na **Amazon (`B0HKPT8XSY`, vendido por Magalu.)** por **R$ 2.519,10 + R$ 49,90 frete = R$ 2.569,00 entregue**, mantendo o menor total. **Elgin Eco Inverter III (`HJFC18C2WHCH`)** manteve **R$ 2.758,54** entregue na WebContinental (R$ 2.599,01 + R$ 159,53 frete, 12 dias úteis), ficando **R$ 189,54** acima do Philco na Amazon por 101 kWh/ano a menos e garantia de 36 meses no aparelho e 10 anos no compressor com credenciado.
+- **Pendências:**
+  - [ ] Acompanhar os alertas triplos até a Black Friday (27/11/2026), conferir fechamento no carrinho/cupom e garantia com instalador credenciado, e desativar/limpar a rotina ao concluir as compras.
+
 ## Sessão 18/11/2026 (tarde): repesquisa dos 4 robôs aspiradores e rotina pré-Black Friday
 
 - **Alterações de preço (18/11/2026 vs 14/11/2026, `fonte=web`):**
