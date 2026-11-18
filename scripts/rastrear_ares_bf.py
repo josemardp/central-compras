@@ -139,11 +139,55 @@ def definir_cep_amazon(page: Any, cep: str) -> str:
     return "n/d"
 
 
+def _extrair_parcelas_texto(texto: str) -> dict[str, Any]:
+    """Extrai quantidade de parcelas e valor da parcela sem juros de um trecho."""
+    out: dict[str, Any] = {"parcelas_qtd": None, "parcela_valor": None, "preco_parcelado": None}
+    if not texto:
+        return out
+    m_full = re.search(
+        r"(?:ou\s*)?(R\$\s*[\d\.]+,\d{2})\s*(?:\([^)]*\)\s*)?em\s+at[ée]\s+(\d+)x\s+de\s+(R\$\s*[\d\.]+,\d{2})\s*sem\s+juros",
+        texto,
+        re.I,
+    )
+    if m_full:
+        out["preco_parcelado"] = parse_brl_flex(m_full.group(1))
+        out["parcelas_qtd"] = int(m_full.group(2))
+        out["parcela_valor"] = parse_brl_flex(m_full.group(3))
+        return out
+    m = re.search(
+        r"(\d+)\s*x\s*(?:de\s*)?(R\$\s*[\d\.]+,\d{2})\s*(?:sem juros|/m[eê]s)?",
+        texto,
+        re.I,
+    )
+    if m:
+        out["parcelas_qtd"] = int(m.group(1))
+        out["parcela_valor"] = parse_brl_flex(m.group(2))
+    m_tot = re.search(r"total\s+parcelado\s*(R\$\s*[\d\.]+,\d{2})", texto, re.I)
+    if m_tot:
+        out["preco_parcelado"] = parse_brl_flex(m_tot.group(1))
+    elif out["parcelas_qtd"] and out["parcela_valor"]:
+        out["preco_parcelado"] = round(out["parcelas_qtd"] * out["parcela_valor"], 2)
+    return out
+
+
+def formatar_parcelas(qtd: int | None, val_parcela: float | None, total: float | None) -> str | None:
+    if not qtd or val_parcela is None:
+        return None
+    base = f"{qtd}x de {rr.fmt_brl(val_parcela)} s/ juros"
+    if total is not None:
+        return f"{rr.fmt_brl(total)} em ate {base}"
+    return base
+
+
 def extrair_amazon_ar(page: Any, url: str) -> dict[str, Any]:
     res = rr.extrair_amazon(page, url)
     res["frete_valor"] = None
     res["prazo"] = None
     res["total"] = None
+    res["parcelas_qtd"] = None
+    res["parcela_valor"] = None
+    res["preco_parcelado"] = None
+    res["total_parcelado"] = None
     try:
         delivery_txt = (
             page.locator("#mir-layout-DELIVERY_BLOCK").inner_text()
@@ -153,6 +197,11 @@ def extrair_amazon_ar(page: Any, url: str) -> dict[str, Any]:
         buybox_txt = (
             page.locator("#desktop_buybox").inner_text()
             if page.locator("#desktop_buybox").count()
+            else ""
+        )
+        core_txt = (
+            page.locator("#corePrice_feature_div").first.inner_text()
+            if page.locator("#corePrice_feature_div").count()
             else ""
         )
         blob = delivery_txt or buybox_txt
@@ -169,6 +218,18 @@ def extrair_amazon_ar(page: Any, url: str) -> dict[str, Any]:
             res["prazo"] = mp.group(1).strip()
         if res.get("preco") is not None and res["frete_valor"] is not None:
             res["total"] = round(res["preco"] + res["frete_valor"], 2)
+
+        apex_txt = (
+            page.locator("#apex_desktop").first.inner_text()
+            if page.locator("#apex_desktop").count()
+            else ""
+        )
+        parc = _extrair_parcelas_texto(apex_txt + "\n" + core_txt + "\n" + buybox_txt)
+        res["parcelas_qtd"] = parc["parcelas_qtd"]
+        res["parcela_valor"] = parc["parcela_valor"]
+        res["preco_parcelado"] = parc["preco_parcelado"]
+        if res["preco_parcelado"] is not None and res["frete_valor"] is not None:
+            res["total_parcelado"] = round(res["preco_parcelado"] + res["frete_valor"], 2)
     except Exception as exc:
         res["erro_frete"] = str(exc)[:120]
     return res
@@ -182,6 +243,10 @@ def extrair_dufrio_ar(page: Any, url: str, cep: str) -> dict[str, Any]:
         "frete_valor": None,
         "prazo": None,
         "total": None,
+        "parcelas_qtd": None,
+        "parcela_valor": None,
+        "preco_parcelado": None,
+        "total_parcelado": None,
         "disponivel": None,
     }
     try:
@@ -193,6 +258,13 @@ def extrair_dufrio_ar(page: Any, url: str, cep: str) -> dict[str, Any]:
         if res["preco_pix"] is None:
             body_head = page.locator("main").inner_text()[:800] if page.locator("main").count() else ""
             res["preco_pix"] = parse_brl_flex(body_head)
+
+        inst_loc = page.locator(".installment-price, .product-pricing")
+        if inst_loc.count():
+            parc = _extrair_parcelas_texto(inst_loc.first.inner_text())
+            res["parcelas_qtd"] = parc["parcelas_qtd"]
+            res["parcela_valor"] = parc["parcela_valor"]
+            res["preco_parcelado"] = parc["preco_parcelado"]
 
         page.wait_for_selector(".shipping-calculator", timeout=10000)
         ship = page.locator(".shipping-calculator")
@@ -236,6 +308,8 @@ def extrair_dufrio_ar(page: Any, url: str, cep: str) -> dict[str, Any]:
         res["disponivel"] = res["preco_pix"] is not None
         if res["preco_pix"] is not None and res["frete_valor"] is not None:
             res["total"] = round(res["preco_pix"] + res["frete_valor"], 2)
+        if res["preco_parcelado"] is not None and res["frete_valor"] is not None:
+            res["total_parcelado"] = round(res["preco_parcelado"] + res["frete_valor"], 2)
     except Exception as exc:
         res["erro"] = str(exc)[:180]
     return res
@@ -249,6 +323,10 @@ def extrair_webcontinental_ar(page: Any, url: str, cep: str) -> dict[str, Any]:
         "frete_valor": None,
         "prazo": None,
         "total": None,
+        "parcelas_qtd": None,
+        "parcela_valor": None,
+        "preco_parcelado": None,
+        "total_parcelado": None,
         "vendedor": None,
         "cupom_banner": None,
     }
@@ -261,6 +339,17 @@ def extrair_webcontinental_ar(page: Any, url: str, cep: str) -> dict[str, Any]:
         )
         if pix_loc.count():
             res["preco_pix"] = parse_brl_flex(pix_loc.first.inner_text())
+
+        body_txt = page.locator("body").inner_text()
+        m_wc_parc = re.search(
+            r"Ou\s+(R\$\s*[\d\.]+,\d{2})\s+at[ée]\s+(\d+)x\s+de\s+(R\$\s*[\d\.]+,\d{2})",
+            body_txt[:3000],
+            re.I,
+        )
+        if m_wc_parc:
+            res["preco_parcelado"] = parse_brl_flex(m_wc_parc.group(1))
+            res["parcelas_qtd"] = int(m_wc_parc.group(2))
+            res["parcela_valor"] = parse_brl_flex(m_wc_parc.group(3))
 
         vend_loc = page.locator(".lojawebcontinental-app-front-1-x-customSellerLinkLink")
         if vend_loc.count() >= 2:
@@ -297,15 +386,170 @@ def extrair_webcontinental_ar(page: Any, url: str, cep: str) -> dict[str, Any]:
 
         if res["preco_pix"] is not None and res["frete_valor"] is not None:
             res["total"] = round(res["preco_pix"] + res["frete_valor"], 2)
+        if res["preco_parcelado"] is not None and res["frete_valor"] is not None:
+            res["total_parcelado"] = round(res["preco_parcelado"] + res["frete_valor"], 2)
     except Exception as exc:
         res["erro"] = str(exc)[:180]
     return res
 
 
-def _escolher_melhor(opcoes: list[tuple[float | None, str]]) -> tuple[float | None, str]:
-    validas = [(val, desc) for val, desc in opcoes if val is not None]
+def extrair_frigelar_ar(page: Any, url: str, cep: str) -> dict[str, Any]:
+    dig = normalizar_cep(cep)
+    res: dict[str, Any] = {
+        "url": url,
+        "preco_pix": None,
+        "frete_valor": None,
+        "prazo": None,
+        "total": None,
+        "parcelas_qtd": None,
+        "parcela_valor": None,
+        "preco_parcelado": None,
+        "total_parcelado": None,
+    }
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(3500)
+        body = page.locator("body").inner_text()
+        m_pix = re.search(r"(R\$\s*[\d\.]+,\d{2})\s*(?:\n|\r|\s)*[ÀA]\s+vista\s+no\s+PIX", body, re.I)
+        if m_pix:
+            res["preco_pix"] = parse_brl_flex(m_pix.group(1))
+        m_parc = re.search(
+            r"ou\s+(R\$\s*[\d\.]+,\d{2})\s+em\s+at[ée]\s+(\d+)x\s+de\s+(R\$\s*[\d\.]+,\d{2})\s+sem\s+juros",
+            body,
+            re.I,
+        )
+        if m_parc:
+            res["preco_parcelado"] = parse_brl_flex(m_parc.group(1))
+            res["parcelas_qtd"] = int(m_parc.group(2))
+            res["parcela_valor"] = parse_brl_flex(m_parc.group(3))
+
+        try:
+            page.evaluate("window.scrollBy(0, 450)")
+            page.wait_for_selector("#cepInput, input[placeholder*='CEP' i]", timeout=12000)
+            inp = page.locator("#cepInput, input[placeholder*='CEP' i]").first
+            inp.scroll_into_view_if_needed()
+            inp.fill(dig)
+            page.wait_for_timeout(400)
+            page.locator("button:has-text('Calcular'), button:has-text('OK')").first.click()
+            for _ in range(14):
+                page.wait_for_timeout(500)
+                ship_txt = page.evaluate("""() => {
+                    const inp = document.querySelector('#cepInput') || document.querySelector('input[placeholder*="CEP" i]');
+                    let el = inp;
+                    for (let i = 0; i < 6 && el; i++) el = el.parentElement;
+                    return el ? el.innerText : '';
+                }""")
+                m_f = re.search(r"(R\$\s*[\d\.]+,\d{2})", ship_txt)
+                if m_f:
+                    res["frete_valor"] = parse_brl_flex(m_f.group(1))
+                    m_p = re.search(r"(\d+\s*dias?\s*[úu]teis)", ship_txt, re.I)
+                    if m_p:
+                        res["prazo"] = m_p.group(1).strip()
+                    break
+        except Exception as exc:
+            res["erro_frete"] = str(exc)[:120]
+
+        if res["preco_pix"] is not None and res["frete_valor"] is not None:
+            res["total"] = round(res["preco_pix"] + res["frete_valor"], 2)
+        if res["preco_parcelado"] is not None and res["frete_valor"] is not None:
+            res["total_parcelado"] = round(res["preco_parcelado"] + res["frete_valor"], 2)
+    except Exception as exc:
+        res["erro"] = str(exc)[:180]
+    return res
+
+
+def extrair_ml_ar(page: Any, url: str) -> dict[str, Any]:
+    res: dict[str, Any] = {
+        "url": url,
+        "preco": None,
+        "frete_gratis": False,
+        "vendedor": None,
+        "parcelas_mp_qtd": None,
+        "parcelas_mp_valor": None,
+        "parcelas_outros_qtd": None,
+        "parcelas_outros_valor": None,
+    }
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=25000)
+        page.wait_for_timeout(2800)
+        if not page.locator("h1").count():
+            res["erro"] = "sem h1 (possivel bloqueio temporario ML)"
+            return res
+        body = page.locator("body").inner_text()
+        # Preco principal exibido perto do titulo / buybox
+        m_pr = re.search(r"(?:R\$\s*[\d\.]+(?:,\d{2})?)\s*\n\s*(\d+)x\s*(?:R\$\s*[\d\.]+,\d{2}|de\s*R\$)", body)
+        price_el = page.locator(".ui-pdp-price__second-line .andes-money-amount__fraction").first
+        if price_el.count():
+            cents_el = page.locator(".ui-pdp-price__second-line .andes-money-amount__cents").first
+            frac = price_el.inner_text().strip()
+            cents = cents_el.inner_text().strip() if cents_el.count() else "00"
+            res["preco"] = parse_brl_flex(f"R$ {frac},{cents}")
+        elif m_pr:
+            res["preco"] = parse_brl_flex(m_pr.group(0))
+
+        m_mp = re.search(
+            r"(\d+)x\s*(?:de\s*)?(R\$\s*[\d\.]+,\d{2})\s*sem juros",
+            body,
+            re.I,
+        )
+        if m_mp:
+            qtd = int(m_mp.group(1))
+            val = parse_brl_flex(m_mp.group(2))
+            if qtd > 12:
+                res["parcelas_mp_qtd"] = qtd
+                res["parcelas_mp_valor"] = val
+            else:
+                res["parcelas_outros_qtd"] = qtd
+                res["parcelas_outros_valor"] = val
+
+        m_out = re.search(
+            r"em\s+at[ée]\s+(\d+)x\s+de\s+(R\$\s*[\d\.]+,\d{2})\s+sem juros",
+            body,
+            re.I,
+        )
+        if m_out:
+            res["parcelas_outros_qtd"] = int(m_out.group(1))
+            res["parcelas_outros_valor"] = parse_brl_flex(m_out.group(2))
+
+        res["frete_gratis"] = "frete grátis" in body.lower() or "chegará grátis" in body.lower()
+        m_vend = re.search(r"Vendido por\s+([^\n]+)", body)
+        if m_vend:
+            res["vendedor"] = m_vend.group(1).strip()[:40]
+    except Exception as exc:
+        res["erro"] = str(exc)[:180]
+    return res
+
+
+def _parcela_loja_texto(loja_dict: dict[str, Any]) -> str | None:
+    qtd = loja_dict.get("parcelas_qtd")
+    val = loja_dict.get("parcela_valor")
+    tot = loja_dict.get("total_parcelado") or loja_dict.get("preco_parcelado")
+    if not qtd or val is None:
+        return None
+    if loja_dict.get("frete_valor") and not loja_dict.get("total_parcelado") and tot is not None:
+        tot = round(tot + loja_dict["frete_valor"], 2)
+    return formatar_parcelas(qtd, val, tot)
+
+
+def _resumo_ml_18x(ml_data: dict[str, Any] | None) -> tuple[float | None, str | None]:
+    if not ml_data or ml_data.get("preco") is None:
+        return None, None
+    p = ml_data["preco"]
+    partes = []
+    if ml_data.get("parcelas_mp_qtd") and ml_data.get("parcelas_mp_valor") is not None:
+        partes.append(f"{ml_data['parcelas_mp_qtd']}x de {rr.fmt_brl(ml_data['parcelas_mp_valor'])} s/ juros Cartao MP")
+    if ml_data.get("parcelas_outros_qtd") and ml_data.get("parcelas_outros_valor") is not None:
+        partes.append(f"{ml_data['parcelas_outros_qtd']}x de {rr.fmt_brl(ml_data['parcelas_outros_valor'])} outros")
+    frete = "frete gratis" if ml_data.get("frete_gratis") else "checar frete"
+    vend = ml_data.get("vendedor") or "ML"
+    desc_parc = " / ".join(partes) if partes else "parcelado"
+    return p, f"ML ({vend}): *{rr.fmt_brl(p)}* em {desc_parc}, {frete}"
+
+
+def _escolher_melhor(opcoes: list[tuple[float | None, str, str | None]]) -> tuple[float | None, str, str | None]:
+    validas = [(val, desc, parc) for val, desc, parc in opcoes if val is not None]
     if not validas:
-        return None, "indisponivel"
+        return None, "indisponivel", None
     return min(validas, key=lambda x: x[0])
 
 
@@ -335,27 +579,6 @@ def coletar_precos(cep_12k: str, cep_18k: str) -> dict[str, Any]:
             "https://www.kabum.com.br/produto/1040358/ar-condicionado-12000-btus-split-hi-wall-inverter-elgin-frio-eco-iii-220v",
         )
         elgin12_prom = rr.extrair_promobit(p12, "elgin+12000+inverter", r"(?:elgin|hjfc12)")
-        cand_elgin12 = [
-            (
-                elgin12_amz.get("total"),
-                f"Amazon ({elgin12_amz.get('vendedor') or 'n/d'}, frete {elgin12_amz.get('frete') or 'n/d'})",
-            ),
-            (
-                elgin12_kbm.get("preco_pix"),
-                f"KaBuM Pix s/ frete ({elgin12_kbm.get('vendedor') or 'n/d'})",
-            ),
-        ]
-        m_elgin12 = _escolher_melhor(cand_elgin12)
-        dados["modelos"]["elgin_12k"] = {
-            "nome": BASELINE_18_11["elgin_12k"]["nome"],
-            "sku": BASELINE_18_11["elgin_12k"]["sku"],
-            "grupo": "12k",
-            "amazon": elgin12_amz,
-            "kabum": elgin12_kbm,
-            "promobit": elgin12_prom,
-            "melhor_preco": m_elgin12[0],
-            "melhor_onde": m_elgin12[1],
-        }
 
         agratto12_duf = extrair_dufrio_ar(
             p12,
@@ -373,6 +596,7 @@ def coletar_precos(cep_12k: str, cep_18k: str) -> dict[str, Any]:
                 if agratto12_duf.get("total") is not None
                 else "Dufrio (indisponivel)"
             ),
+            "melhor_parcelamento": _parcela_loja_texto(agratto12_duf),
         }
 
         midea_lite_duf = extrair_dufrio_ar(
@@ -391,6 +615,7 @@ def coletar_precos(cep_12k: str, cep_18k: str) -> dict[str, Any]:
                 if midea_lite_duf.get("total") is not None
                 else "Dufrio (indisponivel)"
             ),
+            "melhor_parcelamento": _parcela_loja_texto(midea_lite_duf),
         }
 
         midea_eco_amz = extrair_amazon_ar(p12, "https://www.amazon.com.br/dp/B0F9LJT26T")
@@ -405,6 +630,7 @@ def coletar_precos(cep_12k: str, cep_18k: str) -> dict[str, Any]:
                 if midea_eco_amz.get("total") is not None
                 else "Amazon (indisponivel)"
             ),
+            "melhor_parcelamento": _parcela_loja_texto(midea_eco_amz),
         }
         ctx12.close()
 
@@ -420,44 +646,145 @@ def coletar_precos(cep_12k: str, cep_18k: str) -> dict[str, Any]:
         philco18_amz = extrair_amazon_ar(p18, "https://www.amazon.com.br/dp/B0HKPT8XSY")
         philco18_wc = extrair_webcontinental_ar(p18, "https://www.webcontinental.com.br/010101015m31812221/p", cep_18k)
         philco18_prom = rr.extrair_promobit(p18, "pac18ftw", r"pac18ftw")
+
+        elgin18_wc = extrair_webcontinental_ar(p18, "https://www.webcontinental.com.br/010101006l30812222/p", cep_18k)
+        elgin18_prom = rr.extrair_promobit(p18, "hjfc18c2whch", r"(?:hjfc18|elgin.*18000)")
+        ctx18.close()
+
+        # Contexto dedicado Frigelar
+        ctx_frig = browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            locale="pt-BR",
+            user_agent=rr.USER_AGENT,
+        )
+        p_frig = ctx_frig.new_page()
+        elgin12_frig = extrair_frigelar_ar(
+            p_frig,
+            "https://www.frigelar.com.br/ar-condicionado-split-inverter-elgin-eco-iii-12000-btus-frio-220v-hjfc12c2wgcg/p/kit20403",
+            cep_12k,
+        )
+        elgin18_frig = extrair_frigelar_ar(
+            p_frig,
+            "https://www.frigelar.com.br/ar-condicionado-split-inverter-elgin-eco-iii-18000-btus-frio-220v-hjfc18c2whch/p/kit20405",
+            cep_18k,
+        )
+        ctx_frig.close()
+
+        # Contexto dedicado Mercado Livre (18x sem juros)
+        ctx_ml = browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            locale="pt-BR",
+            user_agent=rr.USER_AGENT,
+        )
+        p_ml = ctx_ml.new_page()
+        elgin12_ml = extrair_ml_ar(
+            p_ml,
+            "https://www.mercadolivre.com.br/ar-condicionado-split-hi-wall-inverter-elgin-eco-iii-wifi-12000-btus-frio-220v/p/MLB62516603",
+        )
+        p_ml.wait_for_timeout(1200)
+        philco18_ml = extrair_ml_ar(
+            p_ml,
+            "https://www.mercadolivre.com.br/ar-condicionado-split-inverter-philco-18000-btus-frio-220v/p/MLB48269925",
+        )
+        p_ml.wait_for_timeout(1200)
+        elgin18_ml = extrair_ml_ar(
+            p_ml,
+            "https://www.mercadolivre.com.br/ar-condicionado-split-hi-wall-inverter-elgin-eco-iii-wifi-18000-btus-so-frio-220v/p/MLB54457219",
+        )
+        ctx_ml.close()
+
+        cand_elgin12 = [
+            (
+                elgin12_amz.get("total"),
+                f"Amazon ({elgin12_amz.get('vendedor') or 'n/d'}, frete {elgin12_amz.get('frete') or 'n/d'})",
+                _parcela_loja_texto(elgin12_amz),
+            ),
+            (
+                elgin12_frig.get("total"),
+                f"Frigelar ({rr.fmt_brl(elgin12_frig.get('preco_pix'))} + frete {rr.fmt_brl(elgin12_frig.get('frete_valor'))})",
+                _parcela_loja_texto(elgin12_frig),
+            ),
+            (
+                elgin12_kbm.get("preco_pix"),
+                f"KaBuM Pix s/ frete ({elgin12_kbm.get('vendedor') or 'n/d'})",
+                f"10x s/ juros ({rr.fmt_brl(elgin12_kbm.get('preco_10x'))})" if elgin12_kbm.get("preco_10x") else None,
+            ),
+        ]
+        m_elgin12 = _escolher_melhor(cand_elgin12)
+        ml12_p, ml12_txt = _resumo_ml_18x(elgin12_ml)
+        dados["modelos"]["elgin_12k"] = {
+            "nome": BASELINE_18_11["elgin_12k"]["nome"],
+            "sku": BASELINE_18_11["elgin_12k"]["sku"],
+            "grupo": "12k",
+            "amazon": elgin12_amz,
+            "frigelar": elgin12_frig,
+            "kabum": elgin12_kbm,
+            "ml_18x": elgin12_ml,
+            "promobit": elgin12_prom,
+            "melhor_preco": m_elgin12[0],
+            "melhor_onde": m_elgin12[1],
+            "melhor_parcelamento": m_elgin12[2],
+            "melhor_18x_preco": ml12_p,
+            "melhor_18x_txt": ml12_txt,
+        }
+
         cand_philco18 = [
             (
                 philco18_amz.get("total"),
                 f"Amazon ({philco18_amz.get('vendedor') or 'n/d'}, frete {philco18_amz.get('frete') or 'n/d'})",
+                _parcela_loja_texto(philco18_amz),
             ),
             (
                 philco18_wc.get("total"),
                 f"WebContinental ({rr.fmt_brl(philco18_wc.get('preco_pix'))} + frete {rr.fmt_brl(philco18_wc.get('frete_valor'))})",
+                _parcela_loja_texto(philco18_wc),
             ),
         ]
         m_philco18 = _escolher_melhor(cand_philco18)
+        ml_p18, ml_p18_txt = _resumo_ml_18x(philco18_ml)
         dados["modelos"]["philco_18k"] = {
             "nome": BASELINE_18_11["philco_18k"]["nome"],
             "sku": BASELINE_18_11["philco_18k"]["sku"],
             "grupo": "18k",
             "amazon": philco18_amz,
             "webcontinental": philco18_wc,
+            "ml_18x": philco18_ml,
             "promobit": philco18_prom,
             "melhor_preco": m_philco18[0],
             "melhor_onde": m_philco18[1],
+            "melhor_parcelamento": m_philco18[2],
+            "melhor_18x_preco": ml_p18,
+            "melhor_18x_txt": ml_p18_txt,
         }
 
-        elgin18_wc = extrair_webcontinental_ar(p18, "https://www.webcontinental.com.br/010101006l30812222/p", cep_18k)
-        elgin18_prom = rr.extrair_promobit(p18, "hjfc18c2whch", r"(?:hjfc18|elgin.*18000)")
+        cand_elgin18 = [
+            (
+                elgin18_frig.get("total"),
+                f"Frigelar ({rr.fmt_brl(elgin18_frig.get('preco_pix'))} + frete {rr.fmt_brl(elgin18_frig.get('frete_valor'))})",
+                _parcela_loja_texto(elgin18_frig),
+            ),
+            (
+                elgin18_wc.get("total"),
+                f"WebContinental ({rr.fmt_brl(elgin18_wc.get('preco_pix'))} + frete {rr.fmt_brl(elgin18_wc.get('frete_valor'))})",
+                _parcela_loja_texto(elgin18_wc),
+            ),
+        ]
+        m_elgin18 = _escolher_melhor(cand_elgin18)
+        ml_e18, ml_e18_txt = _resumo_ml_18x(elgin18_ml)
         dados["modelos"]["elgin_18k"] = {
             "nome": BASELINE_18_11["elgin_18k"]["nome"],
             "sku": BASELINE_18_11["elgin_18k"]["sku"],
             "grupo": "18k",
+            "frigelar": elgin18_frig,
             "webcontinental": elgin18_wc,
+            "ml_18x": elgin18_ml,
             "promobit": elgin18_prom,
-            "melhor_preco": elgin18_wc.get("total"),
-            "melhor_onde": (
-                f"WebContinental ({rr.fmt_brl(elgin18_wc.get('preco_pix'))} + frete {rr.fmt_brl(elgin18_wc.get('frete_valor'))})"
-                if elgin18_wc.get("total") is not None
-                else "WebContinental (indisponivel)"
-            ),
+            "melhor_preco": m_elgin18[0],
+            "melhor_onde": m_elgin18[1],
+            "melhor_parcelamento": m_elgin18[2],
+            "melhor_18x_preco": ml_e18,
+            "melhor_18x_txt": ml_e18_txt,
         }
-        ctx18.close()
         browser.close()
 
     return dados
@@ -478,16 +805,23 @@ def detectar_alteracoes(atual: dict[str, Any], anterior: dict[str, Any] | None) 
         if p_ant != p_atu and (p_ant is not None or p_atu is not None):
             if p_ant is not None and p_atu is not None:
                 diff = p_atu - p_ant
-                if abs(diff) < 0.01:
-                    continue
-                icone = "🟢 *BAIXOU*" if diff < 0 else "🔴 *SUBIU*"
-                mudancas.append(
-                    f"{icone} *{mod['nome']}:* {rr.fmt_brl(p_ant)} -> *{rr.fmt_brl(p_atu)}* ({mod['melhor_onde']})"
-                )
+                if abs(diff) >= 0.01:
+                    icone = "🟢 *BAIXOU*" if diff < 0 else "🔴 *SUBIU*"
+                    mudancas.append(
+                        f"{icone} *{mod['nome']}:* {rr.fmt_brl(p_ant)} -> *{rr.fmt_brl(p_atu)}* ({mod['melhor_onde']})"
+                    )
             else:
                 mudancas.append(
                     f"🟡 *{mod['nome']}:* era {rr.fmt_brl(p_ant)}, agora *{rr.fmt_brl(p_atu)}* ({mod['melhor_onde']})"
                 )
+
+        p18_ant = ant.get("melhor_18x_preco")
+        p18_atu = mod.get("melhor_18x_preco")
+        if p18_ant is not None and p18_atu is not None and abs(p18_ant - p18_atu) >= 0.01:
+            icone = "🟢 *BAIXOU 18x*" if p18_atu < p18_ant else "🔴 *SUBIU 18x*"
+            mudancas.append(
+                f"{icone} *{mod['nome']}:* {rr.fmt_brl(p18_ant)} -> *{rr.fmt_brl(p18_atu)}* (ML 18x)"
+            )
     return mudancas
 
 
@@ -495,6 +829,20 @@ def _ordenar_grupo(modelos: dict[str, Any], grupo: str) -> list[tuple[str, dict[
     itens = [(k, v) for k, v in modelos.items() if v.get("grupo") == grupo]
     itens.sort(key=lambda kv: (kv[1].get("melhor_preco") is None, kv[1].get("melhor_preco") or 999999.0))
     return itens
+
+
+def _linha_vencedor_resumo(titulo_grupo: str, mod: dict[str, Any]) -> list[str]:
+    out = [
+        f"*{titulo_grupo}:* {mod['nome']} (`{mod['sku']}`)",
+        f"   💵 A vista: *{rr.fmt_brl(mod.get('melhor_preco'))}* · {mod.get('melhor_onde')}",
+    ]
+    parc = mod.get("melhor_parcelamento")
+    if parc:
+        out.append(f"   💳 Parcelado na loja: *{parc}*")
+    ml_txt = mod.get("melhor_18x_txt")
+    if ml_txt:
+        out.append(f"   💳 >12x ({ml_txt})")
+    return out
 
 
 def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, primeira_vez: bool = False) -> str:
@@ -514,10 +862,13 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
         linhas.extend(mudancas)
 
     medalhas = ["🥇", "🥈", "🥉", "4️⃣"]
+    vencedores: dict[str, dict[str, Any]] = {}
     for titulo, grupo in [("🔹 *12.000 BTU (220V, entregue)*", "12k"), ("🔹 *18.000 BTU (220V, entregue)*", "18k")]:
         linhas.append("")
         linhas.append(titulo)
         ordenados = _ordenar_grupo(atual.get("modelos", {}), grupo)
+        if ordenados:
+            vencedores[grupo] = ordenados[0][1]
         for idx, (key, mod) in enumerate(ordenados):
             medalha = medalhas[idx] if idx < len(medalhas) else "•"
             base = BASELINE_18_11[key]["preco_total"]
@@ -542,6 +893,10 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
             linhas.append("")
             linhas.append(f"{medalha} *{mod['nome']}* (`{mod['sku']}`)")
             linhas.append(f"{bola} *{rr.fmt_brl(p)}* · {onde}")
+            if mod.get("melhor_parcelamento"):
+                linhas.append(f"💳 {mod['melhor_parcelamento']}")
+            if mod.get("melhor_18x_txt"):
+                linhas.append(f"💳 {mod['melhor_18x_txt']}")
             linhas.append(f"📊 {comp}")
 
             if key == "elgin_12k":
@@ -565,12 +920,22 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
                     )
 
     linhas.append("")
+    linhas.append("🏆 *RESUMO DOS 2 VENCEDORES*")
+    if "12k" in vencedores:
+        linhas.extend(_linha_vencedor_resumo("12.000 BTU", vencedores["12k"]))
+    if "18k" in vencedores:
+        linhas.extend(_linha_vencedor_resumo("18.000 BTU", vencedores["18k"]))
+        elg18 = (atual.get("modelos", {}) or {}).get("elgin_18k") or {}
+        if elg18.get("melhor_18x_txt") and vencedores["18k"].get("sku") != elg18.get("sku"):
+            linhas.append(f"   🔄 Alt. 18k Elgin (`HJFC18C2WHCH`): {rr.fmt_brl(elg18.get('melhor_preco'))} a vista · {elg18['melhor_18x_txt']}")
+
+    linhas.append("")
     linhas.append(f"⏰ Proxima checagem: *{rr.proxima_checagem()}*")
 
     if primeira_vez:
         linhas.append("")
         linhas.append(
-            "💡 *Resumo:* nos 12k o *Elgin HJFC12C2WGCG* segue campeao com frete gratis na Amazon; nos 18k o *Philco PAC18FTW* subiu na WebContinental e apareceu na Amazon como menor total entregue."
+            "💡 *Obs:* Shopee/Casas Bahia bloqueiam busca automatica e TikTok Shop busca so no app (conferir manual no celular)."
         )
 
     return "\n".join(linhas)
