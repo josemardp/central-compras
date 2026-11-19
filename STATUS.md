@@ -5,6 +5,15 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 19/11/2026: Xiaomi S40 Pro (Paraguai) incluído no rastreador diário de robôs
+
+- **Contexto:** Esdra enviou print do Compras Paraguai com ofertas do **Xiaomi Robot Vacuum S40 Pro** (`OV71GL` / `BHR0890US` / `BHR089REU`, bivolt 100–240V) a US$ 225,00 (R$ 1.327,50) em lojas grandes de Ciudad del Este (Madrid Center, Mega Eletrônicos, Nissei, Cellshop) e US$ 250,00 no Shopping China. Análise técnica e comparativo com os 4 finalistas do Brasil enviados a ela via `nav-zap` (entregue às 17:06), incluindo o alerta de que a foto da Mega Eletrônicos exibe torre autolimpante por engano (o S40 Pro usa base simples `OV71CDZ`) e que modelos `US`/`REU` do Paraguai não têm garantia oficial da DL/Xiaomi no Brasil.
+- **Código atualizado:** [`scripts/rastrear_robos_bf.py`](scripts/rastrear_robos_bf.py) e [`tests/test_rastrear_robos_bf.py`](tests/test_rastrear_robos_bf.py) agora coletam diariamente também o **Xiaomi S40 Pro (Paraguai)** no Compras Paraguai (`robo-de-limpeza-xiaomi-robot-vacuum-s40-pro-bivolt_66296/`), separando oferta **nova** mais barata (`menor_novo`), menor preço entre **grandes lojas CDE** (`menor_grandes`), **recondicionado/caixa avariada** (`menor_geral`) e cotação do dólar exibida no site.
+- **Coleta ao vivo (19/11/2026 18:30, `fonte=web`):** 42 ofertas listadas (dólar CP R$ 5,90); menor **novo** em **R$ 1.262,60 (US$ 214,00)** na MultiPass (`BHR089REU`), grandes CDE em **R$ 1.327,50 (US$ 225,00)** na Madrid Center/Nissei/Cellshop/Mega Eletrônicos, e recondicionado a R$ 1.174,10 (US$ 199,00) na Visãovip. No Brasil na mesma rodada: Dreame F10 R$ 1.994,05, KaBuM K800 Pro 127V R$ 1.199,99 (cupom `CASATECH10` ~R$ 1.079,99), Tapo RV20 Max R$ 854,05 e Xiaomi S40C R$ 1.149,50 (Amazon, Line Eletronicos LTDA).
+- **Validação:** `python scripts/central_compras.py checar-segredos --strict` limpo; suíte completa `python -m unittest discover -s tests` com **598 testes, 0 falhas**.
+- **Pendências:**
+  - [ ] Decidir entre trazer o Xiaomi S40 Pro na cota do Paraguai (sem garantia nacional, vantagem do mop duplo rotativo + 15.000 Pa) ou aguardar a Black Friday (27/11/2026) no Brasil (KaBuM K800 Pro 127V com base autoesvaziante ou Tapo RV20 Max).
+
 ## Sessão 18/11/2026 (tarde, parte 2): rastreador diário triplo dos dois splits na rotina dos robôs
 
 - **Novo script criado:** [`scripts/rastrear_ares_bf.py`](scripts/rastrear_ares_bf.py) + testes em [`tests/test_rastrear_ares_bf.py`](tests/test_rastrear_ares_bf.py). Monitora os 4 modelos de 12.000 BTU (`HJFC12C2WGCG`, `KNICST12F-02`, `42EBVCB12M5`, `42EZVCA12M5`) e os 2 modelos de 18.000 BTU (`PAC18FTW`, `HJFC18C2WHCH`) na Amazon, Frigelar, Dufrio, WebContinental, KaBuM, Mercado Livre (ofertas em até 18x no Cartão Mercado Pago e 12x nos demais cartões) e Promobit usando os dois CEPs salvos fora do Git em `~/.central-compras/dados-privados/rastreador-ares/config.json`.

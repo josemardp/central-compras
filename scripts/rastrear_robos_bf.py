@@ -1,9 +1,9 @@
-"""Rastreador diario de precos dos 4 robos aspiradores (pre-Black Friday 2026).
+"""Rastreador diario de precos dos robos aspiradores (4 no Brasil + S40 Pro Paraguai).
 
-Coleta precos e cupons em fontes publicas (Amazon, KaBuM, Zoom e Promobit),
-compara com a rodada anterior e com a referencia de 14/11/2026, salva historico
-fora do Git (~/.central-compras/dados-privados/rastreador-robos/) e opcionalmente
-envia o resumo pelo WhatsApp das IAs (nav-zap, CDP 9230).
+Coleta precos e cupons em fontes publicas (Amazon, KaBuM, Zoom, Promobit e
+Compras Paraguai), compara com a rodada anterior e com a referencia inicial,
+salva historico fora do Git (~/.central-compras/dados-privados/rastreador-robos/)
+e opcionalmente envia o resumo pelo WhatsApp das IAs (nav-zap, CDP 9230).
 """
 
 from __future__ import annotations
@@ -32,7 +32,26 @@ BASELINE_14_11 = {
     "k800_pro_127v": {"nome": "KaBuM K800 Pro 127V", "preco": 1199.99, "nota": "KaBuM Pix"},
     "tapo_rv20_max": {"nome": "Tapo RV20 Max", "preco": 854.05, "nota": "Amazon (TNTinfoLoja)"},
     "xiaomi_s40c": {"nome": "Xiaomi S40C", "preco": 912.63, "nota": "ML (urbantechcia)"},
+    "xiaomi_s40_pro_py": {
+        "nome": "Xiaomi S40 Pro (Paraguai)",
+        "preco": 1327.50,
+        "ref_label": "19/11",
+        "nota": "Compras PY US$ 225,00 (lojas CDE)",
+    },
 }
+
+LOJAS_GRANDES_PY = (
+    "madrid center",
+    "mega eletronicos",
+    "mega eletrônicos",
+    "nissei",
+    "shopping china",
+    "cellshop",
+    "new zone",
+    "atacado connect",
+)
+
+CP_S40_PRO_URL = "https://www.comprasparaguai.com.br/robo-de-limpeza-xiaomi-robot-vacuum-s40-pro-bivolt_66296/"
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -56,6 +75,24 @@ def fmt_brl(val: float | None) -> str:
         return "indisponivel"
     s = f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"R$ {s}"
+
+
+def parse_usd(texto: str) -> float | None:
+    m = re.search(r"US\$\s*([\d\.]+,\d{2})", texto or "")
+    if not m:
+        return None
+    val = m.group(1).replace(".", "").replace(",", ".")
+    try:
+        return float(val)
+    except ValueError:
+        return None
+
+
+def fmt_usd(val: float | None) -> str:
+    if val is None:
+        return "US$ n/d"
+    s = f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"US$ {s}"
 
 
 def extrair_amazon(page: Any, url: str) -> dict[str, Any]:
@@ -244,6 +281,82 @@ def extrair_promobit(page: Any, query: str, termo_filtro: str) -> list[dict[str,
     return ofertas
 
 
+def _resumir_ofertas_cp(
+    ofertas_raw: list[dict[str, Any]],
+    dolar_hoje: float | None = None,
+) -> dict[str, Any]:
+    """Normaliza e seleciona menor oferta nova, geral e das grandes lojas CDE."""
+    ofertas: list[dict[str, Any]] = []
+    for item in ofertas_raw:
+        texto = item.get("text") or ""
+        loja = (item.get("loja") or "").strip() or "loja n/d"
+        usd = parse_usd(texto)
+        brl = parse_brl(texto)
+        if brl is None and usd is not None and dolar_hoje is not None:
+            brl = round(usd * dolar_hoje, 2)
+        if brl is None:
+            continue
+        avaria = bool(
+            re.search(
+                r"recondicionad|refurbished|usad[oa]|vitrine|caixa\s*(feia|danificada)",
+                texto,
+                re.I,
+            )
+        )
+        ofertas.append(
+            {
+                "loja": loja,
+                "preco_usd": usd,
+                "preco_brl": brl,
+                "avaria_ou_recond": avaria,
+                "titulo": texto.split("Código:")[0].strip()[:120],
+            }
+        )
+
+    novas = [o for o in ofertas if not o["avaria_ou_recond"]]
+    grandes = [o for o in novas if o["loja"].lower() in LOJAS_GRANDES_PY]
+    return {
+        "qtd_ofertas": len(ofertas),
+        "menor_novo": min(novas, key=lambda o: o["preco_brl"]) if novas else None,
+        "menor_geral": min(ofertas, key=lambda o: o["preco_brl"]) if ofertas else None,
+        "menor_grandes": min(grandes, key=lambda o: o["preco_brl"]) if grandes else None,
+    }
+
+
+def extrair_compras_paraguai(page: Any, url: str) -> dict[str, Any]:
+    """Coleta cotacoes no Compras Paraguai (dolar, menor novo, recondicionado e grandes lojas)."""
+    res: dict[str, Any] = {
+        "url": url,
+        "dolar_hoje": None,
+        "qtd_ofertas": 0,
+        "menor_novo": None,
+        "menor_geral": None,
+        "menor_grandes": None,
+    }
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=25000)
+        page.wait_for_timeout(2500)
+        body = page.inner_text("body")
+        m_dol = re.search(r"Dólar hoje:\s*\n?\s*R\$\s*([\d\.]+,\d{2})", body)
+        dolar_hoje = parse_brl("R$ " + m_dol.group(1)) if m_dol else None
+        raw = page.evaluate("""() => {
+            const out = [];
+            document.querySelectorAll('.promocao-produtos-item.tem-linha-de-acoes').forEach(el => {
+                const text = (el.innerText || '').replace(/\\s+/g, ' ').trim();
+                const imgs = Array.from(el.querySelectorAll('img')).map(i => i.alt || i.title || '').filter(Boolean);
+                const loja = imgs.length ? imgs[imgs.length - 1] : '';
+                out.push({loja, text});
+            });
+            return out;
+        }""")
+        resumo = _resumir_ofertas_cp(raw or [], dolar_hoje=dolar_hoje)
+        res["dolar_hoje"] = dolar_hoje
+        res.update(resumo)
+    except Exception as exc:
+        res["erro"] = str(exc)[:180]
+    return res
+
+
 def coletar_precos() -> dict[str, Any]:
     agora = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
     dados: dict[str, Any] = {"coletado_em": agora, "modelos": {}}
@@ -348,6 +461,24 @@ def coletar_precos() -> dict[str, Any]:
             "melhor_onde": melhor_s40c[1],
         }
 
+        # 5. Xiaomi S40 Pro (Paraguai)
+        s40p_cp = extrair_compras_paraguai(page, CP_S40_PRO_URL)
+        melhor_cp = s40p_cp.get("menor_novo") or s40p_cp.get("menor_geral")
+        if melhor_cp:
+            onde_cp = f"Compras PY/{melhor_cp['loja']} ({fmt_usd(melhor_cp.get('preco_usd'))})"
+            if melhor_cp.get("avaria_ou_recond"):
+                onde_cp += " [recond.]"
+            preco_cp = melhor_cp.get("preco_brl")
+        else:
+            onde_cp = "indisponivel"
+            preco_cp = None
+        dados["modelos"]["xiaomi_s40_pro_py"] = {
+            "nome": "Xiaomi S40 Pro (Paraguai)",
+            "compras_paraguai": s40p_cp,
+            "melhor_preco": preco_cp,
+            "melhor_onde": onde_cp,
+        }
+
         browser.close()
     return dados
 
@@ -424,27 +555,32 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
         ("k800_pro_127v", "🥈"),
         ("tapo_rv20_max", "🥉"),
         ("xiaomi_s40c", "4️⃣"),
+        ("xiaomi_s40_pro_py", "5️⃣"),
     ]
     for key, medalha in ordem:
-        mod = atual["modelos"][key]
-        base = BASELINE_14_11[key]["preco"]
+        mod = atual.get("modelos", {}).get(key)
+        if not mod:
+            continue
+        base_info = BASELINE_14_11[key]
+        base = base_info["preco"]
+        ref_label = base_info.get("ref_label", "14/11")
         p = mod.get("melhor_preco")
         onde = mod.get("melhor_onde")
 
         if p is None:
             bola = "⚪"
-            comp = f"ref 14/11 {fmt_brl(base)}"
+            comp = f"ref {ref_label} {fmt_brl(base)}"
         else:
             diff_base = p - base
             if abs(diff_base) < 0.50:
                 bola = "🟢"
-                comp = "igual a 14/11"
+                comp = f"igual a {ref_label}"
             elif diff_base < 0:
                 bola = "🟢"
-                comp = f"*{fmt_brl(abs(diff_base))} mais barato* que 14/11 (era {fmt_brl(base)})"
+                comp = f"*{fmt_brl(abs(diff_base))} mais barato* que {ref_label} (era {fmt_brl(base)})"
             else:
                 bola = "🔴"
-                comp = f"+{fmt_brl(diff_base)} vs 14/11 (era {fmt_brl(base)})"
+                comp = f"+{fmt_brl(diff_base)} vs {ref_label} (era {fmt_brl(base)})"
 
         linhas.append("")
         linhas.append(f"{medalha} *{mod['nome']}*")
@@ -464,6 +600,25 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
             cupons = (mod.get("amazon") or {}).get("cupons") or []
             if cupons:
                 linhas.append(f"🏷️ Cupons na pagina: *{' · '.join(cupons[:3])}*")
+        elif key == "xiaomi_s40_pro_py":
+            cp = mod.get("compras_paraguai") or {}
+            detalhes_cp: list[str] = []
+            if cp.get("dolar_hoje"):
+                detalhes_cp.append(f"Dolar CP: {fmt_brl(cp['dolar_hoje'])}")
+            if cp.get("qtd_ofertas"):
+                detalhes_cp.append(f"{cp['qtd_ofertas']} ofertas")
+            mg = cp.get("menor_grandes")
+            if mg and mg.get("preco_brl") and mg.get("preco_brl") != p:
+                detalhes_cp.append(
+                    f"Grandes CDE: *{fmt_brl(mg['preco_brl'])}* ({mg['loja']} · {fmt_usd(mg.get('preco_usd'))})"
+                )
+            mger = cp.get("menor_geral")
+            if mger and mger.get("avaria_ou_recond") and mger.get("preco_brl") and (p is None or mger["preco_brl"] < p):
+                detalhes_cp.append(
+                    f"Recond.: {fmt_brl(mger['preco_brl'])} ({mger['loja']} · {fmt_usd(mger.get('preco_usd'))})"
+                )
+            if detalhes_cp:
+                linhas.append("💱 " + " · ".join(detalhes_cp))
 
     linhas.append("")
     linhas.append(f"⏰ Proxima checagem: *{proxima_checagem()}*")
