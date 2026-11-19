@@ -13,7 +13,10 @@ $codeRobos = $LASTEXITCODE
 & python "C:\projetos\central-compras\scripts\rastrear_ares_bf.py" --enviar-zap *>> $logPath
 $codeAres = $LASTEXITCODE
 
-$code = if ($codeRobos -ne 0 -or $codeAres -ne 0) { 1 } else { 0 }
+& python "C:\projetos\central-compras\scripts\rastrear_chuveiro_bf.py" --enviar-zap *>> $logPath
+$codeChuveiro = $LASTEXITCODE
+
+$code = if ($codeRobos -ne 0 -or $codeAres -ne 0 -or $codeChuveiro -ne 0) { 1 } else { 0 }
 $stampFim = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-Add-Content -Path $logPath -Value "=== Fim $stampFim (robos=$codeRobos ares=$codeAres exit=$code) ===" -Encoding UTF8
+Add-Content -Path $logPath -Value "=== Fim $stampFim (robos=$codeRobos ares=$codeAres chuveiro=$codeChuveiro exit=$code) ===" -Encoding UTF8
 exit $code

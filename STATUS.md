@@ -5,6 +5,18 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 19/11/2026 (noite): Lorenzetti Loren Shower Eletrônico 6800W 220V incluído na rotina diária
+
+- **O que foi pedido:** incluir o chuveiro **Lorenzetti Loren Shower Eletrônico 6800W 220V** (SKU fabricante `7510157`) na rotina automática dos robôs e dos ares-condicionados.
+- **Código criado/atualizado:**
+  - [`scripts/rastrear_chuveiro_bf.py`](scripts/rastrear_chuveiro_bf.py): coleta preços na Amazon (`B095V215YN`), Leroy Merlin (`_91697823`), Zoom (`chuveiro-lorenzetti-loren-shower-eletronica-220v-6800w`) e Promobit (filtro restrito a `eletrônico` + `6800` para evitar confundir com as versões Multitemperaturas ou 7500W). O CEP é resolvido fora do Git em `~/.central-compras/dados-privados/` (`rastreador-chuveiro/config.json`, `rastreador-ares/config.json` ou `endereco.md`), salvando estado e histórico em `~/.central-compras/dados-privados/rastreador-chuveiro/` e enviando via `nav-zap` (CDP 9230).
+  - [`scripts/rodar_rastreador_robos.ps1`](scripts/rodar_rastreador_robos.ps1): passou a executar também `rastrear_chuveiro_bf.py --enviar-zap` junto de `rastrear_robos_bf.py` e `rastrear_ares_bf.py` na rotina das 08:00, 14:00 e 20:00.
+  - [`tests/test_rastrear_chuveiro_bf.py`](tests/test_rastrear_chuveiro_bf.py): 5 testes unitários cobrindo parsing da Leroy Merlin, fallback de CEP, detecção de alterações e montagem da mensagem.
+- **Coleta ao vivo (19/11/2026 19:15, `fonte=web`):** menor preço entregue na **Amazon (`B095V215YN`, Amazon.com.br)** por **R$ 111,89** com frete grátis (ou R$ 128,90 em até 4x de R$ 32,24 s/ juros; cupons exibidos `10OFFBF`, `25PRIMEBF`, `PRIMEIRA20BF`); Zoom/Magazine Luiza R$ 152,99; Leroy Merlin R$ 223,34 entregue; alerta no Promobit em R$ 87,16 (a conferir voltagem/6800W).
+- **Validação:** `python scripts/central_compras.py checar-segredos --strict` limpo; suíte completa `python -m unittest discover -s tests` com **603 testes, 0 falhas**.
+- **Pendências:**
+  - [ ] Dar `git pull` na máquina onde está agendada a tarefa `Central Compras - Rastrear Robos BF` para passar a incluir o chuveiro nas execuções das 08:00, 14:00 e 20:00, e conferir a tensão 220V/6800W no fechamento antes de comprar.
+
 ## Sessão 19/11/2026: Xiaomi S40 Pro (Paraguai) incluído no rastreador diário de robôs
 
 - **Contexto:** Esdra enviou print do Compras Paraguai com ofertas do **Xiaomi Robot Vacuum S40 Pro** (`OV71GL` / `BHR0890US` / `BHR089REU`, bivolt 100–240V) a US$ 225,00 (R$ 1.327,50) em lojas grandes de Ciudad del Este (Madrid Center, Mega Eletrônicos, Nissei, Cellshop) e US$ 250,00 no Shopping China. Análise técnica e comparativo com os 4 finalistas do Brasil enviados a ela via `nav-zap` (entregue às 17:06), incluindo o alerta de que a foto da Mega Eletrônicos exibe torre autolimpante por engano (o S40 Pro usa base simples `OV71CDZ`) e que modelos `US`/`REU` do Paraguai não têm garantia oficial da DL/Xiaomi no Brasil.
