@@ -831,10 +831,15 @@ def _ordenar_grupo(modelos: dict[str, Any], grupo: str) -> list[tuple[str, dict[
     return itens
 
 
-def _linha_vencedor_resumo(titulo_grupo: str, mod: dict[str, Any]) -> list[str]:
+def _linha_vencedor_resumo(
+    titulo_grupo: str,
+    mod: dict[str, Any],
+    extremos: tuple[float | None, float | None] = (None, None),
+) -> list[str]:
+    p = mod.get("melhor_preco")
     out = [
         f"*{titulo_grupo}:* {mod['nome']} (`{mod['sku']}`)",
-        f"   💵 A vista: *{rr.fmt_brl(mod.get('melhor_preco'))}* · {mod.get('melhor_onde')}",
+        f"   💵 A vista: *{rr.fmt_brl(p)}* · {mod.get('melhor_onde')}",
     ]
     parc = mod.get("melhor_parcelamento")
     if parc:
@@ -842,12 +847,21 @@ def _linha_vencedor_resumo(titulo_grupo: str, mod: dict[str, Any]) -> list[str]:
     ml_txt = mod.get("melhor_18x_txt")
     if ml_txt:
         out.append(f"   💳 >12x ({ml_txt})")
+    menor, maior = extremos
+    if menor is not None and maior is not None:
+        out.append(f"   📈 {rr.formatar_comparacao_extremos(p, menor, maior)}")
     return out
 
 
-def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, primeira_vez: bool = False) -> str:
+def montar_mensagem(
+    atual: dict[str, Any],
+    anterior: dict[str, Any] | None,
+    primeira_vez: bool = False,
+    historico: list[dict[str, Any]] | None = None,
+) -> str:
     agora_fmt = dt.datetime.strptime(atual["coletado_em"], "%Y-%m-%d %H:%M").strftime("%d/%m %H:%M")
     mudancas = detectar_alteracoes(atual, anterior)
+    hist = historico if historico is not None else rr.carregar_historico_jsonl(HIST_PATH)
 
     linhas = [f"❄️ *RASTREIO ARES • {rr.periodo_dia().upper()} ({agora_fmt})*", ""]
 
@@ -862,18 +876,21 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
         linhas.extend(mudancas)
 
     medalhas = ["🥇", "🥈", "🥉", "4️⃣"]
-    vencedores: dict[str, dict[str, Any]] = {}
+    vencedores: dict[str, tuple[str, dict[str, Any]]] = {}
+    extremos_por_key: dict[str, tuple[float | None, float | None]] = {}
     for titulo, grupo in [("🔹 *12.000 BTU (220V, entregue)*", "12k"), ("🔹 *18.000 BTU (220V, entregue)*", "18k")]:
         linhas.append("")
         linhas.append(titulo)
         ordenados = _ordenar_grupo(atual.get("modelos", {}), grupo)
         if ordenados:
-            vencedores[grupo] = ordenados[0][1]
+            vencedores[grupo] = ordenados[0]
         for idx, (key, mod) in enumerate(ordenados):
             medalha = medalhas[idx] if idx < len(medalhas) else "•"
             base = BASELINE_18_11[key]["preco_total"]
             p = mod.get("melhor_preco")
             onde = mod.get("melhor_onde")
+            menor, maior = rr.calcular_extremos_historico(hist, atual, key, baseline_preco=base)
+            extremos_por_key[key] = (menor, maior)
 
             if p is None:
                 bola = "⚪"
@@ -898,6 +915,7 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
             if mod.get("melhor_18x_txt"):
                 linhas.append(f"💳 {mod['melhor_18x_txt']}")
             linhas.append(f"📊 {comp}")
+            linhas.append(f"📈 {rr.formatar_comparacao_extremos(p, menor, maior)}")
 
             if key == "elgin_12k":
                 cupons = (mod.get("amazon") or {}).get("cupons") or []
@@ -922,11 +940,13 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
     linhas.append("")
     linhas.append("🏆 *RESUMO DOS 2 VENCEDORES*")
     if "12k" in vencedores:
-        linhas.extend(_linha_vencedor_resumo("12.000 BTU", vencedores["12k"]))
+        k12, m12 = vencedores["12k"]
+        linhas.extend(_linha_vencedor_resumo("12.000 BTU", m12, extremos_por_key.get(k12, (None, None))))
     if "18k" in vencedores:
-        linhas.extend(_linha_vencedor_resumo("18.000 BTU", vencedores["18k"]))
+        k18, m18 = vencedores["18k"]
+        linhas.extend(_linha_vencedor_resumo("18.000 BTU", m18, extremos_por_key.get(k18, (None, None))))
         elg18 = (atual.get("modelos", {}) or {}).get("elgin_18k") or {}
-        if elg18.get("melhor_18x_txt") and vencedores["18k"].get("sku") != elg18.get("sku"):
+        if elg18.get("melhor_18x_txt") and m18.get("sku") != elg18.get("sku"):
             linhas.append(f"   🔄 Alt. 18k Elgin (`HJFC18C2WHCH`): {rr.fmt_brl(elg18.get('melhor_preco'))} a vista · {elg18['melhor_18x_txt']}")
 
     linhas.append("")

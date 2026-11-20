@@ -534,9 +534,73 @@ def proxima_checagem() -> str:
     return "08:00 de amanha"
 
 
-def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, primeira_vez: bool = False) -> str:
+def carregar_historico_jsonl(hist_path: Path) -> list[dict[str, Any]]:
+    """Carrega registros validos de um arquivo historico.jsonl."""
+    if not hist_path.exists():
+        return []
+    registros: list[dict[str, Any]] = []
+    for linha in hist_path.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha:
+            continue
+        try:
+            registros.append(json.loads(linha))
+        except Exception:
+            continue
+    return registros
+
+
+def calcular_extremos_historico(
+    historico: list[dict[str, Any]],
+    atual: dict[str, Any],
+    key: str,
+    baseline_preco: float | None = None,
+) -> tuple[float | None, float | None]:
+    """Retorna (menor_preco, maior_preco) ja registrados para o item."""
+    precos: list[float] = []
+    if baseline_preco is not None:
+        precos.append(float(baseline_preco))
+    for reg in historico:
+        p = ((reg.get("modelos") or {}).get(key) or {}).get("melhor_preco")
+        if p is not None:
+            precos.append(float(p))
+    p_atual = ((atual.get("modelos") or {}).get(key) or {}).get("melhor_preco")
+    if p_atual is not None:
+        precos.append(float(p_atual))
+    if not precos:
+        return None, None
+    return min(precos), max(precos)
+
+
+def formatar_comparacao_extremos(
+    preco_atual: float | None,
+    menor: float | None,
+    maior: float | None,
+) -> str:
+    """Formata a comparacao do preco atual com o menor e o maior ja registrados."""
+    if menor is None or maior is None:
+        return "Hist.: sem registros"
+    base_txt = f"Hist.: menor *{fmt_brl(menor)}* · maior *{fmt_brl(maior)}*"
+    if preco_atual is None:
+        return base_txt
+    if abs(maior - menor) < 0.01:
+        return f"{base_txt} (estavel)"
+    diff_min = preco_atual - menor
+    diff_max = maior - preco_atual
+    parte_min = "no menor preco" if diff_min < 0.01 else f"+{fmt_brl(diff_min)} vs menor"
+    parte_max = "no maior preco" if diff_max < 0.01 else f"-{fmt_brl(diff_max)} vs maior"
+    return f"{base_txt} ({parte_min} | {parte_max})"
+
+
+def montar_mensagem(
+    atual: dict[str, Any],
+    anterior: dict[str, Any] | None,
+    primeira_vez: bool = False,
+    historico: list[dict[str, Any]] | None = None,
+) -> str:
     agora_fmt = dt.datetime.strptime(atual["coletado_em"], "%Y-%m-%d %H:%M").strftime("%d/%m %H:%M")
     mudancas = detectar_alteracoes(atual, anterior)
+    hist = historico if historico is not None else carregar_historico_jsonl(HIST_PATH)
 
     linhas = [f"🤖 *RASTREIO ROBOS • {periodo_dia().upper()} ({agora_fmt})*", ""]
 
@@ -557,6 +621,7 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
         ("xiaomi_s40c", "4️⃣"),
         ("xiaomi_s40_pro_py", "5️⃣"),
     ]
+    resumo_itens: list[tuple[float, str, float | None, float | None, float | None]] = []
     for key, medalha in ordem:
         mod = atual.get("modelos", {}).get(key)
         if not mod:
@@ -566,6 +631,9 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
         ref_label = base_info.get("ref_label", "14/11")
         p = mod.get("melhor_preco")
         onde = mod.get("melhor_onde")
+        menor, maior = calcular_extremos_historico(hist, atual, key, baseline_preco=base)
+        comp_extremos = formatar_comparacao_extremos(p, menor, maior)
+        resumo_itens.append((p if p is not None else 999999.0, mod["nome"], p, menor, maior))
 
         if p is None:
             bola = "⚪"
@@ -586,6 +654,7 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
         linhas.append(f"{medalha} *{mod['nome']}*")
         linhas.append(f"{bola} *{fmt_brl(p)}* · {onde}")
         linhas.append(f"📊 {comp}")
+        linhas.append(f"📈 {comp_extremos}")
 
         if key == "dreame_f10":
             proms = [pr for pr in mod.get("promobit", []) if pr.get("preco")]
@@ -619,6 +688,11 @@ def montar_mensagem(atual: dict[str, Any], anterior: dict[str, Any] | None, prim
                 )
             if detalhes_cp:
                 linhas.append("💱 " + " · ".join(detalhes_cp))
+
+    linhas.append("")
+    linhas.append("🏆 *RESUMO (MENOR / MAIOR HISTORICO)*")
+    for _, nome, p, menor, maior in sorted(resumo_itens, key=lambda item: item[0]):
+        linhas.append(f"• *{nome}:* *{fmt_brl(p)}* | {formatar_comparacao_extremos(p, menor, maior)}")
 
     linhas.append("")
     linhas.append(f"⏰ Proxima checagem: *{proxima_checagem()}*")
