@@ -5,6 +5,12 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 21/11/2026: cotação inicial de sacolas para a Esdra Cosméticos
+
+- Preços anunciados (fonte web, sem frete): [plástica 30×40 cm, 50 por R$ 7,90](https://ksembalagens.com.br/produtos/sacola-plastica-branca-30x40-pacote-c-50-unidades-1w0ia/), [plástica 40×50 cm, 50 por R$ 12,50](https://ksembalagens.com.br/produtos/sacola-plastica-branca-40x50-pacote-c-50-unidades-1q0kp/) e [kraft liso em quatro tamanhos, 40 por R$ 46,35 no Pix](https://www.magazineluiza.com.br/sacola-papel-kraft-lisa-kit-com-pp-p-m-g-10-de-cada-tamanho-mlbpel/p/dka98e974d/af/sacs/). Cesta inicial de 140 sacolas por R$ 66,75 antes dos fretes.
+- Para reposição, [plástica fina 25×35 cm, 1.000 por R$ 34,00](https://diegodoces.com.br/products/sacola-plastica-alca-camiseta-branca-com-1000-unidades) para itens leves e [kraft 15×20×7 cm, 50 por R$ 31,32 no Pix](https://loja.sandraembalagens.com.br/sacolas-kraft-pequena-delivery-lanches-15x20x7-50-unid) para presentes pequenos.
+- [ ] Se a compra avançar, conferir o encaixe dos kits, estoque e frete no carrinho. Comparar o total com retirada na Emballê em Araçatuba.
+
 ## Sessão 19/11/2026 (noite): Lorenzetti Loren Shower Eletrônico 6800W 220V incluído na rotina diária
 
 - **O que foi pedido:** incluir o chuveiro **Lorenzetti Loren Shower Eletrônico 6800W 220V** (SKU fabricante `7510157`) na rotina automática dos robôs e dos ares-condicionados.
