@@ -77,6 +77,14 @@
   - [ ] Rever os alertas em sombra (`python -m radar alertas`) antes de 21/11 08:00 e ajustar `config/radar_regras.yaml`.
   - [ ] Nada foi commitado nem enviado ao GitHub (ordem da missão). Dar `git pull` nas outras máquinas só depois do commit.
 
+## Sessão 21/11/2026 (noite, parte 4): radar, fechamento da implantação e ajustes do piloto (commit base `512fd9b`)
+
+- **Tarefa da Black Friday CRIADA no Windows** (21/11 21:18, com autorização): `Central Compras - Radar Promobit BF`, `Ready`, 1 gatilho de 26/11 00:05 a 01/12 00:00 (`EndBoundary`), repete a cada 10 min por 4d23h55m (**último disparo 30/11 23:55**, corrigido), `MultipleInstances=IgnoreNew`, limite 4 min, sem recuperar disparo perdido, apaga-se 24 h depois de expirar. As duas tarefas existentes ficaram idênticas (hash igual). Custo medido de uma leitura do Promobit: ~3,7 s, 0,28 s de CPU, ~38 MB.
+- **Alertas em SOMBRA** (`enviar: false`, `homologado_em: null`, `piloto.ativo: false`, `destinatario_confirmado_em: null`). Teste único de entrega feito às 21:12 (15,6 s, confirmação do mecanismo) e **chegada no celular confirmada pelo Josemar** ("chegou no meu zap sim"). `piloto.destinatario_confirmado_em` continua vazio até ordem expressa dele.
+- **Piloto, decisão do Josemar (21/11): AJUSTAR PARA TOTAL.** Orçamento do dia continua 2 comuns + 1 crítico, mas o limite por varredura é **1 alerta no TOTAL** (`piloto.max_total_por_ciclo: 1`); crítico tem preferência e o comum espera o próximo ciclo sem ser apagado. Política completa inalterada. **Frequência da Black Friday corrigida:** a folga de vencimento para intervalos curtos subiu de 20 s para 60 s (mín. 240 s entre leituras); provado por simulação dos disparos.
+- **`piloto.destinatario_confirmado_em` preenchido** com "2026-11-21 21:21" (horário real da sua confirmação no registro da sessão). `alertas.enviar`, `homologado_em` e `piloto.ativo` seguem desligados (SOMBRA).
+- **Pendências do Josemar:** ordem final para ativar o piloto (3 edições); login do Telegram; validar PHI200/BLACK150 no carrinho.
+
 ## Sessão 21/11/2026: cotação inicial de sacolas para a Esdra Cosméticos
 
 - Preços anunciados (fonte web, sem frete): [plástica 30×40 cm, 50 por R$ 7,90](https://ksembalagens.com.br/produtos/sacola-plastica-branca-30x40-pacote-c-50-unidades-1w0ia/), [plástica 40×50 cm, 50 por R$ 12,50](https://ksembalagens.com.br/produtos/sacola-plastica-branca-40x50-pacote-c-50-unidades-1q0kp/) e [kraft liso em quatro tamanhos, 40 por R$ 46,35 no Pix](https://www.magazineluiza.com.br/sacola-papel-kraft-lisa-kit-com-pp-p-m-g-10-de-cada-tamanho-mlbpel/p/dka98e974d/af/sacs/). Cesta inicial de 140 sacolas por R$ 66,75 antes dos fretes.

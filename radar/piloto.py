@@ -30,14 +30,15 @@ PADRAO: dict[str, Any] = {
     "orcamento_excecao_diario": 0,
     "max_por_ciclo": 1,
     "max_criticos_por_ciclo": 1,
+    "max_total_por_ciclo": 1,         # UM alerta por varredura no total, de qualquer categoria (o critico tem preferencia)
     "intervalo_mesmo_produto_min": 240,
     "intervalo_critico_mesmo_produto_min": 120,
     "melhora_para_repetir_pct": 7,
 }
-LIMITES = ("orcamento_diario", "orcamento_critico_diario", "orcamento_excecao_diario", "max_por_ciclo", "max_criticos_por_ciclo",
+LIMITES = ("orcamento_diario", "orcamento_critico_diario", "orcamento_excecao_diario", "max_por_ciclo", "max_criticos_por_ciclo", "max_total_por_ciclo",
            "intervalo_mesmo_produto_min", "intervalo_critico_mesmo_produto_min", "melhora_para_repetir_pct")
 # Teto do que ainda se pode chamar de "conservador": acima disto a verificacao previa acusa.
-TETO_CONSERVADOR = {"orcamento_diario": 3, "orcamento_critico_diario": 1, "orcamento_excecao_diario": 0, "max_por_ciclo": 1}
+TETO_CONSERVADOR = {"orcamento_diario": 3, "orcamento_critico_diario": 1, "orcamento_excecao_diario": 0, "max_por_ciclo": 1, "max_total_por_ciclo": 1}
 
 
 def config(regras: dict[str, Any]) -> dict[str, Any]:
@@ -90,7 +91,7 @@ def painel(con: Any, regras: dict[str, Any], agora: Any, horas: float = 24.0) ->
     m = modo(regras)
     L = [f"== PILOTO | modo atual: {m}"]
     L.append(f"   limites: {pil['orcamento_diario']} comum + {pil['orcamento_critico_diario']} critico + {pil['orcamento_excecao_diario']} excecao por dia, "
-             f"{pil['max_por_ciclo']} por varredura, mesmo produto a cada {pil['intervalo_mesmo_produto_min']} min ou melhora de {pil['melhora_para_repetir_pct']}%")
+             f"{pil['max_total_por_ciclo']} por varredura no TOTAL, mesmo produto a cada {pil['intervalo_mesmo_produto_min']} min ou melhora de {pil['melhora_para_repetir_pct']}%")
     L.append(f"   produtos do piloto: {len(pil['produtos_exatos'])} | confianca minima {pil['confianca_minima']} | destinatario confirmado por voce: "
              f"{pil['destinatario_confirmado_em'] or 'NAO'}")
     ini = (agora - dt.timedelta(hours=horas)).strftime("%Y-%m-%d %H:%M:%S")

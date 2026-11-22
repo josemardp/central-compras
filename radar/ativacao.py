@@ -121,8 +121,8 @@ def verificar(agora: dt.datetime | None = None, *, rodar_externos: bool = True) 
 
     pil = piloto.config(regras)
     exc = {k: (pil.get(k), t) for k, t in piloto.TETO_CONSERVADOR.items() if (pil.get(k) or 0) > t}
-    out.append(_i("P1", "piloto com limites conservadores (<= 3 comuns, 1 critico, 0 excecao, 1 por varredura)", "OK" if not exc else "FALHA",
-                  f"{pil['orcamento_diario']} comum/{pil['orcamento_critico_diario']} critico/{pil['orcamento_excecao_diario']} excecao, {pil['max_por_ciclo']} por varredura, "
+    out.append(_i("P1", "piloto com limites conservadores (<= 3 comuns, 1 critico, 0 excecao, 1 por varredura NO TOTAL)", "OK" if not exc else "FALHA",
+                  f"{pil['orcamento_diario']} comum/{pil['orcamento_critico_diario']} critico/{pil['orcamento_excecao_diario']} excecao, {pil['max_total_por_ciclo']} por varredura no total, "
                   f"{len(pil['produtos_exatos'])} produtos exatos, confianca minima {pil['confianca_minima']}" if not exc else f"acima do conservador (atual, teto): {exc}"))
     out.append(_i("P2", "destinatario do WhatsApp confirmado POR VOCE", "OK" if pil.get("destinatario_confirmado_em") else "MANUAL",
                   f"confirmado em {pil['destinatario_confirmado_em']}" if pil.get("destinatario_confirmado_em")

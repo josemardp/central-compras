@@ -32,7 +32,9 @@ python -m radar teste-entrega --confirmo    # envia 1 mensagem rotulada TESTE ao
 
 Mede criação, início do envio e confirmação lida de volta na conversa, grava em `latencia.jsonl` (`python -m radar latencia` passa de ESTIMADO para MEDIDO). No máximo 1 por dia. Confira no celular que chegou **no chat certo**.
 
-## 4. Confirmar o destinatário (passo seu)
+## 4. Confirmar o destinatário (feito em 21/11/2026 às 21:21)
+
+**Já registrado**: você confirmou no celular que o teste de 21:12 chegou (mensagem "chegou no meu zap sim", 21:21, horário do registro da sessão) e o campo foi preenchido com esse horário. O restante desta seção fica como referência.
 
 Só depois de ver o teste chegar no seu chat, em `config/radar_regras.yaml`, bloco `piloto`:
 

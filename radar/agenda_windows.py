@@ -72,10 +72,10 @@ def _script_aplicar(ag: dict[str, Any], python: str, raiz: str, backup_xml: Path
         if inicio and fim:  # janela com data: dispara so dentro dela; EndBoundary + DeleteExpiredTaskAfter = a tarefa expira e some sozinha
             import datetime as _dt
             d_ini, d_fim = _dt.datetime.strptime(str(inicio), "%Y-%m-%d %H:%M"), _dt.datetime.strptime(str(fim), "%Y-%m-%d %H:%M")
-            horas = max(int((d_fim - d_ini).total_seconds() // 3600), 1)
+            minutos = max(int((d_fim - d_ini).total_seconds() // 60), 1)   # em MINUTOS: o ultimo disparo cai na grade (30/11 23:55), nao na hora cheia
             gatilhos = (
                 f"$gat += New-ScheduledTaskTrigger -Once -At {_q(str(inicio))} "
-                f"-RepetitionInterval (New-TimeSpan -Minutes {passo}) -RepetitionDuration (New-TimeSpan -Hours {horas})\n"
+                f"-RepetitionInterval (New-TimeSpan -Minutes {passo}) -RepetitionDuration (New-TimeSpan -Minutes {minutos})\n"
                 f"$gat[0].EndBoundary = {_q(d_fim.strftime('%Y-%m-%dT%H:%M:%S'))}"
             )
         else:

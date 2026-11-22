@@ -38,6 +38,7 @@ PADRAO: dict[str, Any] = {
     "limiar_ultimo_comum": 65,
     "max_por_ciclo": 2,
     "max_criticos_por_ciclo": 2,
+    "max_total_por_ciclo": None,     # None = sem teto total (politica completa). O piloto usa 1: UM alerta por varredura, de qualquer categoria
     "intervalo_mesmo_produto_min": 90,
     "intervalo_critico_mesmo_produto_min": 30,
     "melhora_para_repetir_pct": 5,
@@ -232,7 +233,10 @@ def despachar(
     n_ciclo = n_crit_ciclo = 0
     selecionados: list[sqlite3.Row] = []
     restantes: list[sqlite3.Row] = []
-    for c in melhores.values():
+    total_max = int(p["max_total_por_ciclo"]) if p.get("max_total_por_ciclo") else None
+    # Com teto TOTAL por varredura, o CRITICO tem preferencia (depois, a maior pontuacao); o que nao couber espera o proximo ciclo.
+    ordem = sorted(melhores.values(), key=lambda x: (0 if x["classe"] == "CRITICA" else 1, -x["score"], x["id"])) if total_max else list(melhores.values())
+    for c in ordem:
         # candidato que esperou: confirma na fonte antes de entregar (nunca apresenta oferta encerrada como ativa)
         try:
             idade_min = (agora - dt.datetime.strptime(c["criado_em"], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60.0
@@ -263,6 +267,9 @@ def despachar(
             if _repete(ult, c["preco_final"], agora, float(p["intervalo_critico_mesmo_produto_min"]), float(p["melhora_para_repetir_pct"])):
                 reg(c, "suprimido_repeticao", f"CRITICO repetido: ja houve alerta deste produto ha menos de {p['intervalo_critico_mesmo_produto_min']} min sem melhora de {p['melhora_para_repetir_pct']}%")
                 continue
+            if total_max and n_ciclo + n_crit_ciclo >= total_max:
+                restantes.append(c)  # teto total da varredura ja usado: espera o proximo ciclo
+                continue
             orc = "critico"
         else:
             if c["score"] < float(p["score_minimo"]):
@@ -277,7 +284,7 @@ def despachar(
                 reg(c, "retida_orcamento", f"pontuacao {c['score']:.0f} abaixo do limiar do momento ({limiar:.0f}; {usados['comum']} de {p['orcamento_diario']} "
                     "vagas comuns ja usadas hoje): reserva vaga para oferta melhor; oferta NAO entregue")
                 continue
-            if n_ciclo >= int(p["max_por_ciclo"]):
+            if n_ciclo >= int(p["max_por_ciclo"]) or (total_max and n_ciclo + n_crit_ciclo >= total_max):
                 restantes.append(c)
                 continue
             if usados["comum"] < int(p["orcamento_diario"]):
@@ -301,9 +308,14 @@ def despachar(
     con.commit()
 
     # substituicao: quem ficou esperando e e MUITO inferior ao melhor selecionado perde a vez de vez
+    # Com teto total, so substitui quem e da MESMA categoria do selecionado: um critico escolhido NAO apaga um comum que so esperou a vez
+    # (o comum segue pendente para o proximo ciclo, ate vencer). Sem teto total (politica completa) vale a regra original.
     if selecionados and restantes:
-        topo = max(s["score"] for s in selecionados)
         for c in restantes:
+            base = [s_ for s_ in selecionados if (s_["classe"] == "CRITICA") == (c["classe"] == "CRITICA")] if total_max else selecionados
+            if not base:
+                continue
+            topo = max(s_["score"] for s_ in base)
             if c["score"] + float(p["substituicao_delta"]) <= topo:
                 reg(c, "substituido", f"substituido por oferta superior neste despacho (pontuacao {topo:.0f} contra {c['score']:.0f})")
     return decisoes

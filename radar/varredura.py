@@ -56,7 +56,11 @@ def _vencida(con, fonte: str, intervalo_min: float, agora: dt.datetime) -> bool:
     if not row or not row["ultima_tentativa"]:
         return True
     ultima = dt.datetime.strptime(row["ultima_tentativa"], "%Y-%m-%d %H:%M:%S")
-    return (agora - ultima).total_seconds() >= intervalo_min * 60 - 20  # folga: a tarefa dispara de 10 em 10 min
+    # Folga para o atraso do agendador. Com 10 min ou mais, 20 s (como sempre foi). Com intervalo CURTO (janela da Black Friday, 5 min) a folga
+    # de 20 s fazia a leitura de :05 ser PULADA sempre que a leitura anterior tivesse comecado com mais de 20 s de atraso (cai para 10 min
+    # efetivos); 60 s tolera esse atraso e mesmo assim garante pelo menos 240 s entre duas leituras (sem requisicao duplicada).
+    folga = 20.0 if intervalo_min >= 10 else 60.0
+    return (agora - ultima).total_seconds() >= intervalo_min * 60 - folga
 
 
 def _saude(con, fonte: str, ok: bool, itens: int, erro: str | None, agora: dt.datetime) -> None:

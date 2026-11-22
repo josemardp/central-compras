@@ -28,7 +28,7 @@ Cada oferta só vira mensagem se passar em **todas**. O que não passa fica regi
 | alertas comuns por dia | **2** | 6 |
 | alertas críticos por dia | **1** | 3 |
 | alertas de exceção por dia | **0** | 2 |
-| por varredura (10 min) | **1** | 2 |
+| por varredura (10 min) | **1 no TOTAL**, de qualquer categoria (o crítico tem preferência; o comum espera o próximo ciclo) | 2 comuns e 1 crítico, por categoria |
 | mesmo produto de novo | só após **4 h** ou melhora de **7%** | 90 min ou 5% |
 
 Quando o orçamento acaba, o que sobrar fica `retida_orcamento` (visível, não some).

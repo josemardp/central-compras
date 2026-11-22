@@ -46,7 +46,7 @@ prioridade:
 # TODAS as barreiras abaixo) e COMPLETO (piloto.ativo false: politica inteira). Ver docs/ecossistema/16-plano-de-ativacao.md e 17-piloto.
 piloto:
   ativo: false                      # so tem efeito com alertas.enviar true E alertas.homologado_em preenchidos (edicao SUA)
-  destinatario_confirmado_em: null  # VOCE preenche (ex.: "2026-11-22 10:30") depois de ver o teste de entrega chegar no SEU chat. Sem isso o piloto nao envia nada
+  destinatario_confirmado_em: "2026-11-21 21:21"   # confirmado por voce em 21/11/2026 21:21 (mensagem "chegou no meu zap sim"; teste de entrega de 21:12). Horario do registro da sessao, nao estimado
   produtos_exatos: [dreame_f10, k800_pro_127v, tapo_rv20_max, xiaomi_s40c, elgin_12k, agratto_12k, midea_lite_12k, midea_ecomaster_12k, philco_18k, elgin_18k, loren_shower_6800_220v]
   confianca_minima: MEDIA           # BAIXA nunca; a confianca (ALTA/MEDIA) e a razao dela aparecem na mensagem
   exigir_sem_avisos: true           # nenhum aviso: modelo, voltagem, hora incerta, preco que depende de cupom nao confirmado
@@ -57,6 +57,7 @@ piloto:
   orcamento_excecao_diario: 0
   max_por_ciclo: 1
   max_criticos_por_ciclo: 1
+  max_total_por_ciclo: 1            # UM alerta por varredura no TOTAL (qualquer categoria); critico tem preferencia, o comum espera o proximo ciclo
   intervalo_mesmo_produto_min: 240
   intervalo_critico_mesmo_produto_min: 120
   melhora_para_repetir_pct: 7

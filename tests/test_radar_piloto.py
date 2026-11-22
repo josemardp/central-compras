@@ -74,7 +74,9 @@ class ModoTest(unittest.TestCase):
         self.assertEqual(piloto.modo(real), "SOMBRA")
         pil = piloto.config(real)
         self.assertFalse(pil["ativo"])
-        self.assertIsNone(pil["destinatario_confirmado_em"])
+        dest = pil["destinatario_confirmado_em"]                 # preenchido por ordem do usuario (21/11 21:21); se um dia voltar a vazio, tambem vale
+        self.assertTrue(dest is None or __import__("datetime").datetime.strptime(str(dest), "%Y-%m-%d %H:%M"))
+        self.assertFalse(real["alertas"]["enviar"] or real["alertas"]["homologado_em"])   # o destinatario confirmado NAO liga nada: segue SOMBRA
         self.assertTrue(all(pil[k] <= t for k, t in piloto.TETO_CONSERVADOR.items()))
         self.assertNotIn("xiaomi_s40_pro_py", pil["produtos_exatos"])     # produto em USD (Paraguai) fora do piloto
         self.assertLess(pil["orcamento_diario"], real["prioridade"]["orcamento_diario"])
@@ -185,6 +187,81 @@ class DespachoNoPilotoTest(Base):
         txt = piloto.painel(self.con, regras(), AGORA)
         for trecho in ("modo atual: PILOTO", "2 comum + 1 critico + 0 excecao", "fora do piloto: xiaomi_s40_pro_py", "ativacao --desligar"):
             self.assertIn(trecho, txt)
+
+
+class TetoTotalPorVarreduraTest(Base):
+    """Decisao do Josemar (21/11): orcamento 2 comuns + 1 critico por dia, mas UM alerta por varredura no TOTAL. Critico tem preferencia."""
+
+    def ciclo(self, minutos, caixa, r=None):
+        decs = prioridade.despachar(self.con, r or regras(), caixa, AGORA + dt.timedelta(minutes=minutos))
+        return [(d["produto"], d["classe"]) for d in decs if d.get("estado") == "enviado"]
+
+    def test_critico_tem_preferencia_mesmo_com_pontuacao_menor_e_o_comum_espera(self):
+        caixa = Caixa()
+        comum = self.cand(produto="dreame_f10", classe="ALTA", score=90)
+        crit = self.cand(produto="k800_pro_127v", classe="CRITICA", score=70)
+        self.assertEqual(self.ciclo(0, caixa), [("k800_pro_127v", "CRITICA")])           # so 1 na varredura, e e o critico
+        self.assertEqual(self.estado(comum), ("pendente", "aguardando vaga no proximo ciclo"))
+        self.assertEqual(self.estado(crit)[0], "enviado")
+        self.assertEqual(self.ciclo(10, caixa), [("dreame_f10", "ALTA")])               # o comum sai no ciclo seguinte
+        self.assertEqual(len(caixa.msgs), 2)
+
+    def test_comum_nao_e_apagado_por_um_critico_muito_melhor_so_espera(self):
+        caixa = Caixa()
+        comum = self.cand(produto="dreame_f10", classe="ALTA", score=55)
+        self.cand(produto="k800_pro_127v", classe="CRITICA", score=98)                   # 43 pontos acima: na politica completa substituiria
+        self.ciclo(0, caixa)
+        self.assertEqual(self.estado(comum)[0], "pendente")                             # aqui NAO substitui: categorias diferentes
+        self.assertEqual(self.ciclo(10, caixa), [("dreame_f10", "ALTA")])
+
+    def test_comum_muito_inferior_a_outro_comum_selecionado_continua_sendo_substituido(self):
+        caixa = Caixa()
+        fraco = self.cand(produto="dreame_f10", classe="ALTA", score=50)
+        self.cand(produto="k800_pro_127v", classe="ALTA", score=90)
+        self.ciclo(0, caixa)
+        self.assertEqual(self.estado(fraco)[0], "substituido")                          # mesma categoria: vale a prioridade
+
+    def test_nunca_mais_de_um_por_varredura_e_o_dia_fecha_em_2_comuns_mais_1_critico(self):
+        caixa = Caixa()
+        for p, c, s in (("dreame_f10", "ALTA", 90), ("k800_pro_127v", "ALTA", 85), ("tapo_rv20_max", "ALTA", 80), ("xiaomi_s40c", "CRITICA", 95), ("elgin_12k", "CRITICA", 92)):
+            self.cand(produto=p, classe=c, score=s)
+        por_ciclo = [self.ciclo(10 * i, caixa) for i in range(8)]
+        self.assertTrue(all(len(x) <= 1 for x in por_ciclo), por_ciclo)
+        enviados = [e for x in por_ciclo for e in x]
+        self.assertEqual(sorted(c for _, c in enviados), ["ALTA", "ALTA", "CRITICA"])   # orcamento do dia preservado: 2 comuns + 1 critico
+        self.assertEqual(enviados[0][1], "CRITICA")                                     # o critico saiu primeiro
+
+    def test_comum_que_esperou_alem_da_validade_fica_retido_e_visivel(self):
+        caixa = Caixa()
+        r = regras(orcamento_critico_diario=9)
+        r["prioridade"]["validade_candidato_min"] = 15                                    # o candidato comum vence em 15 min
+        comum = self.cand(produto="dreame_f10", classe="ALTA", score=70, r=r)
+        for i, p in enumerate(("k800_pro_127v", "tapo_rv20_max")):                       # criticos novos a cada ciclo ocupam a vaga unica
+            self.cand(produto=p, classe="CRITICA", score=90, r=r, quando=AGORA + dt.timedelta(minutes=10 * i))
+            self.ciclo(10 * i, caixa, r)
+        self.assertEqual(self.estado(comum)[0], "pendente")
+        self.ciclo(20, caixa, r)                                                          # 20 min: o comum ja venceu esperando
+        self.assertEqual(self.estado(comum)[0], "retida_orcamento")
+        self.assertIn("venceu aguardando vaga", self.estado(comum)[1])
+        self.assertEqual([x["produto"] for x in prioridade.retidas(self.con, AGORA + dt.timedelta(minutes=21))], ["dreame_f10"])
+
+    def test_orcamento_e_deduplicacao_continuam_valendo_com_o_teto_total(self):
+        caixa = Caixa()
+        self.cand(produto="dreame_f10", classe="ALTA", score=90, preco=1000.0)
+        self.assertEqual(self.ciclo(0, caixa), [("dreame_f10", "ALTA")])
+        repetido = self.cand(produto="dreame_f10", classe="ALTA", score=90, preco=980.0, quando=AGORA + dt.timedelta(minutes=10))
+        self.assertEqual(self.ciclo(10, caixa), [])
+        self.assertEqual(self.estado(repetido)[0], "suprimido_repeticao")              # 2% melhor, dentro de 4 h: deduplicado
+
+    def test_politica_completa_nao_mudou_comum_e_critico_saem_juntos(self):
+        caixa = Caixa()
+        self.cand(produto="dreame_f10", classe="ALTA", score=90, r=regras("COMPLETO"))
+        self.cand(produto="k800_pro_127v", classe="CRITICA", score=70, r=regras("COMPLETO"))
+        self.assertEqual(len(self.ciclo(0, caixa, regras("COMPLETO"))), 2)
+
+    def test_configuracao_real_do_piloto_tem_teto_total_de_1(self):
+        self.assertEqual(piloto.config(ranking.carregar_regras())["max_total_por_ciclo"], 1)
+        self.assertEqual(prioridade.config(ranking.carregar_regras()).get("max_total_por_ciclo"), None)   # politica completa sem teto total
 
 
 if __name__ == "__main__":
