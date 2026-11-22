@@ -38,6 +38,58 @@ BASE = ROOT / "base-conhecimento"
 VEREDITOS = ROOT / "vereditos"
 DASHBOARD = ROOT / "dashboard"
 
+# Casa de trabalho externa (`--base`, `CENTRAL_COMPRAS_BASE`). None = o proprio
+# repositorio do motor. So os DADOS mudam de casa (projetos, produtos,
+# vereditos, dashboard, base de conhecimento); codigo, config e templates
+# continuam no motor: e o mesmo motor para duas casas separadas.
+WORKSPACE: Path | None = None
+BASE_ENV = "CENTRAL_COMPRAS_BASE"
+
+
+def workspace_root() -> Path:
+    """Raiz contra a qual caminhos relativos de projeto e veredito se resolvem."""
+    return WORKSPACE if WORKSPACE is not None else ROOT
+
+
+def display_path(path: Path) -> Path:
+    """Caminho para mostrar ao usuario: relativo a casa, ao motor ou absoluto."""
+    for raiz in (workspace_root(), ROOT):
+        try:
+            return path.relative_to(raiz)
+        except ValueError:
+            continue
+    return path
+
+
+def resolve_base(valor: str | None) -> Path | None:
+    """Valida a pasta de trabalho externa. Nunca cria nada."""
+    if not valor:
+        return None
+    pasta = Path(valor).expanduser()
+    if not pasta.is_dir():
+        raise SystemExit(f"Pasta de trabalho (--base) nao existe ou nao e pasta: {valor}")
+    return pasta.resolve()
+
+
+@contextlib.contextmanager
+def casa_de_trabalho(base: Path | None):
+    """Aponta os dados para `base` durante o comando e restaura ao sair."""
+    global WORKSPACE, PROJETOS, PRODUTOS, BASE, VEREDITOS, DASHBOARD
+    if base is None:
+        yield
+        return
+    anterior = (WORKSPACE, PROJETOS, PRODUTOS, BASE, VEREDITOS, DASHBOARD)
+    WORKSPACE = base
+    PROJETOS = base / "projetos"
+    PRODUTOS = base / "produtos"
+    BASE = base / "base-conhecimento"
+    VEREDITOS = base / "vereditos"
+    DASHBOARD = base / "dashboard"
+    try:
+        yield
+    finally:
+        WORKSPACE, PROJETOS, PRODUTOS, BASE, VEREDITOS, DASHBOARD = anterior
+
 # O modulo csv grava CRLF por padrao. Como o repo e usado de varias maquinas,
 # tudo aqui e gravado em LF, igual ao que o .gitattributes armazena.
 CSV_EOL = "\n"
@@ -1057,7 +1109,7 @@ def save_frontmatter(path: Path, meta: dict[str, Any], body: str) -> None:
 def project_path(value: str) -> Path:
     path = Path(value)
     if not path.is_absolute():
-        path = ROOT / value
+        path = workspace_root() / value
     if not path.exists():
         candidates = sorted(p for p in PROJETOS.glob(f"*{value}*") if p.is_dir())
         if len(candidates) == 1:
@@ -1415,7 +1467,7 @@ def new_project(args: argparse.Namespace) -> None:
     atomic_write_text((path / "decisao.md"), render_template("decisao.md"))
     atomic_write_text(path / "cotacoes.csv", ",".join(COTACOES_HEADER) + CSV_EOL)
     set_process_state(path, estado="pesquisando", proxima_acao="definir modelo/requisitos com ajuda da IA")
-    print(path.relative_to(ROOT))
+    print(display_path(path))
     print(f"Proximo comando: python scripts/central_compras.py prompt-ia projetos/{projeto_id} --etapa modelo")
 
 
@@ -1478,7 +1530,7 @@ def new_product(args: argparse.Namespace) -> None:
 
     append_timeline(project, "produto", f"Candidato registrado: {args.nome}", f"id={produto_id}")
     mark_steps(project, [3])
-    print(path.relative_to(ROOT))
+    print(display_path(path))
 
 
 def link_product(args: argparse.Namespace) -> None:
@@ -3506,7 +3558,7 @@ def list_waiting_price(args: argparse.Namespace) -> None:
     writer.writeheader()
     writer.writerows(rows)
     atomic_write_text(csv_path, buffer.getvalue())
-    print(report.relative_to(ROOT))
+    print(display_path(report))
     print(f"Itens: {len(rows)}")
 
 
@@ -4689,7 +4741,7 @@ def replace_or_append_bullet(text: str, label: str, value: str) -> str:
 def resolve_verdict_path(veredito: str) -> Path:
     path = Path(veredito)
     if not path.is_absolute():
-        path = ROOT / veredito
+        path = workspace_root() / veredito
     if not path.exists():
         raise SystemExit(f"Veredito nao encontrado: {veredito}")
     return path
@@ -4820,7 +4872,7 @@ def _projeto_da_confirmacao_de_compra(veredito: str) -> Path | None:
     do projeto nao ser deste produto (decisao substituida por outra)."""
     caminho = Path(veredito)
     if not caminho.is_absolute():
-        caminho = ROOT / veredito
+        caminho = workspace_root() / veredito
     if not caminho.exists():
         return None
     texto = caminho.read_text(encoding="utf-8")
@@ -5310,7 +5362,7 @@ def new_verdict(args: argparse.Namespace) -> None:
         raise SystemExit(f"Veredito ja existe: {path}")
     text = render_template("veredito.md").replace("- Projeto:", f"- Projeto: {project.name}")
     atomic_write_text(path, text)
-    print(path.relative_to(ROOT))
+    print(display_path(path))
 
 
 def annotate(args: argparse.Namespace) -> None:
@@ -5512,13 +5564,13 @@ def register_store(args: argparse.Namespace) -> None:
     # `main()` (tabela RECURSOS_DIRETOS_POR_COMANDO), antes de chegar aqui.
     path, entry = knowledge_entry(args, "loja")
     append_text(path, entry)
-    print(path.relative_to(ROOT))
+    print(display_path(path))
 
 
 def register_brand(args: argparse.Namespace) -> None:
     path, entry = knowledge_entry(args, "marca")
     append_text(path, entry)
-    print(path.relative_to(ROOT))
+    print(display_path(path))
 
 
 def yaml_scalar(value: Any) -> str:
@@ -5830,7 +5882,7 @@ def reuse_report(args: argparse.Namespace) -> None:
         ])
     path = BASE / "reaproveitamento.md"
     atomic_write_text(path, "\n".join(lines) + "\n")
-    print(path.relative_to(ROOT))
+    print(display_path(path))
     print(f"Taxa: {percent}%")
 
 
@@ -6995,7 +7047,7 @@ def generate_dashboard(args: argparse.Namespace) -> None:
 """
     index = DASHBOARD / "index.html"
     atomic_write_text(index, html_page("Central de Compras", body, DASHBOARD))
-    print(index.relative_to(ROOT))
+    print(display_path(index))
     print(f"Projetos: {len(projects)}")
 
 
@@ -7525,6 +7577,8 @@ def scan_sensitive(root: Path) -> list[tuple[str, int, str, str]]:
 
 def check_secrets(args: argparse.Namespace) -> None:
     achados = scan_sensitive(ROOT)
+    if WORKSPACE is not None and WORKSPACE.resolve() != ROOT.resolve():
+        achados += scan_sensitive(WORKSPACE)
     if not achados:
         print("Nenhum padrao sensivel encontrado na arvore versionada.")
         print("Lembrete: endereco, CPF e comprovante moram em ~/.central-compras/dados-privados/.")
@@ -7561,6 +7615,11 @@ def serve_panel(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Central de Compras")
+    parser.add_argument(
+        "--base", "--workspace", dest="base", metavar="PASTA",
+        help=f"pasta de trabalho externa para os dados (padrao: este repositorio; ou variavel {BASE_ENV}). "
+             "Vem antes do comando.",
+    )
     sub = parser.add_subparsers(required=True, dest="comando")
 
     p = sub.add_parser("init", help="confere/cria a estrutura de diretorios")
@@ -7962,7 +8021,7 @@ def _recursos_diretos_novo_projeto(args: argparse.Namespace) -> "set[Path]":
 def _recursos_diretos_preencher_veredito(args: argparse.Namespace) -> "set[Path]":
     caminho = Path(args.veredito)
     if not caminho.is_absolute():
-        caminho = ROOT / args.veredito
+        caminho = workspace_root() / args.veredito
     return {caminho}
 
 
@@ -8045,6 +8104,12 @@ def locked_project(args: argparse.Namespace) -> Path | None:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    base = resolve_base(args.base or os.environ.get(BASE_ENV))
+    with casa_de_trabalho(base):
+        return _executar(args)
+
+
+def _executar(args: argparse.Namespace) -> int:
     # Todas as travas sao adquiridas em ordem lexicografica. Assim, comandos
     # que tocam projeto + produtos + conhecimento nunca formam ciclo entre si.
     with contextlib.ExitStack() as travas:

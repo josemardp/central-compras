@@ -15,6 +15,16 @@ Default repository:
 C:\projetos\central-compras
 ```
 
+## Which house? (first question of every new purchase)
+
+The engine is one, the data lives in two separate houses. Before opening any process, ask: **"Pessoal/da casa, ou da Esdra Cosmeticos?"**. Do not guess; if the request already says which, do not ask again.
+
+- **Personal or household:** default, no flag. Data stays in this repository.
+- **Esdra Cosmeticos (business):** run every command with `--base` pointing to the business purchases folder (the `compras` folder of the private `central-ec` repository, `C:\projetos\central-ec\compras`), for example `python scripts/central_compras.py --base C:\projetos\central-ec\compras novo-projeto ...`. `--base` goes BEFORE the command; `CENTRAL_COMPRAS_BASE` does the same. Nothing about the business is written to this public repository.
+- When in the business house: read `perfil-loja.yaml` and the supplier registry in that folder first; classify the purchase in one of the 3 drawers (supply/consumption, investment/structure, resale goods) when opening it; on closing, the verdict must carry the standard handoff block for `financeiro-ec` (model in that folder's `README.md`). Full rules: decision EC-012 in `central-ec/DECISOES.md`.
+- Never copy business data (suppliers, prices, CNPJ, delivery address) into this repository, its STATUS, or its knowledge base. Each house has its own `base-conhecimento`.
+- If `--base` fails because the folder does not exist, stop and tell Josemar. Do not create the folder or fall back to the public repository.
+
 ## Operating Rules
 
 - Treat every purchase as a decision process, not a loose price table.
