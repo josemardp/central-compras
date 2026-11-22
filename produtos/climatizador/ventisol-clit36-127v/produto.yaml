@@ -1,0 +1,13 @@
+id: ventisol-clit36-127v
+categoria: climatizador
+nome: Climatizador Ventisol Torre Clit Abastece 3,6L 75W 127V (CLIT3.6-01)
+marca: Ventisol
+atributos:
+  tipo: climatizador_torre
+  tensao: 127V (CLIT3.6-01; tambem existe CLIT3.6-02 220V)
+  potencia_w: 75
+  reservatorio_l: 3.6
+  controle_remoto: false
+  garantia_meses: 12
+  rede_assistencia: true
+proveniencia: null

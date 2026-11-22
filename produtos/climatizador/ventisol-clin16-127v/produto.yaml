@@ -1,0 +1,13 @@
+id: ventisol-clin16-127v
+categoria: climatizador
+nome: Climatizador Ventisol CLIN16-01 16L 130W 127V
+marca: Ventisol
+atributos:
+  tipo: climatizador_portatil
+  tensao: 127V (CLIN16-01; 220V e CLIN16-02)
+  potencia_w: 130
+  reservatorio_l: 16
+  controle_remoto: false
+  garantia_meses: 12
+  rede_assistencia: true
+proveniencia: null

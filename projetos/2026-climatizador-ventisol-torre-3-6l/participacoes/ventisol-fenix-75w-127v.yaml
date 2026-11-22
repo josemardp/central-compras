@@ -1,0 +1,17 @@
+produto_id: ventisol-fenix-75w-127v
+estado: pesquisando
+preco_alvo: null
+preco_teto: null
+requisitos_atendidos:
+  tensao_127v: true
+  garantia_nacional_12m: true
+  assistencia_local_regiao: true
+  controle_remoto: true
+  timer_desligamento: true
+  climatiza_umidifica: "ausente"
+  tanque_facil_higiene_ou_sem_agua: true
+  baixo_ruido_relatado: true
+  compartimento_gelo: "ausente"
+descartado_porque: null
+aguardando_preco_porque: null
+aguardando_preco_desde: null

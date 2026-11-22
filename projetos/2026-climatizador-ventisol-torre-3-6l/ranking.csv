@@ -1,0 +1,7 @@
+produto_id,nome,score,qualidade,valor,risco,aderencia,conveniencia,status,motivos,alertas,fonte,confianca,idade_dias,cotacao_vencida,eixos_sem_dado,custo_total,custo_operacional_mensal,tco_meses,valor_revenda_estimado,tco_total
+ventisol-fenix-75w-127v,Ventilador Torre Ventisol Fenix 75W c/ Controle Remoto 127V,77.8,0.631,1.0,0.612,0.778,1.0,elegivel,,AVAL_SUSPEITA,web,1.0,0,nao,,245.98,0.0,,0.0,245.98
+midea-liva-akaf1-127v,"Midea Climatizador de Ar Frio Liva AKAF1 (4,5L util / 7L) 60W 127V",75.9,0.747,0.609,0.867,0.889,0.5,elegivel,,,web,0.9,0,nao,conveniencia,404.11,0.0,,0.0,404.11
+wap-clima-control-digital-127v,"WAP Climatizador de Ar Torre Control Digital 8,5L 100W 127V",66.4,0.494,0.572,0.867,0.889,0.5,elegivel,,,web,0.9,0,nao,conveniencia,429.9,0.0,,0.0,429.9
+ventisol-clit36-127v,"Climatizador Ventisol Torre Clit Abastece 3,6L 75W 127V (CLIT3.6-01)",60.0,0.316,0.779,0.762,0.556,0.75,elegivel,,,web,1.0,0,nao,,315.9,0.0,,0.0,315.9
+mondial-flash-air-cl03-127v,"Mondial Climatizador Flash Air CL-03 3,2L 80W 127V",57.4,0.253,0.636,0.867,0.722,0.5,elegivel,,,web,0.9,0,nao,conveniencia,386.9,0.0,,0.0,386.9
+ventisol-clin16-127v,Climatizador Ventisol CLIN16-01 16L 130W 127V,54.5,0.255,0.647,0.762,0.667,0.5,elegivel,,,web,0.9,0,nao,conveniencia,379.9,0.0,,0.0,379.9

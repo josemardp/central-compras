@@ -1,0 +1,12 @@
+id: wap-clima-control-digital-127v
+categoria: climatizador
+nome: WAP Climatizador de Ar Torre Control Digital 8,5L 100W 127V
+marca: WAP
+atributos:
+  tipo: climatizador_torre
+  tensao: 127V (tambem existe 220V)
+  potencia_w: 100
+  reservatorio_l: 8.5
+  controle_remoto: true
+  garantia_meses: 12
+proveniencia: null

@@ -299,3 +299,22 @@ medicamento:
     garantia_tipo_aceita:
       - nenhuma
       - nacional
+
+# Aberta em 21/11/2026 para analise do Climatizador Ventisol Torre 3,6L (CLIT3.6)
+# e alternativas (Fenix 75W, CLIN16, WAP, Midea, Mondial).
+climatizador:
+  atributos_obrigatorios:
+    - tipo
+    - tensao
+    - potencia_w
+    - reservatorio_l
+    - controle_remoto
+    - garantia_meses
+  nota_bayesiana:
+    peso_ancora: 50
+  gate:
+    nota_minima_ajustada: 4.1
+    minimo_avaliacoes: 20
+    garantia_tipo_aceita:
+      - nacional
+

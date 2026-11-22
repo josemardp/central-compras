@@ -1,0 +1,17 @@
+produto_id: ventisol-clin16-127v
+estado: pesquisando
+preco_alvo: null
+preco_teto: null
+requisitos_atendidos:
+  tensao_127v: true
+  garantia_nacional_12m: true
+  assistencia_local_regiao: true
+  controle_remoto: "ausente"
+  timer_desligamento: "ausente"
+  climatiza_umidifica: true
+  tanque_facil_higiene_ou_sem_agua: true
+  baixo_ruido_relatado: "ausente"
+  compartimento_gelo: true
+descartado_porque: null
+aguardando_preco_porque: null
+aguardando_preco_desde: null

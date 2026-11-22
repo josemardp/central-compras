@@ -1,0 +1,17 @@
+produto_id: ventisol-clit36-127v
+estado: pesquisando
+preco_alvo: 280.0
+preco_teto: null
+requisitos_atendidos:
+  tensao_127v: true
+  garantia_nacional_12m: true
+  assistencia_local_regiao: true
+  controle_remoto: "ausente"
+  timer_desligamento: "ausente"
+  climatiza_umidifica: true
+  tanque_facil_higiene_ou_sem_agua: "ausente"
+  baixo_ruido_relatado: true
+  compartimento_gelo: "ausente"
+descartado_porque: null
+aguardando_preco_porque: null
+aguardando_preco_desde: null

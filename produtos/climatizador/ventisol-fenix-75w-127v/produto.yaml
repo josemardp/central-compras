@@ -1,0 +1,13 @@
+id: ventisol-fenix-75w-127v
+categoria: climatizador
+nome: Ventilador Torre Ventisol Fenix 75W c/ Controle Remoto 127V
+marca: Ventisol
+atributos:
+  tipo: ventilador_torre
+  tensao: 127V (tambem existe 220V)
+  potencia_w: 75
+  reservatorio_l: 0
+  controle_remoto: true
+  garantia_meses: 12
+  rede_assistencia: true
+proveniencia: null

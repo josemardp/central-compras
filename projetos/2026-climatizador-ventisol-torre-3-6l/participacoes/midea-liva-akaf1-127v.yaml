@@ -1,0 +1,17 @@
+produto_id: midea-liva-akaf1-127v
+estado: pesquisando
+preco_alvo: null
+preco_teto: null
+requisitos_atendidos:
+  tensao_127v: true
+  garantia_nacional_12m: true
+  assistencia_local_regiao: "verificar"
+  controle_remoto: true
+  timer_desligamento: true
+  climatiza_umidifica: true
+  tanque_facil_higiene_ou_sem_agua: true
+  baixo_ruido_relatado: true
+  compartimento_gelo: true
+descartado_porque: null
+aguardando_preco_porque: null
+aguardando_preco_desde: null

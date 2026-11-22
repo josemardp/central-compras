@@ -1,0 +1,12 @@
+id: midea-liva-akaf1-127v
+categoria: climatizador
+nome: Midea Climatizador de Ar Frio Liva AKAF1 (4,5L util / 7L) 60W 127V
+marca: Midea
+atributos:
+  tipo: climatizador_portatil
+  tensao: 127V (AKAF1; 220V e AKAF2)
+  potencia_w: 60
+  reservatorio_l: 4.5
+  controle_remoto: true
+  garantia_meses: 12
+proveniencia: null

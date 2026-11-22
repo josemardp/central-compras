@@ -1,0 +1,12 @@
+id: mondial-flash-air-cl03-127v
+categoria: climatizador
+nome: Mondial Climatizador Flash Air CL-03 3,2L 80W 127V
+marca: Mondial
+atributos:
+  tipo: climatizador_portatil
+  tensao: 127V (tambem existe 220V)
+  potencia_w: 80
+  reservatorio_l: 3.2
+  controle_remoto: true
+  garantia_meses: 12
+proveniencia: null
