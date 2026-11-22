@@ -80,7 +80,7 @@ def _rodar(enviar_teste: bool, abertas: list) -> dict[str, Any]:
     con = db.abrir()
     abertas.append(con)
     cat = catalogo.carregar()
-    real = ranking.carregar_regras()
+    real = ranking.carregar_regras(operacao=False)  # sintetico: independe da ativacao viva
     regras = copy.deepcopy(real)
     regras["alertas"].update(enviar=True, homologado_em="SINTETICO (so em memoria)")
     _semear(con, "k800_pro_127v", [1250.0, 1230.0, 1199.98, 1240.0, 1260.0])
@@ -304,7 +304,7 @@ def _cenarios_prioridade(con, regras_ligadas: dict[str, Any]) -> list[dict[str, 
                     est(pid) == "falha_envio" and na_fila == 1 and len(voltou.mensagens) == 1))
 
     # P06 sombra: com a configuracao REAL (alertas desligados) o ranking roda e NADA e enviado
-    real = ranking.carregar_regras()
+    real = ranking.carregar_regras(operacao=False)
     t6 = t0 + dt.timedelta(hours=3)
     s1 = prioridade.registrar_candidato(con, oferta_id=None, produto="tapo_rv20_max", loja="Z", vendedor=None, classe="ALTA", score=85,
                                         componentes={}, preco_final=700.0, status_cupom="PROVAVEL", cupom=None, fonte="SINTETICO", hora_incerta=False,
@@ -338,7 +338,7 @@ def demonstrar_ofertas_reais() -> dict[str, Any]:
                 for nome, arq in reais.items():
                     historico.importar_para_db(con, nome, arq)
                 cat = catalogo.carregar()
-                regras = copy.deepcopy(ranking.carregar_regras())
+                regras = copy.deepcopy(ranking.carregar_regras(operacao=False))
                 regras["alertas"].update(enviar=True, homologado_em="DEMONSTRACAO (so em memoria)")
                 agora = dt.datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
                 caixa = _Caixa()

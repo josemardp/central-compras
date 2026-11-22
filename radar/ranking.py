@@ -18,8 +18,101 @@ ARQ_REGRAS = caminhos.CONFIG_DIR / "radar_regras.yaml"
 ORDEM = {"CRITICA": 4, "ALTA": 3, "MEDIA": 2, "BAIXA": 1}
 
 
-def carregar_regras(caminho: Path | None = None) -> dict[str, Any]:
-    return yaml.safe_load((caminho or ARQ_REGRAS).read_text(encoding="utf-8")) or {}
+def arquivo_operacao() -> Path:
+    """Estado OPERACIONAL local (ligado/desligado), FORA do Git: <dados-privados>/radar/operacao.yaml. Nao cria a pasta."""
+    return caminhos.privado_dir() / "radar" / "operacao.yaml"
+
+
+def _operacao_valida(bruto: Any) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Aceita SO as 3 chaves da ativacao e SO com o tipo certo. O resto e ignorado e avisado: o arquivo local nunca altera politica."""
+    ok: dict[str, dict[str, Any]] = {}
+    avisos: list[str] = []
+    if not isinstance(bruto, dict):
+        return ok, ["conteudo nao e um mapa"]
+    for bloco, chave, tipo in (("alertas", "enviar", bool), ("alertas", "homologado_em", (str, type(None))), ("piloto", "ativo", bool)):
+        sec = bruto.get(bloco)
+        if isinstance(sec, dict) and chave in sec:
+            v = sec[chave]
+            if chave == "homologado_em" and hasattr(v, "strftime"):   # "2026-11-22 09:03:00" sem aspas vira data no YAML: aceita e normaliza
+                v = v.strftime("%Y-%m-%d %H:%M")
+            if isinstance(v, tipo):
+                ok.setdefault(bloco, {})[chave] = v
+            else:
+                avisos.append(f"{bloco}.{chave} com tipo invalido ({type(v).__name__}): ignorado")
+    extras = {b: [k for k in (s or {}) if k not in ("enviar", "homologado_em", "ativo")] for b, s in bruto.items() if isinstance(s, dict) and b in ("alertas", "piloto")}
+    outros = [b for b in bruto if b not in ("alertas", "piloto") and not str(b).startswith(("ativado", "autorizado", "desligado", "commit", "nota"))]
+    if any(extras.values()) or outros:
+        avisos.append("chaves fora da lista permitida ignoradas")
+    return ok, avisos
+
+
+def carregar_regras(caminho: Path | None = None, *, operacao: bool = True) -> dict[str, Any]:
+    """Regras versionadas (config/radar_regras.yaml) + camada OPERACIONAL local (operacao.yaml: enviar, homologado_em, piloto.ativo).
+
+    Sem o arquivo local (instalacao nova, `git pull`, `git restore`) vale o versionado, que e SOMBRA. Arquivo ilegivel = o versionado
+    (seguro: nao liga nada). `operacao=False` ou `caminho` explicito ignoram a camada local (cenarios sinteticos, ensaios e testes).
+    O resultado traz `_operacao` (origem e avisos) para os paineis mostrarem de onde veio o estado."""
+    regras = yaml.safe_load((caminho or ARQ_REGRAS).read_text(encoding="utf-8")) or {}
+    info: dict[str, Any] = {"arquivo": None, "presente": False, "aplicado": [], "avisos": []}
+    if caminho is None and operacao:
+        arq = arquivo_operacao()
+        info["arquivo"] = str(arq)
+        if arq.exists():
+            info["presente"] = True
+            try:
+                bruto = yaml.safe_load(arq.read_text(encoding="utf-8"))
+            except (OSError, yaml.YAMLError) as exc:
+                bruto = None
+                info["avisos"].append(f"operacao.yaml ilegivel ({type(exc).__name__}): vale o versionado (sombra)")
+            else:
+                valido, avisos = _operacao_valida(bruto)
+                info["avisos"] += avisos
+                for bloco, chaves in valido.items():
+                    regras.setdefault(bloco, {})
+                    if not isinstance(regras[bloco], dict):
+                        regras[bloco] = {}
+                    for k, v in chaves.items():
+                        regras[bloco][k] = v
+                        info["aplicado"].append(f"{bloco}.{k}")
+    regras["_operacao"] = info
+    return regras
+
+
+def gravar_operacao(valores: dict[str, dict[str, Any]], extras: dict[str, Any] | None = None) -> Path:
+    """Grava o estado operacional local de forma ATOMICA (arquivo temporario + replace) para o agendador nunca ler pela metade.
+    Preserva o que ja existia (metadados e chaves nao mencionadas); `extras` sao so metadados (ativado_em, autorizado_por...)."""
+    import os
+    import tempfile
+
+    arq = arquivo_operacao()
+    arq.parent.mkdir(parents=True, exist_ok=True)
+    atual: dict[str, Any] = {}
+    if arq.exists():
+        try:
+            atual = yaml.safe_load(arq.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            atual = {}
+        if not isinstance(atual, dict):
+            atual = {}
+    for bloco, chaves in valores.items():
+        atual.setdefault(bloco, {})
+        atual[bloco].update(chaves)
+    atual.update(extras or {})
+    texto = ("# ESTADO OPERACIONAL LOCAL do radar. NAO versionado (fica fora do Git). Valem so: alertas.enviar, alertas.homologado_em, piloto.ativo.\n"
+             "# Sem este arquivo o radar roda em SOMBRA. Desligar: python -m radar ativacao --desligar\n"
+             + yaml.safe_dump(atual, allow_unicode=True, sort_keys=False, default_flow_style=False))
+    fd, tmp = tempfile.mkstemp(prefix=".operacao-", suffix=".tmp", dir=str(arq.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write(texto)
+        os.replace(tmp, arq)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    return arq
 
 
 def classificar(

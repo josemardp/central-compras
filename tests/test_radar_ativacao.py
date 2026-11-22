@@ -33,7 +33,8 @@ class VeredictoTest(unittest.TestCase):
 
     def test_formatar_sempre_lembra_que_ligar_e_passo_do_usuario(self):
         txt = ativacao.formatar([{"id": "A1", "nome": "n", "status": "OK", "detalhe": "d"}])
-        self.assertIn("Para LIGAR: edite config/radar_regras.yaml", txt)
+        self.assertIn("Para LIGAR: edite", txt)
+        self.assertIn("operacao.yaml", txt)                        # o estado ligado vive no arquivo LOCAL, fora do Git
         self.assertIn("--desligar", txt)
 
 

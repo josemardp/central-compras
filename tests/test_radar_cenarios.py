@@ -17,12 +17,15 @@ class CenariosTest(unittest.TestCase):
 
     def test_o_harness_nao_toca_o_banco_real_nem_a_config(self):
         import os
+        from radar import ranking
         antes = os.environ.get("CENTRAL_COMPRAS_DADOS_PRIVADOS")
+        local = ranking.arquivo_operacao()
+        estado_local = local.read_bytes() if local.exists() else None
         with mock.patch("builtins.print"):
             cenarios.executar_cenarios()
         self.assertEqual(os.environ.get("CENTRAL_COMPRAS_DADOS_PRIVADOS"), antes)
-        from radar import ranking
-        a = ranking.carregar_regras()["alertas"]
+        self.assertEqual(local.read_bytes() if local.exists() else None, estado_local)   # o estado operacional local nao foi tocado
+        a = ranking.carregar_regras(operacao=False)["alertas"]                           # o arquivo versionado segue desligado
         self.assertFalse(a["enviar"])
         self.assertIsNone(a["homologado_em"])
 

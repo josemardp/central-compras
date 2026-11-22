@@ -70,7 +70,9 @@ class ModoTest(unittest.TestCase):
         self.assertEqual(piloto.modo(r), "SOMBRA")
 
     def test_configuracao_real_esta_em_sombra_e_o_piloto_e_conservador(self):
-        real = ranking.carregar_regras()
+        # O arquivo VERSIONADO (o que vai ao GitHub e o que uma instalacao nova recebe) e sempre SOMBRA; a ativacao vive so no
+        # estado operacional local (operacao.yaml), por isso aqui se le sem a camada local. Serve de trava contra commitar a ativacao.
+        real = ranking.carregar_regras(operacao=False)
         self.assertEqual(piloto.modo(real), "SOMBRA")
         pil = piloto.config(real)
         self.assertFalse(pil["ativo"])

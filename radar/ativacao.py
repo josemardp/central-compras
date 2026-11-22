@@ -2,7 +2,8 @@
 
 Cada item sai como OK, FALHA (algo quebrado), PENDENTE (falta evidencia que so o tempo ou voce produzem) ou MANUAL (passo seu).
 Veredito: APTO so se nao houver FALHA nem PENDENTE. Os itens MANUAL sao os passos do procedimento (docs/ecossistema/16-plano-de-ativacao.md).
-Ligar e uma edicao SUA em config/radar_regras.yaml (`enviar: true` e `homologado_em`); este modulo so sabe DESLIGAR.
+Ligar e uma edicao SUA no estado operacional LOCAL (<dados-privados>/radar/operacao.yaml: `alertas.enviar: true`, `alertas.homologado_em` e
+`piloto.ativo: true`; fora do Git); este modulo so sabe DESLIGAR.
 """
 
 from __future__ import annotations
@@ -182,12 +183,17 @@ def formatar(itens: list[dict[str, str]]) -> str:
     for i in itens:
         L.append(f"  [{i['status']:8s}] {i['id']} {i['nome']}\n             {i['detalhe']}")
     L.append(f"\nVEREDITO: {veredito(itens)}")
-    L.append("Para LIGAR: edite config/radar_regras.yaml (alertas.enviar: true e alertas.homologado_em) so depois do plano. Para DESLIGAR agora: python -m radar ativacao --desligar")
+    L.append(f"Para LIGAR: edite {ranking.arquivo_operacao()} (alertas.enviar, alertas.homologado_em, piloto.ativo), arquivo LOCAL fora do Git, so depois do plano. Para DESLIGAR agora: python -m radar ativacao --desligar")
     return "\n".join(L)
 
 
 def desligar() -> tuple[bool, str]:
-    """Kill switch: poe `enviar: false` e `homologado_em: null` no bloco alertas, preservando comentarios e o resto do arquivo. So desliga."""
+    """Kill switch: `enviar: false` e `homologado_em: null` no estado OPERACIONAL LOCAL (operacao.yaml, fora do Git, gravacao atomica).
+    Por compatibilidade, se o arquivo versionado estiver ligado (ativacao antiga) ele tambem e desligado, preservando comentarios; se ja
+    estiver desligado, nao e reescrito. So desliga."""
+    import datetime as dt
+
+    ranking.gravar_operacao({"alertas": {"enviar": False, "homologado_em": None}}, {"desligado_em": dt.datetime.now().strftime("%Y-%m-%d %H:%M")})
     arq = caminhos.CONFIG_DIR / "radar_regras.yaml"
     txt = arq.read_text(encoding="utf-8")
     ini = txt.index("\nalertas:")
@@ -198,7 +204,8 @@ def desligar() -> tuple[bool, str]:
     if n == 0:
         return False, "linha `enviar:` nao encontrada no bloco alertas"
     novo = re.sub(r"(?m)^(\s*homologado_em:\s*)[^#\n]*", r"\1null              ", novo, count=1)
-    arq.write_text(txt[:ini] + novo + txt[fim:], encoding="utf-8")
+    if novo != bloco and re.search(r"(?m)^\s*enviar:\s*true\b", bloco):  # so mexe no versionado se ele estava LIGADO
+        arq.write_text(txt[:ini] + novo + txt[fim:], encoding="utf-8")
     cfg = ranking.carregar_regras()["alertas"]
     ok = not cfg.get("enviar") and not cfg.get("homologado_em")
     descartados = 0
@@ -316,5 +323,6 @@ def ensaio_kill_switch() -> list[dict[str, str]]:
             with contextlib.redirect_stdout(io.StringIO()):
                 varredura.executar(enviar=True, enviar_fn=lambda t: (enviados.append(t) or (True, "ok")), coletores={"x": lambda c: []}, fontes_cfg={"x": {}})
             out.append(_i("K4", "proxima varredura entrega o relatorio e NENHUM alerta", "OK" if len(enviados) == 1 and "RELATORIO NA FILA" in enviados[0] else "FALHA", f"{len(enviados)} envio(s)"))
-    out.append(_i("K5", "config real continua como estava", "OK" if not ranking.carregar_regras()["alertas"].get("enviar") else "FALHA", "o ensaio usou so copias temporarias"))
+    out.append(_i("K5", "config real continua como estava", "OK" if not ranking.carregar_regras(operacao=False)["alertas"].get("enviar") else "FALHA",
+                  "o ensaio usou so copias temporarias (arquivo versionado, sem a camada operacional local)"))
     return out

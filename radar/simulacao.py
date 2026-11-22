@@ -52,7 +52,7 @@ class Simulador:
         os.environ["CENTRAL_COMPRAS_DADOS_PRIVADOS"] = self._tmp.name
         self.con = db.abrir()
         self.cat = catalogo.carregar()
-        self.regras = copy.deepcopy(ranking.carregar_regras())
+        self.regras = copy.deepcopy(ranking.carregar_regras(operacao=False))
         self.regras["alertas"].update(enviar=True, homologado_em="SIMULACAO (so em memoria)")
         self.regras.setdefault("prioridade", {}).update(ajustes or {})
         self.caixa = _Caixa()

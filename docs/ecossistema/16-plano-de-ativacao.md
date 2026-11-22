@@ -54,7 +54,7 @@ Ensaia em cópias temporárias: alertas ligados, alerta e relatório na fila, de
 
 ## 6. Ativação do PILOTO (passo seu, explícito)
 
-Em `config/radar_regras.yaml`:
+No arquivo **local** `C:\Users\<você>\.central-compras\dados-privados\radar\operacao.yaml` (fora do Git; ver a seção 9-B). O `config/radar_regras.yaml` versionado **não** se edita para ligar:
 
 ```
 alertas:
@@ -85,7 +85,7 @@ Ative de manhã (alertas só valem entre 07:00 e 23:00) e fique por perto na pri
 python -m radar ativacao --desligar
 ```
 
-Grava `enviar: false` e `homologado_em: null` preservando o resto do arquivo e **descarta na hora os alertas da fila**. Se esquecer, a próxima varredura também descarta. Relatórios 08/14/20h não são tocados.
+Grava `enviar: false` e `homologado_em: null` no `operacao.yaml` local (e também no versionado, se alguém o tiver deixado ligado), preservando o resto dos arquivos, e **descarta na hora os alertas da fila**. Se esquecer, a próxima varredura também descarta. Relatórios 08/14/20h não são tocados.
 
 ## 9. Rollback (do mais leve ao mais pesado)
 
@@ -94,6 +94,22 @@ Grava `enviar: false` e `homologado_em: null` preservando o resto do arquivo e *
 3. Voltar a configuração: restaurar `config/radar_regras.yaml` do zip `codigo-radar-*.zip` em `C:\Users\<você>\.central-compras\dados-privados\radar\backups\`.
 4. Voltar o banco: `python -m radar migrar --reverter 3` (remove a tabela de candidatos e as 3 colunas de hora; faz backup antes) ou restaurar o `radar-*-pre-migracao.db`.
 5. Voltar o código: antes do commit, só os zips têm o código; depois, `git revert` do commit do radar (só com a sua ordem).
+
+## 9-B. Recuperação a partir do GitHub, estado operacional local e `migrar --reverter`
+
+**Onde mora a ativação (desde 22/11/2026):** no arquivo local `C:\Users\<você>\.central-compras\dados-privados\radar\operacao.yaml`, fora do Git. Só ele liga o envio, com três chaves: `alertas.enviar`, `alertas.homologado_em` e `piloto.ativo`. O `config/radar_regras.yaml` versionado fica sempre desligado (SOMBRA). Por isso `git pull`, `git restore`, `git reset` e o trabalho de outra sessão não desligam o piloto em silêncio, e um `git add -A` não publica a ativação. Sem o arquivo local, o radar roda em SOMBRA. Arquivo ilegível também cai em SOMBRA, e `python -m radar status` mostra a origem do estado e qualquer aviso. As seções 6 e 8 acima ainda citam `config/radar_regras.yaml` como lugar de ligar e desligar: o lugar que vale agora é o `operacao.yaml` (o `--desligar` já grava lá).
+
+**Instalação nova (clone sem pasta de dados):**
+- O que vem do GitHub: alertas desligados, `piloto.ativo: false`, a trava de máquina (`LAPTOP-3NSQG27T`) e `piloto.destinatario_confirmado_em`, que **já está no GitHub** (preenchido em 21/11/2026 21:21).
+- O que não vem: banco, históricos, backups, sessão do Telegram, `ativacao.jsonl`, a marca do teste único de entrega, `operacao.yaml` e as tarefas do Windows.
+- Passos: `python -m radar migrar` (cria o banco) e `python -m radar agendar --aplicar` (cria as tarefas). O radar fica em SOMBRA. Em outra máquina, a trava de máquina mantém tudo inativo, então só a máquina oficial coleta e envia. Para operar de verdade: teste único de entrega (seção 3) e ativação (seção 6, escrevendo no `operacao.yaml`). Confirmar o destinatário de novo só vale se o chat de destino mudou.
+
+**Máquina com configuração local preexistente (este notebook):**
+- O `operacao.yaml` sobrevive a `git pull`, `git restore`, `git reset --hard` e `git stash`, porque está fora do repositório. Só se perde se a pasta `dados-privados` for apagada ou o perfil do Windows for recriado, e nesse caso o radar volta a SOMBRA (lado seguro).
+- Até 22/11/2026 a ativação era uma alteração não commitada do `config/radar_regras.yaml`. Foi migrada para o `operacao.yaml` com os mesmos valores (09:03, piloto). O registro `ativacao.jsonl` e os backups foram preservados.
+- Um `ativacao --desligar` grava o desligamento no `operacao.yaml` e, se alguém tiver deixado o arquivo versionado ligado, desliga ele também.
+
+**Voltar o banco (`migrar --reverter`):** o número é a **versão alvo**, não a migração a desfazer. `python -m radar migrar --reverter 3` volta o banco à **versão 3**: desfaz só a **migração 4** (tabela `candidatos_alerta` e as 3 colunas de hora em `ofertas`) e **mantém a 3** (`validacoes_manuais`). Para desfazer a 3 seria `--reverter 2`, que apaga as validações manuais. O comando faz backup antes. **Atenção:** o código atual, ao abrir o banco, **reaplica a migração 4 sozinho** (com backup) na próxima execução, seja a varredura agendada ou qualquer comando `radar`. Para a reversão valer, pause as tarefas do radar antes (seção 9, item 2) e volte o código junto (`git revert` do commit do radar, só com a sua ordem). Sem isso, ela é refeita em minutos.
 
 ## 10. O que NÃO muda na ativação
 

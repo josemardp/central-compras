@@ -14,8 +14,11 @@ def imprimir() -> int:
     print(f"== RADAR DE COMPRAS | {dt.datetime.now():%d/%m/%Y %H:%M} | banco v{db.versao_aplicada(con)} | {caminhos.db_path()}")
     pode, motivo = maquina.pode_rodar()
     print(f"Maquina: {maquina.hostname()} | oficial: {maquina.oficial() or '(sem trava)'} | {'ATIVA' if pode else 'INATIVA'}: {motivo}")
-    alr = ranking.carregar_regras().get("alertas", {})
+    reg = ranking.carregar_regras()
+    alr, op = reg.get("alertas", {}), reg.get("_operacao", {})
     print(f"Alertas urgentes: {'LIGADOS e homologados em ' + str(alr['homologado_em']) if alr.get('enviar') and alr.get('homologado_em') else 'EM SOMBRA (so registram; ativacao explicita pendente)'}")
+    origem = f"arquivo local {op.get('arquivo')} ({', '.join(op['aplicado']) or 'nada aplicado'})" if op.get("presente") else "so o versionado (sem operacao.yaml local: SOMBRA por padrao)"
+    print(f"  origem do estado: {origem}" + "".join(f"\n  AVISO: {a}" for a in op.get("avisos", [])))
 
     print("\n-- Produtos monitorados (catalogo)")
     grupos = catalogo.produtos_por_grupo(cat)

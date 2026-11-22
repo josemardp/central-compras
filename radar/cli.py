@@ -456,16 +456,23 @@ def cmd_lacunas(args) -> int:
 
 
 def cmd_prioridade(args) -> int:
-    from . import prioridade, ranking
+    from . import piloto, prioridade, ranking
 
     con = db.abrir()
     regras = ranking.carregar_regras()
     p = prioridade.config(regras)
+    modo = piloto.modo(regras)
+    pil = piloto.config(regras)
+    if modo == "PILOTO":  # mesmos limites que a politica aplica no piloto (despachar); nada e alterado aqui, so exibido
+        p = {**p, **piloto.limites_prioridade(pil)}
     usados = prioridade._usados_hoje(con, dt.datetime.now())
     al = regras.get("alertas", {})
     print(f"Alertas: {'LIGADOS e homologados em ' + str(al['homologado_em']) if al.get('enviar') and al.get('homologado_em') else 'EM SOMBRA (selecionado_sombra = o que SERIA enviado)'}")
+    print(f"Modo: {modo}" + (" (limites do PILOTO abaixo; painel do piloto: python -m radar piloto)" if modo == "PILOTO" else
+                              " (politica completa; so vale se os alertas forem ligados)" if modo == "SOMBRA" else " (politica completa)"))
+    total = f" | total por varredura {p['max_total_por_ciclo']}" if p.get("max_total_por_ciclo") else ""
     print(f"Orcamento de hoje: comum {usados['comum']}/{p['orcamento_diario']} | critico {usados['critico']}/{p['orcamento_critico_diario']} | "
-          f"excecao {usados['excecao']}/{p['orcamento_excecao_diario']} | max por ciclo {p['max_por_ciclo']} | pontuacao minima {p['score_minimo']}")
+          f"excecao {usados['excecao']}/{p['orcamento_excecao_diario']} | max por ciclo {p['max_por_ciclo']}{total} | pontuacao minima {p['score_minimo']}")
     linhas = prioridade.painel(con, horas=args.horas)
     print(f"\nCandidatos das ultimas {args.horas:.0f} h: {len(linhas)}")
     for r in linhas[:args.limite]:

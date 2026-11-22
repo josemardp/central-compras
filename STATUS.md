@@ -5,6 +5,29 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 21/11/2026: cotação inicial de sacolas para a Esdra Cosméticos
+
+- Preços anunciados (fonte web, sem frete): [plástica 30×40 cm, 50 por R$ 7,90](https://ksembalagens.com.br/produtos/sacola-plastica-branca-30x40-pacote-c-50-unidades-1w0ia/), [plástica 40×50 cm, 50 por R$ 12,50](https://ksembalagens.com.br/produtos/sacola-plastica-branca-40x50-pacote-c-50-unidades-1q0kp/) e [kraft liso em quatro tamanhos, 40 por R$ 46,35 no Pix](https://www.magazineluiza.com.br/sacola-papel-kraft-lisa-kit-com-pp-p-m-g-10-de-cada-tamanho-mlbpel/p/dka98e974d/af/sacs/). Cesta inicial de 140 sacolas por R$ 66,75 antes dos fretes.
+- Para reposição, [plástica fina 25×35 cm, 1.000 por R$ 34,00](https://diegodoces.com.br/products/sacola-plastica-alca-camiseta-branca-com-1000-unidades) para itens leves e [kraft 15×20×7 cm, 50 por R$ 31,32 no Pix](https://loja.sandraembalagens.com.br/sacolas-kraft-pequena-delivery-lanches-15x20x7-50-unid) para presentes pequenos.
+- [ ] Se a compra avançar, conferir o encaixe dos kits, estoque e frete no carrinho. Comparar o total com retirada na Emballê em Araçatuba.
+
+## Sessão 22/11/2026 (manhã): radar, PILOTO ATIVADO (commit publicado `a3273be`)
+
+- **Push feito:** `origin/main` = `a3273be` (fast-forward, 1 commit, 12 arquivos, 0 do Climatizador).
+- **PILOTO ATIVADO em 22/11/2026 às 09:03**, por ordem expressa do Josemar: `alertas.enviar: true`, `alertas.homologado_em: "2026-11-22 09:03"`, `piloto.ativo: true`; `piloto.destinatario_confirmado_em` preservado ("2026-11-21 21:21"). **O estado ligado vive agora SÓ no arquivo local `~/.central-compras/dados-privados/radar/operacao.yaml` (fora do Git; migrado às 09:48 com os mesmos valores)**; o `config/radar_regras.yaml` versionado fica sempre em SOMBRA, então `git pull`, `restore` ou `reset` não desligam o piloto e um commit não publica a ativação. Sem o `operacao.yaml` o radar roda em SOMBRA. Registro de auditoria em `dados-privados/radar/ativacao.jsonl` (preservado).
+- **Limites reais:** 2 comuns + 1 crítico por dia, 0 exceção, 1 alerta TOTAL por varredura, crítico com preferência, produto exato, sem aviso, fonte revalidada no envio, confiança mínima MEDIA, só ao WhatsApp confirmado. Cupom não confirmado (PHI200, BLACK150) nunca vira preço garantido.
+- **Antes de ativar:** a 1ª verificação acusou fontes "velhas" porque o notebook **suspendeu de 21:40 a 08:00** (620 min sem varrer); retomou às 08:00 sem erro. Sobrou 1 PENDENTE (lacuna dessa suspensão, só sai da janela às 08:00 de 23/11); o Josemar aceitou o risco e mandou ativar. **Risco aberto:** o notebook suspende à noite e pode suspender de 26 a 30/11 (derruba os 5 min do Promobit); o Josemar vai ajustar a energia do Windows sozinho (não alterei). **Evidência do log do Windows (somente leitura):** a suspensão de 21:47 foi iniciada pelo Menu Iniciar na sessão do usuário `pc` (evento User32 1074, 3 s antes; o evento Kernel-Power 187 registra `SystemAction=3`, hibernar, por interpretação), com o notebook **sem tomada** (`AcOnline=false` às 21:47:27; voltou a `true` às 07:48:33). Tampa = nada; na tomada suspender/hibernar já estão em "Nunca" (bateria: 2 h). "Nunca na tomada" não teria evitado aquela lacuna. Outras 4 suspensões em 72 h não têm iniciador no log e não foram atribuídas. Risco real de 26 a 30/11: hibernar, suspender ou tirar da tomada à mão.
+- **Desligar:** `python -m radar ativacao --desligar` (limpa a fila de alertas). Acompanhar: `python -m radar piloto`. `radar prioridade` agora mostra "Modo: PILOTO" e os limites efetivos do piloto (2/1/0, 1 por varredura no total); `radar status` mostra a origem do estado. Para desfazer a camada local, apagar o `operacao.yaml` (volta a SOMBRA).
+- **Primeiro ciclo real (09:10):** ok, 0 erros, 0 alertas, fila 0.
+
+## Sessão 21/11/2026 (noite, parte 4): radar, fechamento da implantação e ajustes do piloto (commit base `512fd9b`)
+
+- **Tarefa da Black Friday CRIADA no Windows** (21/11 21:18, com autorização): `Central Compras - Radar Promobit BF`, `Ready`, 1 gatilho de 26/11 00:05 a 01/12 00:00 (`EndBoundary`), repete a cada 10 min por 4d23h55m (**último disparo 30/11 23:55**, corrigido), `MultipleInstances=IgnoreNew`, limite 4 min, sem recuperar disparo perdido, apaga-se 24 h depois de expirar. As duas tarefas existentes ficaram idênticas (hash igual). Custo medido de uma leitura do Promobit: ~3,7 s, 0,28 s de CPU, ~38 MB.
+- **Alertas em SOMBRA** (`enviar: false`, `homologado_em: null`, `piloto.ativo: false`, `destinatario_confirmado_em: null`). Teste único de entrega feito às 21:12 (15,6 s, confirmação do mecanismo) e **chegada no celular confirmada pelo Josemar** ("chegou no meu zap sim"). `piloto.destinatario_confirmado_em` continua vazio até ordem expressa dele.
+- **Piloto, decisão do Josemar (21/11): AJUSTAR PARA TOTAL.** Orçamento do dia continua 2 comuns + 1 crítico, mas o limite por varredura é **1 alerta no TOTAL** (`piloto.max_total_por_ciclo: 1`); crítico tem preferência e o comum espera o próximo ciclo sem ser apagado. Política completa inalterada. **Frequência da Black Friday corrigida:** a folga de vencimento para intervalos curtos subiu de 20 s para 60 s (mín. 240 s entre leituras); provado por simulação dos disparos.
+- **`piloto.destinatario_confirmado_em` preenchido** com "2026-11-21 21:21" (horário real da sua confirmação no registro da sessão). `alertas.enviar`, `homologado_em` e `piloto.ativo` seguem desligados (SOMBRA).
+- **Pendências do Josemar:** ordem final para ativar o piloto (3 edições); login do Telegram; validar PHI200/BLACK150 no carrinho.
+
 ## Sessão 21/11/2026 (noite, parte 3): radar, preparação final e piloto (fase 6)
 
 - **Relatório:** [`docs/ecossistema/18-relatorio-fase-6.md`](docs/ecossistema/18-relatorio-fase-6.md); piloto: [`17-piloto-controlado.md`](docs/ecossistema/17-piloto-controlado.md); plano: [`16-plano-de-ativacao.md`](docs/ecossistema/16-plano-de-ativacao.md). **Recomendação: APTO PARA PILOTO, condicionado** (teste de entrega, destinatário confirmado por você, commit). Alertas seguem **desligados** (SOMBRA); nada commitado; nenhuma mensagem enviada.
@@ -12,14 +35,14 @@
 - **Novo:** conferência de preço na loja, 3 níveis de preço e confiança na mensagem, modo PILOTO, teste único de entrega com medição, janela Black Friday do Promobit (5 min, 26 a 30/11, volta sozinha), ensaio do kill switch.
 - **Novos comandos:** `radar conferir`, `radar piloto`, `radar teste-entrega`, `radar ativacao --ensaio-kill-switch`, `radar varrer --so`.
 - **Pendências:**
-  - [ ] `python -m radar teste-entrega --confirmo` (seu), depois preencher `piloto.destinatario_confirmado_em`.
-  - [ ] Criar a tarefa da Black Friday: `python -m radar agendar --aplicar` (antes de 26/11).
-  - [ ] Autorizar o commit (escopo no relatório 18). Telegram: login seu. Validar PHI200 e BLACK150 no carrinho.
+  - [x] Teste único de entrega feito em 21/11 às 21:12 (1 mensagem, 15,6 s, confirmação do mecanismo, fila 0). [ ] Conferir no celular e então preencher `piloto.destinatario_confirmado_em` (seu).
+  - [ ] Criar a tarefa da Black Friday: `python -m radar agendar --aplicar --job varredura_promobit_bf` (antes de 26/11).
+  - [x] Commit e push do radar feitos em 21/11 com a sua autorização. [ ] Telegram: login seu. [ ] Validar PHI200 e BLACK150 no carrinho. [ ] Criar a tarefa da Black Friday (aguarda sua autorização).
 
 ## Sessão 21/11/2026 (noite, parte 2): radar, estabilização e pré-Black Friday (fase 5)
 
 - **Relatório:** [`docs/ecossistema/15-relatorio-fase-5.md`](docs/ecossistema/15-relatorio-fase-5.md); plano de ativação: [`16-plano-de-ativacao.md`](docs/ecossistema/16-plano-de-ativacao.md). **Recomendação: NÃO APTO para ativar alertas reais hoje.** Alertas seguem desligados; nada commitado; nenhuma mensagem enviada.
-- **Por que não:** 1 candidato real em sombra (Philco 18k R$ 2.379, WebContinental, cupom PHI200, ativo na fonte), o plano pede 3 aprovados por você; entrega no WhatsApp nunca medida (só estimada); código sem commit.
+- **Por que não:** 1 candidato real em sombra (Philco 18k R$ 2.379, WebContinental, cupom PHI200, ativo na fonte), o plano pede 3 aprovados por você; entrega no WhatsApp medida 1 vez (15,6 s); código sem commit (ver o fechamento).
 - **Achados corrigidos:** ordem de chegada voltava dentro do orçamento (limiar de pontuação por vaga); oferta retida pelo orçamento sumia (estado `retida_orcamento`); alerta na fila sairia depois de desligar (kill switch efetivo); `100IMPRESSORA` virava candidato; Telegram aceitaria id de pessoa.
 - **Novos comandos:** `radar ativacao` (`--desligar`), `radar simular-prioridade`, `radar latencia`.
 - **Pendências:**
@@ -76,20 +99,6 @@
   - [ ] Telegram de canais privados exige sessão de usuário sua (ver `docs/ecossistema/10-pendencias-e-melhorias.md`). Grupos de WhatsApp: dizer quais autorizar. X/Instagram/Facebook inviáveis sem login/API paga.
   - [ ] Rever os alertas em sombra (`python -m radar alertas`) antes de 21/11 08:00 e ajustar `config/radar_regras.yaml`.
   - [ ] Nada foi commitado nem enviado ao GitHub (ordem da missão). Dar `git pull` nas outras máquinas só depois do commit.
-
-## Sessão 21/11/2026 (noite, parte 4): radar, fechamento da implantação e ajustes do piloto (commit base `512fd9b`)
-
-- **Tarefa da Black Friday CRIADA no Windows** (21/11 21:18, com autorização): `Central Compras - Radar Promobit BF`, `Ready`, 1 gatilho de 26/11 00:05 a 01/12 00:00 (`EndBoundary`), repete a cada 10 min por 4d23h55m (**último disparo 30/11 23:55**, corrigido), `MultipleInstances=IgnoreNew`, limite 4 min, sem recuperar disparo perdido, apaga-se 24 h depois de expirar. As duas tarefas existentes ficaram idênticas (hash igual). Custo medido de uma leitura do Promobit: ~3,7 s, 0,28 s de CPU, ~38 MB.
-- **Alertas em SOMBRA** (`enviar: false`, `homologado_em: null`, `piloto.ativo: false`, `destinatario_confirmado_em: null`). Teste único de entrega feito às 21:12 (15,6 s, confirmação do mecanismo) e **chegada no celular confirmada pelo Josemar** ("chegou no meu zap sim"). `piloto.destinatario_confirmado_em` continua vazio até ordem expressa dele.
-- **Piloto, decisão do Josemar (21/11): AJUSTAR PARA TOTAL.** Orçamento do dia continua 2 comuns + 1 crítico, mas o limite por varredura é **1 alerta no TOTAL** (`piloto.max_total_por_ciclo: 1`); crítico tem preferência e o comum espera o próximo ciclo sem ser apagado. Política completa inalterada. **Frequência da Black Friday corrigida:** a folga de vencimento para intervalos curtos subiu de 20 s para 60 s (mín. 240 s entre leituras); provado por simulação dos disparos.
-- **`piloto.destinatario_confirmado_em` preenchido** com "2026-11-21 21:21" (horário real da sua confirmação no registro da sessão). `alertas.enviar`, `homologado_em` e `piloto.ativo` seguem desligados (SOMBRA).
-- **Pendências do Josemar:** ordem final para ativar o piloto (3 edições); login do Telegram; validar PHI200/BLACK150 no carrinho.
-
-## Sessão 21/11/2026: cotação inicial de sacolas para a Esdra Cosméticos
-
-- Preços anunciados (fonte web, sem frete): [plástica 30×40 cm, 50 por R$ 7,90](https://ksembalagens.com.br/produtos/sacola-plastica-branca-30x40-pacote-c-50-unidades-1w0ia/), [plástica 40×50 cm, 50 por R$ 12,50](https://ksembalagens.com.br/produtos/sacola-plastica-branca-40x50-pacote-c-50-unidades-1q0kp/) e [kraft liso em quatro tamanhos, 40 por R$ 46,35 no Pix](https://www.magazineluiza.com.br/sacola-papel-kraft-lisa-kit-com-pp-p-m-g-10-de-cada-tamanho-mlbpel/p/dka98e974d/af/sacs/). Cesta inicial de 140 sacolas por R$ 66,75 antes dos fretes.
-- Para reposição, [plástica fina 25×35 cm, 1.000 por R$ 34,00](https://diegodoces.com.br/products/sacola-plastica-alca-camiseta-branca-com-1000-unidades) para itens leves e [kraft 15×20×7 cm, 50 por R$ 31,32 no Pix](https://loja.sandraembalagens.com.br/sacolas-kraft-pequena-delivery-lanches-15x20x7-50-unid) para presentes pequenos.
-- [ ] Se a compra avançar, conferir o encaixe dos kits, estoque e frete no carrinho. Comparar o total com retirada na Emballê em Araçatuba.
 
 ## Sessão 19/11/2026 (noite): Lorenzetti Loren Shower Eletrônico 6800W 220V incluído na rotina diária
 
