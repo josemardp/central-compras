@@ -1,0 +1,17 @@
+# Maquina OFICIAL do radar (fonte de verdade dos historicos e unica que coleta, envia relatorio e alerta).
+#
+# Por que: os historicos e o banco ficam em ~/.central-compras/dados-privados (fora do Git, por maquina, de proposito:
+# la tem CEP/endereco). Se duas maquinas rodarem as tarefas, cada uma teria uma serie diferente e os dois WhatsApps
+# receberiam alertas duplicados. Com esta trava, uma maquina que nao e a oficial IGNORA os jobs do radar.
+#
+# Como trocar de maquina oficial (planejado, nao automatico):
+#   1. na maquina atual:  python -m radar agendar --remover "<cada tarefa do radar>"   (ou Disable-ScheduledTask)
+#   2. copie as pastas rastreador-robos/ rastreador-ares/ rastreador-chuveiro/ (os historico.jsonl sao a verdade portavel)
+#      e radar/telegram/ se usar Telegram, para a nova maquina, por meio privado (nunca Git);
+#   3. troque `maquina_oficial` abaixo, commit/push, git pull na nova maquina;
+#   4. na nova: python -m radar migrar --reconstruir ; python -m radar agendar --aplicar
+# Reconstruir o banco a partir dos JSONL e seguro e idempotente (correcoes versionadas entram junto).
+#
+# Vazio ou ausente = sem trava (qualquer maquina roda).
+
+maquina_oficial: LAPTOP-3NSQG27T

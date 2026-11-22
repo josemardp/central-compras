@@ -26,6 +26,8 @@ except ImportError:
     import rastrear_ares_bf as ra
     import rastrear_robos_bf as rr
 
+from radar import ciclo  # noqa: E402  (o import de rr ja colocou a raiz do repo no sys.path)
+
 PRIVADO_ROOT = Path.home() / ".central-compras" / "dados-privados"
 PRIVADO_DIR = PRIVADO_ROOT / "rastreador-chuveiro"
 CONFIG_PATH = PRIVADO_DIR / "config.json"
@@ -94,10 +96,22 @@ def _parse_leroy_texto(body_txt: str) -> dict[str, Any]:
 
     # Bloco principal antes de "Mais opcoes" / "Ver estoque"
     corte = re.split(r"Mais op[çc][õo]es a partir de|Ver estoque nas lojas", body_txt, maxsplit=1, flags=re.I)[0]
-    precos = re.findall(r"R\$\s*[\d\.]+,\d{2}", corte)
-    valores = [v for v in (ra.parse_brl_flex(p) for p in precos) if v is not None and v >= 50.0]
-    if valores:
-        out["preco_avista"] = min(valores)
+    # 1) o preco do produto e o que vem rotulado "a vista" (20/11/2026: pegar o menor valor da pagina
+    #    capturava "Instalacao por R$ 89,90", um servico, como se fosse o preco do chuveiro).
+    m_avista = re.search(r"R\$\s*([\d\.]+,\d{2})\s*\n?\s*[àa]\s*vista", corte, re.I)
+    if m_avista:
+        preco = ra.parse_brl_flex(m_avista.group(1))
+        if preco is not None and preco >= 50.0:
+            out["preco_avista"] = preco
+    if out["preco_avista"] is None:
+        # 2) sem rotulo: ignora linhas de servico/garantia/frete e usa o menor preco restante
+        linhas_produto = [
+            ln for ln in corte.splitlines() if not re.search(r"instala|garantia|servi[çc]o|frete|parcel", ln, re.I)
+        ]
+        precos = re.findall(r"R\$\s*[\d\.]+,\d{2}", "\n".join(linhas_produto))
+        valores = [v for v in (ra.parse_brl_flex(p) for p in precos) if v is not None and v >= 50.0]
+        if valores:
+            out["preco_avista"] = min(valores)
 
     m_frete = re.search(
         r"(?:Receba em casa|Entrega|Frete)[^\n]{0,60}?(Gr[áa]tis|R\$\s*[\d\.]+,\d{2})",
@@ -347,31 +361,23 @@ def main() -> int:
     parser.add_argument("--cep", help="CEP de entrega (sobrescreve config local).")
     parser.add_argument("--enviar-zap", action="store_true", help="Envia o resumo pelo nav-zap.")
     parser.add_argument("--primeira-vez", action="store_true", help="Inclui nota inicial.")
+    parser.add_argument("--sem-persistir", action="store_true", help="Teste: nao grava estado, historico nem banco.")
     args = parser.parse_args()
 
     cep = carregar_cep(args.cep)
     PRIVADO_DIR.mkdir(parents=True, exist_ok=True)
-    anterior = None
-    if ESTADO_PATH.exists():
-        try:
-            anterior = json.loads(ESTADO_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            anterior = None
-
-    atual = coletar_precos(cep=cep)
-    mensagem = montar_mensagem(atual, anterior, primeira_vez=args.primeira_vez)
-    print(mensagem)
-
-    with HIST_PATH.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(atual, ensure_ascii=False) + "\n")
-
-    ESTADO_PATH.write_text(json.dumps(atual, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    if args.enviar_zap:
-        ok, info = rr.enviar_whatsapp(mensagem)
-        print(f"[ZAP] ok={ok} | {info}")
-        return 0 if ok else 1
-    return 0
+    return ciclo.executar_ciclo(
+        rotulo="chuveiro",
+        origem="rastreador-chuveiro",
+        coletar=lambda: coletar_precos(cep=cep),
+        montar_mensagem=montar_mensagem,
+        estado_path=ESTADO_PATH,
+        hist_path=HIST_PATH,
+        enviar_zap=args.enviar_zap,
+        enviar_fn=rr.enviar_whatsapp,
+        primeira_vez=args.primeira_vez,
+        persistir=not args.sem_persistir,
+    )
 
 
 if __name__ == "__main__":

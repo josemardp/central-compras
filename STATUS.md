@@ -5,6 +5,78 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 21/11/2026 (noite, parte 3): radar, preparação final e piloto (fase 6)
+
+- **Relatório:** [`docs/ecossistema/18-relatorio-fase-6.md`](docs/ecossistema/18-relatorio-fase-6.md); piloto: [`17-piloto-controlado.md`](docs/ecossistema/17-piloto-controlado.md); plano: [`16-plano-de-ativacao.md`](docs/ecossistema/16-plano-de-ativacao.md). **Recomendação: APTO PARA PILOTO, condicionado** (teste de entrega, destinatário confirmado por você, commit). Alertas seguem **desligados** (SOMBRA); nada commitado; nenhuma mensagem enviada.
+- **Philco 18k (PHI200):** conferido na loja (API pública da WebContinental): anunciado R$ 2.379 já embute o cupom; a loja cobra **R$ 2.579** (lista R$ 2.930,68), vendido e entregue pela WebContinental, em estoque. Sem o cupom não é oferta. Cupom NAO_CONFIRMADO, nunca descontado de novo. Com a conferência a mesma oferta cai de ALTA para MEDIA.
+- **Novo:** conferência de preço na loja, 3 níveis de preço e confiança na mensagem, modo PILOTO, teste único de entrega com medição, janela Black Friday do Promobit (5 min, 26 a 30/11, volta sozinha), ensaio do kill switch.
+- **Novos comandos:** `radar conferir`, `radar piloto`, `radar teste-entrega`, `radar ativacao --ensaio-kill-switch`, `radar varrer --so`.
+- **Pendências:**
+  - [ ] `python -m radar teste-entrega --confirmo` (seu), depois preencher `piloto.destinatario_confirmado_em`.
+  - [ ] Criar a tarefa da Black Friday: `python -m radar agendar --aplicar` (antes de 26/11).
+  - [ ] Autorizar o commit (escopo no relatório 18). Telegram: login seu. Validar PHI200 e BLACK150 no carrinho.
+
+## Sessão 21/11/2026 (noite, parte 2): radar, estabilização e pré-Black Friday (fase 5)
+
+- **Relatório:** [`docs/ecossistema/15-relatorio-fase-5.md`](docs/ecossistema/15-relatorio-fase-5.md); plano de ativação: [`16-plano-de-ativacao.md`](docs/ecossistema/16-plano-de-ativacao.md). **Recomendação: NÃO APTO para ativar alertas reais hoje.** Alertas seguem desligados; nada commitado; nenhuma mensagem enviada.
+- **Por que não:** 1 candidato real em sombra (Philco 18k R$ 2.379, WebContinental, cupom PHI200, ativo na fonte), o plano pede 3 aprovados por você; entrega no WhatsApp nunca medida (só estimada); código sem commit.
+- **Achados corrigidos:** ordem de chegada voltava dentro do orçamento (limiar de pontuação por vaga); oferta retida pelo orçamento sumia (estado `retida_orcamento`); alerta na fila sairia depois de desligar (kill switch efetivo); `100IMPRESSORA` virava candidato; Telegram aceitaria id de pessoa.
+- **Novos comandos:** `radar ativacao` (`--desligar`), `radar simular-prioridade`, `radar latencia`.
+- **Pendências:**
+  - [ ] BLOQUEIO: 3 alertas reais em sombra aprovados por você + teste controlado de envio (`homologar --enviar-teste-whatsapp --confirmo`).
+  - [ ] Autorizar o commit (escopo no relatório, seção 7). Telegram: login seu. BLACK150 e PHI200: validar no carrinho (sem finalizar).
+  - [ ] Decidir ciclo de 5 min só para o Promobit na Black Friday (cobertura pior 14 min, ciclo 10).
+
+## Sessão 21/11/2026 (noite): radar, consolidação, segurança e Black Friday (fase 4)
+
+- **Relatório completo:** [`docs/ecossistema/14-relatorio-fase-4.md`](docs/ecossistema/14-relatorio-fase-4.md). **Veredito:** radar protegido e pronto para ativação controlada, **mas não ativado**: `alertas.enviar: false` e `homologado_em` vazio. A prioridade já roda em sombra nas tarefas agendadas. Nada commitado.
+- **Prioridade no lugar do limite de 6 por ordem de chegada:** `radar/prioridade.py`, pontuação 0 a 100, orçamento 6 comuns + 3 críticos + 2 de exceção, 2 por varredura, anti-repetição, substituição de candidato fraco por um muito melhor, CRÍTICO acima do limite com proteção própria. Ajuste em `config/radar_regras.yaml` (`prioridade`). Ver: `python -m radar prioridade`.
+- **Três horas por oferta** (published, first seen, collected; migração 4 do banco real aplicada com backup). Oferta sem hora de postagem (HardMOB) nunca é "relâmpago". **Lacunas de coleta medidas** (`python -m radar lacunas`): hoje 0 lacunas reais; Promobit cobre só ~18 min com ciclo de 10 min (risco na Black Friday).
+- **Corpus por conjunto** (treino 27, regressão 46, independente 106): o independente achou 1 falso positivo real ("Q/f", corrigido). **Recall de mercado não provado** (7 positivos reais, IC95 64,6% a 100%).
+- **Cupons:** guarda por teste (cruzamento nunca vira alerta; `BLACK150` segue `NAO_CONFIRMADO`). Teste no carrinho, sem finalizar, é seu (relatório, seção 5).
+- **Segurança:** backup fora do Git com restauração testada; foto SHA-256 dos arquivos do Climatizador (30 intactos); patch do STATUS só com seções do radar (`git-escopo --manifesto`, `--verificar`, `--backup-completo`). Nenhum comando de escrita no Git.
+- **Novos comandos:** `radar prioridade`, `radar lacunas`.
+- **Pendências:**
+  - [ ] Autorizar o commit do radar (STATUS.md pelo patch, nunca inteiro). Decidir o orçamento de alertas. Testar `BLACK150` no carrinho (sem finalizar). Telegram: login seu.
+  - [ ] BLOQUEIO: alertas reais só saem com `enviar: true` e `homologado_em`, decisão sua depois de ver `radar prioridade` em sombra.
+
+## Sessão 21/11/2026 (tarde): radar, comprovação da efetividade (fase 3)
+
+- **Relatório completo:** [`docs/ecossistema/13-relatorio-fase-3.md`](docs/ecossistema/13-relatorio-fase-3.md). **Veredito:** o radar transforma oferta real descoberta em oportunidade identificada (24 de 24 ofertas reais reencenadas com o seu histórico real foram reconhecidas), **mas nenhuma oferta ao vivo dos 12 produtos apareceu ainda**, então a cadeia ao vivo não viu um caso positivo. Alertas reais seguem **desligados**.
+- **14 defeitos achados com dado real e corrigidos**, os mais graves: falso negativo do Dreame F10 "Passa Pano"; alerta ALTA para preço **igual ao já monitorado** (agora exige 3% de melhora); `radar validar` era sobrescrito (VALIDADO nunca alertaria; migração 3); Promobit `?page=N` devolvia sempre os mesmos 12 itens (cobertura 9 min contra ciclo de 10; agora cursor, 42 min); HardMOB nunca alertaria (sem hora); Pelando lia GUID "894d" como 894 dias; cruzamento de cupons marcava 268 pares "aplicável" (agora 4 candidatos).
+- **Novos comandos:** `radar avaliar` (precisão/recuperação sobre `tests/corpus/radar_ofertas_rotuladas.yaml`, 85 itens), `cruzar` (cupons de loja x produtos), `equivalentes`, `homologar [--reais] [--enviar-teste-whatsapp --confirmo]` (16 cenários), `qualidade-fontes`, `git-escopo [--backup]`, `telegram-status`.
+- **Achados para você:** cupom `BLACK150` da Amazon (R$ 150 em compras acima de R$ 1.499) pode baixar Dreame, Elgin 12k, Midea Ecomaster e Philco 18k (não confirmado; teste no carrinho é seu); split **Hisense 12.000 BTU** a R$ 1.710 na Amazon, 8% abaixo do seu melhor 12k (não passou pelo seu gate de qualidade).
+- **Git:** nada commitado. Arquivos do **climatizador** são de outra sessão (inclui `config/categorias.yaml` e a seção "Climatizador" deste STATUS.md); **STATUS.md é arquivo misto**: use `git add -p`. O pacote `radar/` está **sem versionar** e os scripts rastreados já fazem `import radar`: backup fora do Git com `python -m radar git-escopo --backup` até o commit.
+- **Pendências:**
+  - [ ] Autorizar o commit do radar (separando o climatizador). Testar `BLACK150` no carrinho. Decidir sobre o Hisense.
+  - [ ] Telegram: login seu (`docs/ecossistema/12-telegram-passo-a-passo.md`). Homologar alertas (`homologado_em`) quando decidir.
+  - [x] Decidir o `limite_diario` de alertas (6, por ordem de chegada): substituído por prioridade e orçamento na fase 4.
+
+## Sessão 21/11/2026: homologação e expansão do radar (fase 2)
+
+- **Alertas urgentes:** o "período de sombra por data" foi **removido** (ligaria o envio sozinho às 08:00 de 21/11). Agora exige ativação explícita: `alertas.enviar: true` **e** `alertas.homologado_em` em `config/radar_regras.yaml` (hoje `false`/`null`). Só status `PROVAVEL`/`VALIDADO` saem; alerta na fila vence em 30 min e só é entregue se **revalidado na fonte** (Promobit e Gatry); senão é descartado com desfecho registrado.
+- **Relatório das 08h de 21/11 perdido:** o notebook dormiu de 02:26 a 09:37 e o Windows não recuperou o slot. Agora a varredura detecta e dispara a própria tarefa (`radar recuperar`); recuperado de verdade às 09:54 (3 de 3).
+- **Integridade:** banco guarda o valor bruto e a correção como auditoria (migração 2); `radar auditar` achou 1 leitura suspeita real (chuveiro R$ 60,65, já corrigida); `radar migrar --reconstruir`.
+- **Fontes novas:** Gatry (API JSON pública, 40 itens/ciclo) e Pelando (HTML/JSON-LD sem navegador; o WAF bloqueia Chrome automatizado e **não foi contornado**). Telegram com a sua conta: adaptador pronto (Telethon 1.46 só no Python do radar), **falta o seu login**. WhatsApp: lista de autorização de grupos criada e vazia; leitor não escrito. X/Instagram/Facebook: sem via gratuita sustentável (429/429/400).
+- **Operação:** testes reais de job morto (kill), conexão caída (proxy inexistente, achou e corrigiu o Méliuz que escondia erro) e WhatsApp indisponível. Trava de **máquina oficial** (`config/radar_maquina.yaml`, `LAPTOP-3NSQG27T`).
+- **Documentação:** `docs/ecossistema/11-matriz-de-status.md` (implementado x testado x homologado x pendente) e `10` atualizados.
+- **Pendências:**
+  - [ ] Telegram: login seu (09), escolher canais. WhatsApp: dizer quais grupos autorizar, se quiser.
+  - [ ] Homologar os alertas (`homologado_em`) depois de revisar `python -m radar alertas`.
+  - [ ] Confirmar a leitura de `robots.txt` do Gatry e o uso do HTML público do Pelando (decisão sua).
+  - [ ] Nada foi commitado nem enviado ao GitHub. A outra máquina não foi tocada.
+
+## Sessão 20/11/2026 (noite): Radar de compras V3 (central-compras vira dono único das automações de compras)
+
+- **Diagnóstico:** Coral e central_automacoes **não têm código de compras** (só citam o projeto). O sistema real já era deste repositório. Defeitos achados e corrigidos: tarefa com limite de 10 min (a rodada de 14:34 levou 11,5 min e foi morta); relatório das 14h não chegou (envio ao WhatsApp falhou 3x); coleta degradada por rede lenta sobrescrevia `estado.json`; parser da Leroy pegava "Instalação por R$ 89,90" como preço. Detalhe: [`docs/ecossistema/01-auditoria-do-ecossistema.md`](docs/ecossistema/01-auditoria-do-ecossistema.md).
+- **Novo pacote [`radar/`](radar/)** (`python -m radar status|executar|agendar|varrer|alertas|ofertas|validar|estatisticas|fila|migrar|cupom`): banco SQLite com migrações, trava de execução, jobs com timeout, fila de reenvio do WhatsApp, última coleta boa, catálogo, motor de cupons, ranking, alertas com deduplicação, fontes públicas (Promobit, HardMOB, Méliuz, Telegram público). Config em `config/radar_*.yaml`. Documentação completa em [`docs/ecossistema/`](docs/ecossistema/) (01 a 10).
+- **Cutover feito nesta máquina (LAPTOP-3NSQG27T):** a tarefa `Central Compras - Rastrear Robos BF` passou a rodar `python -m radar executar relatorios` (mesmos horários 08/14/20h, limite 60 min). XML original em `~/.central-compras/dados-privados/radar/backups/`. Reverter: `python -m radar agendar --restaurar "Central Compras - Rastrear Robos BF"`.
+- **Alertas urgentes em período de sombra até 21/11 08:00** (registram, não enviam). A tarefa da varredura (`Central Compras - Radar Varredura`, 10 min) está definida em `config/radar_jobs.yaml`; aplicar com `python -m radar agendar --aplicar --job varredura`.
+- **Pendências:**
+  - [ ] Telegram de canais privados exige sessão de usuário sua (ver `docs/ecossistema/10-pendencias-e-melhorias.md`). Grupos de WhatsApp: dizer quais autorizar. X/Instagram/Facebook inviáveis sem login/API paga.
+  - [ ] Rever os alertas em sombra (`python -m radar alertas`) antes de 21/11 08:00 e ajustar `config/radar_regras.yaml`.
+  - [ ] Nada foi commitado nem enviado ao GitHub (ordem da missão). Dar `git pull` nas outras máquinas só depois do commit.
+
 ## Sessão 21/11/2026: cotação inicial de sacolas para a Esdra Cosméticos
 
 - Preços anunciados (fonte web, sem frete): [plástica 30×40 cm, 50 por R$ 7,90](https://ksembalagens.com.br/produtos/sacola-plastica-branca-30x40-pacote-c-50-unidades-1w0ia/), [plástica 40×50 cm, 50 por R$ 12,50](https://ksembalagens.com.br/produtos/sacola-plastica-branca-40x50-pacote-c-50-unidades-1q0kp/) e [kraft liso em quatro tamanhos, 40 por R$ 46,35 no Pix](https://www.magazineluiza.com.br/sacola-papel-kraft-lisa-kit-com-pp-p-m-g-10-de-cada-tamanho-mlbpel/p/dka98e974d/af/sacs/). Cesta inicial de 140 sacolas por R$ 66,75 antes dos fretes.

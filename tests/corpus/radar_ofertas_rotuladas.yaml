@@ -1,0 +1,340 @@
+# Amostra ROTULADA para medir o reconhecimento de produtos (precisao, recuperacao, falsos positivos/negativos).
+#
+# `origem` diz de onde veio o texto (a metrica separa por origem para nao superestimar):
+#   real_historico   titulo de oferta real visto pelos rastreadores (historico.jsonl, 14-21/11/2026); sem nome de quem postou
+#   real_ao_vivo     titulo real lido ao vivo nas fontes em 21/11/2026
+#   documentado      oferta real documentada no STATUS.md; o TITULO foi reconstruido a partir do que la consta (preco/loja reais)
+#   construido       variacao escrita por mim para exercitar uma regra (otimista: nao e dado de mercado)
+# `caso`: positivo (deve casar com `esperado`), negativo (nao deve casar com nada),
+#         ambiguo (o comportamento esperado esta em `esperado` + `aviso`; fora de precisao/recuperacao).
+# `calibracao: true` = item que eu vi ANTES de ajustar o catalogo (nao e independente).
+
+itens:
+  # ---------------- reais do historico (Promobit: busca por produto) ----------------
+  - {id: H01, origem: real_historico, conjunto: treino, caso: positivo, esperado: dreame_f10, calibracao: true, loja: mercadolivre, preco: 1102.00,
+     texto: "Ofertas ativas Robô Aspirador Dreame F10 R$ 2.099,00 R$1.102,00 Ir à loja"}
+  - {id: H02, origem: real_historico, conjunto: treino, caso: positivo, esperado: dreame_f10, calibracao: true, loja: amazon, preco: 1136.50,
+     texto: "DREAME F10 Robô Aspirador e Passa Pano Sucção 13000Pa Limpeza de Sujeiras Secas e Úmi Frete Grátis R$ 2.099,00 R$1.136,50"}
+  - {id: H03, origem: real_historico, conjunto: treino, caso: negativo, calibracao: true, loja: amazon, preco: 1066.97,
+     nota: "K800 Pro de 220V (Ksar81020pt): o seu e o 127V",
+     texto: "Robô Aspirador Kabum! Smart K800 Pro Mapeamento Laser Autolimpante 13000pa 220v, Preto - Ksar81020pt Frete Grátis R$ 2.111,10 R$1.066,97"}
+  - {id: H04, origem: real_historico, conjunto: treino, caso: ambiguo, esperado: k800_pro_127v, aviso: tensao_nao_informada, calibracao: true, loja: kabum, preco: 1079.00,
+     nota: "K800 Pro existe em 127V e 220V e o titulo nao diz qual",
+     texto: "Robô Aspirador KABUM! K800 Pro Laser 13000Pa R$ 2.111,10 R$1.079,00"}
+  - {id: H05, origem: real_historico, conjunto: treino, caso: positivo, esperado: k800_pro_127v, calibracao: true, loja: kabum, preco: 959.00,
+     nota: "o cupom relampago de R$ 959 (durou menos de 10 min)",
+     texto: "Robô Aspirador KABUM! smart K800 Pro Mapeamento Laser Autolimpante 13000Pa 127v Preto R$ 2.111,10 R$959,00"}
+  - {id: H06, origem: real_historico, conjunto: treino, caso: ambiguo, esperado: elgin_12k, aviso: tensao_nao_informada, calibracao: true, loja: shopee, preco: 1610.00,
+     texto: "Ar Condicionado Elgin Split 12000 BTUs Eco Inverter Iii Frio R$ 2.094,55 R$1.610,00"}
+  - {id: H07, origem: real_historico, conjunto: treino, caso: positivo, esperado: elgin_12k, calibracao: true, loja: amazon, preco: 1799.00,
+     texto: "Ar Condicionado Split Elgin Eco Inverter III Wi-Fi 12000 BTUs Frio - 220V Frete Grátis R$ 2.311,25 R$1.799,00"}
+  - {id: H08, origem: real_historico, conjunto: treino, caso: ambiguo, esperado: elgin_12k, aviso: sku_nao_confirmado, calibracao: true, loja: amazon, preco: 1895.00,
+     nota: "nome alternativo da Amazon (HW Inverter ... Eco III), sem o SKU HJFC12C2WGCG",
+     texto: "Ar-Condicionado Split HW Inverter Elgin Eco III Wi-Fi 12.000 BTUs R-32 Só Frio - 220V Frete Grátis R$ 2.249,00 R$1.895,00"}
+  - {id: H09, origem: real_historico, conjunto: treino, caso: positivo, esperado: philco_18k, calibracao: true, loja: friopecas, preco: 2248.00,
+     texto: "Ar Condicionado Split Philco Inverter 18000 BTUh Frio PAC18FTW - 220 Volts R$ 2.366,32 R$2.248,00"}
+  - {id: H10, origem: real_historico, conjunto: treino, caso: positivo, esperado: philco_18k, calibracao: true, loja: webcontinental, preco: 2099.01,
+     texto: "Ar Condicionado Split Inverter Philco com WiFi 18000 BTUs Frio 220V PAC18FTW R$ 2.612,50 R$2.099,01"}
+  - {id: H11, origem: real_historico, conjunto: treino, caso: positivo, esperado: philco_18k, calibracao: true, loja: webcontinental, preco: 2299.00,
+     texto: "Ar Condicionado Split Inverter Philco com WiFi 18000 BTUs Frio 220V PAC18FTW R$ 2.839,77 R$2.299,00"}
+  - {id: H12, origem: real_historico, conjunto: treino, caso: positivo, esperado: loren_shower_6800_220v, calibracao: true, loja: mercadolivre, preco: 87.16,
+     texto: "Chuveiro Ducha Lorenzetti Loren Shower Eletrônico 6800W 220V R$ 399,70 R$87,16"}
+  - {id: H13, origem: real_historico, conjunto: treino, caso: positivo, esperado: loren_shower_6800_220v, calibracao: true, loja: mercadolivre, preco: 76.49,
+     texto: "Chuveiro Ducha Lorenzetti Loren Shower Eletrônico Branco 6800w 220V R$76,49"}
+  - {id: H14, origem: real_historico, conjunto: treino, caso: positivo, esperado: loren_shower_6800_220v, calibracao: true, loja: mercadolivre, preco: 79.00,
+     texto: "Chuveiro Ducha Lorenzetti Loren Shower Eletrônico Branco 6800W 220V Parcelado R$79,00"}
+  - {id: H15, origem: real_historico, conjunto: treino, caso: positivo, esperado: xiaomi_s40_pro_py, calibracao: true,
+     texto: "Xiaomi Robot Vacuum S40 Pro Bivolt Eu BHR089REU 0V71GL"}
+  - {id: H16, origem: real_historico, conjunto: treino, caso: positivo, esperado: xiaomi_s40_pro_py, calibracao: true,
+     texto: "Robô Aspirador de Pó Xiaomi Vacuum S40 Pro BHR0890US - Bivolt - Recarregável - Branco"}
+
+  # ---------------- reais ao vivo (Pelando, 21/11/2026): NEGATIVOS genuinos ----------------
+  - {id: L01, origem: real_ao_vivo, conjunto: independente, caso: negativo, loja: webcontinental, preco: 1579.00, nota: "Elgin Eco Inverter III, mas de 9.000 BTU",
+     texto: "Ar Condicionado Split Elgin Eco Inverter III Wi-Fi 9000 BTUs Frio - 220V"}
+  - {id: L02, origem: real_ao_vivo, conjunto: independente, caso: negativo, texto: "Micro-ondas Philco 20L Pintura Limpa Fácil"}
+  - {id: L03, origem: real_ao_vivo, conjunto: independente, caso: negativo, texto: "Lava Louças 8 Serviços Brastemp Branca BLF08BB - 110V ou 220V"}
+  - {id: L04, origem: real_ao_vivo, conjunto: independente, caso: negativo, texto: "Notebook Gamer Lenovo LOQ Core i5-13450HX, RTX 5050, 16GB"}
+  - {id: L05, origem: real_ao_vivo, conjunto: independente, caso: negativo, texto: "Fonte MSI MAG BN65A, 650W, 80 Plus Bronze"}
+  - {id: L06, origem: real_ao_vivo, conjunto: independente, caso: negativo, texto: "Whey Protein 100 Integralmedica 1.8kg"}
+  - {id: L07, origem: real_ao_vivo, conjunto: independente, caso: negativo, texto: "Máquina de Lavar Consul 13Kg Branca Ciclo Edredom"}
+  - {id: L08, origem: real_ao_vivo, conjunto: independente, caso: negativo, texto: "Philips Walita Fritadeira Airfryer Série 1000 Xl 6"}
+
+  # ---------------- documentados no STATUS.md (titulo reconstruido) ----------------
+  - {id: D01, origem: documentado, conjunto: treino, caso: positivo, esperado: k800_pro_127v, loja: kabum, preco: 1199.99,
+     texto: "Robô Aspirador KaBuM Smart K800 Pro Mapeamento Laser Autolimpante 13000Pa 127V Preto KSAR81010PT"}
+  - {id: D02, origem: documentado, conjunto: treino, caso: positivo, esperado: tapo_rv20_max, loja: amazon, preco: 854.05,
+     texto: "Robô Aspirador TP-Link Tapo RV20 Max Mapeamento a Laser"}
+  - {id: D03, origem: documentado, conjunto: treino, caso: positivo, esperado: xiaomi_s40c, loja: amazon, preco: 1165.83,
+     texto: "Robô Aspirador Xiaomi Robot Vacuum S40C"}
+  - {id: D04, origem: documentado, conjunto: treino, caso: positivo, esperado: agratto_12k, loja: dufrio, preco: 1871.19,
+     texto: "Ar Condicionado Split Inverter Agratto Kyn Top 12000 BTUs Frio 220V KNICST12F-02"}
+  - {id: D05, origem: documentado, conjunto: treino, caso: positivo, esperado: midea_lite_12k, loja: dufrio, preco: 2022.48,
+     texto: "Ar Condicionado Split Inverter Midea AirVolution Lite 12000 BTUs Frio 220V 42EBVCB12M5"}
+  - {id: D06, origem: documentado, conjunto: treino, caso: positivo, esperado: midea_ecomaster_12k, loja: amazon, preco: 2304.90,
+     texto: "Ar Condicionado Split Inverter Midea AI Ecomaster 12000 BTUs Frio 220V 42EZVCA12M5"}
+  - {id: D07, origem: documentado, conjunto: treino, caso: positivo, esperado: elgin_18k, loja: frigelar, preco: 2727.35,
+     texto: "Ar Condicionado Split Inverter Elgin Eco Inverter III 18000 BTUs Frio 220V HJFC18C2WHCH"}
+  - {id: D08, origem: documentado, conjunto: treino, caso: positivo, esperado: philco_18k, loja: amazon, preco: 2569.00,
+     texto: "Ar Condicionado Split Philco Eco Inverter 18000 BTUs Frio 220V PAC18FTW"}
+  - {id: D09, origem: documentado, conjunto: treino, caso: positivo, esperado: elgin_12k, loja: amazon, preco: 1799.90,
+     texto: "Ar Condicionado Split Elgin Eco Inverter III 12000 BTUs Frio 220V HJFC12C2WGCG"}
+  - {id: D10, origem: documentado, conjunto: treino, caso: positivo, esperado: loren_shower_6800_220v, loja: amazon, preco: 111.89,
+     texto: "Chuveiro Lorenzetti Loren Shower Eletrônico 6800W 220V 7510157"}
+  - {id: D11, origem: documentado, conjunto: treino, caso: positivo, esperado: dreame_f10, loja: amazon, preco: 1994.05,
+     texto: "Robô Aspirador Dreame F10 Passa Pano"}
+
+  # ---------------- reais INDEPENDENTES: slugs de links em projetos/*/cotacoes.csv (coletados em 05/10 e 18/11 por outras sessoes,
+  # ---------------- com produto_id rotulado por elas, ANTES do catalogo do radar; eu nao vi nem ajustei nada com base neles) ----------------
+  - {id: I01, origem: real_cotacao_independente, conjunto: independente, caso: positivo, esperado: agratto_12k, loja: dufrio, preco: 1699.01, nota: "a URL escreve 'agrato' (erro da loja)",
+     texto: "ar condicionado split inverter 12000 btus agrato kyn top frio knicst12f 02 220v"}
+  - {id: I02, origem: real_cotacao_independente, conjunto: independente, caso: positivo, esperado: midea_lite_12k, loja: dufrio, preco: 1849.00, nota: "a URL escreve 'air volution' com espaco",
+     texto: "ar condicionado split inverter 12000 btus midea air volution lite frio 42ebvcb12m5 220v"}
+  - {id: I03, origem: real_cotacao_independente, conjunto: independente, caso: positivo, esperado: midea_ecomaster_12k, loja: frigelar, preco: 2472.04,
+     texto: "ar condicionado split inverter 12000 btus midea ai ecomaster high wall frio 42ezvca12m5 38ezvca12m5 220v"}
+  - {id: I04, origem: real_cotacao_independente, conjunto: independente, caso: negativo, loja: frigelar, preco: 2695.49, texto: "ar condicionado split inverter 12000 btus lg ai dual inverter voice frio s3 q12ja31j 220v"}
+  - {id: I05, origem: real_cotacao_independente, conjunto: independente, caso: negativo, loja: webcontinental, preco: 2573.20, texto: "ar condicionado split lg dual inverter ai voice 12000 btus frio 220v s3 q12ja31l"}
+  - {id: I06, origem: real_cotacao_independente, conjunto: independente, caso: negativo, loja: friopecas, preco: 2555.76, texto: "split lg hw 12k 220 f voice"}
+  - {id: I07, origem: real_cotacao_independente, conjunto: independente, caso: negativo, loja: gree, preco: 2502.20, texto: "ar condicionado split inverter 12 000 btus gree g side auto inverter r 32 frio 220v 12000 frio"}
+  - {id: I08, origem: real_cotacao_independente, conjunto: independente, caso: negativo, loja: frigelar, preco: 3120.49, texto: "ar condicionado split inverter 12000 btus samsung windfree ai pro wi fi high wall frio ar60h12d1awnaz"}
+
+  # ---------------- construidos: positivos (variacao de nome, grafia, ordem) ----------------
+  - {id: C15, origem: construido, conjunto: regressao, caso: positivo, esperado: agratto_12k, nota: "grafia da loja SEM o SKU", texto: "Ar Condicionado Agrato Kyn Top Inverter 12000 BTUs Frio 220V"}
+  - {id: C16, origem: construido, conjunto: regressao, caso: positivo, esperado: midea_lite_12k, nota: "'Air Volution' SEM o SKU", texto: "Ar Condicionado Midea Air Volution Lite 12000 BTUs Frio 220V"}
+  - {id: C01, origem: construido, conjunto: regressao, caso: positivo, esperado: dreame_f10, texto: "Aspirador Robô Dreame F10 com Mop 13000Pa"}
+  - {id: C02, origem: construido, conjunto: regressao, caso: positivo, esperado: dreame_f10, texto: "Dreame F10 - Robô Aspirador e Passa Pano - Frete Grátis"}
+  - {id: C03, origem: construido, conjunto: regressao, caso: positivo, esperado: k800_pro_127v, texto: "KaBuM! K800 Pro Robô Aspirador 127V Laser Autolimpante"}
+  - {id: C04, origem: construido, conjunto: regressao, caso: positivo, esperado: k800_pro_127v, texto: "Robô Aspirador Smart K800 PRO KSAR81010BR Branco"}
+  - {id: C05, origem: construido, conjunto: regressao, caso: positivo, esperado: tapo_rv20_max, texto: "Tapo RV20 Max Robô Aspirador e Mop Wi-Fi"}
+  - {id: C06, origem: construido, conjunto: regressao, caso: positivo, esperado: xiaomi_s40c, texto: "Aspirador Robô Xiaomi S40C Branco Bivolt"}
+  - {id: C07, origem: construido, conjunto: regressao, caso: positivo, esperado: philco_18k, texto: "Split Philco PAC18FTW 18.000 Btus 220V"}
+  - {id: C08, origem: construido, conjunto: regressao, caso: positivo, esperado: elgin_18k, texto: "Ar Condicionado Elgin Eco Inverter III 18.000 BTUs 220V Só Frio"}
+  - {id: C09, origem: construido, conjunto: regressao, caso: positivo, esperado: elgin_12k, texto: "Elgin Eco Inverter III 12k BTUs Frio 220V Wi-Fi"}
+  - {id: C10, origem: construido, conjunto: regressao, caso: positivo, esperado: midea_lite_12k, texto: "Split Midea AirVolution Lite 12.000 Btu/h Frio 220 V"}
+  - {id: C11, origem: construido, conjunto: regressao, caso: positivo, esperado: agratto_12k, texto: "Agratto Kyn Top Inverter 12000 BTUs Só Frio 220V"}
+  - {id: C12, origem: construido, conjunto: regressao, caso: positivo, esperado: loren_shower_6800_220v, texto: "Chuveiro Loren Shower Lorenzetti Eletrônico 6800 W 220 V Branco"}
+  - {id: C13, origem: construido, conjunto: regressao, caso: positivo, esperado: xiaomi_s40_pro_py, texto: "Xiaomi Robot Vacuum S40 Pro - Compras Paraguai US$ 225"}
+  - {id: C14, origem: construido, conjunto: regressao, caso: positivo, esperado: midea_ecomaster_12k, texto: "Ar Condicionado Midea Ecomaster AI Inverter 12000 BTUs 220V"}
+
+  # ---------------- construidos: negativos (cada um exercita uma regra) ----------------
+  - {id: N01, origem: construido, conjunto: regressao, caso: negativo, nota: "K800 Pro 220V explicito", texto: "Robô Aspirador KaBuM K800 Pro 220V Preto"}
+  - {id: N02, origem: construido, conjunto: regressao, caso: negativo, nota: "Dreame F10 Pro e outra linha", texto: "Robô Aspirador Dreame F10 Pro"}
+  - {id: N03, origem: construido, conjunto: regressao, caso: negativo, nota: "Dreame L10 e outro modelo", texto: "Robô Aspirador Dreame L10 Ultra"}
+  - {id: N04, origem: construido, conjunto: regressao, caso: negativo, nota: "Tapo RV20 Mop e outro produto", texto: "TP-Link Tapo RV20 Mop Robô Aspirador"}
+  - {id: N05, origem: construido, conjunto: regressao, caso: negativo, nota: "Tapo RV30 Plus", texto: "Robô Aspirador TP-Link Tapo RV30 Plus"}
+  - {id: N06, origem: construido, conjunto: regressao, caso: negativo, nota: "S40 sem Pro nem C", texto: "Robô Aspirador Xiaomi Robot Vacuum S40"}
+  - {id: N07, origem: construido, conjunto: regressao, caso: negativo, nota: "acessorio", texto: "Filtro HEPA para Dreame F10"}
+  - {id: N08, origem: construido, conjunto: regressao, caso: negativo, nota: "acessorio", texto: "Escova lateral compatível com Xiaomi S40C"}
+  - {id: N09, origem: construido, conjunto: regressao, caso: negativo, nota: "acessorio", texto: "Kit de Panos Mop para Tapo RV20 Max"}
+  - {id: N10, origem: construido, conjunto: regressao, caso: negativo, nota: "acessorio", texto: "Bateria de reposição Dreame F10 5200mAh"}
+  - {id: N11, origem: construido, conjunto: regressao, caso: negativo, nota: "BTU diferente", texto: "Ar Condicionado Elgin Eco Inverter III 9.000 BTUs 220V HJFC09C2WGCG"}
+  - {id: N12, origem: construido, conjunto: regressao, caso: negativo, nota: "BTU diferente (24k)", texto: "Ar Condicionado Philco Eco Inverter 24000 BTUs 220V"}
+  - {id: N13, origem: construido, conjunto: regressao, caso: negativo, nota: "quente e frio", texto: "Ar Condicionado Elgin Eco Inverter III 12000 BTUs Quente e Frio 220V"}
+  - {id: N14, origem: construido, conjunto: regressao, caso: negativo, nota: "voltagem errada (127V)", texto: "Ar Condicionado Midea AirVolution Lite 12000 BTUs 127V"}
+  - {id: N15, origem: construido, conjunto: regressao, caso: negativo, nota: "chuveiro 7500W multitemperaturas", texto: "Chuveiro Loren Shower Multitemperaturas 7500W 220V"}
+  - {id: N16, origem: construido, conjunto: regressao, caso: negativo, nota: "chuveiro 127V", texto: "Chuveiro Loren Shower Eletrônico 6800W 127V"}
+  - {id: N17, origem: construido, conjunto: regressao, caso: negativo, nota: "outra marca, mesma categoria", texto: "Robô Aspirador Roborock Q Revo S 220V"}
+  - {id: N18, origem: construido, conjunto: regressao, caso: negativo, nota: "outra marca de split 12k", texto: "Ar Condicionado Split Samsung WindFree 12000 BTUs 220V"}
+  - {id: N19, origem: construido, conjunto: regressao, caso: negativo, nota: "Midea Liva e outra linha", texto: "Ar Condicionado Midea Liva Inverter 12000 BTUs 220V"}
+  - {id: N20, origem: construido, conjunto: regressao, caso: negativo, nota: "Philco sem relacao (liquidificador)", texto: "Liquidificador Philco 1200W 127V"}
+  - {id: N21, origem: construido, conjunto: regressao, caso: negativo, nota: "cupom de loja nao e produto", texto: "Cupom Amazon R$ 70 OFF acima de R$ 1.000 código 70OFF"}
+  - {id: N22, origem: construido, conjunto: regressao, caso: negativo, nota: "texto sem produto", texto: "Black Friday: até 70% OFF em eletrodomésticos"}
+
+  # ---------------- construidos: ambiguos ----------------
+  - {id: A01, origem: construido, conjunto: regressao, caso: ambiguo, esperado: k800_pro_127v, aviso: tensao_ambigua, nota: "bivolt: nao garante 127V",
+     texto: "Robô Aspirador KaBuM K800 Pro Bivolt 127V/220V"}
+  - {id: A02, origem: construido, conjunto: regressao, caso: ambiguo, esperado: dreame_f10, aviso: possivel_importado, texto: "Robô Dreame F10 versão global importado do Paraguai"}
+  - {id: A03, origem: construido, conjunto: regressao, caso: ambiguo, esperado: elgin_18k, aviso: sku_nao_confirmado, texto: "Ar Condicionado HW Inverter Elgin Eco III 18.000 BTUs 220V Só Frio"}
+  - {id: A04, origem: construido, conjunto: regressao, caso: ambiguo, esperado: philco_18k, aviso: sku_nao_confirmado, nota: "Philco Eco Inverter 18k sem o SKU: pode ser outro modelo da linha",
+     texto: "Ar Condicionado Split Philco Eco Inverter 18000 BTUs Frio 220V"}
+
+  # ---------------- INDEPENDENTES (fase 4): titulos reais do historico do Gatry, busca publica por marca/categoria/SKU em 21/11/2026 ----------------
+  # Rotulados por leitura do titulo e das definicoes do catalogo ANTES de rodar o reconhecimento sobre eles. Sorteio aleatorio (seed 7) de itens fora
+  # das marcas entra como negativo. LIMITE: o Gatry traz pouquissimos titulos destes produtos (so 7 positivos/ambiguos em ~590 titulos baixados);
+  # a recuperacao medida aqui tem n minusculo (veja o intervalo de confianca) e NAO prova recall de mercado.
+  - {id: G001, origem: real_gatry_historico, conjunto: independente, caso: positivo, esperado: elgin_12k, loja: shopee, preco: 1554.07, data: "2026-05-20", gatry_id: "41dc4856",
+     texto: "Ar Condicionado Inverter Elgin High Wall Eco III Wifi 12.000 Btus Frio 220v"}
+  - {id: G002, origem: real_gatry_historico, conjunto: independente, caso: positivo, esperado: xiaomi_s40c, loja: amazon, preco: 1140.0, data: "2026-11-18", gatry_id: "5f820870",
+     texto: "Robô Aspirador De Pó Inteligente S40C Xiaomi, Branco (XM865BRA)"}
+  - {id: G003, origem: real_gatry_historico, conjunto: independente, caso: positivo, esperado: xiaomi_s40c, loja: amazon, preco: 1197.0, data: "2026-06-25", gatry_id: "ff7ff4f8",
+     texto: "ROBÔ ASPIRADOR DE PÓ INTELIGENTE S40C XIAOMI, BRANCO (XM865BRA)"}
+  - {id: G004, origem: real_gatry_historico, conjunto: independente, caso: positivo, esperado: xiaomi_s40c, loja: shopee, preco: 960.53, data: "2026-11-12", gatry_id: "6e968f3e",
+     texto: "Robô Aspirador Xiaomi S40C Inteligente Passa Pano Aspira Varre utomático Wi-Fi Controle App"}
+  - {id: G005, origem: real_gatry_historico, conjunto: independente, caso: ambiguo, esperado: elgin_12k, aviso: sku_nao_confirmado, loja: amazon, preco: 1737.95, data: "2026-09-08", gatry_id: "6bbfc89f",
+     texto: "Ar-Condicionado Split HW Inverter Elgin Eco III Wi-Fi 12.000 BTUs R-32 Só Frio 220V"}
+  - {id: G006, origem: real_gatry_historico, conjunto: independente, caso: ambiguo, esperado: k800_pro_127v, aviso: tensao_nao_informada, loja: kabum, preco: 1382.0, data: "2026-09-12", gatry_id: "26e1497e",
+     texto: "Robô Aspirador KABUM! K800 Pro Laser 13000Pa"}
+  - {id: G007, origem: real_gatry_historico, conjunto: independente, caso: ambiguo, esperado: midea_lite_12k, aviso: tensao_nao_informada, loja: amazon, preco: 1464.73, data: "2026-06-15", gatry_id: "e93146cf",
+     texto: "Ar-Condicionado Split 12.000 BTUs AirVolution Lite Inverter Frio Midea"}
+  - {id: G008, origem: real_gatry_historico, conjunto: independente, caso: negativo, primeira_passada: {obtido: elgin_12k, achado: "abreviacao Q/f de quente/frio nao era excluida; corrigido em config/radar_catalogo.yaml"}, nota: "Elgin Eco III 12k mas QUENTE/FRIO (Q/f)", loja: mercadolivre, preco: 1319.0, data: "2026-07-08", gatry_id: "d2526de4",
+     texto: "Ar Condicionado 12k Elgin Eco Inverter Iii Wi-fi Q/f Branco"}
+  - {id: G009, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco Inverter II (nao III) 12k", loja: amazon, preco: 1676.14, data: "2026-10-27", gatry_id: "96243513",
+     texto: "Ar Condicionado Split Elgin Eco Inverter II WiFi 12000 BTUs Frio 220V"}
+  - {id: G010, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco Inverter II 12k", loja: amazon, preco: 1700.97, data: "2026-10-23", gatry_id: "87374098",
+     texto: "Ar Condicionado Split Elgin Eco Inverter II WiFi 12000 BTUs Frio 220V HJFC12C2WECE"}
+  - {id: G011, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco Inverter II 12k", loja: mercadolivre, preco: 1559.0, data: "2025-11-28", gatry_id: "5d1d123b",
+     texto: "Ar Condicionado Split Elgin Eco Inverter Ii Wi-fi 12000 Btus"}
+  - {id: G012, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco II 18k (nao III)", loja: carrefour, preco: 3486.57, data: "2025-02-25", gatry_id: "610d286d",
+     texto: "Ar Condicionado Inverter Elgin Eco Ii 18000 Btus Frio 220v R-32 Wi-fi"}
+  - {id: G013, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco II 18k (nao III)", loja: climario, preco: 2830.91, data: "2023-12-10", gatry_id: "587acd48",
+     texto: "Ar Condicionado Split Hi Wall Eco II Inverter Elgin 18.000 Btus Frio 220v"}
+  - {id: G014, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco III 9k", loja: amazon, preco: 1294.1, data: "2026-05-26", gatry_id: "45d7a5b6",
+     texto: "Ar-Condicionado Split HW Inverter Elgin Eco III Wi-Fi 9.000 BTUs R-32 Só Frio 220V"}
+  - {id: G015, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco III 9k", loja: amazon, preco: 1566.55, data: "2026-04-07", gatry_id: "f47eb2c8",
+     texto: "Ar-Condicionado Split HW Inverter Elgin Eco III Wi-Fi 9.000 BTUs R-32 Só Frio 220V"}
+  - {id: G016, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin 30k", loja: amazon, preco: 3531.34, data: "2026-07-07", gatry_id: "2ec3b7e5",
+     texto: "Ar Condicionado Split Hi Wall Elgin Eco Inverter Wifi 30000 BTU/h Frio 45HJFI30C2WB"}
+  - {id: G017, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco II 12k quente/frio", loja: amazon, preco: 1599.05, data: "2025-12-19", gatry_id: "08f9b03a",
+     texto: "Ar-Condicionado Split HW Elgin Eco Inverter II Wi-Fi 12.000 BTUs R-32 Quente/Frio 220V"}
+  - {id: G018, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco 12k quente e frio", loja: amazon, preco: 1899.05, data: "2025-11-17", gatry_id: "4eb1f407",
+     texto: "Ar Condicionado Split Hi Wall Inverter Elgin Eco 12000 BTU/h Quente & Frio 45HJQE12C2CC – 220 Volts"}
+  - {id: G019, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco Dream 12k quente e frio", loja: amazon, preco: 1699.05, data: "2025-12-22", gatry_id: "b31257aa",
+     texto: "Ar Condicionado Split Hi Wall Inverter Elgin Eco Dream 12000 BTU/h Quente E Frio 45HIQI12C2WA – 220 Volts"}
+  - {id: G020, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco II 12k", loja: amazon, preco: 1655.1, data: "2026-06-27", gatry_id: "fe72ef4f",
+     texto: "Ar-condicionado Split Inverter Ii 12000 Btus Elgin Eco Com Wi-fi Integrado High Wall Só Frio"}
+  - {id: G021, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco II 12k", loja: extra, preco: 1951.11, data: "2025-03-08", gatry_id: "d5b256a2",
+     texto: "Ar Condicionado Split High Wall Eco Inverter II Wifi R-32 Elgin 12000 Btus Frio 220V 45HJFI12C2WB"}
+  - {id: G022, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Elgin Eco II 9k", loja: aliexpress, preco: 1689.46, data: "2025-11-27", gatry_id: "6d5ad9d8",
+     texto: "Ar-condicionado Split 9.000 BTUs Elgin Eco Inverter II Frio High Wall HJFC09C2WBCC - 220V"}
+  - {id: G023, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco 12k PAC12FC", loja: shopee, preco: 1516.07, data: "2026-11-11", gatry_id: "58b2523b",
+     texto: "Ar Condicionado Philco 12000 BTUs Philco PAC12FC -Split, Eco Inverter, Frio, Interno+Externo, 220V"}
+  - {id: G024, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco 12k PAC12FC", loja: amazon, preco: 1344.15, data: "2026-06-17", gatry_id: "c0101897",
+     texto: "Ar Condicionado Split Hi Wall Inverter Philco 12000 BTU/h Frio PAC12FC – 220 Volts"}
+  - {id: G025, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco 12k PAC12FT", loja: amazon, preco: 1599.0, data: "2026-07-18", gatry_id: "f36c7d86",
+     texto: "Ar Condicionado Split Inverter Philco 12000 BTUs Frio 220V PAC12FT"}
+  - {id: G026, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco 30k", loja: amazon, preco: 3688.2, data: "2026-05-14", gatry_id: "7a6ed659",
+     texto: "Ar-condicionado Split Inverter 30000 Btus Philco Só Frio Pac30000ifm15 220v"}
+  - {id: G027, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco 24k", loja: philco, preco: 2969.91, data: "2021-08-10", gatry_id: "dd77eb24",
+     texto: "Ar Condicionado Philco 24000Btus Inverter PAC24000IQFM8 - 220V"}
+  - {id: G028, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco 12k PAC12FB", loja: lebiscuit, preco: 2279.9, data: "2025-02-03", gatry_id: "b430e2dc",
+     texto: "Ar Condicionado Split 12.000 BTUS PAC12FB Hi Wall Inverter Philco 220V"}
+  - {id: G029, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco 18k antigo quente/frio PAC18000IQFM9", loja: webcontinental, preco: 1899.0, data: "2020-02-19", gatry_id: "62815f3a",
+     texto: "Ar Condicionado Split Inverter 18000 BTUs Philco Quente/Frio 220V PAC18000IQFM9"}
+  - {id: G030, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco 18k antigo quente/frio PAC18000QFM6", loja: webcontinental, preco: 1800.0, data: "2020-01-02", gatry_id: "0cde4c3e",
+     texto: "Ar Condicionado Split Hi Wall 18000 BTUs Philco Quente/ Frio 220V PAC18000QFM6"}
+  - {id: G031, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco 18k antigo nao inverter PAC18000FM9", loja: magazineluiza, preco: 1851.55, data: "2021-01-23", gatry_id: "bb3bdada",
+     texto: "Ar Condicionado Split Philco 18000 BTUs Frio 220V PAC18000FM9 - Marketplace"}
+  - {id: G032, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Midea AirVolution 12k modelo antigo 42MACT12S5", loja: americanas, preco: 1499.0, data: "2022-03-21", gatry_id: "46508c5b",
+     texto: "Ar Condicionado Split Inverter HW Springer Midea AirVolution Só Frio 12000 BTUs 42MACT12S5"}
+  - {id: G033, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Midea Xtreme Save 12k (outra linha)", loja: amazon, preco: 780.0, data: "2026-01-22", gatry_id: "8ec85335",
+     texto: "Ar Condicionado Split Inverter Springer Midea Xtreme Save Connect 12000 Btus - Marketplace"}
+  - {id: G034, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Midea Xtreme Save 12k", loja: webcontinental, preco: 2499.0, data: "2025-02-25", gatry_id: "02abb9fa",
+     texto: "Ar Condicionado Split Inverter Springer Midea Xtreme Save Connect 12000 BTUS Frio 220V 38AGVCI12M5"}
+  - {id: G035, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Midea Ecomaster 18k", loja: fastshop, preco: 3099.0, data: "2026-02-08", gatry_id: "d79a7efc",
+     texto: "Ar Split Midea Ecomaster 18000 Inverter"}
+  - {id: G036, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Midea Ecomaster 9k", loja: webcontinental, preco: 1656.65, data: "2026-03-14", gatry_id: "d551e782",
+     texto: "Ar-Condicionado Split Midea 9.000 BTUs Inverter AI Ecomaster Frio 220V 42EZVCA09M5.38EZVCA09M5"}
+  - {id: G037, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Midea Ecomaster 18k", loja: amazon, preco: 1999.99, data: "2026-11-15", gatry_id: "963b40c0",
+     texto: "Ar-condicionado Split Inverter 18000 Btus Midea Ai Ecomaster High Wall"}
+  - {id: G038, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Midea Ecomaster 9k", loja: amazon, preco: 1709.05, data: "2026-11-13", gatry_id: "0260cd62",
+     texto: "Ar-condicionado Split 9.000 BTUs Midea Carrier Inverter Frio AI Ecomaster 38EZVCA09M5"}
+  - {id: G039, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Midea AirVolution Connect 9k", loja: amazon, preco: 1663.2, data: "2025-11-26", gatry_id: "6cb4fe44",
+     texto: "Ar Condicionado Split Hi Wall Inverter Springer Midea Airvolution Connect 9.000 Btus Frio 220v R-32"}
+  - {id: G040, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Midea 18k antigo", loja: poloar, preco: 1399.0, data: "2016-03-27", gatry_id: "b02ca7f1",
+     texto: "Ar Condicionado Split Midea 18000 BTUs 42MDQA18M5 / 38KQG18M5"}
+  - {id: G041, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Agratto Fit Top 12k", loja: amazon, preco: 1799.0, data: "2025-04-20", gatry_id: "7369dd2b",
+     texto: "Ar-Condicionado Split HW Agratto Fit Top 12.000 BTUs R-32 Só Frio 220V"}
+  - {id: G042, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Agratto Digital Inverter 12k", loja: magazineluiza, preco: 2184.99, data: "2025-03-12", gatry_id: "f850c1b4",
+     texto: "Ar-condicionado Split Agratto Digital Inverter - 12.000 BTUs Frio"}
+  - {id: G043, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Agratto Liv Top 12k", loja: magazineluiza, preco: 1799.0, data: "2025-05-14", gatry_id: "a29b09d5",
+     texto: "Ar Condicionado Split Inverter Agratto Hi Wall Liv Top 12000 BTUs Quente Frio LCST12QF02I - 220V"}
+  - {id: G044, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Agratto One Top 12k", loja: mercadolivre, preco: 1690.05, data: "2025-05-26", gatry_id: "ffb20171",
+     texto: "Ar Condicionado Agratto One Top 12.000 Btus Frio 220v R-32 220v"}
+  - {id: G045, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Agratto Zen Top 9k", loja: mercadolivre, preco: 1399.0, data: "2026-09-30", gatry_id: "d6fca994",
+     texto: "Ar Condicionado Hi Wall Agratto Zen Top Inverter 9k F 220v"}
+  - {id: G046, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Agratto Liv Top 9k", loja: amazon, preco: 1409.58, data: "2026-06-10", gatry_id: "3664f64b",
+     texto: "Ar Condicionado Split Inverter 9000 Btus Frio Liv Top Agratto 220V"}
+  - {id: G047, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "KaBuM Smart 900 (outro modelo)", loja: kabum, preco: 1214.0, data: "2025-12-03", gatry_id: "a38e286b",
+     texto: "Robô Aspirador KABUM! Smart 900 3D 127V Branco"}
+  - {id: G048, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "KaBuM Smart 550", loja: kabum, preco: 599.0, data: "2026-01-09", gatry_id: "022b4932",
+     texto: "Robô Aspirador E Passa Pano KABUM! Smart 550, 3000Pa, 100min Bateria, Bivolt, Branco - KSAR550BR"}
+  - {id: G049, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "KaBuM Smart 700", loja: magazineluiza, preco: 699.9, data: "2025-11-23", gatry_id: "7b582e78",
+     texto: "Robô Aspirador E Passa Pano KABUM! Smart 700 - 5 Modos De Limpeza, Mapeamento - KBSF003"}
+  - {id: G050, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Dreame D10 Plus", loja: amazon, preco: 4046.4, data: "2025-03-03", gatry_id: "e65b9691",
+     texto: "DREAME D10 Plus Gen 2 Robô Aspirador Com Estação De Autoesvaziamento (90 Dias), 6000Pa Sução, Navegação LiDAR E Evitação"}
+  - {id: G051, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Dreame D9 Max", loja: amazon, preco: 1311.8, data: "2025-05-05", gatry_id: "78d534c2",
+     texto: "DREAME D9 Max Gen 2 Robô Aspirador De Pó E Passa Pano, 6000Pa, 240 Min Autonomia, Navegação Laser"}
+  - {id: G052, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Dreame L40 Ultra", loja: amazon, preco: 6149.18, data: "2026-05-10", gatry_id: "737c040b",
+     texto: "DREAME L40 Ultra AE Robô Aspirador & Mopa, Sucção 19.000Pa"}
+  - {id: G053, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Philco PAS23 robo", loja: amazon, preco: 354.9, data: "2026-11-16", gatry_id: "705b3c99",
+     texto: "Philco Aspirador Robô 3 em 1 Com MOP PAS23 Preto Bivolt Anticolisão"}
+  - {id: G054, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Agratto Praticci robo", loja: amazon, preco: 135.18, data: "2026-11-06", gatry_id: "47def844",
+     texto: "Aspirador De Pó Robô Praticci Agratto Preto, 3W, Bivolt"}
+  - {id: G055, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Tapo C206 camera", loja: mercadolivre, preco: 234.0, data: "2025-12-10", gatry_id: "7da0ac58",
+     texto: "Camera De Seguranca Residencial Wi-fi Tp-link Tapo C206"}
+  - {id: G056, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Tapo C200 camera", loja: amazon, preco: 129.36, data: "2026-06-16", gatry_id: "0d9abe7a",
+     texto: "Camera De Segurança Wi-Fi 360º, 1080p Full HD TP-Link Tapo C200"}
+  - {id: G057, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Tapo C500 camera", loja: mercadolivre, preco: 147.23, data: "2026-11-17", gatry_id: "b5450eb2",
+     texto: "TP-Link Tapo C500 Câmera de Segurança Wifi 1080P 360° Colorida IP65"}
+  - {id: G058, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Tapo P110 tomada", loja: amazon, preco: 46.55, data: "2026-11-04", gatry_id: "7dce6b6e",
+     texto: "Tomada Inteligente Wi-Fi TP-Link Tapo P110"}
+  - {id: G059, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Tapo L530E lampada", loja: amazon, preco: 34.9, data: "2023-12-13", gatry_id: "859be11b",
+     texto: "Lâmpada Wi-Fi Inteligente TP-Link Tapo L530E, Com 16 Milhões De Cores, Colorido RGB"}
+  - {id: G060, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Headset Edifier K800", loja: kabum, preco: 113.99, data: "2024-04-17", gatry_id: "695c25e4",
+     texto: "Headset Edifier Over-Ear, Comunicador USB Profissional - K800 USB"}
+  - {id: G061, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Headset Edifier K800", loja: kabum, preco: 45.9, data: "2016-11-28", gatry_id: "beeffade",
+     texto: "Fone De Ouvido Headset Preto K800 Edifier"}
+  - {id: G062, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Acqua Ultra Storm 6800W 220V (outro modelo)", loja: mercadolivre, preco: 374.0, data: "2024-07-28", gatry_id: "627d49dc",
+     texto: "Chuveiro Elétrico De Parede Lorenzetti Acqua Ultra Storm Preto 6800W 220V"}
+  - {id: G063, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Acqua Duo Ultra 6800W 220V (outro modelo)", loja: amazon, preco: 359.88, data: "2024-06-11", gatry_id: "9c284e44",
+     texto: "Lorenzetti Chuveiro Eletrônico Branco Acqua Duo Ultra, 6800W 220V"}
+  - {id: G064, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Bella Ducha 6800W 220V", loja: mercadolivre, preco: 59.17, data: "2026-06-03", gatry_id: "129e74b3",
+     texto: "Chuveiro Lorenzetti Bella Ducha Ultra 6800W 220V 4 Temperaturas Branco"}
+  - {id: G065, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Acqua Storm Ultra 6800W", loja: magazineluiza, preco: 250.72, data: "2022-11-17", gatry_id: "5f8884a2",
+     texto: "Chuveiro Elétrico Lorenzetti Acqua Storm Ultra - 6800W Branco Temperatura Gradual"}
+  - {id: G066, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Loren Shower 7500W", loja: amazon, preco: 69.9, data: "2021-11-30", gatry_id: "8d9e2ce3",
+     texto: "Chuveiro Loren Shower Eletrônico 7500w 220v LORENZETTI Branco"}
+  - {id: G067, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Loren Shower 5500W 127V", loja: amazon, preco: 81.25, data: "2022-10-28", gatry_id: "0b5683d8",
+     texto: "Chuveiro Loren Shower Eletrônico 5500w 127v~ LORENZETTI, Branco"}
+  - {id: G068, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Loren Shower Ultra 7500W", loja: mercadolivre, preco: 90.04, data: "2026-06-06", gatry_id: "2cd6c74e",
+     texto: "Chuveiro Lorenzetti Loren Shower Ultra Eletrônico Branco 7500W"}
+  - {id: G069, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Loren Shower sem potencia e sem tensao (nao da para afirmar 6800W 220V)", loja: havan, preco: 119.9, data: "2026-05-26", gatry_id: "f65f48dc",
+     texto: "Chuveiro Loren Shower Eletrônico Lorenzetti"}
+  - {id: G070, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Loren Shower 5500W 220V", loja: amazon, preco: 78.91, data: "2024-12-24", gatry_id: "dfc1de65",
+     texto: "Lorenzetti Loren Shower Chuveiro Elétrico Branco, 5500W 220V"}
+  - {id: G071, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "geladeira Philco Eco Inverter", loja: amazon, preco: 3464.9, data: "2026-02-02", gatry_id: "490cfa26",
+     texto: "Geladeira Philco Side By Side PRF535ID Eco Inverter 434L Inox 220v"}
+  - {id: G072, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "lavadora Philco Inverter", loja: amazon, preco: 2071.27, data: "2025-12-20", gatry_id: "1fe5fa42",
+     texto: "Lavadora E Secadora Philco 10kg Inverter PLS11T Titanium 220V"}
+  - {id: G073, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "refrigerador Philco Eco Inverter", loja: webcontinental, preco: 3955.91, data: "2023-03-23", gatry_id: "a1b3a35c",
+     texto: "Refrigerador French Door Philco Eco Inverter 299l 220v"}
+  - {id: G074, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "lava e seca Philco Eco Inverter", loja: aliexpress, preco: 2445.13, data: "2026-11-12", gatry_id: "4edd0c3a",
+     texto: "Lava e Seca Philco 16 Programas Eco Inverter 11kg PLS11C Titanio"}
+  - {id: G075, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "bicicleta Dream Max", loja: amazon, preco: 899.9, data: "2023-11-24", gatry_id: "96660962",
+     texto: "Bicicleta Ergométrica Horizontal DREAM MAX H, Preto"}
+  - {id: G076, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "perfume Miss Dream", loja: amazon, preco: 70.29, data: "2026-10-28", gatry_id: "df76b55f",
+     texto: "La Rive Miss Dream Feminino Eau De Parfum 100 Ml"}
+  - {id: G077, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Samsung 12k", loja: amazon, preco: 2098.55, data: "2026-10-14", gatry_id: "48eaf55f",
+     texto: "Samsung Ar-condicionado Split Digital Inverter Ultra Connect AI 12.000 BTUs Frio"}
+  - {id: G078, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Daikin 18k", loja: americanas, preco: 2033.96, data: "2020-09-22", gatry_id: "25e9a238",
+     texto: "Ar Condicionado Split Daikin Advance Inverter 18000 Btus Frio 220V - Marketplace (AME)"}
+  - {id: G079, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Eufy robo", loja: amazon, preco: 3205.39, data: "2026-07-09", gatry_id: "22b18cdb",
+     texto: "Aspirador De Pó Robô Eufy Omni C20 3 Em 1 Com Corpo Fino De 8,5cm, Esvaziamento, Limpeza E Secagem Automático"}
+  - {id: G080, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Electrolux robo", loja: amazon, preco: 1769.89, data: "2026-04-30", gatry_id: "491409d6",
+     texto: "Electrolux Robô Aspirador De Pó 4 Em 1 Wi-Fi MOP"}
+  - {id: G081, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "chuveiro Zagonel", loja: mercadolivre, preco: 709.0, data: "2026-09-15", gatry_id: "154babd3",
+     texto: "Chuveiro Elétrico Zagonel Ducali Premium Digital 5500W Preto"}
+  - {id: G082, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Prime Air 12k", loja: mercadolivre, preco: 1520.0, data: "2025-11-28", gatry_id: "fec8079f",
+     texto: "Ar-condicionado Split Inverter 12000 Btu/h Prime Air F 12fc Cor Branco"}
+  - {id: G083, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Electrolux ERB30", loja: amazon, preco: 740.0, data: "2026-01-27", gatry_id: "58a75012",
+     texto: "Robô Aspirador Electrolux - ERB30"}
+  - {id: G084, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "Gree 12k", loja: amazon, preco: 1946.94, data: "2026-11-20", gatry_id: "b24e2fd8",
+     texto: "Ar-Condicionado Split Hi Wall Inverter Gree G-Side 12.000BTU/h Quente e Frio 220v"}
+  - {id: G085, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "TCL 12k", loja: magazineluiza, preco: 2519.33, data: "2025-01-16", gatry_id: "35822ed1",
+     texto: "Ar-Condicionado Split Inverter 12000 BTUs TCL T-Pro 2.0 High Wall Quente E Frio TAC-12CHTG2-INV 220V"}
+  - {id: G086, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "robo W90", loja: mercadolivre, preco: 289.9, data: "2026-06-11", gatry_id: "c0f3d4ee",
+     texto: "Robô Aspirador Robot W90 Varre Aspira E Passa Pano 30w"}
+  - {id: G087, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "LG 9k", loja: amazon, preco: 1799.0, data: "2026-06-03", gatry_id: "94ed1f24",
+     texto: "Ar Condicionado Hi Wall LG Dual Inverter Voice 9.000 Btus Frio 220v R-32"}
+  - {id: G088, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "cafeteira Dream", loja: casasbahia, preco: 67.42, data: "2025-09-24", gatry_id: "7b5b43ef",
+     texto: "Cafeteira Elétrica Cadence Dream Rosé Gold Com Copo Térmico CAF206"}
+  - {id: G089, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "WAP W90", loja: amazon, preco: 237.15, data: "2026-08-28", gatry_id: "36a0e5af",
+     texto: "Robô Aspirador De Pó WAP Robot W90 Pérola Bivolt"}
+  - {id: G090, origem: real_gatry_historico, conjunto: independente, caso: negativo, nota: "WAP W1000", loja: amazon, preco: 1033.9, data: "2026-03-06", gatry_id: "0c37746c",
+     texto: "WAP Robô Aspirador De Pó ROBOT W1000"}
+
+  # ---------------- regressao da fase 4: defeito achado pelo conjunto independente (G008) ----------------
+  - {id: R01, origem: construido, conjunto: regressao, caso: negativo, nota: "Q/f = quente/frio abreviado (achado em G008)", texto: "Ar Condicionado 12k Elgin Eco Inverter III Wi-fi 220V Q/f Branco"}
+  - {id: R02, origem: construido, conjunto: regressao, caso: negativo, nota: "Q&F", texto: "Ar Condicionado Split Elgin Eco Inverter III 18000 BTUs Q&F 220V"}
+  - {id: R03, origem: construido, conjunto: regressao, caso: negativo, nota: "Q / F com espacos", texto: "Ar Condicionado Philco Eco Inverter 18000 BTUs Q / F 220V PAC18FTW"}
+  - {id: R04, origem: construido, conjunto: regressao, caso: positivo, esperado: elgin_12k, nota: "q solto nao pode excluir: so a abreviacao completa", texto: "Ar Condicionado Elgin Eco Inverter III 12000 BTUs Frio 220V HJFC12C2WGCG Qualidade"}
+

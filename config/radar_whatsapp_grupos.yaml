@@ -1,0 +1,26 @@
+# Lista de AUTORIZACAO de grupos de WhatsApp que o radar poderia ler como fonte de ofertas.
+#
+# ESTADO: nenhum grupo autorizado => o radar NAO le nenhum grupo (so ENVIA, ao seu chat proprio).
+# O leitor de grupos ainda nao existe (ver docs/ecossistema/04 e 10): esta lista e a trava de seguranca que ele
+# obedecera. Regras que valem desde ja e sao testadas:
+#   - so le grupo que esteja listado AQUI pelo nome exato (comparacao sem acento/maiusculas);
+#   - conversa privada, numero de telefone como nome e grupos da lista `nunca` sao SEMPRE recusados;
+#   - nunca envia mensagem a grupo, nunca entra em grupo, nunca copia historico;
+#   - le apenas mensagens novas (checkpoint), nada retroativo alem de `retroativo_horas`.
+
+autorizados: []
+# Exemplo (descomente e ajuste o nome EXATO como aparece no seu WhatsApp):
+# - {nome: "Promobit Amazon", habilitado: true}
+
+nunca:                             # sempre recusados, mesmo que alguem os coloque em `autorizados`
+  - "familia"
+  - "igreja"
+  - "ccb"
+  - "5a cia"
+  - "5 cia"
+  - "pmesp"
+  - "batalhao"
+  - "esdra"
+
+max_grupos: 5
+retroativo_horas: 6

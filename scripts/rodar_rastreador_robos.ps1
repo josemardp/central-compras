@@ -1,22 +1,12 @@
+# Atalho de compatibilidade. A logica dos relatorios (robos, ares, chuveiro) agora e do radar:
+#   python -m radar executar relatorios
+# Definicao dos passos, horarios e limites: config/radar_jobs.yaml
+# O radar cuida de trava (sem execucao dupla), timeout por passo, log UTF-8 e fila de reenvio.
+# Este arquivo existe so para quem ainda disparar o caminho antigo (tarefa de outra maquina, atalho manual).
+
 $ErrorActionPreference = "Continue"
-$privadoDir = Join-Path $env:USERPROFILE ".central-compras\dados-privados\rastreador-robos"
-New-Item -ItemType Directory -Force $privadoDir | Out-Null
-$logPath = Join-Path $privadoDir "execucao.log"
-
-$stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-Add-Content -Path $logPath -Value "=== Inicio $stamp ===" -Encoding UTF8
-
-Set-Location "C:\projetos\central-compras"
-& python "C:\projetos\central-compras\scripts\rastrear_robos_bf.py" --enviar-zap *>> $logPath
-$codeRobos = $LASTEXITCODE
-
-& python "C:\projetos\central-compras\scripts\rastrear_ares_bf.py" --enviar-zap *>> $logPath
-$codeAres = $LASTEXITCODE
-
-& python "C:\projetos\central-compras\scripts\rastrear_chuveiro_bf.py" --enviar-zap *>> $logPath
-$codeChuveiro = $LASTEXITCODE
-
-$code = if ($codeRobos -ne 0 -or $codeAres -ne 0 -or $codeChuveiro -ne 0) { 1 } else { 0 }
-$stampFim = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-Add-Content -Path $logPath -Value "=== Fim $stampFim (robos=$codeRobos ares=$codeAres chuveiro=$codeChuveiro exit=$code) ===" -Encoding UTF8
-exit $code
+$raiz = Split-Path -Parent $PSScriptRoot
+Set-Location $raiz
+$env:PYTHONUTF8 = "1"
+& python -m radar executar relatorios
+exit $LASTEXITCODE

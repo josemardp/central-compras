@@ -1,0 +1,161 @@
+# Catalogo canonico dos produtos monitorados pelo radar.
+#
+# Para monitorar um produto novo basta acrescentar um bloco aqui (sem mexer em codigo).
+# Regras de casamento (aplicadas ao titulo/texto da oferta, sem acento e em minusculas):
+#   skus     codigos do fabricante: se aparecer, casa (ainda sujeito a `nenhum` e a tensao/BTU)
+#   todos    lista de expressoes: TODAS precisam aparecer
+#   nenhum   lista de expressoes: NENHUMA pode aparecer (variantes que sao outro produto)
+#   tensao   127 ou 220: oferta que declare so a outra tensao e recusada; as duas juntas viram aviso
+#   btu      capacidade: oferta que declare so outra capacidade e recusada
+#   origem   nacional | importado (importado: aviso quando falar em garantia/paraguai e similares)
+# `chave_rastreador` liga o produto a chave usada nos historicos dos rastreadores atuais.
+
+# Acessorio = a palavra de acessorio e o NUCLEO do titulo (ate a 3a palavra: "Filtro HEPA para...", "2 Panos Mop para...",
+# "Kit de escovas...") ou o texto diz que e compativel com/reposicao. NAO basta a palavra aparecer em qualquer lugar:
+# "Robo Aspirador e Passa Pano ... Limpeza de Sujeiras" e produto completo (falso negativo real de 21/11/2026).
+# `mop` so conta como primeira palavra: "Tapo RV20 Mop" e "Robo Mop Dreame F10" sao ROBOS, nao acessorio.
+acessorio_inicio_regex: '^(?:mops?\b|(?:\S+\s+){0,2}(?:filtros?|escovas?|panos?|refil|refis|reposicao|acessorios?|baterias?|capas?|peliculas?|suportes?|kits?|sacos?|esponjas?|rodas?|reservatorio|tanque)\b)'
+acessorio_compat_regex: '\bcompativel\b|\bcompativeis\b|\bcompat\.|\bp/\s*(?:rob|aspirador)|\b(?:pecas?|item)\s+de\s+reposicao\b'
+
+importado_regex: 'paraguai|importad|versao global|garantia (do )?(vendedor|loja)|sem garantia|\b(us|reu)\b'
+
+produtos:
+  # ---------------- Robos aspiradores ----------------
+  dreame_f10:
+    nome: Dreame F10
+    categoria: robo_aspirador
+    grupo: robos
+    chave_rastreador: dreame_f10
+    origem: nacional
+    todos: ['dreame', '\bf10\b']
+    nenhum: ['f10\s*(pro|plus|max|ultra|combo)', '\bl10\b', '\bx10\b']
+
+  k800_pro_127v:
+    nome: KaBuM Smart K800 Pro 127V
+    categoria: robo_aspirador
+    grupo: robos
+    chave_rastreador: k800_pro_127v
+    origem: nacional
+    tensao: 127
+    skus: ['KSAR81010PT', 'KSAR81010BR']
+    todos: ['k800', '\bpro\b']
+    nenhum: ['k800\s*pro\s*(max|plus)']
+
+  tapo_rv20_max:
+    nome: TP-Link Tapo RV20 Max
+    categoria: robo_aspirador
+    grupo: robos
+    chave_rastreador: tapo_rv20_max
+    origem: nacional
+    todos: ['tapo', 'rv20', '\bmax\b']
+    nenhum: ['rv20\s*mop', 'rv30', 'max\s*plus']
+
+  xiaomi_s40c:
+    nome: Xiaomi Robot Vacuum S40C
+    categoria: robo_aspirador
+    grupo: robos
+    chave_rastreador: xiaomi_s40c
+    origem: nacional
+    todos: ['\bs40c\b']
+
+  xiaomi_s40_pro_py:
+    nome: Xiaomi Robot Vacuum S40 Pro (Paraguai)
+    categoria: robo_aspirador
+    grupo: robos
+    chave_rastreador: xiaomi_s40_pro_py
+    origem: importado
+    moeda: USD
+    skus: ['OV71GL', 'BHR0890US', 'BHR089REU']
+    todos: ['\bs40\s*pro\b']
+
+  # ---------------- Ar-condicionado 12.000 BTU (220V, so frio) ----------------
+  elgin_12k:
+    nome: Elgin Eco Inverter III 12.000 BTU
+    categoria: ar_condicionado
+    grupo: ares_12k
+    chave_rastreador: elgin_12k
+    origem: nacional
+    tensao: 220
+    btu: 12000
+    skus: ['HJFC12C2WGCG']
+    todos: ['elgin', 'eco inverter', '(12\.?000|\b12k\b)', '\biii\b']
+    # Nome alternativo visto na Amazon ("HW Inverter Elgin Eco III"): casa FRACO, sem SKU, com aviso e teto de classificacao.
+    aliases_fracos:
+      - ['elgin', 'eco\s*iii', '(12\.?000|\b12k\b)']
+    nenhum: ['quente', 'hjfq', '\bq\s*[/&]\s*f\b']   # "Q/f" = quente/frio abreviado (achado no conjunto independente, fase 4)
+
+  agratto_12k:
+    nome: Agratto Kyn Top 12.000 BTU
+    categoria: ar_condicionado
+    grupo: ares_12k
+    chave_rastreador: agratto_12k
+    origem: nacional
+    tensao: 220
+    btu: 12000
+    skus: ['KNICST12F-02', 'KNICST12F02']
+    todos: ['agrat{1,2}o', '\bkyn\b', '(12\.?000|\b12k\b)']   # a propria Dufrio escreve "agrato" na URL
+    nenhum: ['quente', '\bq\s*[/&]\s*f\b']   # "Q/f" = quente/frio abreviado (achado no conjunto independente, fase 4)
+
+  midea_lite_12k:
+    nome: Midea AirVolution Lite 12.000 BTU
+    categoria: ar_condicionado
+    grupo: ares_12k
+    chave_rastreador: midea_lite_12k
+    origem: nacional
+    tensao: 220
+    btu: 12000
+    skus: ['42EBVCB12M5']
+    todos: ['midea', 'air\s*-?\s*volution', '\blite\b', '(12\.?000|\b12k\b)']   # "Air Volution" com espaco aparece nas URLs reais
+    nenhum: ['quente', '\bq\s*[/&]\s*f\b']   # "Q/f" = quente/frio abreviado (achado no conjunto independente, fase 4)
+
+  midea_ecomaster_12k:
+    nome: Midea AI Ecomaster 12.000 BTU
+    categoria: ar_condicionado
+    grupo: ares_12k
+    chave_rastreador: midea_ecomaster_12k
+    origem: nacional
+    tensao: 220
+    btu: 12000
+    skus: ['42EZVCA12M5']
+    todos: ['midea', 'ecomaster', '(12\.?000|\b12k\b)']
+    nenhum: ['quente', '\bq\s*[/&]\s*f\b']   # "Q/f" = quente/frio abreviado (achado no conjunto independente, fase 4)
+
+  # ---------------- Ar-condicionado 18.000 BTU (220V, so frio) ----------------
+  philco_18k:
+    nome: Philco Eco Inverter 18.000 BTU
+    categoria: ar_condicionado
+    grupo: ares_18k
+    chave_rastreador: philco_18k
+    origem: nacional
+    tensao: 220
+    btu: 18000
+    skus: ['PAC18FTW']
+    todos: ['philco', 'eco inverter', '(18\.?000|\b18k\b)']
+    nenhum: ['quente', '\bq\s*[/&]\s*f\b']   # "Q/f" = quente/frio abreviado (achado no conjunto independente, fase 4)
+
+  elgin_18k:
+    nome: Elgin Eco Inverter III 18.000 BTU
+    categoria: ar_condicionado
+    grupo: ares_18k
+    chave_rastreador: elgin_18k
+    origem: nacional
+    tensao: 220
+    btu: 18000
+    skus: ['HJFC18C2WHCH']
+    todos: ['elgin', 'eco inverter', '(18\.?000|\b18k\b)', '\biii\b']
+    aliases_fracos:
+      - ['elgin', 'eco\s*iii', '(18\.?000|\b18k\b)']
+    nenhum: ['quente', 'hjfq', '\bq\s*[/&]\s*f\b']   # "Q/f" = quente/frio abreviado (achado no conjunto independente, fase 4)
+
+  # ---------------- Chuveiro ----------------
+  loren_shower_6800_220v:
+    nome: Lorenzetti Loren Shower Eletronico 6800W 220V
+    categoria: chuveiro
+    grupo: chuveiro
+    chave_rastreador: loren_shower_6800_220v
+    origem: nacional
+    tensao: 220
+    # 7510157 e a referencia informada no monitoramento; a confirmar com a embalagem/ficha do fabricante.
+    sku_a_confirmar: '7510157'
+    todos: ['loren\s*shower', 'eletronic', '6800']
+    nenhum: ['7500', 'multitemperaturas?', '5500', '\b127\s*v\b']

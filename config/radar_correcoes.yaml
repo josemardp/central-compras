@@ -1,0 +1,20 @@
+# Correcoes de leituras sabidamente erradas no historico.
+#
+# O historico.jsonl dos rastreadores e append-only e NUNCA e editado. Quando uma leitura
+# se prova defeituosa, ela e corrigida AQUI (versionado, com motivo), e a correcao e
+# aplicada em memoria sempre que o historico e lido (mensagens, menor/maior, estatisticas).
+# `melhor_preco: null` descarta a leitura daquele produto naquela coleta.
+
+correcoes:
+  - origem: rastreador-chuveiro
+    produto: loren_shower_6800_220v
+    coletado_em: "2026-11-20 08:03"
+    melhor_preco: 122.45
+    melhor_onde: "Amazon (Amazon.com.br, frete Gratis) [leitura da Leroy descartada]"
+    motivo: >
+      A coleta registrou R$ 60,65 na Leroy Merlin. O parser da epoca usava o MENOR valor da
+      pagina (inclusive servicos como "Instalacao por R$ ...") como preco do produto. Valor
+      incompativel com as demais fontes da mesma coleta (Amazon R$ 122,45; Zoom R$ 152,99) e
+      com a pagina da Leroy lida em 20/11/2026 18:3x (R$ 127,90 a vista). Parser corrigido em
+      20/11/2026. [VERIFICAR: a pagina das 08:03 nao foi preservada; a causa exata do R$ 60,65 e inferida.]
+      Valor corrigido = melhor total das fontes restantes da propria coleta (Amazon).

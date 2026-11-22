@@ -1,0 +1,81 @@
+# Regras configuraveis de classificacao e de alerta do radar.
+
+# Quem compra: define quais restricoes de cupom contam como atendidas. Mude se for verdade.
+perfil_comprador:
+  primeira_compra: false
+  usa_app: false
+  paga_no_pix: true
+
+classificacao:
+  min_observacoes_historico: 3     # menos que isso: nao se afirma "minimo historico"
+  min_dias_historico: 1
+  fonte_confiavel_nota: 0.0        # reservado
+  critica:
+    queda_vs_mediana_pct: 25       # economia excepcional (exige VALIDADO)
+  alta:
+    ate_pct_acima_do_minimo: 3     # preco ate 3% acima do menor validado, com PROVAVEL ou VALIDADO
+    melhora_vs_atual_pct: 3        # E tem que ser pelo menos 3% abaixo do MELHOR PRECO ATUAL ja monitorado (senao nao e novidade)
+    queda_vs_mediana_pct: 15
+  media:
+    queda_vs_mediana_pct: 5
+
+# Prioridade e ORCAMENTO de notificacoes (fase 4). Substitui o "limite de 6 por ordem de chegada" no fluxo da varredura:
+# cada oferta que passa nos portoes vira candidato com pontuacao 0-100; ao fim do ciclo o despachante rankeia e decide.
+# Explicacao dos pesos e da pontuacao: radar/prioridade.py. Com alertas desligados o resultado e "selecionado_sombra".
+prioridade:
+  orcamento_diario: 6              # alertas comuns (ALTA) por dia
+  orcamento_critico_diario: 3      # CRITICA tem orcamento proprio (pode passar do comum), mas NAO e ilimitado
+  orcamento_excecao_diario: 2      # acima do comum, so para pontuacao >= score_excecao
+  score_minimo: 40                 # abaixo disto nao vira alerta (mesmo sobrando orcamento)
+  score_excecao: 80
+  limiar_ultimo_comum: 65          # a 1a vaga comum do dia pede 40 pontos; a ultima pede 65 (sobe linear). 40 = desliga o limiar
+  max_por_ciclo: 2                 # anti-rajada: no maximo 2 alertas comuns por varredura (10 min)
+  max_criticos_por_ciclo: 2
+  intervalo_mesmo_produto_min: 90  # anti-repeticao: mesmo produto so de novo apos 90 min ...
+  intervalo_critico_mesmo_produto_min: 30
+  melhora_para_repetir_pct: 5      # ... ou se o preco melhorar 5% sobre o ultimo alerta
+  substituicao_delta: 15           # candidato esperando com pontuacao 15 abaixo de um selecionado e substituido
+  validade_candidato_min: 30       # candidato nao enviado vence (oferta pode ter acabado)
+  revalidar_apos_min: 5            # candidato que esperou mais que isto e conferido na fonte antes de ser entregue
+  penalidade_repeticao: 8          # pontos a menos por alerta anterior do mesmo produto nas ultimas 24 h (ate 2)
+  economia_pct_ref: 20             # economia de 20% sobre o melhor preco atual = nota maxima nesse componente
+  economia_reais_ref: 300
+  pesos: {economia_pct: 35, economia_reais: 10, historico: 15, confianca: 20, exatidao: 10, urgencia: 10}
+
+# MODO PILOTO (fase 6). Tres modos: SOMBRA (alertas.enviar false: nada sai), PILOTO (enviar true + homologado_em + piloto.ativo true: so o que passar em
+# TODAS as barreiras abaixo) e COMPLETO (piloto.ativo false: politica inteira). Ver docs/ecossistema/16-plano-de-ativacao.md e 17-piloto.
+piloto:
+  ativo: false                      # so tem efeito com alertas.enviar true E alertas.homologado_em preenchidos (edicao SUA)
+  destinatario_confirmado_em: null  # VOCE preenche (ex.: "2026-11-22 10:30") depois de ver o teste de entrega chegar no SEU chat. Sem isso o piloto nao envia nada
+  produtos_exatos: [dreame_f10, k800_pro_127v, tapo_rv20_max, xiaomi_s40c, elgin_12k, agratto_12k, midea_lite_12k, midea_ecomaster_12k, philco_18k, elgin_18k, loren_shower_6800_220v]
+  confianca_minima: MEDIA           # BAIXA nunca; a confianca (ALTA/MEDIA) e a razao dela aparecem na mensagem
+  exigir_sem_avisos: true           # nenhum aviso: modelo, voltagem, hora incerta, preco que depende de cupom nao confirmado
+  exigir_url: true
+  revalidar_sempre: true            # reconfere a oferta na fonte logo antes de enviar (nao so quando esperou)
+  orcamento_diario: 2               # contra 6 da politica completa
+  orcamento_critico_diario: 1
+  orcamento_excecao_diario: 0
+  max_por_ciclo: 1
+  max_criticos_por_ciclo: 1
+  intervalo_mesmo_produto_min: 240
+  intervalo_critico_mesmo_produto_min: 120
+  melhora_para_repetir_pct: 7
+
+alertas:
+  # ATIVACAO EXPLICITA (21/11/2026): o radar so envia alerta urgente quando `enviar: true` E
+  # `homologado_em` estiver preenchido (data/hora em que o Josemar revisou os alertas em sombra
+  # com `python -m radar alertas`). Nunca ha ativacao automatica por data.
+  # Sem isso, todo alerta e apenas registrado (modo sombra).
+  enviar: false
+  homologado_em: null              # ex.: "2026-11-22 09:00"
+  status_enviaveis: [PROVAVEL, VALIDADO]   # NAO_CONFIRMADO e EXPIRADO nunca saem como alerta urgente
+  ttl_alerta_min: 30               # alerta urgente na fila/em espera: apos isso, so sai se revalidado na fonte
+  ttl_relatorio_horas: 24          # relatorio na fila e descartado depois disso
+  revalidar_antes_de_enviar: true  # reconsulta a oferta na fonte antes de entregar alerta atrasado
+  classes_enviaveis: [CRITICA, ALTA]
+  janela_dedup_horas: 24
+  melhora_minima_pct: 3            # novo alerta do mesmo item so se o preco cair pelo menos isso
+  limite_diario: 6
+  horario: {inicio: "07:00", fim: "23:00"}   # fora dele o alerta aguarda o relatorio programado
+  fontes_so_sombra: []             # fontes que nunca enviam (so registram)
+  idade_maxima_horas: 6            # oferta mais velha que isso nao vira "relampago"

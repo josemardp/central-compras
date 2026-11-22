@@ -24,6 +24,8 @@ try:
 except ImportError:
     import rastrear_robos_bf as rr
 
+from radar import ciclo  # noqa: E402  (o import de rr ja colocou a raiz do repo no sys.path)
+
 PRIVADO_DIR = Path.home() / ".central-compras" / "dados-privados" / "rastreador-ares"
 CONFIG_PATH = PRIVADO_DIR / "config.json"
 ESTADO_PATH = PRIVADO_DIR / "estado.json"
@@ -967,6 +969,7 @@ def main() -> int:
     parser.add_argument("--cep-18k", help="CEP de entrega para o 18.000 BTU (sobrescreve config.json).")
     parser.add_argument("--enviar-zap", action="store_true", help="Envia o resumo pelo nav-zap.")
     parser.add_argument("--primeira-vez", action="store_true", help="Inclui analise inicial.")
+    parser.add_argument("--sem-persistir", action="store_true", help="Teste: nao grava estado, historico nem banco.")
     args = parser.parse_args()
 
     cfg = carregar_config()
@@ -980,27 +983,18 @@ def main() -> int:
         return 2
 
     PRIVADO_DIR.mkdir(parents=True, exist_ok=True)
-    anterior = None
-    if ESTADO_PATH.exists():
-        try:
-            anterior = json.loads(ESTADO_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            anterior = None
-
-    atual = coletar_precos(cep_12k, cep_18k)
-    mensagem = montar_mensagem(atual, anterior, primeira_vez=args.primeira_vez)
-    print(mensagem)
-
-    with HIST_PATH.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(atual, ensure_ascii=False) + "\n")
-
-    ESTADO_PATH.write_text(json.dumps(atual, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    if args.enviar_zap:
-        ok, info = rr.enviar_whatsapp(mensagem)
-        print(f"[ZAP] ok={ok} | {info}")
-        return 0 if ok else 1
-    return 0
+    return ciclo.executar_ciclo(
+        rotulo="ares",
+        origem="rastreador-ares",
+        coletar=lambda: coletar_precos(cep_12k, cep_18k),
+        montar_mensagem=montar_mensagem,
+        estado_path=ESTADO_PATH,
+        hist_path=HIST_PATH,
+        enviar_zap=args.enviar_zap,
+        enviar_fn=rr.enviar_whatsapp,
+        primeira_vez=args.primeira_vez,
+        persistir=not args.sem_persistir,
+    )
 
 
 if __name__ == "__main__":

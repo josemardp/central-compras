@@ -1,1 +1,3 @@
 PyYAML>=6.0
+# Rastreadores de preco (scripts/rastrear_*_bf.py) e envio ao WhatsApp. Chrome instalado no sistema (channel="chrome").
+playwright>=1.40

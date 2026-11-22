@@ -20,6 +20,11 @@ from typing import Any
 
 from playwright.sync_api import sync_playwright
 
+_RAIZ_REPO = Path(__file__).resolve().parents[1]
+if str(_RAIZ_REPO) not in sys.path:
+    sys.path.insert(0, str(_RAIZ_REPO))
+from radar import ciclo, correcoes, trava  # noqa: E402
+
 PRIVADO_DIR = Path.home() / ".central-compras" / "dados-privados" / "rastreador-robos"
 CONFIG_PATH = PRIVADO_DIR / "config.json"
 ESTADO_PATH = PRIVADO_DIR / "estado.json"
@@ -547,7 +552,9 @@ def carregar_historico_jsonl(hist_path: Path) -> list[dict[str, Any]]:
             registros.append(json.loads(linha))
         except Exception:
             continue
-    return registros
+    # Leituras sabidamente erradas sao corrigidas em memoria (config/radar_correcoes.yaml);
+    # o arquivo do historico segue intacto.
+    return correcoes.aplicar(registros, hist_path.parent.name)
 
 
 def calcular_extremos_historico(
@@ -719,9 +726,8 @@ def carregar_destino_config() -> str | None:
     return None
 
 
-def enviar_whatsapp(mensagem: str) -> tuple[bool, str]:
-    garantir_zap_vivo()
-    linhas = mensagem.rstrip("\n").split("\n")
+def _enviar_uma_vez(linhas: list[str]) -> tuple[bool, str]:
+    """Uma tentativa de envio pela aba do WhatsApp Web. So aperta Enter com o texto conferido."""
     norm = lambda x: x.replace("*", "").strip()
 
     with sync_playwright() as p:
@@ -775,6 +781,10 @@ def enviar_whatsapp(mensagem: str) -> tuple[bool, str]:
         if titulo_atual() != destino:
             return False, f"Cabecalho aberto '{titulo_atual()}' difere de '{destino}'."
 
+        try:
+            pg.wait_for_selector('#main footer div[contenteditable="true"]', state="visible", timeout=20000)
+        except Exception:
+            return False, "Caixa de mensagem do WhatsApp nao ficou pronta em 20s."
         box = pg.locator('#main footer div[contenteditable="true"]').first
         box.click()
         pg.keyboard.press("Control+A")
@@ -785,11 +795,16 @@ def enviar_whatsapp(mensagem: str) -> tuple[bool, str]:
                 pg.keyboard.insert_text(linha)
             if i < len(linhas) - 1:
                 pg.keyboard.press("Shift+Enter")
+            if i % 8 == 7:
+                pg.wait_for_timeout(150)  # respiro: o WhatsApp perdia linhas quando a aba estava lenta
         time.sleep(0.8)
 
         obtido = [norm(t) for t in box.locator("p, div[dir]").all_inner_texts() if t.strip()]
         esperado = [norm(l) for l in linhas if l.strip()]
         if obtido != esperado:
+            box.click()
+            pg.keyboard.press("Control+A")
+            pg.keyboard.press("Backspace")  # nao deixa rascunho pela metade na conversa
             return False, f"Texto digitado divergiu do esperado ({len(obtido)} vs {len(esperado)} linhas)."
 
         pg.keyboard.press("Enter")
@@ -799,34 +814,60 @@ def enviar_whatsapp(mensagem: str) -> tuple[bool, str]:
         return True, f"Enviado para '{destino}' | caixa_vazia={caixa_vazia} | ultima='{ultima}'"
 
 
+# Erros de configuracao nao se resolvem repetindo a tentativa.
+_ERROS_SEM_RETENTATIVA = ("nao encontrada", "nao configurado", "difere de")
+
+
+def enviar_whatsapp(mensagem: str, tentativas: int = 3) -> tuple[bool, str]:
+    """Envia ao chat proprio com ate `tentativas` tentativas (so envia texto conferido, sem duplicar)."""
+    try:
+        # Um envio por vez na aba compartilhada: relatorio e alerta urgente nao podem digitar ao mesmo tempo.
+        with trava.aguardar("whatsapp-envio", espera_max_s=300):
+            return _enviar_com_retentativas(mensagem, tentativas)
+    except trava.TravaOcupada:
+        return False, "WhatsApp ocupado por outro envio ha mais de 5 min"
+
+
+def _enviar_com_retentativas(mensagem: str, tentativas: int) -> tuple[bool, str]:
+    garantir_zap_vivo()
+    linhas = mensagem.rstrip("\n").split("\n")
+    info = "sem tentativa"
+    feitas = 0
+    for n in range(1, tentativas + 1):
+        feitas = n
+        try:
+            ok, info = _enviar_uma_vez(linhas)
+        except Exception as exc:  # noqa: BLE001 - conexao CDP caida, aba recarregando etc.
+            ok, info = False, f"excecao no envio: {str(exc)[:160]}"
+        if ok:
+            return True, info + (f" | tentativa {n}" if n > 1 else "")
+        if any(t in info.lower() for t in _ERROS_SEM_RETENTATIVA):
+            break
+        if n < tentativas:
+            time.sleep(8 * n)
+    return False, f"{info} (apos {feitas} tentativa(s))"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Rastreador de precos dos 4 robos aspiradores.")
     parser.add_argument("--enviar-zap", action="store_true", help="Envia o resumo pelo nav-zap.")
     parser.add_argument("--primeira-vez", action="store_true", help="Inclui analise pre-Black Friday.")
+    parser.add_argument("--sem-persistir", action="store_true", help="Teste: nao grava estado, historico nem banco.")
     args = parser.parse_args()
 
     PRIVADO_DIR.mkdir(parents=True, exist_ok=True)
-    anterior = None
-    if ESTADO_PATH.exists():
-        try:
-            anterior = json.loads(ESTADO_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            anterior = None
-
-    atual = coletar_precos()
-    mensagem = montar_mensagem(atual, anterior, primeira_vez=args.primeira_vez)
-    print(mensagem)
-
-    with HIST_PATH.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(atual, ensure_ascii=False) + "\n")
-
-    ESTADO_PATH.write_text(json.dumps(atual, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    if args.enviar_zap:
-        ok, info = enviar_whatsapp(mensagem)
-        print(f"[ZAP] ok={ok} | {info}")
-        return 0 if ok else 1
-    return 0
+    return ciclo.executar_ciclo(
+        rotulo="robos",
+        origem="rastreador-robos",
+        coletar=coletar_precos,
+        montar_mensagem=montar_mensagem,
+        estado_path=ESTADO_PATH,
+        hist_path=HIST_PATH,
+        enviar_zap=args.enviar_zap,
+        enviar_fn=enviar_whatsapp,
+        primeira_vez=args.primeira_vez,
+        persistir=not args.sem_persistir,
+    )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,77 @@
+# Definicao central dos jobs e agendamentos de compras (fonte de verdade).
+#
+# O Agendador do Windows so DISPARA; o que roda, em que ordem e com qual limite
+# e definido aqui. Aplicar no Windows:  python -m radar agendar --aplicar
+# Ver o estado real:                    python -m radar agendar --status
+#
+# Fuso: America/Sao_Paulo (o Windows desta maquina ja usa o horario de Brasilia).
+
+fuso: America/Sao_Paulo
+
+jobs:
+  relatorios:
+    descricao: "Relatorios RASTREIO ROBOS, ARES e CHUVEIRO enviados ao WhatsApp"
+    trava: relatorios
+    continuar_apos_falha: true   # falha nos robos nao impede ares e chuveiro
+    passos:
+      - id: robos
+        comando: ["{python}", "scripts/rastrear_robos_bf.py", "--enviar-zap"]
+        timeout_min: 14
+      - id: ares
+        comando: ["{python}", "scripts/rastrear_ares_bf.py", "--enviar-zap"]
+        timeout_min: 14
+      - id: chuveiro
+        comando: ["{python}", "scripts/rastrear_chuveiro_bf.py", "--enviar-zap"]
+        timeout_min: 10
+
+  varredura:
+    descricao: "Descoberta incremental de ofertas e cupons (fontes publicas) e alertas urgentes"
+    trava: varredura
+    continuar_apos_falha: false
+    passos:
+      # Antes de varrer: se um relatorio programado ficou sem execucao (notebook suspenso etc.), dispara a tarefa dele.
+      - id: recuperar
+        comando: ["{python}", "-m", "radar", "recuperar"]
+        timeout_min: 2
+      - id: varrer
+        comando: ["{python}", "-m", "radar", "varrer"]
+        timeout_min: 6
+
+  # JANELA BLACK FRIDAY (26 a 30/11/2026): so o Promobit, deslocado 5 min da varredura normal. Usa a MESMA trava `varredura`: nunca roda em
+  # cima de outra varredura. As outras fontes nao sao tocadas. A tarefa tem inicio e fim: expira e se apaga sozinha.
+  varredura_promobit_bf:
+    descricao: "Promobit a cada 5 min na Black Friday (so essa fonte)"
+    trava: varredura
+    continuar_apos_falha: false
+    passos:
+      - id: varrer_promobit
+        comando: ["{python}", "-m", "radar", "varrer", "--so", "promobit"]
+        timeout_min: 4
+
+agendamentos:
+  # O nome da tarefa e preservado para nao criar uma segunda tarefa de relatorios.
+  - tarefa: "Central Compras - Rastrear Robos BF"
+    job: relatorios
+    horarios: ["08:00", "14:00", "20:00"]
+    limite_execucao_min: 60        # antes era 10 min: a rodada de 20/11 14:34 levou 11,5 min e foi morta
+    iniciar_se_perdida: true
+    recuperar_ate_horas: 6          # varredura recupera o slot perdido se ainda faltar menos de 6 h (21/11: StartWhenAvailable falhou)
+    habilitada: true
+
+  - tarefa: "Central Compras - Radar Varredura"
+    job: varredura
+    a_cada_min: 10
+    limite_execucao_min: 8
+    iniciar_se_perdida: false      # varredura atrasada nao precisa ser recuperada
+    habilitada: true
+
+  # Criada so quando voce rodar `python -m radar agendar --aplicar --job varredura_promobit_bf` (antes disso nao existe no Windows). Dispara em :05, :15, :25... (a normal em :00, :10...)
+  - tarefa: "Central Compras - Radar Promobit BF"
+    job: varredura_promobit_bf
+    a_cada_min: 10
+    deslocamento_min: 5
+    inicio: "2026-11-26 00:05"
+    fim: "2026-12-01 00:00"          # EndBoundary: depois disso a tarefa nao dispara mais e e apagada em 24 h (DeleteExpiredTaskAfter)
+    limite_execucao_min: 4
+    iniciar_se_perdida: false
+    habilitada: true

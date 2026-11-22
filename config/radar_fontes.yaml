@@ -1,0 +1,71 @@
+# Fontes de ofertas e cupons da varredura incremental. Detalhes e resultado dos testes:
+# docs/ecossistema/04-matriz-de-fontes.md
+#
+# Regra: so fontes publicas, sem login e sem burlar bloqueio. Intervalos respeitam o site
+# (varredura roda a cada 10 min, mas cada fonte so e consultada quando "vence" o seu intervalo).
+
+fontes:
+  promobit:
+    habilitada: true
+    intervalo_min: 10
+    paginas_recentes: 5            # /promocoes/recentes/ por CURSOR (?after=), 12 ofertas por pagina (~60 itens, ~40 min de cobertura)
+                                   # medido em 21/11/2026: 1 pagina = 9 min, 2 = 16 min; o ciclo e de 10 min, entao 2 deixava buraco
+    lojas: [amazon, kabum]         # /promocoes/loja/<slug>/ (ofertas + cupons da loja); 404 e tolerado
+    # BLACK FRIDAY: de 26/11 00:00 a 30/11 23:59 (por DATA) o Promobit e lido a cada 5 min. MANTEM as 5 paginas: no pico a lista inteira cobre so ~14 min
+    # (medido em 21/11), entao reduzir paginas deixaria buraco. Custo: ~7 requisicoes por leitura (84 por hora, uma a cada ~43 s).
+    # Passou o `ate`, a leitura volta SOZINHA ao normal (10 min): nao ha nada para desligar. As outras fontes NAO mudam.
+    janela_intensiva:
+      de: "2026-11-26 00:00"
+      ate: "2026-11-30 23:59"
+      intervalo_min: 5
+
+  gatry:                           # API JSON publica /v1/promotions (robots.txt: "Allow: /v1/"); 4 requisicoes por ciclo
+    habilitada: true
+    intervalo_min: 10
+    paginas_promocoes: 3           # 10 itens por pagina (limite da API)
+
+  pelando:                         # HTML sem navegador (/recentes). O WAF bloqueia Chrome automatizado: NAO contornado.
+    habilitada: true
+    intervalo_min: 15
+
+  hardmob:
+    habilitada: true
+    intervalo_min: 10
+    hora_por_primeira_vista: true  # a lista NAO traz hora: registra first_seen_at (hora em que o RADAR viu) so para ids MAIORES que a marca.
+                                   # published_at continua vazio: a oferta fica com HORA INCERTA, nunca e "relampago" e perde a pontuacao de urgencia.
+    cobertura_estimada_min: 120    # ESTIMATIVA (sem medida: a fonte nao informa hora). Janela sem leitura maior que isto = lacuna.
+
+  meliuz:                          # cupons por loja (texto da pagina publica)
+    habilitada: true
+    intervalo_min: 90
+    lista_estatica: true           # cupom de loja dura dias e nao tem hora de postagem: "lacuna de coleta" nao se aplica
+    lojas:
+      amazon: cupom-desconto-amazon
+      kabum: cupom-desconto-kabum
+      magalu: cupom-desconto-magazine-luiza
+      mercadolivre: cupom-desconto-mercado-livre
+      leroy: cupom-desconto-leroy-merlin
+      dufrio: cupom-desconto-dufrio
+
+  telegram_publico:                # canais com pagina publica t.me/s/<usuario>
+    habilitada: true
+    intervalo_min: 5
+    # Cada canal so e lido se o titulo da pagina contiver `titulo_contem` (protege contra handle de terceiro:
+    # t.me/s/promobit, por exemplo, serve o canal "OFERTAS PC GAMER", que NAO e o Promobit).
+    # Para canais em que voce e membro e que nao tem pagina publica e preciso sessao de usuario Telegram
+    # (ver docs/ecossistema/09-manual-operacional.md). Acrescente aqui canais confirmados:
+    canais: []
+    # - {usuario: exemplo_canal, titulo_contem: "Exemplo", habilitado: true}
+
+  telegram_usuario:                # SUA conta (sessao propria do radar; so leitura). Precisa de `radar telegram-login` feito por voce.
+    habilitada: true               # com `canais: []` nada e aberto e o relatorio mostra "NAO CONFIGURADA"
+    intervalo_min: 5
+    max_mensagens_por_canal: 50
+    primeira_leitura_so_marca: true   # 1a vez: grava o checkpoint e NAO despeja historico antigo como novidade
+    # Lista de autorizados: gere com `python -m radar telegram-listar` e cole so os que quiser.
+    # (nunca conversa privada; nunca grupo que voce nao listou)
+    canais: []
+    # - {id: -1001234567890, nome: "Nome do canal", habilitado: true}
+
+  # Sem acesso automatizavel permitido/viavel (ver matriz de fontes): x, instagram, facebook (login/anti-bot/API paga),
+  # keepa (API paga), buscape/zoom (cobertos pelos rastreadores).

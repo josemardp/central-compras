@@ -23,6 +23,24 @@ class RastrearChuveiroTest(unittest.TestCase):
         self.assertEqual(res["frete_valor"], 24.90)
         self.assertEqual(res["total"], 152.80)
 
+    def test_parse_leroy_ignora_servico_de_instalacao(self):
+        """Regressao de 20/11/2026: o menor valor da pagina (instalacao R$ 89,90) virava o preco do chuveiro."""
+        texto = (
+            "Chuveiro Eletrico Eletronico 220V 6800w Branco Quadrado Loren Shower Lorenzetti\n"
+            "CÓD. 91697823\n"
+            "Descrição\n"
+            "R$ 127,90\nà vista\nR$ 136,06\na prazo\nem até 6x no cartão Celebre!\n"
+            "Vendido e entregue por LEROY MERLIN\n"
+            "Instalação por R$ 89,90 à vista ou parcelado, com 1 ano(s) de garantia. Saiba mais\n"
+            "Calcule seu frete\n"
+        )
+        res = rc._parse_leroy_texto(texto)
+        self.assertEqual(res["preco_avista"], 127.90)
+
+    def test_parse_leroy_sem_rotulo_a_vista_ainda_ignora_instalacao(self):
+        texto = "R$ 127,90\nR$ 136,06\nInstalação por R$ 60,65 à vista\n"
+        self.assertEqual(rc._parse_leroy_texto(texto)["preco_avista"], 127.90)
+
     def test_carregar_cep_fallback_endereco(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
