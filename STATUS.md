@@ -11,6 +11,14 @@
 - Para reposição, [plástica fina 25×35 cm, 1.000 por R$ 34,00](https://diegodoces.com.br/products/sacola-plastica-alca-camiseta-branca-com-1000-unidades) para itens leves e [kraft 15×20×7 cm, 50 por R$ 31,32 no Pix](https://loja.sandraembalagens.com.br/sacolas-kraft-pequena-delivery-lanches-15x20x7-50-unid) para presentes pequenos.
 - [ ] Se a compra avançar, conferir o encaixe dos kits, estoque e frete no carrinho. Comparar o total com retirada na Emballê em Araçatuba.
 
+## Sessão 22/11/2026 (tarde, parte 2): radar, repetição entre fontes, queda relevante e reavaliação
+
+- **Regra nova do piloto** (aprovada pelo Josemar): dentro dos 240 min, novo alerta do mesmo produto também sai com queda de **3% E R$ 100 ou mais** sobre o último preço alertado (mesma loja ou loja desconhecida), com produto exato, fonte revalidada e limites do piloto. Chaves `piloto.queda_extra_pct: 3` e `piloto.queda_extra_reais: 100`; a política completa não muda. Mesmo preço de outra fonte não libera.
+- **Reavaliação:** oferta suprimida por repetição que continua no ar sem mudar de preço agora é reavaliada quando a janela acaba (uma vez por janela), passando de novo por porta de 24 h, revalidação, orçamento e limites. Oferta velha (mais de 6 h), encerrada ou fora da lista não gera alerta retroativo.
+- **Dois defeitos achados e corrigidos:** (1) a porta de 24 h não achava o alerta anterior quando a oferta tinha loja, porque o despachante registrava o alerta sem loja; agora registra com a loja da oferta (mesmos alertas enviados, mas quedas pequenas são barradas na porta); (2) queda de exatamente 7,00% não liberava por erro de ponto flutuante.
+- **Lacuna que continua (não alterada):** Pelando e Telegram NÃO geram alerta no piloto, porque só Promobit e Gatry sabem se revalidar e o piloto revalida sempre (`expirado: fonte ... nao permite revalidar`). Os 3 canais de Telegram servem para descoberta e comparação; o alerta sai se a mesma oferta estiver no Promobit ou no Gatry. Decisão pendente do Josemar: aceitar assim, ou criar uma forma de revalidar a oferta do Telegram/Pelando.
+- **Testes:** 20 (deduplicação entre fontes) + 27 (regra nova e reavaliação), 12 de 12 mutações pegas; suíte do radar 418 OK. Aplicado no código vivo às 13:20, entre duas varreduras, com backup em `dados-privados/radar/backups/pre-repeticao-*`. Piloto, agendamentos e `operacao.yaml` intactos.
+
 ## Sessão 22/11/2026 (tarde): radar, Telegram ligado e 3 canais públicos no piloto
 
 - **Telegram autenticado** (sessão própria do radar, separada do Coral) por QR code, porque o código por mensagem não chegou. Credenciais e sessão em `~/.central-compras/dados-privados/radar/telegram/` (fora do Git). A conta autorizada não tem nenhum canal listado, então `telegram_usuario.canais` segue vazio e o radar não abre nenhuma conversa privada. Lista de sessões do Telegram conferida: a única nova do dia é a do radar ("radarc"); a tentativa por código não criou sessão.

@@ -224,7 +224,14 @@ def processar_oferta(
 
     oferta_id, mudou = _upsert_oferta(con, of, produto, cupom_exib, calc, classe, score, motivo, agora)
     fresca = idade_ref is not None and idade_ref <= limite_h
-    if not (mudou and fresca) or calc.get("preco_final") is None:
+    reavaliar = False
+    if diferir and not mudou and fresca and calc.get("preco_final") is not None:
+        al = regras.get("alertas", {})
+        real = bool(enviar_fn is not None and al.get("enviar") and al.get("homologado_em"))
+        reavaliar = prioridade.suprimido_pronto_para_reavaliar(con, oferta_id, regras, agora, real)
+        if reavaliar:
+            resumo["reavaliada"] = True
+    if not ((mudou or reavaliar) and fresca) or calc.get("preco_final") is None:
         resumo["acao"] = "sem_alerta"
         resumo["descarte"] = ("sem_preco_final" if calc.get("preco_final") is None
                               else ("hora_incerta_sem_evidencia_de_novidade" if hora_incerta else "oferta_antiga") if not fresca

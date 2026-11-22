@@ -29,7 +29,7 @@ Cada oferta só vira mensagem se passar em **todas**. O que não passa fica regi
 | alertas críticos por dia | **1** | 3 |
 | alertas de exceção por dia | **0** | 2 |
 | por varredura (10 min) | **1 no TOTAL**, de qualquer categoria (o crítico tem preferência; o comum espera o próximo ciclo) | 2 comuns e 1 crítico, por categoria |
-| mesmo produto de novo | só após **4 h** ou melhora de **7%** | 90 min ou 5% |
+| mesmo produto de novo | só após **4 h**, ou melhora de **7%**, ou queda de **3% com R$ 100 ou mais** de economia | 90 min ou 5% |
 
 Quando o orçamento acaba, o que sobrar fica `retida_orcamento` (visível, não some).
 
@@ -57,6 +57,29 @@ Três níveis que nunca se misturam:
 5. O destino do WhatsApp só é confirmado por você.
 
 O piloto limita o dano: no pior caso, 2 alertas por dia, de produto exato, sem aviso, com a fonte revalidada no envio.
+
+## Repetição entre fontes, limites de 3% e 7% e reavaliação (corrigido em 22/11/2026)
+
+Testes: `tests/test_radar_dedup_entre_fontes.py` (deduplicação entre fontes, 20 testes) e `tests/test_radar_repeticao_melhora_relevante.py` (regra nova e reavaliação, 27 testes). Banco temporário, nenhum envio real.
+
+**A mesma oferta em várias fontes (Pelando site, Pelando Telegram, Promobit) não gera notificação duplicada.** Quatro camadas:
+1. **No mesmo ciclo:** só a melhor oferta de cada produto segue; as outras viram `substituido`.
+2. **Porta de 24 h** (`alertas.gates`): chave `produto + loja + vendedor`, sem a fonte. Libera de novo só com queda de pelo menos **3%**, cupom novo ou cupom validado.
+3. **Anti-repetição do produto** (despachante): olha só o produto. No piloto: **240 min**, ou queda de **7%**, ou a exceção abaixo.
+4. **Travas do piloto:** 1 alerta por varredura no total e 2 comuns + 1 crítico por dia.
+
+**Regra nova do piloto (`piloto.queda_extra_pct: 3` e `piloto.queda_extra_reais: 100`):** dentro dos 240 min, um novo alerta do mesmo produto também sai quando o preço cai **pelo menos 3% E pelo menos R$ 100** sobre o último preço alertado, com preço comparável (mesma loja, ou loja desconhecida de um dos lados). Produto exato, sem avisos, fonte revalidada, orçamento e limite por varredura continuam valendo. Mesmo preço de outra fonte não tem queda e não libera nada. A política completa não muda (a regra só liga no piloto). Exemplos: de R$ 3.300 para R$ 3.201 (R$ 99) segue suprimido; para R$ 3.200 (R$ 100) alerta. De R$ 1.700 para R$ 1.598 (6%, R$ 102) alerta; para R$ 1.632 (4%, R$ 68) segue suprimido.
+
+**Reavaliação do candidato suprimido:** a oferta suprimida por repetição que continua no ar **sem mudar de preço** não é mais descartada como `sem_mudanca_desde_a_ultima_vez`. Quando a janela do produto acaba (240 min no piloto, 90 min na completa), ela vira um novo candidato e passa de novo por tudo: porta de 24 h (3%), revalidação na fonte, orçamento, limite por varredura e anti-repetição. Reavalia **uma vez por janela**. Oferta velha demais (mais de 6 h), encerrada na fonte ou fora da lista da fonte não gera alerta retroativo.
+
+**Dois defeitos achados e corrigidos no caminho:**
+- **Porta de 24 h inoperante com loja conhecida.** O despachante registrava o alerta enviado com loja e vendedor vazios, mas a porta procura o alerta anterior pela família com a loja da oferta. Com loja conhecida ela nunca achava nada, e só a janela de 240 min segurava repetições. Agora o alerta é registrado com a loja e o vendedor da oferta. Efeito visível: uma queda pequena (por exemplo 1,8%) é barrada na porta de 24 h, e não mais como `suprimido_repeticao`; os alertas enviados são os mesmos.
+- **Borda dos 7%.** Uma queda de exatamente 7,00% (R$ 1.000 para R$ 930) não liberava, por erro de arredondamento de ponto flutuante. A comparação agora é feita em reais, com a borda inclusiva.
+
+**Lacunas que continuam (não alteradas):**
+- **Pelando e Telegram não geram alerta no piloto.** Na varredura real o piloto revalida a fonte antes de enviar, e só Promobit e Gatry sabem se revalidar. Uma oferta que só aparece no Telegram ou no Pelando vira `expirado: fonte ... nao permite revalidar`. Esses canais servem para descoberta, deduplicação e comparação; o alerta sai quando a mesma oferta está no Promobit ou no Gatry.
+- **Porta de 24 h e oferta sem loja.** Uma oferta sem loja (o Telegram) não casa com o alerta de uma loja nessa porta. No piloto real isso não vaza, pelo motivo acima.
+- **Nenhuma fonte informa o vendedor** (todas deixam vazio), então a família é `produto + loja`. Grafias diferentes da mesma loja entre fontes não se casam.
 
 ## Primeiros envios: o que olhar
 

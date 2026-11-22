@@ -61,6 +61,8 @@ piloto:
   intervalo_mesmo_produto_min: 240
   intervalo_critico_mesmo_produto_min: 120
   melhora_para_repetir_pct: 7
+  queda_extra_pct: 3               # dentro da janela de repeticao, queda de pelo menos 3% ...
+  queda_extra_reais: 100           # ... E de pelo menos R$ 100 sobre o ultimo preco alertado libera um novo alerta (mesma loja ou loja desconhecida)
 
 alertas:
   # ATIVACAO EXPLICITA (21/11/2026): o radar so envia alerta urgente quando `enviar: true` E

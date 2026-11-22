@@ -39,7 +39,10 @@ class SimulacaoTest(unittest.TestCase):
         s = self.sit["S3"]
         env = s["precos_enviados"]
         self.assertTrue(all(b <= a * 0.95 for a, b in zip(env, env[1:])), env)
-        self.assertEqual(s["estados_finais"].get("suprimido_repeticao"), 2)
+        # Os mesmos 3 alertas de antes (R$ 1.100, 1.000 e 940). A queda pequena de R$ 1.080 (1,8%) agora e barrada ja na porta de 24 h (o alerta
+        # enviado e registrado com a loja da oferta e a porta o encontra), entao so a de R$ 1.060 (3,6%) chega a candidato e e suprimida.
+        self.assertEqual(s["estados_finais"].get("suprimido_repeticao"), 1)
+        self.assertEqual(s["precos_enviados"], [1100.0, 1000.0, 940.0])
 
     def test_mesmo_cupom_em_varias_comunidades_gera_uma_notificacao(self):
         self.assertEqual(self.sit["S4"]["mensagens_enviadas"], 1)

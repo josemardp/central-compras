@@ -42,6 +42,8 @@ PADRAO: dict[str, Any] = {
     "intervalo_mesmo_produto_min": 90,
     "intervalo_critico_mesmo_produto_min": 30,
     "melhora_para_repetir_pct": 5,
+    "queda_extra_pct": None,         # None = desligado (politica completa). O piloto usa 3: dentro da janela de repeticao, queda de pelo menos 3% ...
+    "queda_extra_reais": None,       # ... E economia de pelo menos R$ 100 sobre o ultimo preco alertado libera novo alerta do mesmo produto
     "substituicao_delta": 15,
     "validade_candidato_min": 30,
     "revalidar_apos_min": 5,
@@ -164,11 +166,35 @@ def _usados_hoje(con: sqlite3.Connection, agora: dt.datetime) -> dict[str, int]:
 
 
 def _ultimo_alerta(con: sqlite3.Connection, produto: str) -> sqlite3.Row | None:
-    return con.execute("SELECT preco, enviado_em FROM alertas WHERE produto=? AND modo IN ('real','sombra') ORDER BY id DESC LIMIT 1", (produto,)).fetchone()
+    return con.execute("SELECT a.preco, a.enviado_em, o.loja FROM alertas a LEFT JOIN ofertas o ON o.id = a.oferta_id "
+                       "WHERE a.produto=? AND a.modo IN ('real','sombra') ORDER BY a.id DESC LIMIT 1", (produto,)).fetchone()
 
 
-def _repete(ult: sqlite3.Row | None, preco: float, agora: dt.datetime, intervalo_min: float, melhora_pct: float) -> bool:
-    """True se for REPETICAO: mesmo produto dentro do intervalo e sem melhora relevante sobre o ultimo alerta."""
+def _loja_e_vendedor(con: sqlite3.Connection, c: sqlite3.Row) -> tuple[str | None, str | None]:
+    """Loja e vendedor da OFERTA do candidato. O alerta tem de ser registrado com eles: a porta de 24 h (`alertas.gates`) procura o alerta
+    anterior pela familia produto+loja+vendedor, e registrar com loja/vendedor vazios a deixava sem achar nada quando a oferta tinha loja."""
+    if c["oferta_id"] is None:
+        return None, None
+    r = con.execute("SELECT loja, vendedor FROM ofertas WHERE id=?", (c["oferta_id"],)).fetchone()
+    return (r["loja"], r["vendedor"]) if r else (None, None)
+
+
+def _loja_do_candidato(con: sqlite3.Connection, c: sqlite3.Row) -> str | None:
+    return _loja_e_vendedor(con, c)[0]
+
+
+def _mesma_loja_ou_desconhecida(a: str | None, b: str | None) -> bool:
+    """Preco comparavel: lojas diferentes e CONHECIDAS nos dois lados nao se comparam (o Telegram nao informa loja: vale como desconhecida)."""
+    return not a or not b or a.strip().lower() == b.strip().lower()
+
+
+def _repete(ult: sqlite3.Row | None, preco: float, agora: dt.datetime, intervalo_min: float, melhora_pct: float, *,
+            queda_extra_pct: float | None = None, queda_extra_reais: float | None = None, loja: str | None = None) -> bool:
+    """True se for REPETICAO: mesmo produto dentro do intervalo e sem melhora relevante sobre o ultimo alerta.
+
+    Melhora relevante = queda de `melhora_pct` (7% no piloto) OU, quando configurado, queda adicional de pelo menos `queda_extra_pct` (3%) E
+    economia de pelo menos `queda_extra_reais` (R$ 100) sobre o ultimo preco alertado, com preco comparavel (mesma loja ou loja desconhecida).
+    Mesmo preco de outra fonte nunca libera nada: nao ha queda."""
     if ult is None:
         return False
     try:
@@ -177,7 +203,39 @@ def _repete(ult: sqlite3.Row | None, preco: float, agora: dt.datetime, intervalo
         return False
     if idade_min >= intervalo_min:
         return False
-    return not (ult["preco"] and preco <= float(ult["preco"]) * (1 - melhora_pct / 100.0))
+    if not ult["preco"]:
+        return True
+    ultimo = float(ult["preco"])
+    queda = round(ultimo - preco, 2)
+    if queda >= round(ultimo * melhora_pct / 100.0, 2):             # borda inclusiva ("7% ou mais"), sem o erro de ponto flutuante de 1 - 7/100
+        return False
+    if queda_extra_pct is not None and queda_extra_reais is not None and _mesma_loja_ou_desconhecida(ult["loja"], loja):
+        if queda >= float(queda_extra_reais) and queda >= round(ultimo * float(queda_extra_pct) / 100.0, 2):
+            return False
+    return True
+
+
+def suprimido_pronto_para_reavaliar(con: sqlite3.Connection, oferta_id: int, regras: dict[str, Any], agora: dt.datetime, real: bool = False) -> bool:
+    """True se o ULTIMO candidato desta oferta foi suprimido por repeticao e a janela de repeticao do produto ja acabou.
+
+    Serve para a oferta que continua no ar SEM mudar de preco: sem isto ela seria descartada como `sem_mudanca_desde_a_ultima_vez` e o alerta
+    da queda que foi segurada nunca sairia. So reavalia uma vez por janela (depois disso o ultimo candidato deixa de ser o suprimido). A
+    reavaliacao so cria um NOVO candidato; ele passa de novo por todos os portoes, revalidacao na fonte, limites e anti-repeticao."""
+    c = con.execute("SELECT produto, classe, estado FROM candidatos_alerta WHERE oferta_id=? ORDER BY id DESC LIMIT 1", (oferta_id,)).fetchone()
+    if c is None or c["estado"] != "suprimido_repeticao":
+        return False
+    p = config(regras)
+    if real and piloto.modo(regras) == "PILOTO":
+        p = {**p, **piloto.limites_prioridade(piloto.config(regras))}
+    intervalo = float(p["intervalo_critico_mesmo_produto_min" if c["classe"] == "CRITICA" else "intervalo_mesmo_produto_min"])
+    ult = _ultimo_alerta(con, c["produto"])
+    if ult is None:
+        return True
+    try:
+        idade_min = (agora - dt.datetime.strptime(ult["enviado_em"], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60.0
+    except ValueError:
+        return False
+    return idade_min >= intervalo
 
 
 # ------------------------------------------------------------------ despachante
@@ -264,7 +322,8 @@ def despachar(
             if n_crit_ciclo >= int(p["max_criticos_por_ciclo"]):
                 restantes.append(c)  # fica para o proximo ciclo (anti-rajada)
                 continue
-            if _repete(ult, c["preco_final"], agora, float(p["intervalo_critico_mesmo_produto_min"]), float(p["melhora_para_repetir_pct"])):
+            if _repete(ult, c["preco_final"], agora, float(p["intervalo_critico_mesmo_produto_min"]), float(p["melhora_para_repetir_pct"]),
+                       queda_extra_pct=p.get("queda_extra_pct"), queda_extra_reais=p.get("queda_extra_reais"), loja=_loja_do_candidato(con, c)):
                 reg(c, "suprimido_repeticao", f"CRITICO repetido: ja houve alerta deste produto ha menos de {p['intervalo_critico_mesmo_produto_min']} min sem melhora de {p['melhora_para_repetir_pct']}%")
                 continue
             if total_max and n_ciclo + n_crit_ciclo >= total_max:
@@ -275,7 +334,8 @@ def despachar(
             if c["score"] < float(p["score_minimo"]):
                 reg(c, "nao_selecionado", f"pontuacao {c['score']:.0f} abaixo do minimo {p['score_minimo']}")
                 continue
-            if _repete(ult, c["preco_final"], agora, float(p["intervalo_mesmo_produto_min"]), float(p["melhora_para_repetir_pct"])):
+            if _repete(ult, c["preco_final"], agora, float(p["intervalo_mesmo_produto_min"]), float(p["melhora_para_repetir_pct"]),
+                       queda_extra_pct=p.get("queda_extra_pct"), queda_extra_reais=p.get("queda_extra_reais"), loja=_loja_do_candidato(con, c)):
                 reg(c, "suprimido_repeticao", f"repeticao: alerta deste produto ha menos de {p['intervalo_mesmo_produto_min']} min sem melhora de {p['melhora_para_repetir_pct']}%")
                 continue
             limiar = limiar_do_momento(p, usados["comum"])
@@ -323,9 +383,10 @@ def despachar(
 
 def _entregar(con, c, orc, real, enviar_fn, regras, agora, reg) -> None:
     motivo = f"orcamento:{orc}"
+    loja_c, vend_c = _loja_e_vendedor(con, c)
     if not real:
         reg(c, "selecionado_sombra", motivo + " (sombra: nada enviado)")
-        alertas.registrar(con, oferta_id=c["oferta_id"], produto=c["produto"], loja=None, vendedor=None, cupom=c["cupom"], preco=c["preco_final"],
+        alertas.registrar(con, oferta_id=c["oferta_id"], produto=c["produto"], loja=loja_c, vendedor=vend_c, cupom=c["cupom"], preco=c["preco_final"],
                           url=c["url"], classe=c["classe"], status=c["status_cupom"] or "", modo="sombra", detalhe=f"{motivo} | prioridade {c['score']:.0f}", agora=agora)
         return
     inicio = dt.datetime.now()
@@ -350,7 +411,7 @@ def _entregar(con, c, orc, real, enviar_fn, regras, agora, reg) -> None:
                           ttl_min=float(regras.get("alertas", {}).get("ttl_alerta_min", outbox.TTL_ALERTA_MIN)))
         latencia.registrar("alerta_na_fila", cid=c["id"], enfileirado_em=dt.datetime.now().strftime("%H:%M:%S"), motivo=str(info)[:120])
         modo = "falha"
-    alertas.registrar(con, oferta_id=c["oferta_id"], produto=c["produto"], loja=None, vendedor=None, cupom=c["cupom"], preco=c["preco_final"],
+    alertas.registrar(con, oferta_id=c["oferta_id"], produto=c["produto"], loja=loja_c, vendedor=vend_c, cupom=c["cupom"], preco=c["preco_final"],
                       url=c["url"], classe=c["classe"], status=c["status_cupom"] or "", modo=modo, detalhe=f"{motivo} | {info if not ok else 'enviado'}", agora=agora)
 
 
