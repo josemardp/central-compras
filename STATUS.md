@@ -11,6 +11,14 @@
 - Para reposição, [plástica fina 25×35 cm, 1.000 por R$ 34,00](https://diegodoces.com.br/products/sacola-plastica-alca-camiseta-branca-com-1000-unidades) para itens leves e [kraft 15×20×7 cm, 50 por R$ 31,32 no Pix](https://loja.sandraembalagens.com.br/sacolas-kraft-pequena-delivery-lanches-15x20x7-50-unid) para presentes pequenos.
 - [ ] Se a compra avançar, conferir o encaixe dos kits, estoque e frete no carrinho. Comparar o total com retirada na Emballê em Araçatuba.
 
+## Sessão 22/11/2026 (tarde): radar, Telegram ligado e 3 canais públicos no piloto
+
+- **Telegram autenticado** (sessão própria do radar, separada do Coral) por QR code, porque o código por mensagem não chegou. Credenciais e sessão em `~/.central-compras/dados-privados/radar/telegram/` (fora do Git). A conta autorizada não tem nenhum canal listado, então `telegram_usuario.canais` segue vazio e o radar não abre nenhuma conversa privada. Lista de sessões do Telegram conferida: a única nova do dia é a do radar ("radarc"); a tentativa por código não criou sessão.
+- **3 canais PÚBLICOS em `telegram_publico`** (`config/radar_fontes.yaml`, com trava de título, sem usar a conta): `cupons_desconto` (Promobit), `pelandobr` (Pelando; descrição, 20/20 links em `pelando.promo` e citado no site) e `ofertasthautec` (Thautec; agregador só com links de afiliado, indicado no Reddit). Varredura das 12:30: `telegram_publico 60 itens`, 5 fontes ok, 0 erros, 0 casadas. Reversível: apagar a linha do canal.
+- **Pesquisa de canais:** busca global pela conta achou 56 canais públicos; descartados os genéricos e os pequenos de revendedor desconhecido. Reddit bloqueia leitura automatizada (e a extensão do Chrome bloqueia o site): só vale o que o Josemar colar. Canais de afiliado costumam postar "promoção" sem desconto real, por isso o radar segue exigindo produto exato e preço conferido na loja.
+- **Pendências do Josemar:** avaliar, nos primeiros alertas, de qual canal veio cada um (se o Thautec só trouxer afiliado sem desconto real, sai); revisar a lista de dispositivos do Telegram (há sessão de navegador antiga com país "Unknown"); energia do notebook de 26 a 30/11; validar PHI200 e BLACK150 no carrinho (opcional).
+- **Instalei a biblioteca `segno`** (QR) no Python do usuário, com autorização; remover com `pip uninstall segno`.
+
 ## Sessão 22/11/2026 (manhã): radar, PILOTO ATIVADO (commit publicado `a3273be`)
 
 - **Push feito:** `origin/main` = `a3273be` (fast-forward, 1 commit, 12 arquivos, 0 do Climatizador).

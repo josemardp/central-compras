@@ -54,7 +54,10 @@ fontes:
     # t.me/s/promobit, por exemplo, serve o canal "OFERTAS PC GAMER", que NAO e o Promobit).
     # Para canais em que voce e membro e que nao tem pagina publica e preciso sessao de usuario Telegram
     # (ver docs/ecossistema/09-manual-operacional.md). Acrescente aqui canais confirmados:
-    canais: []
+    canais:
+      - {usuario: cupons_desconto, titulo_contem: "Promobit", habilitado: true}   # Promobit oficial; confirmado em 22/11/2026 (titulo e postagens ao vivo)
+      - {usuario: pelandobr, titulo_contem: "Pelando", habilitado: true}   # Pelando oficial (descricao, 20/20 links em pelando.promo, citado no site); aprovado em 22/11/2026
+      - {usuario: ofertasthautec, titulo_contem: "THAUTEC", habilitado: true}   # Thautec (agregador, so links de afiliado; indicado no Reddit); aprovado em 22/11/2026
     # - {usuario: exemplo_canal, titulo_contem: "Exemplo", habilitado: true}
 
   telegram_usuario:                # SUA conta (sessao propria do radar; so leitura). Precisa de `radar telegram-login` feito por voce.
