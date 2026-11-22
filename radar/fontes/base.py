@@ -43,6 +43,31 @@ def http_get(url: str, timeout: float = 15.0, tentativas: int = 2, espera: float
     raise (FonteErroRede if rede else FonteErro)(f"{url}: {ultimo}")
 
 
+def http_post_json(url: str, corpo: dict, timeout: float = 15.0, tentativas: int = 2, espera: float = 2.0, max_bytes: int = 2_000_000) -> str:
+    """POST de JSON (so para SIMULAR carrinho em API publica de loja: nao cria pedido, nao envia dado pessoal). Mesmo tratamento de erro do GET."""
+    import json
+
+    ultimo = ""
+    rede = False
+    dados = json.dumps(corpo).encode("utf-8")
+    for n in range(1, tentativas + 1):
+        req = urllib.request.Request(url, data=dados, method="POST", headers={
+            "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9", "Content-Type": "application/json", "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read(max_bytes).decode("utf-8", "replace")
+        except urllib.error.HTTPError as exc:
+            ultimo = f"HTTP {exc.code}"
+            if exc.code not in (429, 500, 502, 503, 504):
+                raise FonteErro(f"{url}: {ultimo}") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            ultimo = f"{type(exc).__name__}: {str(exc)[:80]}"
+            rede = True
+        if n < tentativas:
+            time.sleep(espera * n)
+    raise (FonteErroRede if rede else FonteErro)(f"{url}: {ultimo}")
+
+
 def texto_visivel(fragmento_html: str) -> str:
     sem = re.sub(r"<script.*?</script>|<style.*?</style>", " ", fragmento_html, flags=re.S | re.I)
     sem = re.sub(r"<br\s*/?>", "\n", sem, flags=re.I)

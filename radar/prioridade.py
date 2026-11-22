@@ -261,8 +261,10 @@ def despachar(
 
     # Quem venceu ESPERANDO vaga (limite por varredura) nao some em silencio: vira `retida_orcamento`, que aparece no painel e no bloco de retidas.
     con.execute("UPDATE candidatos_alerta SET "
-                "estado=CASE WHEN motivo LIKE 'aguardando vaga%' THEN 'retida_orcamento' ELSE 'expirado' END, "
+                "estado=CASE WHEN motivo LIKE 'aguardando vaga%' THEN 'retida_orcamento' "
+                "WHEN motivo LIKE 'aguardando confirmacao na loja%' THEN 'nao_confirmada' ELSE 'expirado' END, "
                 "motivo=CASE WHEN motivo LIKE 'aguardando vaga%' THEN 'venceu aguardando vaga (limite por varredura); oferta NAO entregue' "
+                "WHEN motivo LIKE 'aguardando confirmacao na loja%' THEN 'sem confirmacao na loja ate a validade vencer (loja sem verificacao publica ou fora do ar); NAO e prova de que a oferta acabou; oferta NAO entregue' "
                 "WHEN motivo LIKE 'aguardando horario%' THEN 'venceu fora do horario de alertas; oferta NAO entregue' "
                 "ELSE 'validade do candidato vencida (oferta pode ter acabado)' END, decidido_em=? "
                 "WHERE estado='pendente' AND expira_em < ?", (_s(agora), _s(agora)))
@@ -279,13 +281,48 @@ def despachar(
         decisoes.append({"estado": "adiado", "motivo": f"fora do horario de alertas ({hi}-{hf}): candidatos aguardam ate vencer"})
         return decisoes
 
-    # 1 candidato por produto por despacho: a melhor oferta; as demais do mesmo produto ficam substituidas
+    # Revalidacao (na fonte e/ou na loja): cada candidato e conferido no maximo UMA vez por despacho, e ANTES de escolher o melhor do produto.
+    # Senao um candidato melhor mas nao verificavel (ou encerrado) "engoliria" os outros do mesmo produto e a oferta valida se perderia.
+    # Resultado: (True, m) confirmada | (False, m) encerrada/divergente | (None, m) NAO verificavel (fica pendente, nao vira expirada).
+    revalidados: dict[int, tuple[bool | None, str]] = {}
+
+    def conferir(c: sqlite3.Row) -> tuple[bool | None, str] | None:
+        if revalidar is None or c["oferta_id"] is None:
+            return None
+        try:
+            idade_min = (agora - dt.datetime.strptime(c["criado_em"], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60.0
+        except ValueError:
+            idade_min = 0.0
+        if idade_min < float(p["revalidar_apos_min"]):
+            return None
+        if c["id"] not in revalidados:
+            try:
+                revalidados[c["id"]] = revalidar(int(c["oferta_id"]))
+            except Exception as exc:  # noqa: BLE001 - na duvida nao entrega
+                revalidados[c["id"]] = (False, f"revalidacao falhou: {str(exc)[:60]}")
+        return revalidados[c["id"]]
+
+    def aguardar(c: sqlite3.Row, motivo: str) -> None:
+        m = f"aguardando confirmacao na loja: {motivo}"[:300]
+        con.execute("UPDATE candidatos_alerta SET motivo=? WHERE id=?", (m, c["id"]))
+        con.commit()
+        decisoes.append({"id": c["id"], "produto": c["produto"], "classe": c["classe"], "score": c["score"], "estado": "pendente", "motivo": m,
+                         "preco_final": c["preco_final"]})
+
+    # 1 candidato por produto por despacho: a melhor oferta CONFIRMADA; as demais do mesmo produto ficam substituidas
     melhores: dict[str, sqlite3.Row] = {}
     for c in pend:
         if c["produto"] in melhores:
             reg(c, "substituido", f"melhor oferta do mesmo produto neste despacho (pontuacao {melhores[c['produto']]['score']:.0f} contra {c['score']:.0f})")
-        else:
-            melhores[c["produto"]] = c
+            continue
+        rv = conferir(c)
+        if rv is not None and rv[0] is False:
+            reg(c, "expirado", f"revalidacao antes de entregar: {rv[1]}")
+            continue
+        if rv is not None and rv[0] is None:
+            aguardar(c, rv[1])
+            continue
+        melhores[c["produto"]] = c
 
     usados = _usados_hoje(con, agora)
     n_ciclo = n_crit_ciclo = 0
@@ -295,19 +332,15 @@ def despachar(
     # Com teto TOTAL por varredura, o CRITICO tem preferencia (depois, a maior pontuacao); o que nao couber espera o proximo ciclo.
     ordem = sorted(melhores.values(), key=lambda x: (0 if x["classe"] == "CRITICA" else 1, -x["score"], x["id"])) if total_max else list(melhores.values())
     for c in ordem:
-        # candidato que esperou: confirma na fonte antes de entregar (nunca apresenta oferta encerrada como ativa)
-        try:
-            idade_min = (agora - dt.datetime.strptime(c["criado_em"], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60.0
-        except ValueError:
-            idade_min = 0.0
-        if revalidar is not None and c["oferta_id"] is not None and idade_min >= float(p["revalidar_apos_min"]):
-            try:
-                ativa, mot = revalidar(int(c["oferta_id"]))
-            except Exception as exc:  # noqa: BLE001 - na duvida nao entrega
-                ativa, mot = False, f"revalidacao falhou: {str(exc)[:60]}"
-            if not ativa:
-                reg(c, "expirado", f"revalidacao antes de entregar: {mot}")
-                continue
+        # candidato que esperou: confirma antes de entregar (nunca apresenta oferta encerrada como ativa). Ja conferido na escolha do melhor
+        # do produto; so entra aqui o que foi confirmado (ou que nao precisava de conferencia).
+        rv = conferir(c)
+        if rv is not None and rv[0] is not True:
+            if rv[0] is None:
+                aguardar(c, rv[1])
+            else:
+                reg(c, "expirado", f"revalidacao antes de entregar: {rv[1]}")
+            continue
         if pil is not None:
             passa, porque = piloto.avaliar_candidato(c, pil)
             if not passa:

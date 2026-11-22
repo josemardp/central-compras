@@ -359,16 +359,17 @@ class ReavaliacaoTest(Base):
         self.assertEqual(len(self.caixa.msgs), 2)
 
 
-class LimitacaoDeRevalidacaoTest(Base):
-    def test_LIMITACAO_telegram_e_pelando_nao_sao_revalidaveis_e_expiram_no_piloto_real(self):
-        """Na varredura real o piloto revalida a fonte antes de enviar, mas so Promobit e Gatry sabem se revalidar. Uma oferta que so aparece
-        no Telegram ou no Pelando vira `expirado: fonte ... nao permite revalidar` e NAO gera alerta (documentado; nao e alterado aqui)."""
+class RevalidacaoSemLojaVerificavelTest(Base):
+    def test_telegram_sem_loja_verificavel_fica_pendente_e_nao_expirada(self):
+        """Antes (ate 22/11/2026) a oferta so do Telegram ou do Pelando virava `expirado: fonte ... nao permite revalidar`. Agora, sem loja que a
+        API publica consiga conferir, ela fica PENDENTE (nao e prova de que acabou) e nao alerta. A cobertura de quem TEM loja verificavel esta em
+        test_radar_revalidacao_na_loja.py."""
         revalidar_real = lambda oid: varredura.revalidar_oferta(self.con, oid)
         self.ciclo([oferta("telegram", "pelandobr", "901", "https://pelando.promo/Xk3Tz9", loja=None, preco=self.P0)], AGORA, revalidar=revalidar_real)
         self.assertEqual(len(self.caixa.msgs), 0)
         ultimo = self.ultimo_estado()
-        self.assertEqual(ultimo["estado"], "expirado")
-        self.assertIn("nao permite revalidar", ultimo["motivo"])
+        self.assertEqual(ultimo["estado"], "pendente")
+        self.assertIn("aguardando confirmacao na loja", ultimo["motivo"])
 
 
 if __name__ == "__main__":

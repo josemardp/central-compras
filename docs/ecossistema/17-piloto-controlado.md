@@ -77,9 +77,41 @@ Testes: `tests/test_radar_dedup_entre_fontes.py` (deduplicação entre fontes, 2
 - **Borda dos 7%.** Uma queda de exatamente 7,00% (R$ 1.000 para R$ 930) não liberava, por erro de arredondamento de ponto flutuante. A comparação agora é feita em reais, com a borda inclusiva.
 
 **Lacunas que continuam (não alteradas):**
-- **Pelando e Telegram não geram alerta no piloto.** Na varredura real o piloto revalida a fonte antes de enviar, e só Promobit e Gatry sabem se revalidar. Uma oferta que só aparece no Telegram ou no Pelando vira `expirado: fonte ... nao permite revalidar`. Esses canais servem para descoberta, deduplicação e comparação; o alerta sai quando a mesma oferta está no Promobit ou no Gatry.
+- **Pelando e Telegram agora podem gerar alerta** (ver a seção abaixo), desde que a loja da oferta seja verificável (WebContinental e FrioPeças). Antes de 22/11/2026 a revalidação só existia para Promobit e Gatry e essas ofertas expiravam.
 - **Porta de 24 h e oferta sem loja.** Uma oferta sem loja (o Telegram) não casa com o alerta de uma loja nessa porta. No piloto real isso não vaza, pelo motivo acima.
 - **Nenhuma fonte informa o vendedor** (todas deixam vazio), então a família é `produto + loja`. Grafias diferentes da mesma loja entre fontes não se casam.
+
+## Revalidação na loja, independente da fonte de descoberta (22/11/2026)
+
+**Problema:** o piloto revalida a oferta antes de enviar, mas só Promobit e Gatry sabiam se revalidar. Uma oferta descoberta só no Telegram ou no Pelando virava `expirado: fonte ... nao permite revalidar` e nunca alertava. Pior: uma postagem ainda acessível não prova que o desconto continua valendo.
+
+**Como funciona agora** (`lojas.revalidar_na_loja`, chamada por `varredura.revalidar_oferta`): a oportunidade é conferida **direto na API pública da loja**, sem seguir o link da postagem (que passa pelo rastreador do afiliado) e sem comprar nada.
+1. **Loja:** a da fonte; se a fonte não informa (o Telegram nunca informa), a loja **configurada** citada no texto ou no domínio do link direto. Link encurtado ou de afiliado (`pelando.promo`, `link.amazon`, `meli.la`) nunca é resolvido.
+2. **Produto exato:** busca pelo SKU do catálogo e confere modelo e voltagem pelo nome que a loja devolve.
+3. **Vendedor:** só estoque **próprio** conta (vendedor terceiro do marketplace é ignorado).
+4. **Disponibilidade e preço:** em estoque e com preço que cobre o prometido pelo alerta.
+5. **Cupom:** quando o preço prometido depende de cupom, a **simulação do carrinho** da loja diz se o cupom é aceito e quanto o carrinho cobra com ele. É a mesma API de checkout que o site usa, sem login, sem CEP, sem forma de pagamento e sem criar pedido.
+
+**Quatro resultados, em três estados para o despachante:**
+
+| Resultado | Estado | O que acontece com o candidato |
+|---|---|---|
+| `confirmada` | `True` | segue para as barreiras e o orçamento do piloto |
+| `encerrada` (sem estoque, produto ou vendedor próprio ausente) | `False` | `expirado`, com o motivo |
+| `divergente` (preço diferente no carrinho, cupom inválido ou sem efeito) | `False` | `expirado`, com o motivo |
+| `pendente` (loja sem API pública, fora do ar, sem loja identificada) | `None` | fica `pendente` e é reconferido a cada ciclo; ao vencer a validade vira `nao_confirmada` (**nunca** `expirado`, não é prova de que a oferta acabou) |
+
+Uma oferta pendente **não inventa preço confirmado** (a mensagem do candidato diz "Confirmado na loja: não") e **não engole** outra oferta confirmável do mesmo produto: a revalidação agora acontece **antes** de escolher o melhor candidato do produto.
+
+**Cobertura real (sondada em 22/11/2026):** só **WebContinental e FrioPeças** têm API pública utilizável. Dufrio (404), Casas Bahia (devolve página), Fast Shop (503), KaBuM (DNS não resolve) e Mercado Livre (403) não servem; Amazon e Magalu não têm API pública. Ofertas dessas lojas ficam `pendente`. Para acrescentar uma loja VTEX que responda, basta uma entrada em `config/radar_lojas.yaml` (`tipo: vtex`, `base`, `vendedor_contem`, `nome`, `simula_carrinho`).
+
+**Promobit e Gatry:** continuam validando a publicação; agora a loja também tem voz. Publicação encerrada manda mais que a loja. Publicação ativa com loja divergente **não alerta**. Publicação ativa com loja não verificável segue como antes. Se a página da fonte não abre (falha de rede), o resultado é `pendente`, e não mais "encerrada".
+
+**Limites da simulação:** sem CEP e sem forma de pagamento, o carrinho pode não mostrar desconto que só aparece no checkout (por exemplo, cupom restrito a PIX ou a cartão). Por isso a **validação manual** (`radar validar`, o que você viu no SEU carrinho) vale enquanto o preço não piorar mais de 2%, **só para divergência de preço ou cupom**. Ela nunca vence "encerrada".
+
+**Resultado real de 22/11 (13:55):** oferta #232, Philco 18k anunciado R$ 2.379 com o cupom **PHI200** na WebContinental. A loja vende o produto exato, do vendedor próprio e em estoque, por R$ 2.579, e o carrinho **aceita o PHI200 mas não reduz o preço** (R$ 2.579 com e sem cupom). Resultado: `divergente`, e o alerta não sai. É o comportamento certo para não transformar publicação de cupom em falso desconto.
+
+**O que não mudou:** os limites do piloto (2 comuns + 1 crítico por dia, 1 por varredura), as barreiras (produto exato, sem avisos, confiança mínima MEDIA, destinatário confirmado), os agendamentos e a ativação local.
 
 ## Primeiros envios: o que olhar
 

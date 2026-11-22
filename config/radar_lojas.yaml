@@ -3,12 +3,19 @@
 # leroy, casasbahia e mercadolivre NAO (ali o preco fica "nao conferido na loja" e a confianca do alerta nunca passa de MEDIA).
 #
 # `vendedor_contem`: so conta como estoque PROPRIO o vendedor cujo nome contem este texto (marketplace de terceiros e ignorado).
+# `nome`: como a loja aparece na mensagem e na familia de deduplicacao (o texto/link da oferta e comparado com ele para descobrir a loja).
+# `simula_carrinho`: a API publica de checkout (orderForms/simulation) responde sem login, sem CEP e sem criar pedido (medido em 22/11/2026
+# nas duas lojas); serve para conferir preco COM cupom e dizer se o cupom e valido. Nunca conclui compra.
 lojas:
   webcontinental:
     tipo: vtex
+    nome: "WebContinental"
     base: "https://www.webcontinental.com.br"
     vendedor_contem: "webcontinental"
+    simula_carrinho: true
   friopecas:
     tipo: vtex
+    nome: "FrioPecas"
     base: "https://www.friopecas.com.br"
     vendedor_contem: "friope"
+    simula_carrinho: true

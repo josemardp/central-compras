@@ -113,11 +113,12 @@ def coletar(cfg: dict[str, Any], baixar: Callable[[str], str] = http_get) -> lis
     return list(saida.values())
 
 
-def revalidar(id_externo: str, preco_ref: float | None, baixar: Callable[[str], str] = http_get, tolerancia: float = 0.02) -> tuple[bool, str]:
+def revalidar(id_externo: str, preco_ref: float | None, baixar: Callable[[str], str] = http_get, tolerancia: float = 0.02) -> tuple[bool | None, str]:
+    """`None` = NAO VERIFICAVEL (a API nao respondeu: falha de rede nao prova que a promocao acabou)."""
     try:
         p = json.loads(baixar(f"{API}/{id_externo}"))
     except (FonteErro, ValueError) as exc:
-        return False, f"nao consegui reabrir a promocao: {str(exc)[:80]}"
+        return None, f"nao consegui reabrir a promocao: {str(exc)[:80]}"
     if not isinstance(p, dict) or not p.get("id"):
         return False, "promocao removida ou sem dados"
     if str(p.get("status")) not in STATUS_ATIVO:

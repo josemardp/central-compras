@@ -92,12 +92,13 @@ def _lista_de_cupons(bruto: Any) -> list[dict[str, Any]]:
 STATUS_INATIVOS = {"FINISHED", "EXPIRED", "REMOVED", "REJECTED", "DELETED", "CANCELED"}
 
 
-def revalidar(url: str, preco_ref: float | None, baixar: Callable[[str], str] = http_get, tolerancia: float = 0.02) -> tuple[bool, str]:
-    """Abre a pagina da oferta: ativa = status fora de STATUS_INATIVOS e preco nao pior que o do alerta (+2%)."""
+def revalidar(url: str, preco_ref: float | None, baixar: Callable[[str], str] = http_get, tolerancia: float = 0.02) -> tuple[bool | None, str]:
+    """Abre a pagina da oferta: ativa = status fora de STATUS_INATIVOS e preco nao pior que o do alerta (+2%).
+    `None` = NAO VERIFICAVEL (a pagina nao abriu: falha de rede nao prova que a oferta acabou)."""
     try:
         so = _next_data(baixar(url)).get("serverOffer") or {}
     except (FonteErro, ValueError) as exc:
-        return False, f"nao consegui reabrir a oferta: {str(exc)[:80]}"
+        return None, f"nao consegui reabrir a oferta: {str(exc)[:80]}"
     if not so:
         return False, "pagina da oferta sem dados (removida?)"
     status = str(so.get("offerStatusName") or "")

@@ -137,6 +137,8 @@ def processar_oferta(
     portoes vira um CANDIDATO com pontuacao e o despachante (`prioridade.despachar`) decide ao fim do ciclo."""
     _t0 = time.perf_counter()
     resumo: dict[str, Any] = {"id_externo": of.id_externo, "produto": None, "classe": None, "acao": None}
+    if not of.loja:  # Telegram nao informa a loja: so vale a loja VERIFICAVEL citada no texto ou no link direto (nunca resolve link de afiliado)
+        of.loja = lojas.inferir_loja(of.texto_completo, of.url)
     texto = of.texto_completo
     lista = _cupons_da_oferta(of, agora)
 
@@ -505,16 +507,46 @@ def _telemetria(con, agora: dt.datetime, fonte: str, status: str, itens: int, da
     con.commit()
 
 
-def revalidar_oferta(con, oferta_id: int, baixar=None) -> tuple[bool, str]:
-    """Reconsulta a oferta na fonte. So Promobit e revalidavel (pagina individual com status e preco)."""
-    row = con.execute("SELECT fonte, url, id_externo, preco_final, preco_anunciado FROM ofertas WHERE id=?", (oferta_id,)).fetchone()
+def revalidar_oferta(con, oferta_id: int, baixar=None, *, loja_baixar=None, loja_postar=None, lojas_cfg=None) -> tuple[bool | None, str]:
+    """Revalida a oportunidade antes de enviar, INDEPENDENTE de onde foi descoberta. Retorna (estado, motivo):
+      True   confirmada;  False  encerrada ou divergente (verificado: nao enviar);  None  NAO VERIFICAVEL (nao enviar agora, mas tambem NAO e expirada).
+
+    1) Fonte propria: Promobit e Gatry sabem reabrir a publicacao. Publicacao encerrada = False. Uma publicacao ainda acessivel NAO prova que o
+       desconto continua valendo; por isso 2) vale para todas as fontes.
+    2) Loja (lojas.revalidar_na_loja): produto exato, vendedor proprio, disponibilidade, preco e cupom, direto na API publica da loja.
+       Fonte sem revalidacao propria (Telegram, Pelando, Hardmob...) so confirma pela loja; se a loja nao puder ser verificada fica None (pendente)."""
+    row = con.execute("SELECT fonte, url, id_externo, preco_final, preco_anunciado, produto, loja, titulo, cupom_codigo FROM ofertas WHERE id=?", (oferta_id,)).fetchone()
     if not row:
         return False, "oferta nao encontrada"
     from .fontes import gatry, promobit
 
     kw = {"baixar": baixar} if baixar else {}
+    fonte_ok: bool | None = None
+    motivo_fonte = ""
     if row["fonte"] == "promobit" and row["url"]:
-        return promobit.revalidar(row["url"], row["preco_anunciado"], **kw)
-    if row["fonte"] == "gatry":
-        return gatry.revalidar(row["id_externo"], row["preco_anunciado"], **kw)
-    return False, f"fonte {row['fonte']} nao permite revalidar"
+        fonte_ok, motivo_fonte = promobit.revalidar(row["url"], row["preco_anunciado"], **kw)
+    elif row["fonte"] == "gatry":
+        fonte_ok, motivo_fonte = gatry.revalidar(row["id_externo"], row["preco_anunciado"], **kw)
+    if fonte_ok is False:
+        return False, motivo_fonte
+    loja_kw: dict[str, Any] = {}
+    if loja_baixar is not None:
+        loja_kw["baixar"] = loja_baixar
+    if loja_postar is not None:
+        loja_kw["postar"] = loja_postar
+    r = lojas.revalidar_na_loja(row, lojas=lojas_cfg, **loja_kw)
+    if r["resultado"] == "confirmada":
+        return True, f"confirmada na loja: {r['motivo']}"
+    if r["resultado"] == "divergente":
+        # Validacao MANUAL (`radar validar`): voce viu o preco no SEU carrinho. A simulacao anonima (sem CEP e sem forma de pagamento) pode nao
+        # enxergar desconto que so aparece no checkout, entao a decisao humana vale enquanto o preco nao piorar mais de 2% (mesma regra da
+        # classificacao). Nunca vale para "encerrada" (sem estoque ou produto ausente).
+        vm = con.execute("SELECT por, em, preco_validado FROM validacoes_manuais WHERE oferta_id=?", (oferta_id,)).fetchone()
+        alvo = row["preco_final"] or row["preco_anunciado"]
+        if vm is not None and alvo and (vm["preco_validado"] is None or float(alvo) <= float(vm["preco_validado"]) * 1.02):
+            return True, f"VALIDADO por {vm['por']} no carrinho em {vm['em']}; a simulacao anonima da loja diverge ({r['motivo']})"
+    if r["resultado"] in ("encerrada", "divergente"):
+        return False, f"{r['resultado']} na loja: {r['motivo']}"
+    if fonte_ok is True:  # Promobit/Gatry ativos e a loja nao pode ser verificada: segue como antes (a confianca do alerta ja diz "nao conferido na loja")
+        return True, f"{motivo_fonte} (loja nao verificada: {r['motivo']})"
+    return None, r["motivo"]
