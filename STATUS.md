@@ -5,6 +5,17 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 27/11/2026 (fim de tarde): Xiaomi S40 Pro e dois splits para compra
+
+- **Robô:** [Amazon, S40 Pro](https://www.amazon.com.br/dp/B0FD9CXF2W) exibiu R$ 1.994,05 + R$ 58,07 de frete para o CEP usado na verificação (GFS Imports). O rastreador público mostrou R$ 2.033,28 com frete em outra oferta da Amazon (Harada Tech). A vitrine indexada do [Mercado Livre](https://lista.mercadolivre.com.br/s40pro-robo-xiaomi) mostrou R$ 1.870 no Pix, com página individual bloqueada para conferência. O aviso de R$ 1.749,72 do Promobit estava encerrado. A opção econômica [KaBuM K800 Pro 127 V](https://www.amazon.com.br/dp/B0HCZVJ6M1) apareceu a R$ 978,99 entregue na Amazon, vendido pela KaBuM.
+- **12.000 BTU frio, 220 V:** [Midea EcoMaster `42EZVCA12M5/38EZVCA12M5` na Poloar](https://www.poloar.com.br/ar-condicionado-split-hi-wall-midea-inverter-ai-ecomaster-12000-btu-h-frio-220v-r-32/p), R$ 2.205,23 no Pix ou R$ 2.345,99 em 10x sem juros, frete grátis simulado. O `42EZVCC12M5` anunciado na Dufrio e no Magalu ficou acima do teto nos preços consultados. A oferta Amazon de R$ 2.089,05 registrada às 18h deixou de aparecer na reconsulta, quando outro vendedor mostrou R$ 2.523,95 entregue. Alternativas com frete grátis nas simulações: [Hisense na Amazon](https://www.amazon.com.br/dp/B0G4R4QZM5) R$ 1.682,90 no Pix ou R$ 1.869,90 em 12x sem juros e [Midea AirVolution na Poloar](https://www.poloar.com.br/ar-condicionado-split-ai-airvolution-midea-inverter-12000-btu-h-frio-220v-r-32/p) R$ 1.897,85 no Pix ou R$ 2.018,99 em 10x sem juros.
+- **18.000 BTU quente/frio, 220 V:** [Elgin Eco II na Poloar](https://www.poloar.com.br/ar-condicionado-split-hi-wall-elgin-eco-inverter-ii-18000-btu-h-quente-frio-220v-r-32-wi-fi/p) por R$ 2.628,23 no Pix ou R$ 2.795,99 em 10x sem juros, frete grátis simulado. O [Eco III quente/frio](https://www.poloar.com.br/ar-condicionado-split-hi-wall-elgin-eco-inverter-iii-18000-btu-h-quente-frio-220v-r-32-wi-fi/p) ficou acima de R$ 3 mil. O [Philco PAC18QC na KaBuM](https://www.kabum.com.br/produto/931187/ar-condicionado-split-inverter-philco-18000-btus-quente-e-frio-220v-pac18qc), vendido pela ClimaRio, exibiu R$ 2.599 no Pix antes do frete. As cotações anteriores de Eco III `HJFC18C2WHCH` são da versão só frio.
+- **Orçamento:** R$ 6.885,58 pelo S40 Pro da Amazon, EcoMaster 12 mil e Eco II 18 mil nas condições à vista acima, ante R$ 7.408,90 planejados. Instalação à parte.
+
+### Pendências
+
+- [ ] Conferir vendedor, garantia e total final do robô na Amazon ou no Mercado Livre e validar os valores dos splits no carrinho antes da compra.
+
 ## Sessão 27/11/2026 (manhã, Black Friday): Xiaomi S40 Pro (Brasil) incluído no Radar e no rastreador diário
 
 - **Separação Paraguai x Brasil no catálogo ([`config/radar_catalogo.yaml`](config/radar_catalogo.yaml)):** mantido `xiaomi_s40_pro_py` (`moeda: USD`, exigindo termos do Paraguai/CDE ou `US$` junto ao SKU/modelo) e criado `xiaomi_s40_pro_br` (BRL, sem `skus` obrigatórios para evitar bloqueio por `sku_nao_confirmado` no piloto, e bloqueando anúncios multi-variação enganosos como `S40CS40S40 Pro 10.000Pa`).
