@@ -200,7 +200,11 @@ class CatalogoTest(unittest.TestCase):
 
     def test_s40c_nao_vira_s40_pro_e_vice_versa(self):
         self.assertEqual(self.id("Xiaomi S40C"), "xiaomi_s40c")
-        self.assertEqual(self.id("Xiaomi S40 Pro"), "xiaomi_s40_pro_py")
+        self.assertEqual(self.id("Xiaomi S40 Pro"), "xiaomi_s40_pro_br")
+        self.assertEqual(self.id("Xiaomi S40 Pro US$ 214 Paraguai"), "xiaomi_s40_pro_py")
+        c_br = catalogo.identificar("Robô Aspirador Xiaomi S40 Pro Bivolt Branco", self.cat)
+        self.assertEqual((c_br.produto_id, c_br.avisos), ("xiaomi_s40_pro_br", []))
+        self.assertIsNone(self.id("Robô Aspirador Xiaomi S40CS40S40 Pro 110220v Passa Pano 10.000Pa Wi-Fi"))
 
     def test_ares_por_sku_e_por_nome(self):
         casos = {

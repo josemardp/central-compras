@@ -47,7 +47,7 @@ prioridade:
 piloto:
   ativo: false                      # so tem efeito com alertas.enviar true E alertas.homologado_em preenchidos (edicao SUA)
   destinatario_confirmado_em: "2026-11-21 21:21"   # confirmado por voce em 21/11/2026 21:21 (mensagem "chegou no meu zap sim"; teste de entrega de 21:12). Horario do registro da sessao, nao estimado
-  produtos_exatos: [dreame_f10, k800_pro_127v, tapo_rv20_max, xiaomi_s40c, elgin_12k, agratto_12k, midea_lite_12k, midea_ecomaster_12k, philco_18k, elgin_18k, loren_shower_6800_220v]
+  produtos_exatos: [dreame_f10, k800_pro_127v, tapo_rv20_max, xiaomi_s40c, xiaomi_s40_pro_br, elgin_12k, agratto_12k, midea_lite_12k, midea_ecomaster_12k, philco_18k, elgin_18k, loren_shower_6800_220v]
   confianca_minima: MEDIA           # BAIXA nunca; a confianca (ALTA/MEDIA) e a razao dela aparecem na mensagem
   exigir_sem_avisos: true           # nenhum aviso: modelo, voltagem, hora incerta, preco que depende de cupom nao confirmado
   exigir_url: true

@@ -43,6 +43,12 @@ BASELINE_14_11 = {
         "ref_label": "19/11",
         "nota": "Compras PY US$ 225,00 (lojas CDE)",
     },
+    "xiaomi_s40_pro_br": {
+        "nome": "Xiaomi S40 Pro (Brasil)",
+        "preco": 1870.00,
+        "ref_label": "26/11",
+        "nota": "ML Pix (vitrine) / Amazon R$ 1.935,15",
+    },
 }
 
 LOJAS_GRANDES_PY = (
@@ -362,6 +368,49 @@ def extrair_compras_paraguai(page: Any, url: str) -> dict[str, Any]:
     return res
 
 
+def extrair_ml_vitrine_s40_pro(page: Any) -> dict[str, Any]:
+    """Coleta menor preco a vista/Pix do Xiaomi S40 Pro na vitrine publica do ML (sem quebrar se o ML pedir login)."""
+    res: dict[str, Any] = {"url": "https://meli.la/2xCjJ3p", "preco": None}
+    try:
+        page.goto(res["url"], wait_until="domcontentloaded", timeout=15000)
+        page.wait_for_timeout(2000)
+        textos = page.evaluate("""() => {
+            const sels = ['.poly-card', '.ui-recommendations-card', '.andes-card', 'li', 'article'];
+            const out = [];
+            for (const sel of sels) {
+                document.querySelectorAll(sel).forEach(el => {
+                    const t = (el.innerText || '').replace(/\\s+/g, ' ').trim();
+                    if (t.length >= 30 && t.length <= 500 && /s40\\s*pro/i.test(t)) out.push(t);
+                });
+                if (out.length) break;
+            }
+            return out;
+        }""")
+        precos_cards: list[float] = []
+        for txt in textos or []:
+            if re.search(r"s40c|10\.?000\s*pa|filtro|escova|pano|refil|kit|acess[oó]rio", txt, re.I):
+                continue
+            # Extrai valores com ou sem centavos ("R$ 1.870" ou "R$ 1.870,00"), ignorando parcelas (< 950)
+            brutos = re.findall(r"R\$\s*([\d\.]+(?:,\d{2})?)", txt)
+            candidatos_card: list[float] = []
+            for b in brutos:
+                s = b.replace(".", "").replace(",", ".")
+                try:
+                    v = float(s)
+                except ValueError:
+                    continue
+                if 950.0 <= v <= 4500.0:
+                    candidatos_card.append(v)
+            if candidatos_card:
+                precos_cards.append(min(candidatos_card))
+        if precos_cards:
+            res["preco"] = min(precos_cards)
+    except Exception as exc:
+        # Usa chave `aviso_ml` em vez de `erro` para bloqueio/timeout do ML nao marcar a rodada inteira como degradada
+        res["aviso_ml"] = str(exc)[:140]
+    return res
+
+
 def coletar_precos() -> dict[str, Any]:
     agora = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
     dados: dict[str, Any] = {"coletado_em": agora, "modelos": {}}
@@ -482,6 +531,42 @@ def coletar_precos() -> dict[str, Any]:
             "compras_paraguai": s40p_cp,
             "melhor_preco": preco_cp,
             "melhor_onde": onde_cp,
+        }
+
+        # 6. Xiaomi S40 Pro (Brasil)
+        s40p_amz = extrair_amazon(page, "https://www.amazon.com.br/dp/B0FD9CXF2W")
+        s40p_kbm = extrair_kabum(
+            page,
+            "https://www.kabum.com.br/produto/1069144/robo-de-limpeza-xiaomi-robot-vacuum-s40-pro-bivolt",
+        )
+        s40p_ml = extrair_ml_vitrine_s40_pro(page)
+        s40p_prom = [
+            pr
+            for pr in extrair_promobit(page, "xiaomi+s40+pro", r"s40\s*pro")
+            if not re.search(r"s40c|10\.?000\s*pa", pr.get("texto") or "", re.I)
+        ]
+        cand_s40p_br: list[tuple[float, str]] = []
+        if s40p_ml.get("preco"):
+            cand_s40p_br.append((s40p_ml["preco"], "Mercado Livre (Pix)"))
+        if s40p_amz.get("preco"):
+            frete_s40p = parse_brl(s40p_amz.get("frete") or "") or 0.0
+            cand_s40p_br.append(
+                (
+                    round(s40p_amz["preco"] + frete_s40p, 2),
+                    f"Amazon ({s40p_amz.get('vendedor') or 'n/d'} + frete {s40p_amz.get('frete') or 'n/d'})",
+                )
+            )
+        if s40p_kbm.get("disponivel") and s40p_kbm.get("preco_pix"):
+            cand_s40p_br.append((s40p_kbm["preco_pix"], f"KaBuM ({s40p_kbm.get('vendedor') or 'n/d'})"))
+        melhor_s40p_br = min(cand_s40p_br, key=lambda x: x[0]) if cand_s40p_br else (None, "indisponivel")
+        dados["modelos"]["xiaomi_s40_pro_br"] = {
+            "nome": "Xiaomi S40 Pro (Brasil)",
+            "amazon": s40p_amz,
+            "kabum": s40p_kbm,
+            "ml_vitrine": s40p_ml,
+            "promobit": s40p_prom,
+            "melhor_preco": melhor_s40p_br[0],
+            "melhor_onde": melhor_s40p_br[1],
         }
 
         browser.close()
@@ -627,6 +712,7 @@ def montar_mensagem(
         ("tapo_rv20_max", "🥉"),
         ("xiaomi_s40c", "4️⃣"),
         ("xiaomi_s40_pro_py", "5️⃣"),
+        ("xiaomi_s40_pro_br", "6️⃣"),
     ]
     resumo_itens: list[tuple[float, str, float | None, float | None, float | None]] = []
     for key, medalha in ordem:
@@ -695,6 +781,20 @@ def montar_mensagem(
                 )
             if detalhes_cp:
                 linhas.append("💱 " + " · ".join(detalhes_cp))
+        elif key == "xiaomi_s40_pro_br":
+            outras: list[str] = []
+            amz = mod.get("amazon") or {}
+            ml = mod.get("ml_vitrine") or {}
+            if amz.get("preco") and "Amazon" not in (onde or ""):
+                outras.append(f"Amazon: {fmt_brl(amz['preco'])} ({amz.get('vendedor') or 'n/d'})")
+            elif ml.get("preco") and "Mercado Livre" not in (onde or ""):
+                outras.append(f"Mercado Livre: {fmt_brl(ml['preco'])}")
+            if outras:
+                linhas.append("🏪 Outras lojas: " + " | ".join(outras))
+            proms = [pr for pr in mod.get("promobit", []) if pr.get("preco")]
+            if proms:
+                p0 = proms[0]
+                linhas.append(f"🔥 Alerta Promobit: *{fmt_brl(p0['preco'])}* (checar se ativo)")
 
     linhas.append("")
     linhas.append("🏆 *RESUMO (MENOR / MAIOR HISTORICO)*")

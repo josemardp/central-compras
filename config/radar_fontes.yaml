@@ -10,7 +10,7 @@ fontes:
     intervalo_min: 10
     paginas_recentes: 5            # /promocoes/recentes/ por CURSOR (?after=), 12 ofertas por pagina (~60 itens, ~40 min de cobertura)
                                    # medido em 21/11/2026: 1 pagina = 9 min, 2 = 16 min; o ciclo e de 10 min, entao 2 deixava buraco
-    lojas: [amazon, kabum]         # /promocoes/loja/<slug>/ (ofertas + cupons da loja); 404 e tolerado
+    lojas: [amazon, kabum, mercado-livre, shopee, magazine-luiza]   # /promocoes/loja/<slug>/ (ofertas + cupons da loja); 404 e tolerado
     # BLACK FRIDAY: de 26/11 00:00 a 30/11 23:59 (por DATA) o Promobit e lido a cada 5 min. MANTEM as 5 paginas: no pico a lista inteira cobre so ~14 min
     # (medido em 21/11), entao reduzir paginas deixaria buraco. Custo: ~7 requisicoes por leitura (84 por hora, uma a cada ~43 s).
     # Passou o `ate`, a leitura volta SOZINHA ao normal (10 min): nao ha nada para desligar. As outras fontes NAO mudam.
@@ -46,6 +46,7 @@ fontes:
       mercadolivre: cupom-desconto-mercado-livre
       leroy: cupom-desconto-leroy-merlin
       dufrio: cupom-desconto-dufrio
+      shopee: cupom-desconto-shopee
 
   telegram_publico:                # canais com pagina publica t.me/s/<usuario>
     habilitada: true

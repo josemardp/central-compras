@@ -5,6 +5,14 @@
 > `projetos/<projeto>/processo.md`, ou rodando
 > `python scripts/central_compras.py status projetos/<projeto>`.
 
+## Sessão 27/11/2026 (manhã, Black Friday): Xiaomi S40 Pro (Brasil) incluído no Radar e no rastreador diário
+
+- **Separação Paraguai x Brasil no catálogo ([`config/radar_catalogo.yaml`](config/radar_catalogo.yaml)):** mantido `xiaomi_s40_pro_py` (`moeda: USD`, exigindo termos do Paraguai/CDE ou `US$` junto ao SKU/modelo) e criado `xiaomi_s40_pro_br` (BRL, sem `skus` obrigatórios para evitar bloqueio por `sku_nao_confirmado` no piloto, e bloqueando anúncios multi-variação enganosos como `S40CS40S40 Pro 10.000Pa`).
+- **Piloto e cobertura de lojas:** incluído `xiaomi_s40_pro_br` em `piloto.produtos_exatos` ([`config/radar_regras.yaml`](config/radar_regras.yaml), mantendo a versão versionada em SOMBRA enquanto o estado ativo segue só no `operacao.yaml` local) e ampliadas as lojas em [`config/radar_fontes.yaml`](config/radar_fontes.yaml) (`mercado-livre`, `shopee` e `magazine-luiza` no Promobit + `shopee` no Méliuz).
+- **Rastreador diário ([`scripts/rastrear_robos_bf.py`](scripts/rastrear_robos_bf.py)):** adicionada coleta e exibição `6️⃣ Xiaomi S40 Pro (Brasil)` para os relatórios das 08h, 14h e 20h cobrindo Amazon (`B0FD9CXF2W`), KaBuM (`1069144`, exigindo `disponivel=True`), vitrine pública do Mercado Livre (`extrair_ml_vitrine_s40_pro`) e Promobit.
+- **Histórico semeado no `radar.db` local:** inseridas 3 observações reais verificadas (`referencia-verificada`: 25/11 15:40 R$ 1.795,50 ML/Gatry #411, 25/11 20:00 R$ 1.795,50 e 26/11 19:31 R$ 1.870,00 ML Pix) para liberar classificação `ALTA` e envio no modo Piloto já a partir das 07:00 de hoje (27/11).
+- **Validação:** `python -m radar avaliar` com 0 FP e 0 FN (179 itens rotulados, 10/10 ambíguos), suíte completa `python -m unittest discover -s tests` com **1.090 testes, 0 falhas** (incluindo novos testes em [`tests/test_radar_cupons_catalogo.py`](tests/test_radar_cupons_catalogo.py) e [`tests/test_rastrear_robos_bf.py`](tests/test_rastrear_robos_bf.py)), e `checar-segredos --strict` limpo.
+
 ## Sessão 22/11/2026: sacolas personalizadas com logo oficial da Esdra Cosméticos e veredito sobre KDU Embalagem
 
 - **Identidade visual aplicada (sem alucinação):** vetores oficiais `logo_esdra.svg` e `sublogo_esdra.svg` (`C:\projetos\central-ec\loja-dos-sonhos\modelo\`, marca `ESDRA COSMÉTICOS` com borboleta, INPI `945874561`), paleta da Loja dos Sonhos (`#FFFCF8`, `#E5ABB2` e dourado `#B6914F` do letreiro da fachada). Logo antiga `DARES COSMÉTICOS` (`LOGO 1/2/3.png`) descartada. Como a logo oficial tem 1 cor sólida, encaixa na faixa mais econômica de silk (1 cor), mas os traços da borboleta e de "COSMÉTICOS" são finos e exigem aprovação de prova digital antes da produção.

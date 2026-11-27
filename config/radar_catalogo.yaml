@@ -66,7 +66,17 @@ produtos:
     origem: importado
     moeda: USD
     skus: ['OV71GL', 'BHR0890US', 'BHR089REU']
+    todos: ['\bs40\s*pro\b', '(?:us\$|compras\s*paraguai|\bcde\b|paraguai)']
+    nenhum: ['s40c\s*/?\s*s40', 's40cs40']
+
+  xiaomi_s40_pro_br:
+    nome: Xiaomi Robot Vacuum S40 Pro (Brasil)
+    categoria: robo_aspirador
+    grupo: robos
+    chave_rastreador: xiaomi_s40_pro_br
+    origem: importado
     todos: ['\bs40\s*pro\b']
+    nenhum: ['s40c\s*/?\s*s40', 's40cs40', '\b10\.?000\s*pa\b']
 
   # ---------------- Ar-condicionado 12.000 BTU (220V, so frio) ----------------
   elgin_12k:

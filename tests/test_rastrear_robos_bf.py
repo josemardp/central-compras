@@ -121,6 +121,31 @@ class RastrearRobosTest(unittest.TestCase):
         self.assertIn("Grandes CDE: *R$ 1.327,50* (Madrid Center · US$ 225,00)", msg)
         self.assertIn("Recond.: R$ 1.174,10 (Visãovip · US$ 199,00)", msg)
 
+    def test_montar_mensagem_inclui_s40_pro_brasil(self):
+        snap = {
+            "coletado_em": "2026-11-27 08:00",
+            "modelos": {
+                "dreame_f10": {"nome": "Dreame F10", "melhor_preco": 1994.05, "melhor_onde": "Amazon (DREAME LTDA)", "promobit": []},
+                "k800_pro_127v": {"nome": "KaBuM K800 Pro 127V", "melhor_preco": 923.99, "melhor_onde": "Amazon 127V", "kabum_preto": {}},
+                "tapo_rv20_max": {"nome": "Tapo RV20 Max", "melhor_preco": 853.10, "melhor_onde": "Amazon (Brasil Inter)", "amazon": {"cupons": []}},
+                "xiaomi_s40c": {"nome": "Xiaomi S40C", "melhor_preco": 1140.00, "melhor_onde": "Amazon (PACMAGAZZINE)"},
+                "xiaomi_s40_pro_py": {"nome": "Xiaomi S40 Pro (Paraguai)", "melhor_preco": 1262.54, "melhor_onde": "Compras PY/Prime Shop (US$ 213,99)", "compras_paraguai": {}},
+                "xiaomi_s40_pro_br": {
+                    "nome": "Xiaomi S40 Pro (Brasil)",
+                    "melhor_preco": 1870.00,
+                    "melhor_onde": "Mercado Livre (Pix)",
+                    "amazon": {"preco": 1935.15, "vendedor": "Jr Eletro"},
+                    "ml_vitrine": {"preco": 1870.00},
+                    "promobit": [{"preco": 1545.00, "href": "https://www.promobit.com.br/x"}],
+                },
+            },
+        }
+        msg = rr.montar_mensagem(snap, None)
+        self.assertIn("6️⃣ *Xiaomi S40 Pro (Brasil)*", msg)
+        self.assertIn("Mercado Livre (Pix)", msg)
+        self.assertIn("🏪 Outras lojas: Amazon: R$ 1.935,15 (Jr Eletro)", msg)
+        self.assertIn("🔥 Alerta Promobit: *R$ 1.545,00* (checar se ativo)", msg)
+
 
 if __name__ == "__main__":
     unittest.main()
