@@ -3,8 +3,8 @@
 ## Estado atual
 
 - Estado: pesquisando
-- Proxima acao: conferir o valor entregue do Elgin no fechamento e o termo de garantia com o instalador.
-- Decisao aberta: indicação preliminar do Elgin Eco Inverter III HJFC12C2WGCG.
+- Proxima acao: Josemar conferir as abas abertas do Mercado Livre (18x sem juros Cartão Mercado Pago) e fechar a compra de hoje (27/11 Black Friday).
+- Decisao aberta: Midea AirVolution Connect 12k (Amazon 12x R$ 175,36 ou Poloar 10x R$ 201,89), Hisense 12k (Amazon 12x R$ 155,88) ou Electrolux MaxComfort (Amazon 12x R$ 163,25, conferir kit completo).
 
 ## Linha do tempo decisoria
 
@@ -63,3 +63,22 @@ Valores à vista nas páginas das lojas depois de informar o CEP destinado à co
 - **Alternativas.** O Agratto pode cair abaixo do Elgin se o desconto de primeira compra de R$ 50 da Dufrio entrar. A diferença seria de apenas R$ 17,88, com cobertura anunciada de 12 meses com credenciado. O AirVolution Lite sai mais caro entregue e declara consumo maior. O Ecomaster é mais eficiente, porém o total ficou R$ 505 acima do Elgin.
 - **Cupons.** O anúncio da Amazon mostra `70OFF` na primeira compra pelo app, com login. A Dufrio anuncia `DUFRIDAY` na primeira compra acima da faixa mínima de R$ 1.000. Ver elegibilidade no fechamento.
 - **Fontes técnicas.** [Ficha comercial do Elgin](https://www.kabum.com.br/produto/1040358/ar-condicionado-12000-btus-split-hi-wall-inverter-elgin-frio-eco-iii-220v), [garantia Elgin](https://blog.elgin.com.br/ar-condicionado/nova-garantia-ar-condicionado-elgin/) e [catálogo Midea](https://www.leverosintegra.com.br/download/manuais/midea/catalogo-comercial-hw-inverter-ecomaster-ai-midea.pdf). Links de cada cotação no CSV.
+
+
+## Pesquisa de 27/11/2026 (Black Friday, foco em parcelamento longo)
+
+Coleta ao vivo para o CEP do 12.000 BTU (`fonte=web`, conferir valores e frete no carrinho antes de pagar):
+
+| Modelo | Loja / Vendedor | Pix / À vista | Melhor s/ juros | 21x c/ juros (WebContinental) |
+|---|---|---:|---|---|
+| Hisense Inverter R-32 Wi-Fi (`B0G4R4QZM5`) | Amazon, Refricril | **R$ 1.682,90** (frete grátis) | **12x R$ 155,88** (**R$ 1.869,90** frete grátis) | - |
+| Electrolux MaxComfort (`NI12F/NE12F`, `B0HLMF8PDX`) | Amazon, FRIGELAR | R$ 1.861,05 (frete grátis) | **12x R$ 163,25** (**R$ 1.959,00** frete grátis) | - |
+| TCL BreezeIN AI (`TAC-12CTG3-INV`, `B0H6XVD985`) | Amazon, ClimaRio | R$ 1.899,00 (frete grátis) | **12x R$ 166,68** (**R$ 1.998,95** frete grátis) | - |
+| Midea AirVolution Connect (`38TAVCB12M5/42EFVCB12M5`, `B0HJRQDJ82`) | Amazon, ClimaRio | R$ 1.999,00 (frete grátis) | **12x R$ 175,36** (**R$ 2.104,21** frete grátis) | - |
+| Midea AI AirVolution R-32 | Poloar (oficial) | R$ 2.018,99 (frete grátis) | **10x R$ 201,89** (**R$ 2.018,99** frete grátis) | - |
+| Agratto Kyn Top (`KNICST12F-02`) | WebContinental, Belmicro | R$ 1.988,86 c/ frete | 8x s/ juros (**R$ 1.988,86** c/ frete) | 21x R$ 110,34 + R$ 109,90 = R$ 2.427,04 |
+| Elgin Eco Inverter III (`HJFC12C2WGCG`, `B0H6Y153G3`) | Amazon, Refricril | R$ 2.050,60 c/ frete | 12x R$ 172,76 + R$ 185 = R$ 2.257,90 | - |
+| Midea AI Ecomaster (`42EZVCA12M5`) | Poloar (oficial) | R$ 2.345,99 (frete grátis) | **10x R$ 234,59** (**R$ 2.345,99** frete grátis) | R$ 3.074,34 (Belmicro) |
+| LG Dual Inverter Voice +AI (`S3-Q12JA31K`) | Poloar (oficial) | R$ 2.564,99 (frete grátis) | **10x R$ 256,49** (**R$ 2.564,99** frete grátis) | R$ 3.115,74 (`S3-Q12JA31E`, WebContinental) |
+
+- **Observações:** no Electrolux `B0HLMF8PDX`, a ficha mostra "Contagem de unidades: 1 Count" e peso 7,5 kg apesar de citar `NI12F/NE12F` e "Requer Unidade Externa Sim": confirmar com o suporte/descrição no fechamento que inclui as duas unidades. Cupom Amazon exibido: `BFSICREDI75` (R$ 75 off no cartão Sicredi Mastercard). Mercado Livre (18x sem juros no Cartão Mercado Pago) bloqueou leitura sem login; abas abertas no Chrome do Josemar.

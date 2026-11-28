@@ -126,7 +126,7 @@ produtos:
     origem: nacional
     tensao: 220
     btu: 12000
-    skus: ['42EZVCA12M5']
+    skus: ['42EZVCA12M5', '38EZVCA12M5', '42EZVCC12M5', '38EZVCC12M5']
     todos: ['midea', 'ecomaster', '(12\.?000|\b12k\b)']
     nenhum: ['quente', '\bq\s*[/&]\s*f\b']   # "Q/f" = quente/frio abreviado (achado no conjunto independente, fase 4)
 

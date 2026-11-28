@@ -24,6 +24,24 @@
 
 - [ ] Conferir vendedor, garantia e total final do robô na Amazon ou no Mercado Livre e validar os valores dos splits no carrinho antes da compra.
 
+## Sessão 27/11/2026 (meio-dia, Black Friday): pesquisa profunda e comparativo de parcelamento longo dos dois splits (12k e 18k)
+
+- **Contexto:** coleta ao vivo (Amazon com os CEPs privados configurados e simulação nas APIs públicas VTEX de WebContinental, FrioPeças e Poloar) para decisão de compra hoje (27/11) com foco em parcelamento estendido (10x a 21x). O Mercado Livre exigiu login humano (`"Olá! Para continuar, acesse sua conta"` mesmo fora do modo headless); as abas foram abertas diretamente no Chrome do Josemar para conferência do preço de hoje em 18x sem juros no Cartão Mercado Pago.
+- **12.000 BTU (220V Inverter Frio, entregue no CEP do 12.000 BTU, `fonte=web`):**
+  - **Hisense Inverter R-32 Wi-Fi (`B0G4R4QZM5`, Amazon/Refricril, 4,3★/24 av.):** **R$ 1.682,90 Pix** ou **12x de R$ 155,88 s/ juros (R$ 1.869,90)**, frete grátis (21 a 23/12).
+  - **Electrolux MaxComfort (`NI12F/NE12F`, Amazon `B0HLMF8PDX`/FRIGELAR):** **R$ 1.861,05 Pix** ou **12x de R$ 163,25 s/ juros (R$ 1.959,00)**, frete grátis (11 a 15/12; alerta: conferir na finalização se envia as duas unidades porque a ficha lista "1 Count" e 7,5 kg).
+  - **Midea AirVolution Connect (`38TAVCB12M5`/`42EFVCB12M5`, Amazon `B0HJRQDJ82`/ClimaRio):** **R$ 1.999,00 Pix** ou **12x de R$ 175,36 s/ juros (R$ 2.104,21)**, frete grátis (15 a 17/12; conjunto completo confirmado na ficha). Na **Poloar** (`poloar.com.br`): **10x de R$ 201,89 s/ juros = R$ 2.018,99 entregue** (frete grátis, 7 dias úteis).
+  - **Midea AI Ecomaster 12k (`42EZVCA12M5`) e LG Dual Inverter Voice +AI 12k (`S3-Q12JA31K`):** na **Poloar** com frete grátis em **10x s/ juros** por **R$ 2.345,99** e **R$ 2.564,99**, respectivamente (bem abaixo da Amazon parcelada).
+  - **Em 21x (WebContinental com juros):** Agratto Kyn Top 12k (`Belmicro`) sai a **21x de R$ 110,34 + R$ 109,90 frete = R$ 2.427,04** (ou **R$ 1.988,86 em 8x s/ juros**).
+- **18.000 BTU (220V Inverter Frio, entregue no CEP do 18.000 BTU, `fonte=web`):**
+  - **Agratto Liv Top Inverter 18k R-32 (`LCST18F-02I`, Amazon `B0CV946GDT`/ClimaRio, 4,7★/63 av., serpentina cobre):** **R$ 2.413,09 Pix** (R$ 2.274,09 + R$ 139 frete) ou **12x de R$ 208,25 s/ juros + R$ 139 frete = R$ 2.638,00 entregue** (15 a 17/12).
+  - **Philco Eco Inverter 18k (`PAC18FTW`):** na **WebContinental** (oficial) sai a R$ 2.579,00 + R$ 139,00 = **R$ 2.718,00 em até 8x s/ juros** (ou **21x de R$ 151,45 com juros + frete = R$ 3.319,45**); na **Amazon** (`B0HGC5B635` Go Compras / `B0HKPT8XSY` FrioPeças) sai a **R$ 2.551,79–2.552,83 Pix** ou **R$ 2.810,23–2.813,79 em 12x s/ juros** entregue.
+  - **Elgin Eco Inverter III 18k (`HJFC18C2WHCH`):** indisponível na Frigelar e WebContinental nesta rodada (conferir no Mercado Livre `MLB54457219` aberto no navegador).
+- **Cupom Amazon exibido nas páginas:** `BFSICREDI75` (R$ 75 off com cartão Sicredi Mastercard).
+- **Higiene:** removido arquivo vazio espúrio `=` da raiz; cotações adicionadas em modo append-only nos dois `cotacoes.csv` e `processo.md` atualizados sem expor CEPs.
+- **Pendências:**
+  - [ ] Josemar conferir as abas do Mercado Livre abertas no Chrome (18x sem juros Cartão Mercado Pago), escolher os vencedores de 12k e 18k e confirmar no checkout antes de `promover-cotacao` + `decidir --comprado`.
+
 ## Sessão 27/11/2026 (manhã, Black Friday): Xiaomi S40 Pro (Brasil) incluído no Radar e no rastreador diário
 
 - **Separação Paraguai x Brasil no catálogo ([`config/radar_catalogo.yaml`](config/radar_catalogo.yaml)):** mantido `xiaomi_s40_pro_py` (`moeda: USD`, exigindo termos do Paraguai/CDE ou `US$` junto ao SKU/modelo) e criado `xiaomi_s40_pro_br` (BRL, sem `skus` obrigatórios para evitar bloqueio por `sku_nao_confirmado` no piloto, e bloqueando anúncios multi-variação enganosos como `S40CS40S40 Pro 10.000Pa`).
